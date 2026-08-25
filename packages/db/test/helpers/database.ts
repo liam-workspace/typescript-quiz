@@ -1,6 +1,7 @@
 import { createPool, waitForDatabase } from "@liam-public/node-postgres"
 import type pg from "pg"
 import { inject } from "vitest"
+import { migrateToLatest } from "../../src/migrate.js"
 
 export interface DatabaseHandle {
   pool: pg.Pool
@@ -27,8 +28,7 @@ export async function withDatabase(
     await pool.query(
       "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;",
     )
-    // The migrateToLatest step arrives in Task 3; until then the harness only
-    // proves connectivity.
+    await migrateToLatest(databaseUrl)
     await fn(pool, { pool, databaseUrl })
   } finally {
     await pool.end()

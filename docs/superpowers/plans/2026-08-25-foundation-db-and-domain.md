@@ -6,9 +6,10 @@
 
 **Architecture:** A pnpm workspace gains two new packages. `@pp/common` holds domain types and the Zod validators for the import/export document; it has no runtime dependencies beyond `zod`. `@pp/db` holds `node-pg-migrate` migrations transcribed from the reviewed `docs/db/schema.sql`, plus repositories that own every SQL statement — no SQL leaves this package. Tests run against a throwaway PostgreSQL 16 via testcontainers, so constraint tests exercise real triggers and real composite foreign keys rather than mocks.
 
-**Tech Stack:** Node 24, pnpm 10.16, TypeScript 6, PostgreSQL 16, `@liam-public/node-postgres` (pooling, transactions, `runMigrations`), `node-pg-migrate`, Zod 4, Vitest 4, `@testcontainers/postgresql`, oxlint, prettier.
+**Tech Stack:** Node 24, pnpm 10.16, TypeScript 6, PostgreSQL 16, `@liam-public/shared-core` (umbrella over `node-postgres`: pooling, transactions, `runMigrations`, pino logging, undici HTTP, in-memory event bus), `@liam-workspace/platform` (`Clock`, `Result`, domain errors), `@liam-public/node-config`, `node-pg-migrate`, Zod 4, Vitest 4, `@testcontainers/postgresql`, oxlint, prettier.
 
 **Spec:** `docs/superpowers/specs/2026-08-25-toefl-primary-fork-design.md`
+**Library adoption map:** `docs/architecture/library-adoption.md` — a verdict on all 47 packages in `~/projects/typescript-libraries`. Consult it before adding any dependency; six are declined on grounds that adopting them would make this design worse.
 
 ## Global Constraints
 
@@ -20,6 +21,9 @@
 - **A published `test_version` is immutable**, and **nothing may cross a version boundary** (spec §3). Every table carries `test_version_id` and every parent link is a composite FK including it.
 - `failed_write.raw_body` is **`text`, never `jsonb`**, and the table has **no foreign keys**. Its job is holding bodies that failed to parse.
 - Ordering is **`(client_instance_id, client_seq)`**, never `answered_at`. `answered_at` is display text with no authority.
+- **Reach for `~/projects/typescript-libraries` before writing infrastructure.** If a utility exists there, use it; if you decline one, record the reason in `docs/architecture/library-adoption.md`. Hand-rolling a pool, a logger, an env parser or a clock is a plan violation.
+- **`@liam-public/*` resolves from npmjs.org; `@liam-workspace/*` from npm.pkg.github.com** and needs `GITHUB_TOKEN`. Both scopes must be in `.npmrc` before install resolves (Task 1).
+- **Never call `new Date()` or `Date.now()` in service code.** Take a `Clock` from `@liam-workspace/platform`. Expiry is the core of this app and `createFixedClock` is what makes it testable without sleeping.
 - Commit after every task with a `feat:` / `test:` / `chore:` message.
 - `pnpm lint` and `pnpm format` must pass before each commit.
 
@@ -40,7 +44,10 @@
 | `packages/db/migrations/1001_content.cjs` | test → choice, `section_instruction`, `question_tag` |
 | `packages/db/migrations/1002_attempts.cjs` | attempt, sections, responses, cursor, plays |
 | `packages/db/migrations/1003_durability_and_triggers.cjs` | `failed_write`, immutability triggers, `publication_violation` |
-| `packages/db/src/pool.ts` | `createRequestPool` / `createJobPool` with named `applicationName` |
+| `.npmrc` | both registries; `GITHUB_TOKEN` for the `@liam-workspace` scope |
+| `packages/db/src/pool.ts` | `createRequestPool` / `createJobPool` over `shared-core`, with named `applicationName` |
+| `packages/db/src/config.ts` | `loadDbConfig()` over `@liam-public/node-config` |
+| `packages/common/src/domain/clock.ts` | re-exports `Clock` / `systemClock` / `createFixedClock` so no package imports `platform` twice |
 | `packages/db/src/migrate.ts` | `migrateToLatest(databaseUrl)` |
 | `packages/db/src/repositories/test-version.repository.ts` | `loadForRunner` / `loadForScoring` — the two deliberately separate projections |
 | `packages/db/src/repositories/test-import.repository.ts` | import a `TestDocument`, export one back |
@@ -74,6 +81,7 @@
   "type": "module",
   "exports": { ".": "./src/index.ts" },
   "dependencies": {
+    "@liam-workspace/platform": "^0.1.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -96,7 +104,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@liam-public/node-postgres": "workspace:*",
+    "@liam-public/node-config": "^0.2.0",
+    "@liam-public/shared-core": "^0.2.1",
+    "@liam-workspace/platform": "^0.1.0",
     "@pp/common": "workspace:*",
     "node-pg-migrate": "^7.9.0",
     "pg": "^8.13.0"
@@ -111,10 +121,14 @@
 }
 ```
 
-> `@liam-public/node-postgres` is published from `~/projects/typescript-libraries`.
-> If it is not on the registry yet, add it as a `file:` dependency pointing at
-> `../../../typescript-libraries/packages/public/server/node-postgres` and note
-> that in the commit message.
+> `shared-core` re-exports `createPool`, `withTransaction`, `runMigrations`,
+> `waitForDatabase` from `node-postgres`, so `node-postgres` is NOT listed
+> separately — one dependency, not two, and no chance of the two resolving to
+> different versions.
+>
+> If a `@liam-*` package is not yet published, add it as a `file:` dependency
+> pointing into `~/projects/typescript-libraries/packages/...` and say so in the
+> commit message. Do not vendor a copy.
 
 `packages/db/tsconfig.json`:
 
@@ -167,20 +181,42 @@ Add to root `package.json` scripts:
 "test:db": "pnpm --filter @pp/db test"
 ```
 
-- [ ] **Step 5: Install and verify the workspace resolves**
+- [ ] **Step 5: Configure both registries**
+
+`@liam-workspace/*` lives on GitHub Packages and will 404 without a token.
+Create `.npmrc` at the repo root:
+
+```
+@liam-public:registry=https://registry.npmjs.org/
+@liam-workspace:registry=https://npm.pkg.github.com/
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+```
+
+Add `.npmrc` to `.gitignore` only if you inline a literal token; the
+`${GITHUB_TOKEN}` form above is safe to commit. Export the token first:
+
+```bash
+export GITHUB_TOKEN=<a classic PAT with read:packages>
+```
+
+- [ ] **Step 6: Install and verify the workspace resolves**
 
 ```bash
 pnpm install
 pnpm -r exec tsc --noEmit
+node -e "import('@liam-public/shared-core').then(m => console.log(Object.keys(m).sort().join(' ')))"
 ```
 
-Expected: install succeeds, no type errors.
+Expected: install succeeds, no type errors, and the last command prints a list
+including `createPool`, `runMigrations`, `withTransaction`, `waitForDatabase`,
+`createLogger`. If it does not, the umbrella assumption is wrong — stop and
+depend on `@liam-public/node-postgres` directly rather than working around it.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add package.json tsconfig.json vitest.workspace.ts packages/common/package.json packages/db pnpm-lock.yaml
-git commit -m "chore: scaffold @pp/db and rename @razzia/common to @pp/common"
+git add .npmrc package.json tsconfig.json vitest.workspace.ts packages/common/package.json packages/db pnpm-lock.yaml
+git commit -m "chore: scaffold @pp/db on shared-core, rename @razzia/common to @pp/common"
 ```
 
 ---
@@ -223,8 +259,9 @@ Expected: FAIL — cannot resolve `./helpers/database.js`.
 `packages/db/test/helpers/database.ts`:
 
 ```ts
+import { createPool, waitForDatabase } from "@liam-public/shared-core"
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql"
-import pg from "pg"
+import type pg from "pg"
 
 export interface DatabaseHandle {
   pool: pg.Pool
@@ -243,7 +280,10 @@ export async function withDatabase(
 ): Promise<void> {
   container ??= await new PostgreSqlContainer("postgres:16-alpine").start()
   const databaseUrl = container.getConnectionUri()
-  const pool = new pg.Pool({ connectionString: databaseUrl })
+  // The same readiness poll the API uses at boot, so the test path and the
+  // production path agree about what "the database is up" means.
+  await waitForDatabase(databaseUrl, { retries: 20, delayMs: 250 })
+  const pool = createPool(databaseUrl, { applicationName: "pp:test" })
 
   try {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;")
@@ -418,7 +458,7 @@ exports.down = (pgm) => {
 `packages/db/src/migrate.ts`:
 
 ```ts
-import { runMigrations } from "@liam-public/node-postgres"
+import { runMigrations } from "@liam-public/shared-core"
 import { fileURLToPath } from "node:url"
 import { dirname, resolve } from "node:path"
 
@@ -1211,6 +1251,12 @@ Expected: FAIL — cannot resolve `test-document.js`.
 
 - [ ] **Step 3: Write the branded ids**
 
+`@liam-workspace/platform` also ships an `EntityId` class. It is deliberately
+NOT used: ids come from `gen_random_uuid()` and cross the wire as strings, so
+wrapping them in a class would mean mapping on every read and write for safety
+branded string types already provide. The rest of `platform` — `Clock`,
+`Result`, the three domain errors — is adopted in Task 11.
+
 `packages/common/src/domain/ids.ts`:
 
 ```ts
@@ -1629,7 +1675,7 @@ Expected: FAIL — cannot resolve `test-import.repository.js`.
 `packages/db/src/repositories/test-import.repository.ts`:
 
 ```ts
-import { withTransaction } from "@liam-public/node-postgres"
+import { withTransaction } from "@liam-public/shared-core"
 import type { TestDocument } from "@pp/common"
 import type pg from "pg"
 
@@ -2171,14 +2217,230 @@ git commit -m "feat(db): separate runner and scoring projections"
 
 ---
 
+### Task 11: Pools, config and the Clock seam
+
+Placed last because nothing earlier in this plan consumes it — plan 2 does.
+Building it here means plan 2 starts with its connection policy already decided
+and tested, rather than inventing one under time pressure.
+
+**Files:**
+- Create: `packages/db/src/pool.ts`, `packages/db/src/config.ts`
+- Create: `packages/common/src/domain/clock.ts`
+- Create: `packages/db/test/pool.test.ts`
+- Modify: `packages/db/src/index.ts`, `packages/common/src/index.ts`
+
+**Interfaces:**
+- Produces:
+  - `loadDbConfig(env?: Environment): DbConfig` where
+    `DbConfig = { databaseUrl: string; requestTimeoutMs: number; jobTimeoutMs: number; poolMax: number }`
+  - `createRequestPool(cfg: DbConfig): pg.Pool` — fail-fast timeouts, `applicationName: 'pp:api'`
+  - `createJobPool(cfg: DbConfig): pg.Pool` — long statements, `applicationName: 'pp:jobs'`
+  - `Clock`, `systemClock`, `createFixedClock` re-exported from `@pp/common`
+
+- [ ] **Step 1: Write the failing test**
+
+`packages/db/test/pool.test.ts`:
+
+```ts
+import { describe, expect, it } from "vitest"
+import { createFixedClock, systemClock } from "@pp/common"
+import { loadDbConfig } from "../src/config.js"
+import { createJobPool, createRequestPool } from "../src/pool.js"
+import { withDatabase } from "./helpers/database.js"
+
+describe("config", () => {
+  it("reads bounded defaults and honours overrides", () => {
+    const base = loadDbConfig({ DATABASE_URL: "postgres://x/y" })
+    expect(base.requestTimeoutMs).toBe(5_000)
+    expect(base.jobTimeoutMs).toBe(300_000)
+
+    const tuned = loadDbConfig({
+      DATABASE_URL: "postgres://x/y",
+      DB_REQUEST_TIMEOUT_MS: "1200",
+      DB_POOL_MAX: "4",
+    })
+    expect(tuned.requestTimeoutMs).toBe(1_200)
+    expect(tuned.poolMax).toBe(4)
+  })
+
+  it("refuses to start without a DATABASE_URL", () => {
+    expect(() => loadDbConfig({})).toThrow(/DATABASE_URL/)
+  })
+})
+
+describe("pools", () => {
+  it("names itself in pg_stat_activity so an incident can attribute connections", async () => {
+    await withDatabase(async (_pool, handle) => {
+      const cfg = loadDbConfig({ DATABASE_URL: handle.databaseUrl })
+      for (const [make, expected] of [
+        [createRequestPool, "pp:api"],
+        [createJobPool, "pp:jobs"],
+      ] as const) {
+        const p = make(cfg)
+        const { rows } = await p.query<{ application_name: string }>(
+          "SELECT current_setting('application_name') AS application_name",
+        )
+        expect(rows[0].application_name).toBe(expected)
+        await p.end()
+      }
+    })
+  }, 120_000)
+})
+
+describe("clock", () => {
+  it("createFixedClock lets an expiry test assert instead of sleep", () => {
+    const at = new Date("2026-08-25T08:52:40Z")
+    expect(createFixedClock(at).now().toISOString()).toBe("2026-08-25T08:52:40.000Z")
+    expect(systemClock.now().getTime()).toBeGreaterThan(0)
+  })
+})
+```
+
+- [ ] **Step 2: Run it to verify it fails**
+
+Run: `pnpm --filter @pp/db test pool`
+Expected: FAIL — cannot resolve `../src/config.js`.
+
+- [ ] **Step 3: Implement the config loader**
+
+`packages/db/src/config.ts`:
+
+```ts
+import { nodeEnvironment, parseIntegerEnv, type Environment } from "@liam-public/node-config"
+
+export interface DbConfig {
+  databaseUrl: string
+  requestTimeoutMs: number
+  jobTimeoutMs: number
+  poolMax: number
+}
+
+export function loadDbConfig(env: Environment = nodeEnvironment()): DbConfig {
+  const databaseUrl = env.DATABASE_URL
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL is required")
+  }
+  return {
+    databaseUrl,
+    requestTimeoutMs: parseIntegerEnv(env, "DB_REQUEST_TIMEOUT_MS", 5_000),
+    jobTimeoutMs: parseIntegerEnv(env, "DB_JOB_TIMEOUT_MS", 300_000),
+    poolMax: parseIntegerEnv(env, "DB_POOL_MAX", 10),
+  }
+}
+```
+
+- [ ] **Step 4: Implement the two pools**
+
+`packages/db/src/pool.ts`:
+
+```ts
+import { createPool } from "@liam-public/shared-core"
+import type pg from "pg"
+import type { DbConfig } from "./config.js"
+
+/**
+ * Request path. Fails fast, so a hung database rejects rather than hangs and
+ * takes every request with it. keepAlive detects a blackholed socket that no
+ * query deadline can observe.
+ */
+export function createRequestPool(cfg: DbConfig): pg.Pool {
+  return createPool(cfg.databaseUrl, {
+    connectionTimeoutMillis: 2_000,
+    statementTimeoutMillis: cfg.requestTimeoutMs,
+    queryTimeoutMillis: cfg.requestTimeoutMs,
+    max: cfg.poolMax,
+    keepAlive: true,
+    applicationName: "pp:api",
+  })
+}
+
+/**
+ * Import, seed and rescore. Long statements are expected and correct here, so
+ * this pool must NOT share the request path's deadlines — a 40-question import
+ * would be cancelled part-way by a 5s statement_timeout.
+ */
+export function createJobPool(cfg: DbConfig): pg.Pool {
+  return createPool(cfg.databaseUrl, {
+    connectionTimeoutMillis: 5_000,
+    statementTimeoutMillis: cfg.jobTimeoutMs,
+    max: 2,
+    applicationName: "pp:jobs",
+  })
+}
+```
+
+- [ ] **Step 5: Add the Clock seam**
+
+`packages/common/src/domain/clock.ts`:
+
+```ts
+/**
+ * Re-exported so no other package imports @liam-workspace/platform for a clock.
+ * Service code takes a Clock; nothing calls new Date() or Date.now() directly.
+ * Every deadline in this app is server-authoritative, and createFixedClock is
+ * what turns an expiry test into an assertion rather than a 50-minute sleep.
+ */
+export { type Clock, systemClock, createFixedClock } from "@liam-workspace/platform"
+export { type Result, ok, err } from "@liam-workspace/platform"
+export { NotFoundError, ValidationError, ConflictError } from "@liam-workspace/platform"
+```
+
+Append to `packages/common/src/index.ts`:
+
+```ts
+export * from "./domain/clock.js"
+```
+
+- [ ] **Step 6: Export from the db surface**
+
+Append to `packages/db/src/index.ts`:
+
+```ts
+export { loadDbConfig, type DbConfig } from "./config.js"
+export { createRequestPool, createJobPool } from "./pool.js"
+```
+
+- [ ] **Step 7: Run tests to verify they pass**
+
+Run: `pnpm --filter @pp/db test pool`
+Expected: PASS — all four.
+
+- [ ] **Step 8: Add the lint gates**
+
+```bash
+pnpm add -Dw @liam-public/node-frontend-lint @liam-public/node-i18n-lint
+```
+
+Add to root `package.json` scripts (they have nothing to audit until plan 5,
+but wiring them now means the frontend is never written without them):
+
+```json
+"lint:frontend": "node-frontend-lint packages/app/src || true",
+"lint:i18n": "node-i18n-lint packages/app/src || true"
+```
+
+Drop the `|| true` in plan 5, when `packages/app` exists and the audits are
+expected to pass.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add packages/db packages/common package.json pnpm-lock.yaml
+git commit -m "feat(db): two-pool connection policy, env config, and the Clock seam"
+```
+
+---
+
 ## Definition of done
 
-- [ ] `pnpm test` green: harness, migrations, content constraints, attempt constraints, durability, enum parity, interchange schema, import/export, projections.
+- [ ] `pnpm test` green: harness, migrations, content constraints, attempt constraints, durability, enum parity, interchange schema, import/export, projections, pools/config/clock.
 - [ ] `pnpm lint` and `pnpm format` clean.
 - [ ] `docker compose up -d postgres` brings up a database the migrations run against.
 - [ ] Every invariant in `docs/db/invariants.test.sql` has an equivalent vitest test.
 - [ ] No SQL outside `packages/db/src/`.
 - [ ] No new code under `@razzia/*`.
+- [ ] No hand-rolled pool, logger, env parser or clock — each comes from `~/projects/typescript-libraries`. Any decline is recorded in `docs/architecture/library-adoption.md`.
+- [ ] No `new Date()` or `Date.now()` outside `systemClock`. Check with `grep -rn "new Date()\|Date.now()" packages/*/src` — expect no hits.
 
 ## What this plan deliberately does not do
 
@@ -2200,10 +2462,10 @@ the workspace waiting.
 
 | Plan | Covers | Depends on |
 |---|---|---|
-| 2 — API skeleton and auth | `packages/server`, JWKS verification, session, catalog, attempt start, admin import/publish/media | this plan's repositories |
+| 2 — API skeleton and auth | `packages/server` on **NestJS**, JWKS verification via `node-auth-server`, `AllExceptionsFilter` + `ObservabilityModule`, the `FailedWriteCaptureFilter` **in the same commit as the ValidationPipe**, session, catalog, attempt start, admin import/publish/media | this plan's repositories |
 | 3 — Runner read path | runner payload, section entry, play + signed URLs, position; delete `socket` | plan 2 |
 | 4 — Durable write path | queue, snapshot flush, reorder guard, `failed_write` capture, retry classification, submit and grading | plan 3 |
-| 5 — App | harvest `packages/web` into `packages/app`, screens, navigator, menu, i18n, Docker | plan 4 |
+| 5 — App | `packages/app` on `browser-react-ui` (not a component harvest), `auth-client` + `browser-react-auth` + `auth-fetch`, passkey enrolment via `browser-webauthn`, `vite-preset-pwa` offline shell, `browser-telemetry` traceparent, `i18n` + `text`, screens, navigator, menu, Docker | plan 4 |
 
 Plans 2–5 are written as each predecessor lands. Writing them now would mean
 inventing signatures for repositories that do not exist yet, and this plan's

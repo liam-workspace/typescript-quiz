@@ -26,6 +26,7 @@ machine-checked; where they disagree with this document, they win.
 | `docs/db/schema.sql` | the database design — executed against PostgreSQL 16 |
 | `docs/db/invariants.test.sql` | proves each constraint rejects what it claims |
 | `docs/diagrams/er.*` | 17-entity relational model, generated from the schema |
+| `docs/architecture/library-adoption.md` | a verdict on all 47 packages in `~/projects/typescript-libraries` |
 
 ## 1. Scope
 
@@ -35,7 +36,10 @@ A student signs in with Google, picks a published test, sits it under exam
 conditions, hands it in, sees a score, and reviews their answers. Tests reach
 the database by JSON import; there is no authoring UI.
 
-1. Google sign-in via `auth.icovn.me`; a student profile IS the account
+1. Google sign-in via `auth.icovn.me`; a student profile IS the account.
+   After first sign-in the device enrols a **passkey**, so a returning student
+   authenticates with Face ID rather than a full OIDC tab redirect — which also
+   removes the redirect from the middle of a running attempt
 2. Test library with per-test standing and re-attempt
 3. Test brief and per-section rules screens
 4. Listening: audio plays once, no pause or seek, forward-only navigation
@@ -77,31 +81,62 @@ per-section history, live multiplayer, SCORM, LTI, Redis, cloud object storage.
 ```
 packages/
 ├── common/   domain types + Zod validators for the JSON interchange format
-├── db/       migrations + repositories  (@liam-public/node-postgres)
-├── server/   REST API + JWKS verification (@liam-workspace/node-auth-server)
+├── db/       migrations + repositories  (@liam-public/shared-core)
+├── server/   NestJS REST API + JWKS verification and passkey ceremony
 └── app/      Vite + React 19 SPA
 ```
 
-The existing `packages/web` is **harvested, not migrated**: `vite.config.ts`,
-the tsconfigs, the TanStack router plugin, `i18n.ts` and all seven locale
-trees, `components/*`, `hooks/*`, `branding.ts` and the Tailwind v4 setup are
-copied verbatim into `packages/app`. That retires most of the cost of starting
-a new app while leaving `features/game/**`, the Zustand game stores, the socket
-context, `PinInput`, `qrcode.react`, `react-confetti` and `use-sound` behind.
-`packages/socket` and `packages/web` are deleted once `app` runs.
+`packages/app` takes its **components from `@liam-public/browser-react-ui`**,
+not from Razzia. Both are Tailwind v4 + Radix, so the kit is the same stack
+already tested and maintained elsewhere — and its `sheet` primitive is exactly
+the collapsible drawer the prototype draws by hand. Copying Razzia's
+`components/*` would fork a component library to avoid depending on one.
+
+What is still worth harvesting from `packages/web` is the parts the kit does
+not cover: `vite.config.ts`, the tsconfigs, the TanStack router plugin,
+`i18n.ts` with all seven locale trees, `QuestionMedia.tsx` and `branding.ts`.
+Left behind: `features/game/**`, the Zustand game stores, the socket context,
+`PinInput`, `qrcode.react`, `react-confetti`, `use-sound`.
+
+`packages/socket` and `packages/web` are deleted in plan 3, once `app` can
+replace them — not in phase 0, so the repository never spends two plans with
+no runnable application.
 
 ### Libraries already solving this
 
+All 47 packages in `~/projects/typescript-libraries` were surveyed;
+**28 are adopted**, 3 wait for the admin spec, 6 are declined with reasons, and
+12 share no subject matter. The verdicts are in
+`docs/architecture/library-adoption.md` — consult it before adding any
+dependency.
+
 | Concern | Package |
 |---|---|
+| Pooling, transactions, migrations, logging, HTTP, crypto, event bus | `@liam-public/shared-core` (umbrella over `node-postgres`) |
+| `Clock`, `Result`, domain errors | `@liam-workspace/platform` |
+| Environment parsing | `@liam-public/node-config` |
 | Browser OIDC + PKCE | `@liam-workspace/auth-client` |
 | React session binding | `@liam-public/browser-react-auth` |
-| Server token verification | `@liam-workspace/node-auth-server` |
-| Pooling, transactions, migrations | `@liam-public/node-postgres` |
+| Bearer + transparent refresh on 401 | `@liam-public/auth-fetch` |
+| Server token verification, passkey ceremony | `@liam-workspace/node-auth-server` |
+| Passkeys | `@liam-public/node-webauthn`, `@liam-public/browser-webauthn` |
+| NestJS filters, interceptors, observability | `@liam-public/node-nest-common`, `@liam-public/node-nest-observability` |
+| Tailwind v4 + Radix component kit | `@liam-public/browser-react-ui` |
+| Offline app-shell and API caching | `@liam-public/vite-preset-pwa` |
+| Browser → backend `traceparent`, Web Vitals | `@liam-public/browser-telemetry` |
+| Error boundary, error reporting, browser logging | `browser-react-error-boundary`, `browser-error-reporter`, `browser-logger` |
+| Locale text and formatting | `@liam-public/i18n`, `@liam-public/text` |
+| Frontend and i18n lint gates | `node-frontend-lint`, `node-i18n-lint` |
 
 There are no `users`, `sessions` or `password` tables to build. Identity is a
 verified JWT `sub`; admin is a role claim, which is why revoking admin at the
 identity provider takes effect immediately.
+
+Two libraries changed decisions rather than merely implementing them.
+**`auth-fetch`** transparently refreshes a bearer token on 401, which is the
+mid-attempt expiry risk §7 could previously only flag. **`platform`'s `Clock`**
+makes server-authoritative expiry testable by substitution instead of by
+sleeping — without it, the lazy-expiry rules are asserted but never exercised.
 
 ### Deployment
 
@@ -109,7 +144,7 @@ Two compose services — `api` (serves the built SPA, the REST API and `/media`)
 and `postgres` — with a named volume each. `waitForDatabase` gates API boot so
 ordering is not a compose race, and `runMigrations` runs at startup with a
 scoped `migrationsTable`. Two pools: request-path (5s timeouts,
-`applicationName: 'toefl:api'`) and a longer-timeout pool for import and seed.
+`applicationName: 'pp:api'`) and a longer-timeout pool (`pp:jobs`) for import, seed and rescore — a 40-question import would be cancelled part-way by the request path's 5s statement timeout.
 
 ## 3. Domain
 
@@ -266,7 +301,8 @@ apply would leave real belief in protection that is not there.
 
 | Risk | Mitigation |
 |---|---|
-| PKCE redirects the whole tab; token expiry mid-attempt would bounce a child out of a running test | `browser-react-auth` refreshes silently; the attempt is server-authoritative on time and answers are durable locally, so a redirect cannot lose work |
+| PKCE redirects the whole tab; token expiry mid-attempt would bounce a child out of a running test | `auth-fetch` refreshes transparently on 401; a passkey re-auth needs no redirect at all; and answers are durable locally, so even a redirect cannot lose work |
+| **NestJS's global `ValidationPipe` throws before any controller runs** — the exact mechanism by which awesome-survey lost answers with no trace | `FailedWriteCaptureFilter` is registered in the same commit as the pipe, falling back to `req.rawBody` when the parsed body is empty. Non-negotiable ordering, called out in plan 2 |
 | Two sources of truth — Zod validators for the interchange format, SQL for storage | The enum-parity test above; import/export round-trip tests |
 | Assembling a runner payload is a six-join read | One well-tested `TestVersionRepository.load()`; that shape must not leak upward |
 | A published test cites a deleted asset | `ON DELETE RESTRICT` on `stimulus.media_asset_id` |
@@ -277,7 +313,7 @@ apply would leave real belief in protection that is not there.
 
 | Phase | Deliverable |
 |---|---|
-| 0 | Scaffold `packages/{common,db,server,app}`; harvest config, components, i18n; delete `socket` and `web`; compose with Postgres; vitest + testcontainers |
+| 0 | Scaffold `packages/{common,db}` on `shared-core` + `platform`; two registries in `.npmrc`; compose with Postgres; vitest + testcontainers. (`server` and `app` are scaffolded by the plans that first put code in them; `socket` and `web` are deleted in plan 3, so the repo stays runnable throughout) |
 | 1 | Migrations from `schema.sql`; repositories; constraint tests green |
 | 2 | Session, catalog and attempt-start endpoints; import/export/publish; seed a real test |
 | 3 | Runner payload, section entry, play, position; the listening and reading screens |

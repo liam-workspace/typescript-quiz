@@ -1,16 +1,22 @@
 {
-  "name": "@pp/common",
+  "name": "@pp/db",
   "type": "module",
   "exports": { ".": "./src/index.ts" },
   "scripts": {
     "test": "vitest run"
   },
   "dependencies": {
+    "@liam-public/node-config": "file:/Users/liam/projects/typescript-libraries/packages/public/server/node-config",
+    "@liam-public/shared-core": "^0.2.1",
     "@liam-workspace/platform": "file:/Users/liam/projects/typescript-libraries/packages/private/universal/platform",
-    "zod": "^4.4.3"
+    "@pp/common": "workspace:*",
+    "node-pg-migrate": "^7.9.0",
+    "pg": "^8.13.0"
   },
   "devDependencies": {
+    "@testcontainers/postgresql": "^11.0.0",
     "@types/node": "^26.0.1",
+    "@types/pg": "^8.11.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.0"
   }

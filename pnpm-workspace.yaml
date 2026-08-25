@@ -2,9 +2,12 @@ packages:
   - "packages/*"
 
 allowBuilds:
+  cpu-features: true
   esbuild: true
   oxlint: true
   oxlint-tsgolint: true
+  protobufjs: true
+  ssh2: true
 
 minimumReleaseAge: 10080
 blockExoticSubdeps: true

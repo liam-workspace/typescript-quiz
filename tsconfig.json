@@ -4,9 +4,10 @@
     "noErrorTruncation": true,
     "esModuleInterop": true,
     "paths": {
-      "@razzia/common/*": ["./packages/common/src/*"],
-      "@razzia/socket/*": ["./packages/socket/src/*"],
-      "@razzia/web/*": ["./packages/web/src/*"]
+      "@pp/common": ["./packages/common/src/index.ts"],
+      "@pp/common/*": ["./packages/common/src/*"],
+      "@pp/db": ["./packages/db/src/index.ts"],
+      "@pp/db/*": ["./packages/db/src/*"]
     },
     "strict": true,
     "strictNullChecks": true

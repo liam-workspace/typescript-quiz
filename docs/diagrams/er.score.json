@@ -1,0 +1,75 @@
+{
+  "type": "er",
+  "score_pct": 100.0,
+  "hard_fail": [],
+  "node_count": 15,
+  "well_formed": [
+    {
+      "rule": "er_has_attributes",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "rule": "er_has_key",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "rule": "er_cardinality",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "rule": "no_orphans",
+      "pass": true,
+      "detail": []
+    }
+  ],
+  "faithfulness_pct": 100.0,
+  "readability": [
+    {
+      "check": "complexity_within_cap",
+      "pass": true,
+      "detail": "15/25"
+    },
+    {
+      "check": "connector_crossings",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "check": "connector_overlaps",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "check": "label_collisions",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "check": "legend_connector_crossings",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "check": "legend_overlaps",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "check": "legend_pitch_ok",
+      "pass": true,
+      "detail": null
+    }
+  ],
+  "geometry": {
+    "connector_crossings": [],
+    "connector_overlaps": [],
+    "label_collisions": [],
+    "legend_overlaps": [],
+    "legend_connector_crossings": [],
+    "legend_min_pitch_px": null,
+    "legend_pitch_ok": true
+  }
+}

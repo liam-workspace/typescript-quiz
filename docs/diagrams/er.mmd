@@ -1,0 +1,131 @@
+erDiagram
+  STUDENT {
+    uuid id PK
+    text subject_claim UK
+    text email
+    text display_name
+    text level
+  }
+  TEST {
+    uuid id PK
+    text slug UK
+    text title
+    text status
+    uuid current_version_id FK
+  }
+  TEST_VERSION {
+    uuid id PK
+    uuid test_id FK
+    int version
+    int duration_seconds
+    timestamptz published_at
+  }
+  TEST_SECTION {
+    uuid id PK
+    uuid test_version_id FK
+    int ordinal
+    text title
+    section_type type
+    int duration_seconds
+    nav_mode navigation
+    boolean allow_answer_change
+  }
+  STIMULUS {
+    uuid id PK
+    uuid test_version_id FK
+    uuid media_asset_id FK
+    stimulus_type type
+    text title
+    text body_text
+    int max_plays
+    boolean allow_pause
+    boolean allow_seek
+  }
+  QUESTION_GROUP {
+    uuid id PK
+    uuid test_section_id FK
+    uuid stimulus_id FK
+    int ordinal
+  }
+  QUESTION {
+    uuid id PK
+    uuid test_version_id FK
+    uuid question_group_id FK
+    text question_key
+    int ordinal
+    text prompt
+    question_type type
+    int points
+  }
+  CHOICE {
+    uuid id PK
+    uuid question_id FK
+    int ordinal
+    text label
+    boolean is_correct
+  }
+  QUESTION_TAG {
+    uuid question_id PK
+    text tag PK
+  }
+  MEDIA_ASSET {
+    uuid id PK
+    text kind
+    text filename
+    text mime_type
+    bigint byte_size
+    text checksum
+  }
+  ATTEMPT {
+    uuid id PK
+    uuid student_id FK
+    uuid test_version_id FK
+    attempt_status status
+    timestamptz started_at
+    timestamptz expires_at
+    timestamptz submitted_at
+    uuid current_question_id FK
+  }
+  ATTEMPT_SECTION {
+    uuid attempt_id PK
+    uuid test_section_id PK
+    timestamptz entered_at
+    timestamptz expires_at
+    timestamptz completed_at
+  }
+  RESPONSE {
+    uuid attempt_id PK
+    uuid question_id PK
+    uuid test_version_id FK
+    timestamptz answered_at
+    int time_spent_ms
+  }
+  RESPONSE_CHOICE {
+    uuid attempt_id PK
+    uuid question_id PK
+    uuid choice_id PK
+  }
+  STIMULUS_PLAY {
+    uuid attempt_id PK
+    uuid stimulus_id PK
+    int play_count
+  }
+  STUDENT ||--o{ ATTEMPT : takes
+  TEST ||--o{ TEST_VERSION : "has version"
+  TEST_VERSION ||--o{ TEST_SECTION : contains
+  TEST_VERSION ||--o{ STIMULUS : owns
+  TEST_SECTION ||--o{ QUESTION_GROUP : contains
+  STIMULUS ||--o{ QUESTION_GROUP : introduces
+  QUESTION_GROUP ||--o{ QUESTION : contains
+  QUESTION ||--o{ CHOICE : offers
+  QUESTION ||--o{ QUESTION_TAG : "tagged with"
+  MEDIA_ASSET ||--o{ STIMULUS : "played by"
+  TEST_VERSION ||--o{ ATTEMPT : "pinned by"
+  ATTEMPT ||--o{ ATTEMPT_SECTION : times
+  TEST_SECTION ||--o{ ATTEMPT_SECTION : "timed in"
+  ATTEMPT ||--o{ RESPONSE : records
+  QUESTION ||--o{ RESPONSE : "answered by"
+  RESPONSE ||--o{ RESPONSE_CHOICE : selects
+  CHOICE ||--o{ RESPONSE_CHOICE : "selected as"
+  ATTEMPT ||--o{ STIMULUS_PLAY : counts
+  STIMULUS ||--o{ STIMULUS_PLAY : "counted in"

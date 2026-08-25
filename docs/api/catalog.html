@@ -1,0 +1,429 @@
+<title>Primary Practice API Catalog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  --bg:#EEF1F5; --panel:#FFFFFF; --panel-2:#F7F9FB; --line:#D6DDE6; --line-soft:#E4EAF1;
+  --fg:#17202A; --fg-muted:#5C6B7A; --fg-faint:#8695A5;
+  --accent:#0F6E78; --accent-bg:#E2F0F1;
+  --get:#2A6DB0; --post:#2E8B57; --put:#B07A16; --patch:#8A5CB8;
+  --warn:#A8622F; --warn-bg:#F8EDE4;
+  --shadow:0 1px 2px rgba(23,32,42,.05), 0 6px 20px rgba(23,32,42,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:#0E1319; --panel:#161C24; --panel-2:#1B222B; --line:#252E39; --line-soft:#1F2732;
+    --fg:#CBD5E1; --fg-muted:#8A97A6; --fg-faint:#6B7885;
+    --accent:#3FB3BF; --accent-bg:#133038;
+    --get:#6BA6E0; --post:#62BE8C; --put:#D8AC57; --patch:#B392D8;
+    --warn:#D89A63; --warn-bg:#2A1E14;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"] {
+  --bg:#0E1319; --panel:#161C24; --panel-2:#1B222B; --line:#252E39; --line-soft:#1F2732;
+  --fg:#CBD5E1; --fg-muted:#8A97A6; --fg-faint:#6B7885;
+  --accent:#3FB3BF; --accent-bg:#133038;
+  --get:#6BA6E0; --post:#62BE8C; --put:#D8AC57; --patch:#B392D8;
+  --warn:#D89A63; --warn-bg:#2A1E14;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.3);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin:0; background:var(--bg); color:var(--fg);
+  font-family:"IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
+}
+code, .mono { font-family:"IBM Plex Mono", ui-monospace, Menlo, monospace; }
+:focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
+@media (prefers-reduced-motion: reduce){ *{transition-duration:.001ms!important} }
+
+.wrap { max-width:1000px; margin:0 auto; padding:0 24px 80px; }
+
+header.top {
+  border-bottom:1px solid var(--line); background:var(--panel);
+  padding:34px 0 26px; margin-bottom:30px;
+}
+header.top .wrap { padding-bottom:0; }
+h1 { margin:0 0 6px; font-size:27px; font-weight:600; letter-spacing:-.02em; text-wrap:balance; }
+.lede { margin:0; color:var(--fg-muted); max-width:66ch; }
+.chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+.chip {
+  font-family:"IBM Plex Mono",monospace; font-size:11.5px; padding:3px 9px; border-radius:999px;
+  border:1px solid var(--line); color:var(--fg-muted); background:var(--panel-2);
+}
+.chip.ok { color:var(--post); border-color:color-mix(in srgb,var(--post) 40%,transparent); }
+
+h2 {
+  margin:38px 0 4px; font-size:12px; font-weight:600; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--fg-faint);
+  padding-bottom:8px; border-bottom:1px solid var(--line);
+}
+h2 + p.grp { margin:10px 0 14px; color:var(--fg-muted); font-size:13.5px; max-width:66ch; }
+
+.rules {
+  background:var(--panel); border:1px solid var(--line); border-radius:12px;
+  padding:20px 24px; box-shadow:var(--shadow); margin-bottom:8px;
+}
+.rules h3 { margin:0 0 3px; font-size:16px; font-weight:600; letter-spacing:-.01em; }
+.rules p.sub { margin:0 0 14px; color:var(--fg-muted); font-size:13.5px; }
+.rules ol { margin:0; padding-left:20px; }
+.rules li { margin-bottom:7px; }
+.rules li:last-child { margin-bottom:0; }
+.rules li b { font-weight:600; }
+.origin {
+  margin-top:15px; padding-top:13px; border-top:1px solid var(--line-soft);
+  font-size:12.5px; color:var(--fg-muted);
+}
+.origin b { color:var(--warn); font-weight:600; }
+
+.ep {
+  border:1px solid var(--line); border-radius:10px; margin-bottom:9px;
+  background:var(--panel); overflow:hidden;
+}
+.ep > summary {
+  list-style:none; cursor:pointer; padding:11px 14px;
+  display:grid; grid-template-columns:auto minmax(0,1fr); gap:3px 10px; align-items:center;
+}
+.ep > summary::-webkit-details-marker { display:none; }
+.ep > summary:hover { background:var(--panel-2); }
+.verb {
+  font-family:"IBM Plex Mono",monospace; font-size:10px; font-weight:600; letter-spacing:.05em;
+  padding:3px 6px; border-radius:4px; color:#fff; text-align:center; grid-row:span 2;
+}
+.verb.GET{background:var(--get)} .verb.POST{background:var(--post)}
+.verb.PUT{background:var(--put)} .verb.PATCH{background:var(--patch)}
+.uri { font-family:"IBM Plex Mono",monospace; font-size:12.5px; word-break:break-all; }
+.sum { font-size:13px; color:var(--fg-muted); }
+.body { padding:2px 14px 14px; border-top:1px solid var(--line-soft); }
+.body p { margin:12px 0 0; font-size:13.5px; color:var(--fg-muted); max-width:70ch; }
+.k {
+  font-size:10px; font-weight:600; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--fg-faint); margin:14px 0 6px;
+}
+.codes { display:flex; flex-wrap:wrap; gap:6px; }
+.pill {
+  font-family:"IBM Plex Mono",monospace; font-size:11px; border:1px solid var(--line);
+  border-radius:999px; padding:2px 9px; color:var(--fg-muted);
+}
+.pill.ok { border-color:color-mix(in srgb,var(--post) 45%,transparent); color:var(--post); }
+.pill.no { border-color:color-mix(in srgb,var(--warn) 45%,transparent); color:var(--warn); }
+
+table { width:100%; border-collapse:collapse; font-size:13.5px; }
+.scroll { overflow-x:auto; }
+th {
+  text-align:left; font-size:10px; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--fg-faint); font-weight:600; padding:0 12px 8px 0; white-space:nowrap;
+}
+td { padding:9px 12px 9px 0; border-top:1px solid var(--line-soft); vertical-align:top; }
+td.mono { font-family:"IBM Plex Mono",monospace; font-size:12px; white-space:nowrap; }
+
+footer.foot {
+  margin-top:44px; padding-top:18px; border-top:1px solid var(--line);
+  font-size:13px; color:var(--fg-muted);
+}
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <h1>Primary Practice API Catalog</h1>
+    <p class="lede">
+      Grouped by resource. The student surface is derived screen by screen from the clickable
+      prototype &mdash; every student endpoint exists because a screen needed it, and every field
+      in a student response is consumed by one. The admin routes have no screens; they are here
+      because v1 needs a way to get tests into the database and media onto disk.
+    </p>
+    <div class="chips">
+      <span class="chip">OpenAPI 3.1</span>
+      <span class="chip ok">redocly lint: valid, 0 warnings</span>
+      <span class="chip">20 operations</span>
+      <span class="chip">docs/api/openapi.yaml</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="rules">
+    <h3>Never lose an answer</h3>
+    <p class="sub">Six rules that constrain the whole write path. Each one is a defect that already happened elsewhere.</p>
+    <ol>
+      <li><b>Durable before sent.</b> The client writes every answer to IndexedDB on tap and clears it only on a per-item ack &mdash; never on request completion.</li>
+      <li><b>Snapshot, not delta.</b> <code>PATCH /responses</code> carries every answer held for one section. A delta loses answers that never made it into a batch, even when every request sent succeeds.</li>
+      <li><b>Per-item results, never all-or-nothing.</b> One rejected item must not roll back the rest, and item failures never fail the envelope.</li>
+      <li><b>The server keeps what it refuses.</b> Anything unapplied &mdash; unparseable, oversized (413), rejected &mdash; is persisted verbatim as a <code>failed_write</code> <em>before</em> the error is returned. Oversized matters most: it loses the most data while logging the least, so the capture falls back to raw bytes when no parsed body exists.</li>
+      <li><b>Retry only what is retryable.</b> Network and 5xx back off; 4xx other than 429 stop dead. A retried 409 is a storm, not a recovery.</li>
+      <li><b>Flush at end of life and before submit.</b> <code>pagehide</code> sends a keepalive snapshot; <code>POST /submit</code> carries the queue&rsquo;s remainder in its own body.</li>
+    </ol>
+    <p class="origin">
+      <b>Provenance:</b> read out of <code>_bluebik/awesome-survey</code>, which lost answers four ways
+      &mdash; an all-or-nothing transaction that discarded non-conflicting answers alongside one
+      conflict; a validation pipe that rejected payloads <em>before</em> any handler ran, leaving no
+      trace; delta payloads that never carried what a missed batch dropped; and a resume that
+      overwrote unsaved local edits.
+    </p>
+  </div>
+
+  <div class="rules" style="margin-top:14px;">
+    <h3>Three invariants the routes assume</h3>
+    <p class="sub">Stated once here rather than repeated on every operation.</p>
+    <ol>
+      <li><b>Ordering is <code>(clientInstanceId, seq)</code>, never <code>answeredAt</code>.</b> A write applies when <code>seq</code> exceeds the stored <code>seq</code> <em>for the same instance</em>; across instances the server falls back to its own arrival order, because two devices share no clock. <code>answeredAt</code> is display text.</li>
+      <li><b>Clocks are server-authoritative, and expiry is lazy.</b> An attempt row exists from <code>POST /attempts</code>, but <code>startedAt</code>/<code>expiresAt</code> stay null until first section entry &mdash; reading the brief is untimed. Any request touching an expired attempt finalizes it. <code>/result</code> and <code>/review</code> then succeed with 200 &mdash; the thing the caller asked for has just become available. Everything else, including <code>GET /attempts/{id}</code>, refuses with 410 and carries the finalized attempt.</li>
+      <li><b>Two things never reach a student early.</b> On student routes <code>choice.isCorrect</code> appears only via <code>/review</code>; admin export returns it deliberately, guarded by the role claim rather than by absence. A play-capped stimulus carries no <code>mediaUrl</code> in the runner payload &mdash; a signed, short-lived URL is issued only by a successful <code>/play</code>, which is what makes &ldquo;plays once&rdquo; real rather than an honour system.</li>
+    </ol>
+  </div>
+
+  <h2>Session</h2>
+  <p class="grp">Identity is the Google account itself, one-to-one with a student. No user table beyond the profile row.</p>
+
+  <details class="ep">
+    <summary><span class="verb POST">POST</span><span class="uri">/api/session</span><span class="sum">Establish the session and provision the profile</span></summary>
+    <div class="body">
+      <p>Called once by the OIDC callback. Upserts the student from verified token claims. Provisioning lives here rather than on <code>GET /me</code> because a GET must be safe &mdash; it may not create state.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200 existing</span><span class="pill ok">201 provisioned</span><span class="pill">401</span><span class="pill no">403 email not allowed</span></div>
+    </div>
+  </details>
+
+  <details class="ep">
+    <summary><span class="verb GET">GET</span><span class="uri">/api/me</span><span class="sum">Read the signed-in student&rsquo;s profile</span></summary>
+    <div class="body">
+      <p>Pure read. <code>isAdmin</code> gates the admin area (a separate spec) and is rendered by no student screen.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200</span><span class="pill">401</span><span class="pill no">404 call POST /session first</span></div>
+    </div>
+  </details>
+
+  <h2>Catalog</h2>
+  <p class="grp">Published tests and this student&rsquo;s standing against them. Both routes are read-only and carry no question content.</p>
+
+  <details class="ep">
+    <summary><span class="verb GET">GET</span><span class="uri">/api/tests</span><span class="sum">Published tests, paginated, with this student&rsquo;s standing</span></summary>
+    <div class="body">
+      <p><code>inProgressAttemptId</code> decides Start vs Continue. <code>attemptCount</code> and <code>bestAttempt</code> decide whether Try again and See result appear. A finished attempt never blocks a new one &mdash; re-attempting is <code>POST /attempts</code> again.</p>
+      <div class="k">Query</div>
+      <div class="codes"><span class="pill">limit &le; 50, default 20</span><span class="pill">cursor</span></div>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200</span><span class="pill no">400 bad cursor</span><span class="pill">401</span></div>
+    </div>
+  </details>
+
+  <details class="ep">
+    <summary><span class="verb GET">GET</span><span class="uri">/api/tests/{slug}</span><span class="sum">Section structure, rules and instructions &mdash; no questions</span></summary>
+    <div class="body">
+      <p>Excludes questions and choices: nothing about the content reaches the device before an attempt exists. It does carry each section&rsquo;s <code>title</code>, <code>navigation</code>, <code>allowAnswerChange</code>, <code>playback</code> and <code>instructions</code>, because the section-rules screen renders all of those <em>before</em> the student commits.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200</span><span class="pill">401</span><span class="pill no">404 unknown or unpublished</span></div>
+    </div>
+  </details>
+
+  <h2>Attempt</h2>
+  <p class="grp">The runner. <code>POST /attempts</code> addresses the collection; every other route here is scoped to one attempt and enforces ownership. Every write obeys the six durability rules above.</p>
+
+  <details class="ep">
+    <summary><span class="verb POST">POST</span><span class="uri">/api/attempts</span><span class="sum">Start, resume, or re-attempt</span></summary>
+    <div class="body">
+      <p>One call covers all three: a partial unique index constrains only <code>status = 'in_progress'</code>, so a submitted attempt never blocks a new one. A stale in-progress attempt is finalized and the new one created in the same transaction, reported via <code>finalizedPriorAttempt</code> &mdash; no 410, no retry, and the news of an auto-submit is not swallowed.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200 resumed</span><span class="pill ok">201 new</span><span class="pill">401</span><span class="pill no">409 not published</span></div>
+    </div>
+  </details>
+
+  <details class="ep">
+    <summary><span class="verb GET">GET</span><span class="uri">/api/attempts/{id}</span><span class="sum">The canonical runner envelope</span></summary>
+    <div class="body">
+      <p>One shape read by the listening, reading, hand-in and recovery screens alike &mdash; the whole test as the student may see it, plus every answer recorded so far. This single read is what makes resume work. The client <em>merges</em> it over the local queue by <code>seq</code>; it never replaces state, which is how a reconnect destroyed work in the app this was designed against.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200</span><span class="pill">401</span><span class="pill no">403</span><span class="pill no">410 attempt_expired</span></div>
+    </div>
+  </details>
+
+  <details class="ep">
+    <summary><span class="verb POST">POST</span><span class="uri">/api/attempts/{id}/sections/{sectionId}/enter</span><span class="sum">Start this section&rsquo;s clock and return its rules</span></summary>
+    <div class="body">
+      <p>Fired by &ldquo;I&rsquo;m ready&rdquo;, not on screen load &mdash; the rules screen offers a way out, so starting the clock while the student reads would burn their time. The <em>first</em> entry also starts the whole-test clock, which is why <code>attemptStartedAt</code> appears here. Idempotent: re-entry after a refresh returns the original deadline rather than extending it.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200</span><span class="pill">401</span><span class="pill no">403</span><span class="pill no">409 previous section open</span><span class="pill no">410</span></div>
+    </div>
+  </details>
+
+  <details class="ep">
+    <summary><span class="verb POST">POST</span><span class="uri">/api/attempts/{id}/stimuli/{stimulusId}/play</span><span class="sum">Claim one play and receive a signed media URL</span></summary>
+    <div class="body">
+      <p>Increments the counter and only then issues a short-lived signed URL. The <em>only</em> way to obtain audio for a capped stimulus, which is what makes the cap real. Called before playback begins, so a refresh mid-audio still consumes the play.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200</span><span class="pill">401</span><span class="pill no">403</span><span class="pill no">409 no plays remaining</span><span class="pill no">410</span></div>
+    </div>
+  </details>
+
+  <details class="ep" open>
+    <summary><span class="verb PATCH">PATCH</span><span class="uri">/api/attempts/{id}/responses</span><span class="sum">Flush a section snapshot &mdash; the primary write path</span></summary>
+    <div class="body">
+      <p>The body is a full snapshot of every answer held for <em>one</em> section: never a delta, never the whole attempt. Questions in other sections are untouched, which is exactly why this is PATCH and not PUT.</p>
+      <p>Because every item shares one section, section expiry is an <b>envelope-level 410</b> rather than a per-item reason &mdash; a per-item <code>section_expired</code> could never be true of some items and not others in the same request. A body whose questions span two sections is refused as <code>mixed_sections</code> for the same reason, and captured.</p>
+      <div class="k">Per-item status</div>
+      <div class="codes"><span class="pill ok">applied</span><span class="pill">ignored_stale</span><span class="pill no">rejected + reason + retryable + capturedAs</span></div>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200 per-item results</span><span class="pill no">400 empty_batch</span><span class="pill no">400 mixed_sections</span><span class="pill no">400 unparseable</span><span class="pill">401</span><span class="pill no">403</span><span class="pill no">410 section_expired</span><span class="pill no">410 attempt_expired</span><span class="pill no">413 too large &rarr; capturedAs</span></div>
+    </div>
+  </details>
+
+  <details class="ep">
+    <summary><span class="verb PUT">PUT</span><span class="uri">/api/attempts/{id}/responses/{questionId}</span><span class="sum">Save one answer</span></summary>
+    <div class="body">
+      <p>Full replacement for one question. An empty <code>selectedChoiceIds</code> means <em>cleared</em>, not malformed &mdash; a child deselecting is a real action. Under <code>allowAnswerChange: false</code> the rule tests the <em>selection</em>, not the mere existence of a prior answer: re-sending identical content is an idempotent no-op, or every network retry would fail.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200 applied / ignored_stale</span><span class="pill">401</span><span class="pill no">403</span><span class="pill no">409 answer_change_not_allowed</span><span class="pill no">409 navigation_locked</span><span class="pill no">410</span><span class="pill no">413 too large &rarr; capturedAs</span></div>
+    </div>
+  </details>
+
+  <details class="ep">
+    <summary><span class="verb PUT">PUT</span><span class="uri">/api/attempts/{id}/position</span><span class="sum">Remember where the student is</span></summary>
+    <div class="body">
+      <p>A student can move without answering, so position cannot ride along on a response write. Full replacement of a singleton, hence PUT; debounced and fire-and-forget. Accepted where <code>navigation</code> is <code>free</code> and refused where it is <code>forward_only</code>, from the same route &mdash; the navigator&rsquo;s disabled cells render what this call would reject.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">204</span><span class="pill">401</span><span class="pill no">403</span><span class="pill no">409 navigation_locked</span><span class="pill no">410</span></div>
+    </div>
+  </details>
+
+  <details class="ep">
+    <summary><span class="verb POST">POST</span><span class="uri">/api/attempts/{id}/submit</span><span class="sum">Submit, carrying the final answers atomically</span></summary>
+    <div class="body">
+      <p>Takes an optional final <code>responses</code> array so the last answers and the hand-in are one request. Without it there is a race no client can close: answer, tap Hand in, and the debounced flush is still in flight &mdash; the attempt gets graded without the answer it is still carrying. Applied first, then graded, in one transaction.</p>
+      <p>Returns identity, finality and <code>finalFlush</code> &mdash; one ack per item in the request, always present so the client can clear its queue from this response alone. The score is <em>not</em> returned; it is read from <code>/result</code>, so the result screen renders one shape whether reached from here, the library, or history.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200 already submitted</span><span class="pill ok">201</span><span class="pill">401</span><span class="pill no">403</span><span class="pill no">409 nothing answered</span><span class="pill no">410</span><span class="pill no">413 too large &rarr; capturedAs</span></div>
+    </div>
+  </details>
+
+  <h2>Results</h2>
+  <p class="grp">Both refuse an attempt that is genuinely still running. Both finalize a past-deadline attempt and then succeed &mdash; denying the caller the thing that just became available would be perverse.</p>
+
+  <details class="ep">
+    <summary><span class="verb GET">GET</span><span class="uri">/api/attempts/{id}/result</span><span class="sum">Score breakdown for a finished attempt</span></summary>
+    <div class="body">
+      <p>Because <code>test_version</code> is immutable, re-grading under <em>unchanged</em> rules reproduces the same totals &mdash; the stored score is a cache of a pure function over frozen content. That is what makes an admin rescore safe, and what lets a deliberate grading-rule fix apply retroactively. <code>isPersonalBest</code> is the exception: it is computed at read time against the student&rsquo;s other attempts, so a later attempt can flip it.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200</span><span class="pill">401</span><span class="pill no">403</span><span class="pill no">409 still running</span></div>
+    </div>
+  </details>
+
+  <details class="ep">
+    <summary><span class="verb GET">GET</span><span class="uri">/api/attempts/{id}/review</span><span class="sum">Every question with the answer key</span></summary>
+    <div class="body">
+      <p>A separate route, not a flag on the runner payload &mdash; keeping the answer key here means no query parameter can leak it mid-test. Returns <em>every</em> question, answered or not, because a blank one is still jumpable from the navigator and must render its prompt, choices and answer.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200</span><span class="pill">401</span><span class="pill no">403</span><span class="pill no">409 still running</span></div>
+    </div>
+  </details>
+
+  <details class="ep">
+    <summary><span class="verb GET">GET</span><span class="uri">/api/attempts</span><span class="sum">This student&rsquo;s finished attempts</span></summary>
+    <div class="body">
+      <p><code>status=finished</code> covers submitted <em>and</em> expired. An expired attempt is graded and kept, so filtering it out would hide real results &mdash; which is why the history table renders a &ldquo;How it ended&rdquo; column from <code>status</code>.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200</span><span class="pill no">400 bad cursor</span><span class="pill">401</span></div>
+    </div>
+  </details>
+
+  <h2>Admin</h2>
+  <p class="grp">Require the <code>admin</code> role claim. Only these five are in v1 scope &mdash; the authoring editor is a later spec, so tests reach the database through import.</p>
+
+  <details class="ep">
+    <summary><span class="verb GET">GET</span><span class="uri">/api/admin/failed-writes</span><span class="sum">Everything the server could not apply</span></summary>
+    <div class="body">
+      <p>Without this, a rejected payload leaves no trace anywhere and a validation bug becomes silent data loss rather than a visible queue. <code>rawBody</code> is stored as text or bytea, never <code>jsonb</code> &mdash; the whole point is retaining bodies that failed to <em>parse</em>, which <code>jsonb</code> cannot hold and which would lose byte order and whitespace even when they do parse.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200</span><span class="pill no">400 bad cursor</span><span class="pill">401</span><span class="pill no">403 admin only</span></div>
+    </div>
+  </details>
+
+  <details class="ep">
+    <summary><span class="verb POST">POST</span><span class="uri">/api/admin/tests/import</span><span class="sum">Import a test from JSON</span></summary>
+    <div class="body">
+      <p>Round-trips exactly with export. That contract is what v1 relies on for seeding, since there is no editor yet &mdash; and it is worth a deep-equal test, because import and export are the two halves most likely to drift.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">201</span><span class="pill no">400 &rarr; failed_write</span><span class="pill">401</span><span class="pill no">403</span><span class="pill no">413 too large &rarr; capturedAs</span></div>
+    </div>
+  </details>
+
+  <details class="ep">
+    <summary><span class="verb POST">POST</span><span class="uri">/api/admin/tests/{testId}/publish</span><span class="sum">Validate, then freeze the draft version</span></summary>
+    <div class="body">
+      <p>Runs the cross-row checks column constraints cannot express &mdash; every question has &ge;2 choices, a <code>single_choice</code> question has exactly one correct choice, every cited asset exists &mdash; then marks the version immutable. Attempts pin versions, so after this the content can never change under a recorded score.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200</span><span class="pill">401</span><span class="pill no">403</span><span class="pill no">404</span><span class="pill no">422 violations[]</span></div>
+    </div>
+  </details>
+
+  <details class="ep">
+    <summary><span class="verb GET">GET</span><span class="uri">/api/admin/tests/{testId}/export</span><span class="sum">Export a version as JSON</span></summary>
+    <div class="body">
+      <p>The interchange document, including <code>isCorrect</code> &mdash; the one place the content shape is fully expressed. The runner projection is deliberately a strict subset.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">200</span><span class="pill">401</span><span class="pill no">403</span><span class="pill no">404</span></div>
+    </div>
+  </details>
+
+  <details class="ep">
+    <summary><span class="verb POST">POST</span><span class="uri">/api/admin/media</span><span class="sum">Upload an audio file or image</span></summary>
+    <div class="body">
+      <p>Recorded as a <code>media_asset</code>. A published test citing an asset holds a foreign key with <code>ON DELETE RESTRICT</code>, so an asset in use cannot be deleted &mdash; the failure that prevents is a child hitting Play mid-section and getting a 404.</p>
+      <div class="k">Status</div>
+      <div class="codes"><span class="pill ok">201</span><span class="pill">401</span><span class="pill no">403</span><span class="pill no">413 too large</span><span class="pill no">415 unsupported</span></div>
+    </div>
+  </details>
+
+  <h2>Schema deltas this catalog implies</h2>
+  <p class="grp">Carried into step 3. Each row is a change the prototype forced that the earlier ER diagram does not yet have.</p>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Table</th><th>Change</th><th>Forced by</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono">test_section</td>
+          <td>default playback columns (<code>max_plays</code>, <code>allow_pause</code>, <code>allow_seek</code>) plus <code>instructions</code></td>
+          <td>The rules screen states caps before any stimulus is loaded; stimuli may tighten but never loosen them.</td>
+        </tr>
+        <tr>
+          <td class="mono">attempt</td>
+          <td><code>created_at</code> added; <code>started_at</code> and <code>expires_at</code> become nullable</td>
+          <td>The clock starts at first section entry, not at attempt creation &mdash; otherwise the last section silently loses the time spent reading the brief.</td>
+        </tr>
+        <tr>
+          <td class="mono">attempt_section</td>
+          <td>score columns (<code>points_earned</code>, <code>points_possible</code>, <code>correct_count</code>, &hellip;)</td>
+          <td>History renders per-section rows; trends become a <code>GROUP BY</code> rather than a blob walk.</td>
+        </tr>
+        <tr>
+          <td class="mono">response</td>
+          <td><code>client_instance_id</code>, <code>client_seq</code></td>
+          <td>Ordering must be scoped to a device. Without an instance id the guard compares unrelated clocks and the older answer can win.</td>
+        </tr>
+        <tr>
+          <td class="mono">failed_write</td>
+          <td>new table &mdash; <code>text</code> or <code>bytea</code> body (NOT <code>jsonb</code>), deliberately no foreign keys</td>
+          <td>Its job is holding payloads that failed validation, including ones whose <code>attempt_id</code> does not resolve &mdash; and ones that are not valid JSON at all, which <code>jsonb</code> cannot store.</td>
+        </tr>
+        <tr>
+          <td class="mono">stimulus_play</td>
+          <td>unchanged, but now the sole gate on media access</td>
+          <td>The signed URL is issued by <code>/play</code>, so the counter guards the bytes and not just an endpoint.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer class="foot">
+    Source of truth: <code>docs/api/openapi.yaml</code> &mdash; validated with <code>redocly lint</code>.
+    Behaviour and payload examples: <code>docs/prototype/index.html</code>.
+    This page is the resource-oriented view of both; the prototype is the screen-oriented one.
+  </footer>
+</div>

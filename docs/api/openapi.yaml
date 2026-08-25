@@ -1,0 +1,1572 @@
+openapi: 3.1.0
+
+info:
+  title: Primary Practice API
+  version: 0.1.0
+  license:
+    name: MIT
+    identifier: MIT
+  summary: TOEFL Primary practice-test runner — student surface plus the admin routes v1 needs.
+  description: |
+    The STUDENT surface is derived from the clickable prototype at `docs/prototype/index.html`,
+    screen by screen: every student endpoint exists because a screen needed it, and every field
+    in a student response is consumed by one — usually rendered, sometimes control state the
+    client acts on (`created`, `retryable`, `nextCursor`).
+
+    The ADMIN routes have no prototype screens; the authoring editor is a later spec. They are
+    here because v1 needs a way to get tests into the database and media onto disk.
+
+    ## Identity
+    Every route requires `Authorization: Bearer <jwt>`, verified against the JWKS at
+    `auth.icovn.me`. The `sub` claim resolves to a student; a student profile IS a Google
+    account, one-to-one. `POST /session` provisions from the token claims — no `GET` ever
+    creates state. Admin routes additionally require the `admin` role claim.
+
+    ## Never lose an answer
+    Six rules, each earned from a real data loss in a sibling survey application:
+
+    1. **Durable before sent.** The client writes every answer to IndexedDB on tap and clears it
+       only on a per-item ack, never on request completion.
+    2. **Snapshot, not delta.** `PATCH /responses` carries every answer held for ONE section.
+       A delta loses answers that never made it into a batch even when every request succeeds.
+    3. **Per-item results, never all-or-nothing.** One rejected item must not roll back the rest.
+    4. **The server keeps what it refuses.** Anything unapplied — unparseable, oversized (413),
+       rejected — is persisted verbatim as a `failed_write` BEFORE the error is returned. The
+       oversized case matters most: it is the failure that loses the most data while logging the
+       least, so the capture falls back to the raw bytes when no parsed body exists.
+    5. **Retry only what is retryable.** Network and 5xx back off; 4xx other than 429 stop dead.
+       A retried 409 is a storm, not a recovery.
+    6. **Flush at end of life and before submit.** `pagehide` sends a keepalive snapshot, and
+       `POST /submit` carries the queue's remainder in its own body.
+
+    ## Ordering
+    Writes are ordered by `(clientInstanceId, seq)`, never by `answeredAt`. `clientInstanceId` is
+    minted once per install and stored beside the queue; `seq` increases within that instance
+    across attempts as well as within one. The server applies a write when `seq` exceeds the
+    stored `seq` for the SAME instance, and falls back to its own arrival order across different
+    instances — the only sound rule, since two devices share no clock. `answeredAt` is display
+    text and carries no authority.
+
+    ## Time
+    Every clock is server-authoritative. An attempt row exists from `POST /attempts`, but
+    `startedAt` and `expiresAt` stay null until the first section entry, so reading the brief and
+    the section rules is untimed. Expiry is lazy: any request touching an expired attempt
+    finalizes it. Reads (`/result`, `/review`) finalize and then succeed with 200; writes finalize
+    and then refuse with 410.
+
+    ## What never reaches a student early
+    On STUDENT routes, `choice.isCorrect` appears only via `/review`, which refuses an attempt
+    still running. Admin routes are a different audience: `GET /admin/tests/{testId}/export`
+    returns the full `TestDocument` including `isCorrect`, because exporting an answer key is its
+    purpose — the admin role claim, not the field's absence, is what guards it.
+
+    A play-capped stimulus carries no `mediaUrl` in the runner payload — a short-lived signed URL
+    is issued only by a successful `/play`, which is what makes the cap real.
+
+servers:
+  - url: /api
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Session
+    description: Identity, provisioned from the verified token.
+  - name: Catalog
+    description: Published tests and this student's standing against them.
+  - name: Attempt
+    description: The runner — start, answer, navigate, submit.
+  - name: Results
+    description: Scores and the answer key, available only once an attempt is finished.
+  - name: Admin
+    description: Authoring and operational routes; require the admin role claim.
+
+paths:
+
+  # ─────────────────────────────────────────────────────────── Session ──
+  /session:
+    post:
+      tags: [Session]
+      operationId: establishSession
+      summary: Establish the session and provision the profile
+      description: |
+        Called once by the OIDC callback route. Upserts the student row from the verified token
+        claims and returns the profile. Provisioning lives here rather than on `GET /me` because
+        a GET must be safe — it may not create state.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              description: Claims are read from the Bearer token, never from the body.
+      responses:
+        "200":
+          description: Existing student.
+          content: { application/json: { schema: { $ref: "#/components/schemas/SessionResult" } } }
+        "201":
+          description: Student provisioned on first sign-in.
+          content: { application/json: { schema: { $ref: "#/components/schemas/SessionResult" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: Email not permitted by the allowlist.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /me:
+    get:
+      tags: [Session]
+      operationId: getMe
+      summary: Read the signed-in student's profile
+      description: |
+        Pure read, no side effects. `isAdmin` is not rendered by any student screen — it gates the
+        admin area, which is a separate spec.
+      responses:
+        "200":
+          description: The profile.
+          content: { application/json: { schema: { $ref: "#/components/schemas/Student" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: No profile for this `sub` — call `POST /session` first.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  # ─────────────────────────────────────────────────────────── Catalog ──
+  /tests:
+    get:
+      tags: [Catalog]
+      operationId: listTests
+      summary: Published tests, paginated, with this student's standing
+      description: |
+        `inProgressAttemptId` decides whether the card reads Start or Continue. `attemptCount` and
+        `bestAttempt` decide whether Try again and See result appear. A finished attempt never
+        blocks a new one — re-attempting is `POST /attempts` again.
+      parameters:
+        - { $ref: "#/components/parameters/Limit" }
+        - { $ref: "#/components/parameters/Cursor" }
+      responses:
+        "200":
+          description: One page of tests.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tests, nextCursor, summary]
+                properties:
+                  tests:
+                    type: array
+                    items: { $ref: "#/components/schemas/TestCard" }
+                  nextCursor:
+                    type: [string, "null"]
+                    description: Null on the last page. Drives the Show more control's enabled state.
+                  summary: { $ref: "#/components/schemas/StudentSummary" }
+        "400": { $ref: "#/components/responses/BadCursor" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /tests/{slug}:
+    get:
+      tags: [Catalog]
+      operationId: getTest
+      summary: Section structure, rules and instructions — no questions
+      description: |
+        Deliberately excludes questions and choices: nothing about the content reaches the device
+        before an attempt exists. It DOES carry each section's title, rules and instructions,
+        because the section-rules screen renders all of those before the student commits.
+        The brief renders "Attempt N of this test" optimistically from `attemptCount + 1`;
+        `POST /attempts` returns the authoritative `attemptNumber`.
+      parameters:
+        - { $ref: "#/components/parameters/Slug" }
+      responses:
+        "200":
+          description: The test brief.
+          content: { application/json: { schema: { $ref: "#/components/schemas/TestBrief" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ─────────────────────────────────────────────────────────── Attempt ──
+  /attempts:
+    get:
+      tags: [Attempt]
+      operationId: listAttempts
+      summary: This student's finished attempts
+      description: |
+        `status=finished` covers submitted AND expired. An expired attempt is graded and kept, so
+        filtering it out would hide real results — which is why the history table renders a
+        "How it ended" column from `status`.
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [finished, submitted, expired], default: finished }
+        - { $ref: "#/components/parameters/Limit" }
+        - { $ref: "#/components/parameters/Cursor" }
+      responses:
+        "200":
+          description: One page of attempts, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [attempts, nextCursor]
+                properties:
+                  attempts:
+                    type: array
+                    items: { $ref: "#/components/schemas/AttemptHistoryRow" }
+                  nextCursor: { type: [string, "null"] }
+        "400": { $ref: "#/components/responses/BadCursor" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+    post:
+      tags: [Attempt]
+      operationId: startAttempt
+      summary: Start, resume, or re-attempt
+      description: |
+        One call covers all three. A partial unique index constrains only `status = 'in_progress'`,
+        so previously submitted attempts never block a new one.
+
+        The attempt row exists from here, but its clock does not: `startedAt` and `expiresAt` stay
+        null until the first section entry.
+
+        If the in-progress attempt found is already past its deadline, that one is finalized and
+        the new attempt created in the same transaction, and `finalizedPriorAttempt` reports it.
+        A 410 would be wrong here: the subject of this request is the collection, not the stale
+        attempt, and forcing a retry would discard the news that an earlier attempt was just
+        auto-submitted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [testId]
+              additionalProperties: false
+              properties:
+                testId: { type: string }
+      responses:
+        "200":
+          description: An in-progress attempt already existed; `resumed` is true.
+          content: { application/json: { schema: { $ref: "#/components/schemas/AttemptStart" } } }
+        "201":
+          description: A new attempt was created.
+          content: { application/json: { schema: { $ref: "#/components/schemas/AttemptStart" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409":
+          description: The test is not published.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /attempts/{id}:
+    get:
+      tags: [Attempt]
+      operationId: getAttempt
+      summary: The canonical runner envelope
+      description: |
+        ONE shape, read by the listening, reading, hand-in and recovery screens alike. The whole
+        test as the student may see it, plus every answer recorded so far — this single read is
+        what makes resume work after a reload.
+
+        Two things are deliberately absent: `isCorrect` on any choice, and `mediaUrl` on any
+        play-capped stimulus.
+
+        The client MERGES this over its local queue rather than replacing state with it: per
+        question it keeps whichever of (server response, queued answer) carries the higher `seq`
+        for this `clientInstanceId`, then re-flushes local winners.
+      parameters:
+        - { $ref: "#/components/parameters/AttemptId" }
+      responses:
+        "200":
+          description: The runner envelope.
+          content: { application/json: { schema: { $ref: "#/components/schemas/RunnerEnvelope" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/NotYourAttempt" }
+        "410": { $ref: "#/components/responses/AttemptExpired" }
+
+  /attempts/{id}/sections/{sectionId}/enter:
+    post:
+      tags: [Attempt]
+      operationId: enterSection
+      summary: Start this section's clock and return its rules
+      description: |
+        Fired by "I'm ready", NOT on screen load — the rules screen offers a way out, so starting
+        the clock before the student commits would burn their time while they read.
+
+        The FIRST entry also starts the whole-test clock, which is why `attemptStartedAt` and
+        `attemptExpiresAt` appear here. Idempotent: re-entering after a refresh returns the
+        original deadline rather than extending it.
+
+        `playback` values are section DEFAULTS, which individual stimuli may tighten but never
+        loosen. They and `instructions` echo what `GET /tests/{slug}` already supplied, so a
+        resume has one authoritative source.
+      parameters:
+        - { $ref: "#/components/parameters/AttemptId" }
+        - { $ref: "#/components/parameters/SectionId" }
+      responses:
+        "200":
+          description: The section clock and its rules.
+          content: { application/json: { schema: { $ref: "#/components/schemas/SectionEntry" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/NotYourAttempt" }
+        "409":
+          description: A previous section is still open.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "410": { $ref: "#/components/responses/AttemptExpired" }
+
+  /attempts/{id}/stimuli/{stimulusId}/play:
+    post:
+      tags: [Attempt]
+      operationId: claimPlay
+      summary: Claim one play and receive a signed media URL
+      description: |
+        Increments the play counter and, only then, issues a short-lived signed URL. This is the
+        ONLY way to obtain audio for a capped stimulus, which is what makes the cap real — a URL
+        in the runner payload would let the student fetch the file directly and replay it forever.
+
+        Called before playback begins, so a refresh mid-audio still consumes the play. That is the
+        exam-faithful behaviour.
+      parameters:
+        - { $ref: "#/components/parameters/AttemptId" }
+        - { $ref: "#/components/parameters/StimulusId" }
+      responses:
+        "200":
+          description: A play was claimed.
+          content: { application/json: { schema: { $ref: "#/components/schemas/PlayGrant" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/NotYourAttempt" }
+        "409":
+          description: No plays remaining.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "410": { $ref: "#/components/responses/SectionOrAttemptExpired" }
+
+  /attempts/{id}/responses/{questionId}:
+    put:
+      tags: [Attempt]
+      operationId: saveResponse
+      summary: Save one answer
+      description: |
+        Full replacement of this question's answer. Written to the device queue BEFORE this
+        request is attempted and cleared only when this response acks it, so a crash between tap
+        and ack costs nothing. An empty `selectedChoiceIds` means *cleared*, not malformed — a
+        child deselecting an answer is a real action.
+
+        Ordering is guarded by `(clientInstanceId, seq)`. Under `allowAnswerChange: false` the
+        rule tests the SELECTION, not the mere existence of a prior answer: re-sending identical
+        content is an idempotent no-op, or every network retry would fail.
+      parameters:
+        - { $ref: "#/components/parameters/AttemptId" }
+        - { $ref: "#/components/parameters/QuestionId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SingleResponseWrite" }
+      responses:
+        "200":
+          description: Applied, or discarded as stale. Both are successes.
+          content: { application/json: { schema: { $ref: "#/components/schemas/SingleResponseResult" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/NotYourAttempt" }
+        "409":
+          description: '`answer_change_not_allowed` or `navigation_locked`. Never retry these.'
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "410": { $ref: "#/components/responses/SectionOrAttemptExpired" }
+        "413": { $ref: "#/components/responses/PayloadCaptured" }
+
+  /attempts/{id}/responses:
+    patch:
+      tags: [Attempt]
+      operationId: flushResponses
+      summary: Flush a section snapshot
+      description: |
+        The body is a FULL SNAPSHOT of every answer held for ONE section, never a delta and never
+        the whole attempt. Questions in other sections are untouched, which is exactly why this is
+        PATCH and not PUT. A delta loses any answer that never made it into a batch, even when
+        every request sent succeeds.
+
+        Never all-or-nothing: one rejected item cannot roll back the rest, and item failures never
+        fail the envelope. Because every item shares one section, section expiry is an
+        ENVELOPE-level 410 rather than a per-item reason — a per-item `section_expired` could
+        never be true of some items and not others in the same request.
+
+        Every rejected item names its capture id in `capturedAs`; nothing the server refuses is
+        discarded.
+      parameters:
+        - { $ref: "#/components/parameters/AttemptId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResponseSnapshot" }
+      responses:
+        "200":
+          description: Per-item results. Item failures appear here, not as an HTTP error.
+          content: { application/json: { schema: { $ref: "#/components/schemas/FlushResult" } } }
+        "400":
+          description: |
+            `empty_batch`, `mixed_sections` (questions spanning more than one section), or a body
+            that could not be parsed. All three are captured as a `failed_write` before the error
+            is returned — see `type`.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/NotYourAttempt" }
+        "410": { $ref: "#/components/responses/SectionOrAttemptExpired" }
+        "413": { $ref: "#/components/responses/PayloadCaptured" }
+
+  /attempts/{id}/position:
+    put:
+      tags: [Attempt]
+      operationId: setPosition
+      summary: Remember where the student is
+      description: |
+        A student can move without answering, so position cannot ride along on a response write.
+        Full replacement of a singleton, hence PUT. Debounced and fire-and-forget: losing one
+        costs a wrong landing spot after reload, nothing more.
+
+        Accepted where `navigation` is `free` and refused where it is `forward_only`, from the
+        same route — the navigator's disabled cells are a rendering of what this call would reject.
+      parameters:
+        - { $ref: "#/components/parameters/AttemptId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sectionId, questionId]
+              additionalProperties: false
+              properties:
+                sectionId: { type: string }
+                questionId: { type: string }
+      responses:
+        "204": { description: Position recorded. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/NotYourAttempt" }
+        "409":
+          description: '`navigation_locked` — this section runs forward only.'
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "410": { $ref: "#/components/responses/SectionOrAttemptExpired" }
+
+  /attempts/{id}/submit:
+    post:
+      tags: [Attempt]
+      operationId: submitAttempt
+      summary: Submit, carrying the final answers atomically
+      description: |
+        Accepts an OPTIONAL final `responses` array so the last answers and the hand-in are one
+        request. Without it there is a race no client can close: answer, tap Hand in, and the
+        debounced flush is still in flight, so the attempt is graded without the answer it is
+        still carrying. The array is applied first, then grading runs, in one transaction.
+
+        The client additionally refuses to submit while its queue is non-empty; this array covers
+        the narrower race where an answer lands in the queue after that check but before the
+        request goes out.
+
+        Returns identity, finality and the final flush result. The score itself is read from
+        `GET /result`, so there is exactly one shape the result screen renders whether it was
+        reached from here, from the library, or from history.
+      parameters:
+        - { $ref: "#/components/parameters/AttemptId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmitRequest" }
+      responses:
+        "200":
+          description: Already submitted — the same row, not a regrade.
+          content: { application/json: { schema: { $ref: "#/components/schemas/SubmitResult" } } }
+        "201":
+          description: Graded and finalized.
+          content: { application/json: { schema: { $ref: "#/components/schemas/SubmitResult" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/NotYourAttempt" }
+        "409":
+          description: Nothing answered.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "410": { $ref: "#/components/responses/AttemptExpired" }
+
+  # ─────────────────────────────────────────────────────────── Results ──
+        "413": { $ref: "#/components/responses/PayloadCaptured" }
+
+  /attempts/{id}/result:
+    get:
+      tags: [Results]
+      operationId: getResult
+      summary: Score breakdown for a finished attempt
+      description: |
+        Totals and per-section rows. Refuses an attempt genuinely still running, so a student
+        cannot watch a live score. An in-progress attempt already past its deadline is finalized
+        by this read and then returned with 200 — the result has just become available, so denying
+        it would be perverse.
+
+        Because `test_version` is immutable, re-grading under UNCHANGED grading rules reproduces
+        the same totals: the stored score is a cache of a pure function over frozen content, not a
+        source of truth. That is what makes an admin rescore safe — and what makes a deliberate
+        grading-rule fix apply retroactively, which is the point of having one.
+
+        `isPersonalBest` is the exception: it is computed at read time against this student's other
+        finished attempts, so a later attempt can flip it. It is a fact about the collection, not
+        about this attempt.
+      parameters:
+        - { $ref: "#/components/parameters/AttemptId" }
+      responses:
+        "200":
+          description: The result.
+          content: { application/json: { schema: { $ref: "#/components/schemas/AttemptResult" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/NotYourAttempt" }
+        "409": { $ref: "#/components/responses/StillRunning" }
+
+  /attempts/{id}/review:
+    get:
+      tags: [Results]
+      operationId: getReview
+      summary: Every question with the answer key
+      description: |
+        A separate route, not a flag on the runner payload — keeping the answer key here means no
+        query parameter can leak it mid-test.
+
+        Returns EVERY question, answered or not, since a blank one is still jumpable from the
+        navigator and must render its prompt, choices and answer. Media is freely replayable: the
+        attempt is over, so the play cap no longer applies.
+
+        Like `/result`, a past-deadline attempt is finalized by this read and then returned;
+        409 is reserved for an attempt genuinely still running.
+      parameters:
+        - { $ref: "#/components/parameters/AttemptId" }
+      responses:
+        "200":
+          description: The review items.
+          content: { application/json: { schema: { $ref: "#/components/schemas/ReviewPayload" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/NotYourAttempt" }
+        "409": { $ref: "#/components/responses/StillRunning" }
+
+  # ───────────────────────────────────────────────────────────── Admin ──
+  /admin/failed-writes:
+    get:
+      tags: [Admin]
+      operationId: listFailedWrites
+      summary: Everything the server could not apply
+      description: |
+        Any write that cannot be applied — unparseable body, oversized payload, unknown question,
+        a rejected item — is persisted verbatim BEFORE the error is returned. Without this, a
+        rejected payload leaves no trace anywhere and a validation bug becomes silent data loss
+        rather than a visible queue.
+
+        `rawBody` is deliberately unvalidated and un-foreign-keyed: its entire job is holding
+        bodies that failed validation, including ones whose `attemptId` or `questionId` do not
+        resolve.
+      parameters:
+        - name: attemptId
+          in: query
+          schema: { type: string }
+        - name: replayed
+          in: query
+          schema: { type: boolean }
+        - { $ref: "#/components/parameters/Limit" }
+        - { $ref: "#/components/parameters/Cursor" }
+      responses:
+        "200":
+          description: Captured writes.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [failedWrites, nextCursor]
+                properties:
+                  failedWrites:
+                    type: array
+                    items: { $ref: "#/components/schemas/FailedWrite" }
+                  nextCursor: { type: [string, "null"] }
+        "400": { $ref: "#/components/responses/BadCursor" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+
+  /admin/tests/import:
+    post:
+      tags: [Admin]
+      operationId: importTest
+      summary: Import a test from JSON
+      description: |
+        Creates a test and a draft version from the interchange format. Round-trips exactly with
+        `GET /admin/tests/{id}/export`, which is the contract v1 relies on for seeding, since the
+        authoring editor is a later spec.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TestDocument" }
+      responses:
+        "201":
+          description: Test and draft version created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [testId, versionId, version]
+                properties:
+                  testId: { type: string }
+                  versionId: { type: string }
+                  version: { type: integer }
+        "400":
+          description: The document failed validation — captured as a `failed_write`.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+        "413": { $ref: "#/components/responses/PayloadCaptured" }
+
+  /admin/tests/{testId}/publish:
+    post:
+      tags: [Admin]
+      operationId: publishTest
+      summary: Validate, then freeze the draft version
+      description: |
+        Runs the cross-row checks column constraints cannot express — every question has at least
+        two choices, a `single_choice` question has exactly one correct choice, every cited media
+        asset exists — then marks the version published and immutable. Attempts pin versions, so
+        after this point the content can never change under a recorded score.
+      parameters:
+        - name: testId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Published.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [testId, versionId, version, publishedAt]
+                properties:
+                  testId: { type: string }
+                  versionId: { type: string }
+                  version: { type: integer }
+                  publishedAt: { type: string, format: date-time }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: Content validation failed; the version stays a draft.
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                  - { $ref: "#/components/schemas/Problem" }
+                  - type: object
+                    required: [violations]
+                    properties:
+                      violations:
+                        type: array
+                        minItems: 1
+                        description: Never empty — a 422 that names no violation tells the author nothing.
+                        items:
+                          type: object
+                          required: [rule, detail]
+                          properties:
+                            questionId: { type: string }
+                            sectionId: { type: string }
+                            rule:
+                              type: string
+                              enum: [too_few_choices, wrong_correct_count, missing_media_asset, duration_mismatch]
+                            detail: { type: string }
+
+  /admin/tests/{testId}/export:
+    get:
+      tags: [Admin]
+      operationId: exportTest
+      summary: Export a version as JSON
+      parameters:
+        - name: testId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: version
+          in: query
+          description: Defaults to the current version.
+          schema: { type: integer }
+      responses:
+        "200":
+          description: The interchange document.
+          content: { application/json: { schema: { $ref: "#/components/schemas/TestDocument" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/media:
+    post:
+      tags: [Admin]
+      operationId: uploadMedia
+      summary: Upload an audio file or image
+      description: |
+        Stored on the media volume and recorded as a `media_asset`. A published test citing an
+        asset holds a foreign key with `ON DELETE RESTRICT`, so an asset in use cannot be deleted —
+        the failure mode that prevents is a child hitting Play mid-section and getting a 404.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, kind]
+              properties:
+                file: { type: string, format: binary }
+                kind: { type: string, enum: [audio, image] }
+      responses:
+        "201":
+          description: Asset stored.
+          content: { application/json: { schema: { $ref: "#/components/schemas/MediaAsset" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+        "413":
+          description: File too large.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "415":
+          description: Unsupported media type.
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Issued by auth.icovn.me; verified against its JWKS.
+
+  parameters:
+    AttemptId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    SectionId:
+      name: sectionId
+      in: path
+      required: true
+      schema: { type: string }
+    StimulusId:
+      name: stimulusId
+      in: path
+      required: true
+      schema: { type: string }
+    QuestionId:
+      name: questionId
+      in: path
+      required: true
+      schema: { type: string }
+    Slug:
+      name: slug
+      in: path
+      required: true
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+
+  responses:
+    Unauthorized:
+      description: Missing, invalid or expired token.
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    NotYourAttempt:
+      description: The attempt belongs to another student.
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    AdminOnly:
+      description: The token carries no admin role claim.
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    NotFound:
+      description: No such resource, or it is not published.
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    BadCursor:
+      description: The cursor could not be decoded.
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    PayloadCaptured:
+      description: |
+        The body exceeded the size limit and was NOT applied. It is captured as a `failed_write`
+        first, falling back to the raw bytes because an oversized body may never have been parsed.
+        `capturedAs` names the row, so nothing is lost even though nothing was written.
+      content:
+        application/problem+json:
+          schema:
+            allOf:
+              - { $ref: "#/components/schemas/Problem" }
+              - type: object
+                required: [capturedAs]
+                properties:
+                  capturedAs: { type: string }
+    StillRunning:
+      description: The attempt is genuinely still running, so no score may be read.
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    AttemptExpired:
+      description: |
+        The attempt was past its deadline. It has been finalized (graded, `status: expired`,
+        `submittedAt` pinned to the deadline rather than to arrival) and the request refused.
+        The response carries the finalized attempt so the client can render the time-up screen
+        without a follow-up read.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/AttemptExpiredProblem" }
+    SectionOrAttemptExpired:
+      description: |
+        Two distinct conditions on one status. `section_expired` leaves the attempt running, so it
+        carries no finalized attempt. `attempt_expired` means the attempt was finalized by this
+        request and MUST carry it, so the client can render the time-up screen without a
+        follow-up read.
+      content:
+        application/problem+json:
+          schema:
+            oneOf:
+              - { $ref: "#/components/schemas/SectionExpiredProblem" }
+              - { $ref: "#/components/schemas/AttemptExpiredProblem" }
+
+  schemas:
+
+    SectionExpiredProblem:
+      type: object
+      description: |
+        The section's clock ran out; the attempt itself is still running. Closed deliberately —
+        an `attempt` here would assert a finalization that did not happen.
+      required: [type, title, status]
+      additionalProperties: false
+      properties:
+        type: { type: string, const: section_expired }
+        title: { type: string }
+        status: { type: integer, const: 410 }
+        detail: { type: string }
+        retryable: { type: boolean, const: false }
+
+    AttemptExpiredProblem:
+      type: object
+      description: |
+        The attempt was past its deadline and has been finalized by this request. `attempt` is
+        required — a client told only "expired" would have to make another call to learn what
+        happened to the work.
+      required: [type, title, status, attempt]
+      properties:
+        type: { type: string, const: attempt_expired }
+        title: { type: string }
+        status: { type: integer, const: 410 }
+        detail: { type: string }
+        retryable: { type: boolean, const: false }
+        attempt: { $ref: "#/components/schemas/FinalizedAttempt" }
+      additionalProperties: false
+
+    Problem:
+      type: object
+      description: RFC 9457 problem details.
+      required: [type, title, status]
+      properties:
+        type: { type: string, examples: ["attempt_expired"] }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        retryable:
+          type: boolean
+          const: false
+          description: |
+            When present, always false — every 4xx this API declares is a rule decision, not a
+            transient fault, and a retried 409 is a storm rather than a recovery. A retryable
+            condition (429, or any 5xx) would carry its own schema rather than relax this one.
+
+    Student:
+      type: object
+      description: The pure profile. Carries no `created` flag — that is a fact about a call, not about a student.
+      required: [id, displayName, email, isAdmin]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        email: { type: string, format: email }
+        level: { type: [string, "null"], enum: [primary-step-1, primary-step-2, null] }
+        isAdmin: { type: boolean }
+
+    SessionResult:
+      type: object
+      description: |
+        The profile plus whether this call provisioned it, so the callback can detect a first
+        sign-in. Declared standalone rather than `allOf: [Student, …]` — `Student` is closed with
+        `additionalProperties: false`, so composing onto it would forbid the very property being
+        added and make this schema unsatisfiable.
+      required: [id, displayName, email, isAdmin, created]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        email: { type: string, format: email }
+        level: { type: [string, "null"], enum: [primary-step-1, primary-step-2, null] }
+        isAdmin: { type: boolean }
+        created: { type: boolean }
+
+    StudentSummary:
+      type: object
+      required: [attemptCount, averagePct, bestPct]
+      properties:
+        attemptCount: { type: integer }
+        averagePct: { type: number }
+        bestPct: { type: number }
+
+    AttemptRef:
+      type: object
+      required: [attemptId, submittedAt, pointsEarned, pointsPossible, percentage]
+      properties:
+        attemptId: { type: string }
+        submittedAt: { type: string, format: date-time }
+        pointsEarned: { type: integer }
+        pointsPossible: { type: integer }
+        percentage: { type: number }
+
+    TestCard:
+      type: object
+      required: [id, slug, title, level, durationSeconds, sections, inProgressAttemptId, attemptCount, bestAttempt]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        level: { type: string, enum: [primary-step-1, primary-step-2] }
+        durationSeconds: { type: integer }
+        sections:
+          type: array
+          items:
+            type: object
+            required: [type, questionCount]
+            properties:
+              type: { $ref: "#/components/schemas/SectionType" }
+              questionCount: { type: integer }
+        inProgressAttemptId:
+          type: [string, "null"]
+          description: Decides whether the card reads Start or Continue.
+        attemptCount: { type: integer }
+        bestAttempt:
+          oneOf:
+            - { $ref: "#/components/schemas/AttemptRef" }
+            - { type: "null" }
+
+    SectionType:
+      type: string
+      enum: [listening, reading, vocabulary, grammar]
+
+    NavigationMode:
+      type: string
+      enum: [free, forward_only]
+
+    Playback:
+      type: [object, "null"]
+      description: Section defaults. A stimulus may tighten these but never loosen them. Null where no timed media exists.
+      required: [maxPlays, allowPause, allowSeek]
+      properties:
+        maxPlays: { type: [integer, "null"], description: Null means unlimited. }
+        allowPause: { type: boolean }
+        allowSeek: { type: boolean }
+
+    TestBrief:
+      type: object
+      required: [id, slug, title, durationSeconds, attemptCount, inProgressAttemptId, sections]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        durationSeconds: { type: integer }
+        attemptCount: { type: integer }
+        inProgressAttemptId: { type: [string, "null"] }
+        sections:
+          type: array
+          items:
+            type: object
+            required: [id, type, title, ordinal, questionCount, durationSeconds, navigation, allowAnswerChange, playback, instructions]
+            properties:
+              id: { type: string }
+              type: { $ref: "#/components/schemas/SectionType" }
+              title: { type: string, examples: ["Listening — Part 1"] }
+              ordinal: { type: integer }
+              questionCount: { type: integer }
+              durationSeconds: { type: integer }
+              navigation: { $ref: "#/components/schemas/NavigationMode" }
+              allowAnswerChange: { type: boolean }
+              playback: { $ref: "#/components/schemas/Playback" }
+              instructions:
+                type: array
+                items: { type: string }
+                description: Author-supplied free text rendered on the section-rules screen.
+
+    AttemptStart:
+      type: object
+      required: [id, attemptNumber, status, createdAt, startedAt, expiresAt, serverTime, resumed, finalizedPriorAttempt]
+      properties:
+        id: { type: string }
+        attemptNumber: { type: integer }
+        status: { type: string, enum: [in_progress] }
+        createdAt: { type: string, format: date-time }
+        startedAt:
+          type: [string, "null"]
+          format: date-time
+          description: Null until the first section entry — reading the brief is untimed.
+        expiresAt:
+          type: [string, "null"]
+          format: date-time
+          description: '`startedAt + durationSeconds`; null while `startedAt` is null.'
+        serverTime: { type: string, format: date-time }
+        resumed: { type: boolean }
+        currentSectionId: { type: [string, "null"] }
+        currentQuestionId: { type: [string, "null"] }
+        finalizedPriorAttempt:
+          oneOf:
+            - { $ref: "#/components/schemas/FinalizedAttempt" }
+            - { type: "null" }
+          description: Set when a stale in-progress attempt was auto-submitted to make room for this one.
+
+    FinalizedAttempt:
+      type: object
+      description: |
+        An attempt finalized by lazy expiry — either the one this request touched, or a stale one
+        cleared out of the way by a new start. Both uses are expiry-driven, so `status` is
+        always `expired`; `submittedAt` is pinned to the deadline, never to arrival.
+      required: [id, status, submittedAt, resultUrl]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        status: { type: string, const: expired }
+        submittedAt: { type: string, format: date-time }
+        resultUrl: { type: string }
+
+    SectionEntry:
+      type: object
+      required: [sectionId, title, type, questionCount, enteredAt, expiresAt, serverTime, navigation, allowAnswerChange, playback, instructions]
+      properties:
+        sectionId: { type: string }
+        title: { type: string }
+        type: { $ref: "#/components/schemas/SectionType" }
+        questionCount: { type: integer }
+        enteredAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        serverTime: { type: string, format: date-time }
+        attemptStartedAt:
+          type: string
+          format: date-time
+          description: Present on the FIRST entry — this is what starts the whole-test clock.
+        attemptExpiresAt: { type: string, format: date-time }
+        navigation: { $ref: "#/components/schemas/NavigationMode" }
+        allowAnswerChange: { type: boolean }
+        playback: { $ref: "#/components/schemas/Playback" }
+        instructions:
+          type: array
+          items: { type: string }
+
+    PlayGrant:
+      type: object
+      required: [stimulusId, playsUsed, playsRemaining, mediaUrl, urlExpiresAt]
+      properties:
+        stimulusId: { type: string }
+        playsUsed: { type: integer }
+        playsRemaining: { type: [integer, "null"] }
+        mediaUrl: { type: string, description: Short-lived and signed. }
+        urlExpiresAt: { type: string, format: date-time }
+
+    Choice:
+      type: object
+      description: The runner projection. `isCorrect` is absent by construction.
+      required: [id, label]
+      properties:
+        id: { type: string }
+        label: { type: string }
+
+    Question:
+      type: object
+      required: [id, ordinal, type, prompt, choices]
+      properties:
+        id: { type: string }
+        ordinal: { type: integer }
+        type: { type: string, enum: [single_choice, multi_choice] }
+        prompt: { type: string }
+        choices:
+          type: array
+          items: { $ref: "#/components/schemas/Choice" }
+
+    CappedStimulus:
+      type: object
+      description: |
+        A stimulus with a play limit. Carries NO `mediaUrl`: a cap is meaningless if the bytes are
+        reachable without claiming a play, so the URL is issued only by `/play`, signed and short-lived.
+      required: [id, type, maxPlays, playsUsed, allowPause, allowSeek]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [audio, passage, image, mixed] }
+        title: { type: string }
+        bodyText: { type: string, description: Present for a passage. }
+        maxPlays: { type: integer, minimum: 1 }
+        playsUsed: { type: integer, minimum: 0 }
+        allowPause: { type: boolean }
+        allowSeek: { type: boolean }
+
+    OpenStimulus:
+      type: object
+      description: |
+        A stimulus with no play limit — an image, a passage, or audio a student may replay freely.
+        Only these carry a `mediaUrl` in the runner payload.
+      required: [id, type, maxPlays]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [audio, passage, image, mixed] }
+        title: { type: string }
+        bodyText: { type: string, description: Present for a passage. }
+        maxPlays: { type: "null" }
+        mediaUrl: { type: string }
+        allowPause: { type: boolean }
+        allowSeek: { type: boolean }
+
+    Stimulus:
+      description: Capped or uncapped. The distinction decides whether `mediaUrl` may appear at all.
+      oneOf:
+        - { $ref: "#/components/schemas/CappedStimulus" }
+        - { $ref: "#/components/schemas/OpenStimulus" }
+
+    QuestionGroup:
+      type: object
+      required: [id, questions]
+      properties:
+        id: { type: string }
+        stimulus: { $ref: "#/components/schemas/Stimulus" }
+        questions:
+          type: array
+          items: { $ref: "#/components/schemas/Question" }
+
+    RunnerSection:
+      type: object
+      required: [id, type, status, completedAt, navigation, allowAnswerChange, expiresAt, groups]
+      properties:
+        id: { type: string }
+        type: { $ref: "#/components/schemas/SectionType" }
+        status: { type: string, enum: [pending, open, closed] }
+        completedAt: { type: [string, "null"], format: date-time }
+        navigation: { $ref: "#/components/schemas/NavigationMode" }
+        allowAnswerChange: { type: boolean }
+        expiresAt: { type: [string, "null"], format: date-time }
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/QuestionGroup" }
+
+    RecordedResponse:
+      type: object
+      required: [questionId, selectedChoiceIds, clientInstanceId, seq]
+      properties:
+        questionId: { type: string }
+        selectedChoiceIds:
+          type: array
+          items: { type: string }
+        clientInstanceId: { type: string }
+        seq:
+          type: integer
+          description: What the resume merge compares. Returned so the client can decide which side wins.
+        answeredAt: { type: string, format: date-time, description: Display text only. }
+
+    RunnerEnvelope:
+      type: object
+      required: [id, status, expiresAt, serverTime, questionCount, answeredCount, unansweredOrdinals, currentSectionId, currentQuestionId, sections, responses]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [in_progress] }
+        expiresAt: { type: [string, "null"], format: date-time }
+        serverTime: { type: string, format: date-time }
+        questionCount: { type: integer }
+        answeredCount: { type: integer }
+        unansweredOrdinals:
+          type: array
+          items: { type: integer }
+          description: Drives the navigator's blank cells and the hand-in dialog's blank list.
+        currentSectionId: { type: [string, "null"] }
+        currentQuestionId: { type: [string, "null"] }
+        sections:
+          type: array
+          items: { $ref: "#/components/schemas/RunnerSection" }
+        responses:
+          type: array
+          items: { $ref: "#/components/schemas/RecordedResponse" }
+
+    SingleResponseWrite:
+      type: object
+      required: [clientInstanceId, seq, selectedChoiceIds]
+      additionalProperties: false
+      properties:
+        clientInstanceId: { type: string }
+        seq: { type: integer }
+        selectedChoiceIds:
+          type: array
+          items: { type: string }
+          description: Empty means cleared, not malformed.
+        answeredAt: { type: string, format: date-time }
+        timeSpentMs: { type: integer }
+
+    ResponseSnapshotItem:
+      type: object
+      required: [questionId, seq, selectedChoiceIds]
+      additionalProperties: false
+      properties:
+        questionId: { type: string }
+        seq: { type: integer }
+        selectedChoiceIds:
+          type: array
+          items: { type: string }
+        answeredAt: { type: string, format: date-time }
+        timeSpentMs: { type: integer }
+
+    ResponseSnapshot:
+      type: object
+      required: [clientInstanceId, responses]
+      additionalProperties: false
+      properties:
+        clientInstanceId: { type: string }
+        responses:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/ResponseSnapshotItem" }
+          description: |
+            Every answer held for ONE section — a snapshot, never a delta. A body whose questions
+            span more than one section is refused as `mixed_sections` and captured, because the
+            envelope-level section rules cannot be evaluated against two sections at once.
+
+
+    ItemAccepted:
+      type: object
+      description: The write landed, or was discarded as stale. Both are successes.
+      required: [questionId, status]
+      additionalProperties: false
+      properties:
+        questionId: { type: string }
+        status: { type: string, enum: [applied, ignored_stale] }
+
+    ItemRejected:
+      type: object
+      description: |
+        The write was refused. `capturedAs` is REQUIRED: a rejection without a capture id is an
+        answer the server refused and did not keep, which is the failure mode this whole design
+        exists to prevent.
+      required: [questionId, status, reason, retryable, capturedAs]
+      additionalProperties: false
+      properties:
+        questionId: { type: string }
+        status: { type: string, const: rejected }
+        reason:
+          type: string
+          enum: [answer_change_not_allowed, navigation_locked, unknown_question, invalid]
+          description: Per-item conditions only. `section_expired` and `mixed_sections` are envelope-level.
+        retryable:
+          type: boolean
+          const: false
+          description: |
+            Always false, and enforced as such. Every per-item rejection is a rule decision, not a
+            transient fault — a retried 409-class failure is a storm, not a recovery.
+        capturedAs:
+          type: string
+          description: The `failed_write` id holding this item verbatim.
+
+    ItemResult:
+      oneOf:
+        - { $ref: "#/components/schemas/ItemAccepted" }
+        - { $ref: "#/components/schemas/ItemRejected" }
+      discriminator:
+        propertyName: status
+        mapping:
+          applied: "#/components/schemas/ItemAccepted"
+          ignored_stale: "#/components/schemas/ItemAccepted"
+          rejected: "#/components/schemas/ItemRejected"
+
+    AttemptClock:
+      type: object
+      required: [serverTime]
+      properties:
+        expiresAt: { type: [string, "null"], format: date-time }
+        sectionExpiresAt: { type: [string, "null"], format: date-time }
+        serverTime: { type: string, format: date-time }
+
+    SingleResponseResult:
+      type: object
+      description: |
+        A 200 here is never a rejection — a refused single write is a 409, which names one
+        question and therefore needs no per-item envelope.
+      required: [questionId, status, attempt]
+      properties:
+        questionId: { type: string }
+        status: { type: string, enum: [applied, ignored_stale] }
+        attempt: { $ref: "#/components/schemas/AttemptClock" }
+
+    FlushResult:
+      type: object
+      required: [results, attempt]
+      properties:
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/ItemResult" }
+          description: One entry per snapshot item — the client clears its queue per ack, not per request.
+        attempt: { $ref: "#/components/schemas/AttemptClock" }
+
+    SubmitRequest:
+      type: object
+      required: [clientInstanceId]
+      additionalProperties: false
+      properties:
+        clientInstanceId: { type: string }
+        responses:
+          type: array
+          items: { $ref: "#/components/schemas/ResponseSnapshotItem" }
+          description: Whatever the queue still holds; may be empty or absent.
+
+    SubmitResult:
+      type: object
+      required: [attemptId, status, submittedAt, resultUrl, finalFlush]
+      properties:
+        attemptId: { type: string }
+        status: { type: string, enum: [submitted] }
+        submittedAt: { type: string, format: date-time }
+        resultUrl: { type: string }
+        finalFlush:
+          type: array
+          items: { $ref: "#/components/schemas/ItemResult" }
+          description: |
+            One ack per item in the request's `responses` array; empty when the queue was already
+            drained. Always present, so the client can clear its queue from this response alone.
+
+    SectionScore:
+      type: object
+      required: [title, type, pointsEarned, pointsPossible]
+      properties:
+        title: { type: string }
+        type: { $ref: "#/components/schemas/SectionType" }
+        pointsEarned: { type: integer }
+        pointsPossible: { type: integer }
+
+    Score:
+      type: object
+      required: [pointsEarned, pointsPossible, percentage, answered, unanswered, correct, incorrect, isPersonalBest, sections]
+      properties:
+        pointsEarned: { type: integer }
+        pointsPossible: { type: integer }
+        percentage: { type: number }
+        answered: { type: integer }
+        unanswered: { type: integer }
+        correct: { type: integer }
+        incorrect: { type: integer }
+        isPersonalBest:
+          type: boolean
+          description: |
+            A claim the server makes, not the client. Computed at READ time against this student's
+            other finished attempts, so it can change after a later attempt — unlike every other
+            field here, it is not frozen at grading.
+        sections:
+          type: array
+          items: { $ref: "#/components/schemas/SectionScore" }
+
+    AttemptResult:
+      type: object
+      required: [attemptId, test, status, submittedAt, elapsedSeconds, score]
+      properties:
+        attemptId: { type: string }
+        test:
+          type: object
+          required: [title, version]
+          properties:
+            title: { type: string }
+            version:
+              type: integer
+              description: Attempts pin versions, so two attempts at one test may not be strictly comparable.
+        status: { type: string, enum: [submitted, expired] }
+        submittedAt: { type: string, format: date-time }
+        elapsedSeconds: { type: integer }
+        score: { $ref: "#/components/schemas/Score" }
+
+    AttemptHistoryRow:
+      type: object
+      required: [id, test, submittedAt, status, pointsEarned, pointsPossible, percentage, sections]
+      properties:
+        id: { type: string }
+        test:
+          type: object
+          required: [title]
+          properties:
+            title: { type: string }
+        submittedAt: { type: string, format: date-time }
+        status:
+          type: string
+          enum: [submitted, expired]
+          description: Rendered as the "How it ended" column — an expired attempt must not read as an ordinary hand-in.
+        pointsEarned: { type: integer }
+        pointsPossible: { type: integer }
+        percentage: { type: number }
+        sections:
+          type: array
+          items: { $ref: "#/components/schemas/SectionScore" }
+
+    ReviewChoice:
+      type: object
+      required: [id, label, isCorrect, selected]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        isCorrect: { type: boolean }
+        selected: { type: boolean }
+
+    ReviewItem:
+      type: object
+      required: [questionId, ordinal, sectionId, prompt, outcome, choices]
+      properties:
+        questionId: { type: string }
+        ordinal: { type: integer }
+        sectionId: { type: string }
+        prompt: { type: string }
+        outcome: { type: string, enum: [correct, incorrect, unanswered] }
+        stimulus:
+          oneOf:
+            - { $ref: "#/components/schemas/ReviewMediaStimulus" }
+            - { $ref: "#/components/schemas/ReviewPassageStimulus" }
+            - { $ref: "#/components/schemas/ReviewMixedStimulus" }
+        choices:
+          type: array
+          items: { $ref: "#/components/schemas/ReviewChoice" }
+
+    ReviewMediaStimulus:
+      type: object
+      description: |
+        Audio or image, as the student saw it. `mediaUrl` is REQUIRED here and unsigned: the
+        attempt is finished, so the play cap no longer applies and there is nothing left to guard.
+      required: [id, type, mediaUrl, replayable]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [audio, image] }
+        title: { type: string }
+        mediaUrl: { type: string }
+        replayable: { type: boolean, const: true }
+
+    ReviewMixedStimulus:
+      type: object
+      description: Text AND media together, so review must reproduce both halves.
+      required: [id, type, bodyText, mediaUrl, replayable]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        type: { type: string, const: mixed }
+        title: { type: string }
+        bodyText: { type: string }
+        mediaUrl: { type: string }
+        replayable: { type: boolean, const: true }
+
+    ReviewPassageStimulus:
+      type: object
+      description: A reading passage. Carries its heading, so review reproduces what the student read.
+      required: [id, type, title, bodyText, replayable]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        type: { type: string, const: passage }
+        title:
+          type: string
+          description: Reproduces what the student saw — a reading review needs the passage heading.
+        bodyText: { type: string }
+        replayable: { type: boolean, const: true }
+
+    ReviewPayload:
+      type: object
+      required: [attemptId, items]
+      properties:
+        attemptId: { type: string }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ReviewItem" }
+          description: EVERY question, answered or not — the navigator colours all of them.
+
+    FailedWrite:
+      type: object
+      required: [id, reason, rawBody, receivedAt, replayedAt]
+      properties:
+        id: { type: string }
+        attemptId: { type: [string, "null"], description: Unresolved when the body itself was malformed. }
+        reason: { type: string }
+        rawBody:
+          type: string
+          description: |
+            The request body verbatim, as received, before any parsing. Stored as TEXT or bytea,
+            never as jsonb — the whole point is retaining bodies that failed to parse, which jsonb
+            cannot hold and which would lose byte order and whitespace even when they do parse.
+        clientVersion: { type: string }
+        receivedAt: { type: string, format: date-time }
+        replayedAt: { type: [string, "null"], format: date-time }
+
+    MediaAsset:
+      type: object
+      required: [id, kind, filename, mimeType, byteSize, checksum]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [audio, image] }
+        filename: { type: string }
+        mimeType: { type: string }
+        byteSize: { type: integer }
+        checksum: { type: string }
+
+    TestDocument:
+      type: object
+      description: |
+        The JSON interchange format for import/export. This is the ONE place the content shape is
+        fully expressed — the runner projection deliberately omits `isCorrect`, and this does not.
+      required: [title, sections]
+      properties:
+        title: { type: string }
+        slug: { type: string }
+        level: { type: string, enum: [primary-step-1, primary-step-2] }
+        durationSeconds: { type: integer }
+        sections:
+          type: array
+          items:
+            type: object
+            required: [title, type, groups]
+            properties:
+              title: { type: string }
+              type: { $ref: "#/components/schemas/SectionType" }
+              durationSeconds: { type: integer }
+              navigation: { $ref: "#/components/schemas/NavigationMode" }
+              allowAnswerChange: { type: boolean }
+              playback: { $ref: "#/components/schemas/Playback" }
+              instructions:
+                type: array
+                items: { type: string }
+              groups:
+                type: array
+                items:
+                  type: object
+                  required: [questions]
+                  properties:
+                    stimulus:
+                      type: object
+                      properties:
+                        type: { type: string, enum: [audio, passage, image, mixed] }
+                        title: { type: string }
+                        bodyText: { type: string }
+                        mediaFilename: { type: string }
+                        maxPlays: { type: [integer, "null"] }
+                        allowPause: { type: boolean }
+                        allowSeek: { type: boolean }
+                    questions:
+                      type: array
+                      items:
+                        type: object
+                        required: [questionKey, prompt, type, points, choices]
+                        properties:
+                          questionKey:
+                            type: string
+                            description: Stable across versions, so item history survives a re-publish.
+                          prompt: { type: string }
+                          type: { type: string, enum: [single_choice, multi_choice] }
+                          points: { type: integer }
+                          tags:
+                            type: array
+                            items: { type: string }
+                          choices:
+                            type: array
+                            minItems: 2
+                            items:
+                              type: object
+                              required: [label, isCorrect]
+                              properties:
+                                label: { type: string }
+                                isCorrect: { type: boolean }

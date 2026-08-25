@@ -1,0 +1,1625 @@
+<title>Primary Practice Runner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;0,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+/* ── Shell tokens: light is the base, both dark paths redefine only tokens ── */
+:root {
+  --bg:        #EEF1F5;
+  --panel:     #FFFFFF;
+  --panel-2:   #F7F9FB;
+  --line:      #D6DDE6;
+  --line-soft: #E4EAF1;
+  --fg:        #17202A;
+  --fg-muted:  #5C6B7A;
+  --fg-faint:  #8695A5;
+  --accent:    #0F6E78;
+  --accent-bg: #E2F0F1;
+  --get:       #2A6DB0;
+  --post:      #2E8B57;
+  --put:       #B07A16;
+  --patch:     #8A5CB8;
+  --shadow:    0 1px 2px rgba(23,32,42,.06), 0 8px 24px rgba(23,32,42,.07);
+  --radius:    10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:        #0E1319;
+    --panel:     #161C24;
+    --panel-2:   #1B222B;
+    --line:      #252E39;
+    --line-soft: #1F2732;
+    --fg:        #CBD5E1;
+    --fg-muted:  #8A97A6;
+    --fg-faint:  #6B7885;
+    --accent:    #3FB3BF;
+    --accent-bg: #133038;
+    --get:       #6BA6E0;
+    --post:      #62BE8C;
+    --put:       #D8AC57;
+    --patch:     #B392D8;
+    --shadow:    0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"] {
+  --bg:        #0E1319;
+  --panel:     #161C24;
+  --panel-2:   #1B222B;
+  --line:      #252E39;
+  --line-soft: #1F2732;
+  --fg:        #CBD5E1;
+  --fg-muted:  #8A97A6;
+  --fg-faint:  #6B7885;
+  --accent:    #3FB3BF;
+  --accent-bg: #133038;
+  --get:       #6BA6E0;
+  --post:      #62BE8C;
+  --put:       #D8AC57;
+  --patch:     #B392D8;
+  --shadow:    0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+}
+
+/* ── Device tokens: fixed. A mockup of a product does not follow the reader's OS. ── */
+.device {
+  --d-ink:     #1C2530;
+  --d-ink-2:   #55636F;
+  --d-faint:   #8D9AA6;
+  --d-paper:   #FFFFFF;
+  --d-surface: #F4F7F9;
+  --d-line:    #DFE6EC;
+  --d-teal:    #0F6E78;
+  --d-teal-bg: #E4F1F2;
+  --d-clay:    #A8622F;
+  --d-clay-bg: #F8EDE4;
+  --d-green:   #2E9E5B;
+  --d-green-bg:#E6F4EB;
+  --d-red:     #C4453F;
+  --d-red-bg:  #FAEAE9;
+  --d-amber:   #E8A33D;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+code, .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+
+/* ── Masthead ─────────────────────────────────────────────── */
+.masthead {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 18px;
+  padding: 22px 28px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.masthead h1 {
+  margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -.01em;
+  text-wrap: balance;
+}
+.masthead .sub { color: var(--fg-muted); font-size: 13.5px; }
+.masthead .spacer { flex: 1 1 auto; }
+.step-flag {
+  font-family: "IBM Plex Mono", monospace; font-size: 11px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--accent);
+  background: var(--accent-bg); border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+}
+
+/* ── Three-column frame ───────────────────────────────────── */
+.frame {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr) minmax(0, 460px);
+  gap: 0;
+  align-items: start;
+  min-height: calc(100vh - 62px);
+}
+
+/* ── Rail ─────────────────────────────────────────────────── */
+.rail {
+  border-right: 1px solid var(--line);
+  padding: 20px 14px 40px;
+  position: sticky; top: 0; align-self: stretch;
+}
+.rail-group + .rail-group { margin-top: 22px; }
+.rail-label {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--fg-faint); padding: 0 10px 7px;
+}
+.rail-btn {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 7px 10px; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 13.5px; color: var(--fg-muted);
+  text-align: left; border-radius: 7px;
+}
+.rail-btn:hover { background: var(--panel-2); color: var(--fg); }
+.rail-btn[aria-current="true"] { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+.rail-num {
+  font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+  color: var(--fg-faint); min-width: 15px;
+}
+.rail-btn[aria-current="true"] .rail-num { color: var(--accent); }
+
+/* ── Stage ────────────────────────────────────────────────── */
+.stage {
+  padding: 28px 30px 60px;
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+}
+.stage-head { width: 100%; max-width: 860px; }
+.stage-head h2 {
+  margin: 0 0 3px; font-size: 17px; font-weight: 600; letter-spacing: -.01em;
+}
+.stage-head p { margin: 0; color: var(--fg-muted); font-size: 13.5px; max-width: 62ch; }
+
+/* iPad frame */
+.device-shell {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 13px;
+  box-shadow: var(--shadow);
+  width: 100%; max-width: 860px;
+}
+.device {
+  background: var(--d-surface);
+  border: 1px solid var(--d-line);
+  border-radius: 12px;
+  overflow: hidden;
+  font-family: Nunito, ui-rounded, "Segoe UI", sans-serif;
+  color: var(--d-ink);
+  min-height: 528px;
+  display: flex; flex-direction: column;
+  position: relative;
+}
+
+/* ── Collapsible panels inside the device ─────────────────── */
+.icon-btn {
+  display: inline-flex; flex-direction: column; justify-content: center; gap: 3.5px;
+  width: 30px; height: 30px; padding: 0 6px; flex: none;
+  background: none; border: 1px solid transparent; border-radius: 7px; cursor: pointer;
+}
+.icon-btn:hover { background: var(--d-surface); border-color: var(--d-line); }
+.icon-btn i { display: block; height: 2px; border-radius: 2px; background: var(--d-ink); }
+.icon-btn[aria-expanded="true"] { background: var(--d-teal-bg); border-color: var(--d-teal); }
+.icon-btn[aria-expanded="true"] i { background: var(--d-teal); }
+
+.nav-toggle {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--d-paper); border: 1px solid var(--d-line); border-radius: 8px;
+  padding: 6px 11px; font: inherit; font-size: 12.5px; font-weight: 700;
+  color: var(--d-ink); cursor: pointer;
+}
+.nav-toggle:hover { border-color: var(--d-teal); }
+.nav-toggle[aria-expanded="true"] { background: var(--d-teal-bg); border-color: var(--d-teal); color: var(--d-teal); }
+.nav-toggle .chev { font-size: 10px; transition: transform .18s ease; }
+.nav-toggle[aria-expanded="true"] .chev { transform: rotate(180deg); }
+
+.scrim {
+  position: absolute; inset: 0; background: rgba(28,37,48,.34);
+  opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 4;
+}
+.scrim.on { opacity: 1; pointer-events: auto; }
+
+.drawer {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 234px; z-index: 5;
+  background: var(--d-paper); border-right: 1px solid var(--d-line);
+  transform: translateX(-100%); transition: transform .22s ease;
+  display: flex; flex-direction: column; padding: 14px 12px;
+}
+.drawer.open { transform: translateX(0); }
+.drawer-head {
+  display: flex; align-items: center; gap: 10px; padding: 2px 6px 13px;
+  border-bottom: 1px solid var(--d-line); margin-bottom: 10px;
+}
+.drawer-head .who { min-width: 0; }
+.drawer-head .who b { display: block; font-size: 14px; }
+.drawer-head .who span { font-size: 11.5px; color: var(--d-faint); }
+.drawer-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  background: none; border: 0; border-radius: 8px; padding: 9px 10px;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--d-ink);
+  text-align: left; cursor: pointer;
+}
+.drawer-item:hover { background: var(--d-surface); }
+.drawer-item .gl { width: 16px; text-align: center; color: var(--d-faint); font-size: 13px; }
+.drawer-item.danger { color: var(--d-red); }
+.drawer-item.danger .gl { color: var(--d-red); }
+.drawer-sep { height: 1px; background: var(--d-line); margin: 9px 4px; }
+.drawer-foot { margin-top: auto; padding: 10px 6px 2px; border-top: 1px solid var(--d-line); }
+.lang-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.lang {
+  font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
+  border: 1px solid var(--d-line); background: var(--d-paper); color: var(--d-ink-2);
+  border-radius: 6px; padding: 3px 8px;
+}
+.lang[aria-pressed="true"] { background: var(--d-teal-bg); border-color: var(--d-teal); color: var(--d-teal); }
+
+.navpanel {
+  position: absolute; top: 0; bottom: 0; right: 0; width: 252px; z-index: 5;
+  background: var(--d-paper); border-left: 1px solid var(--d-line);
+  transform: translateX(100%); transition: transform .22s ease;
+  display: flex; flex-direction: column; padding: 14px 14px 12px;
+}
+.navpanel.open { transform: translateX(0); }
+.navpanel h4 { margin: 0 0 2px; font-size: 14.5px; font-weight: 800; }
+.navpanel .np-sub { margin: 0 0 12px; font-size: 12px; color: var(--d-faint); }
+.np-scroll { overflow-y: auto; flex: 1 1 auto; margin: 0 -4px; padding: 0 4px; }
+.np-group + .np-group { margin-top: 14px; }
+.np-group-label {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+  margin-bottom: 7px; display: flex; align-items: center; gap: 7px;
+}
+.np-group-label.listening { color: var(--d-teal); }
+.np-group-label.reading   { color: var(--d-clay); }
+.np-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.np-cell {
+  aspect-ratio: 1; display: grid; place-items: center;
+  font: inherit; font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums;
+  border-radius: 7px; border: 1.5px solid var(--d-line);
+  background: var(--d-paper); color: var(--d-ink-2); cursor: pointer;
+}
+.np-cell:hover:not(:disabled) { border-color: var(--d-teal); }
+.np-cell:disabled { cursor: not-allowed; opacity: .55; }
+.np-cell.answered  { background: var(--d-teal-bg); border-color: var(--d-teal); color: var(--d-teal); }
+.np-cell.current   { background: var(--d-amber); border-color: var(--d-amber); color: #4A3208; }
+.np-cell.correct   { background: var(--d-green-bg); border-color: var(--d-green); color: var(--d-green); }
+.np-cell.incorrect { background: var(--d-red-bg);   border-color: var(--d-red);   color: var(--d-red); }
+.np-cell.blank     { background: var(--d-surface); border-style: dashed; }
+.np-legend {
+  margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--d-line);
+  display: flex; flex-wrap: wrap; gap: 5px 12px; font-size: 11px; color: var(--d-ink-2);
+}
+.np-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.np-key { width: 11px; height: 11px; border-radius: 3px; border: 1.5px solid var(--d-line); }
+.np-key.answered  { background: var(--d-teal-bg);  border-color: var(--d-teal); }
+.np-key.current   { background: var(--d-amber);    border-color: var(--d-amber); }
+.np-key.blank     { background: var(--d-surface);  border-style: dashed; }
+.np-key.correct   { background: var(--d-green-bg); border-color: var(--d-green); }
+.np-key.incorrect { background: var(--d-red-bg);   border-color: var(--d-red); }
+.np-locked-note {
+  margin-top: 10px; font-size: 11.5px; line-height: 1.5; color: var(--d-ink-2);
+  background: var(--d-surface); border-radius: 7px; padding: 8px 10px;
+}
+.screen { display: none; flex: 1 1 auto; flex-direction: column; }
+.screen.is-active { display: flex; }
+
+/* ── In-device chrome ─────────────────────────────────────── */
+.app-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 18px; background: var(--d-paper);
+  border-bottom: 1px solid var(--d-line);
+}
+.app-bar .brand { font-weight: 800; font-size: 14.5px; letter-spacing: -.01em; }
+.app-bar .grow { flex: 1 1 auto; }
+.sec-chip {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 999px;
+}
+.sec-chip.listening { background: var(--d-teal-bg); color: var(--d-teal); }
+.sec-chip.reading   { background: var(--d-clay-bg); color: var(--d-clay); }
+.timer {
+  font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums;
+  font-size: 14px; font-weight: 500; color: var(--d-ink);
+}
+.timer.low { color: var(--d-amber); }
+.avatar {
+  width: 27px; height: 27px; border-radius: 50%;
+  background: var(--d-teal); color: #fff;
+  display: grid; place-items: center; font-size: 12px; font-weight: 700;
+}
+
+.body-pad { padding: 22px 26px; flex: 1 1 auto; }
+.center-pad { padding: 30px 26px; flex: 1 1 auto; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; text-align: center; gap: 5px; }
+
+h3.scr-title { margin: 0 0 4px; font-size: 21px; font-weight: 800; letter-spacing: -.015em; text-wrap: balance; }
+.scr-sub { margin: 0; color: var(--d-ink-2); font-size: 14px; }
+
+/* Buttons in-device */
+.btn {
+  font-family: inherit; font-size: 15px; font-weight: 700;
+  padding: 11px 26px; border-radius: 9px; border: 1px solid transparent;
+  cursor: pointer; background: var(--d-teal); color: #fff;
+}
+.btn:hover { filter: brightness(1.07); }
+.btn.ghost { background: var(--d-paper); color: var(--d-ink); border-color: var(--d-line); }
+.btn.ghost:hover { background: var(--d-surface); filter: none; }
+.btn.sm { font-size: 13.5px; padding: 8px 16px; }
+.btn.google {
+  background: var(--d-paper); color: var(--d-ink); border-color: var(--d-line);
+  display: inline-flex; align-items: center; gap: 10px;
+}
+.g-mark {
+  width: 17px; height: 17px; border-radius: 50%; flex: none;
+  background: conic-gradient(#EA4335 0 25%, #FBBC05 0 50%, #34A853 0 75%, #4285F4 0);
+}
+
+/* Cards */
+.card {
+  background: var(--d-paper); border: 1px solid var(--d-line);
+  border-radius: 11px; padding: 17px 19px;
+}
+.card + .card { margin-top: 11px; }
+.card-title { font-weight: 800; font-size: 15.5px; margin: 0 0 3px; }
+.card-meta { color: var(--d-ink-2); font-size: 13px; margin: 0; }
+
+.stat-row { display: flex; gap: 26px; flex-wrap: wrap; }
+.stat-k { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--d-faint); }
+.stat-v { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Choices */
+.choices { display: flex; flex-direction: column; gap: 9px; margin-top: 15px; }
+.choice {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  background: var(--d-paper); border: 1.5px solid var(--d-line);
+  border-radius: 10px; padding: 12px 15px;
+  font: inherit; font-size: 15px; text-align: left; cursor: pointer; color: var(--d-ink);
+}
+.choice:hover { border-color: var(--d-teal); }
+.choice .dot {
+  width: 19px; height: 19px; border-radius: 50%; flex: none;
+  border: 2px solid var(--d-line); display: grid; place-items: center;
+}
+.choice[aria-checked="true"] { border-color: var(--d-teal); background: var(--d-teal-bg); font-weight: 700; }
+.choice[aria-checked="true"] .dot { border-color: var(--d-teal); background: var(--d-teal); }
+.choice[aria-checked="true"] .dot::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #fff; }
+.choice.locked { cursor: not-allowed; opacity: .92; }
+.choice.locked:hover { border-color: var(--d-line); }
+.choice.locked[aria-checked="true"]:hover { border-color: var(--d-teal); }
+.choice.correct   { border-color: var(--d-green); background: var(--d-green-bg); }
+.choice.incorrect { border-color: var(--d-red);   background: var(--d-red-bg); }
+.tick { margin-left: auto; font-weight: 800; font-size: 13px; }
+.tick.ok  { color: var(--d-green); }
+.tick.bad { color: var(--d-red); }
+
+/* Audio */
+.audio-box {
+  background: var(--d-teal-bg); border: 1px solid color-mix(in srgb, var(--d-teal) 22%, transparent);
+  border-radius: 12px; padding: 20px; display: flex; flex-direction: column;
+  align-items: center; gap: 10px;
+}
+.play-btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--d-teal); color: #fff; border: 0; border-radius: 999px;
+  padding: 12px 27px; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.play-btn[disabled] { background: var(--d-faint); cursor: not-allowed; }
+.plays-left { font-size: 12.5px; font-weight: 700; color: var(--d-teal); }
+.plays-left.spent { color: var(--d-ink-2); }
+.wave { display: flex; align-items: flex-end; gap: 3px; height: 26px; }
+.wave i { width: 3px; background: color-mix(in srgb, var(--d-teal) 45%, transparent); border-radius: 2px; }
+
+/* Passage */
+.passage {
+  background: var(--d-clay-bg); border-left: 3px solid var(--d-clay);
+  border-radius: 0 9px 9px 0; padding: 14px 17px; font-size: 14px; line-height: 1.65;
+  max-height: 168px; overflow-y: auto;
+}
+.passage h4 { margin: 0 0 6px; font-size: 13.5px; font-weight: 800; color: var(--d-clay); }
+.passage p { margin: 0 0 9px; }
+.passage p:last-child { margin: 0; }
+
+.q-prompt { font-size: 16.5px; font-weight: 700; margin: 15px 0 0; text-wrap: balance; }
+.q-count { font-size: 12.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--d-faint); }
+
+/* Progress pips */
+.pips { display: flex; gap: 4px; flex-wrap: wrap; }
+.pip { width: 19px; height: 5px; border-radius: 3px; background: var(--d-line); }
+.pip.done { background: var(--d-teal); }
+.pip.now  { background: var(--d-amber); }
+
+.nav-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 26px; border-top: 1px solid var(--d-line); background: var(--d-paper);
+}
+.nav-bar .grow { flex: 1 1 auto; }
+
+.save-flag {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 700; color: var(--d-green);
+}
+.save-flag .dotlet { width: 6px; height: 6px; border-radius: 50%; background: var(--d-green); }
+
+.notice {
+  background: #FCF4E4; border: 1px solid #EFD9AC; color: #7A5A18;
+  border-radius: 9px; padding: 11px 14px; font-size: 13.5px; font-weight: 600;
+}
+
+.score-ring {
+  width: 118px; height: 118px; border-radius: 50%; display: grid; place-items: center;
+  background: conic-gradient(var(--d-teal) 0 90%, var(--d-line) 0);
+}
+.score-ring .inner {
+  width: 96px; height: 96px; border-radius: 50%; background: var(--d-paper);
+  display: grid; place-items: center; line-height: 1.1;
+}
+.score-pct { font-size: 25px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.score-frac { font-size: 12px; color: var(--d-ink-2); font-weight: 700; }
+
+.bar { height: 7px; border-radius: 4px; background: var(--d-line); overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: 4px; }
+
+table.hist { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.hist th {
+  text-align: left; font-size: 11px; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--d-faint); font-weight: 700; padding: 0 10px 7px 0;
+}
+table.hist td { padding: 10px 10px 10px 0; border-top: 1px solid var(--d-line); font-variant-numeric: tabular-nums; }
+table.hist td.name { font-weight: 700; }
+.badge { font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
+.badge.hi { background: var(--d-green-bg); color: var(--d-green); }
+.badge.mid { background: var(--d-teal-bg); color: var(--d-teal); }
+
+.scroll-x { overflow-x: auto; }
+
+/* ── API panel ────────────────────────────────────────────── */
+.api {
+  border-left: 1px solid var(--line);
+  padding: 20px 20px 60px;
+  align-self: stretch;
+  background: var(--panel);
+  min-width: 0;
+}
+.api-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.api-head h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-faint); }
+.api-count { font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--fg-faint); }
+.api-note { margin: 0 0 15px; font-size: 12.5px; color: var(--fg-muted); }
+
+.ep { border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 10px; background: var(--panel-2); overflow: hidden; }
+.ep > summary {
+  list-style: none; cursor: pointer; padding: 10px 12px;
+  display: grid; grid-template-columns: auto minmax(0,1fr); gap: 4px 9px; align-items: center;
+}
+.ep > summary::-webkit-details-marker { display: none; }
+.ep > summary:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.verb {
+  font-family: "IBM Plex Mono", monospace; font-size: 10px; font-weight: 600;
+  letter-spacing: .05em; padding: 3px 6px; border-radius: 4px; color: #fff; text-align: center;
+}
+.verb.GET   { background: var(--get); }
+.verb.POST  { background: var(--post); }
+.verb.PUT   { background: var(--put); }
+.verb.PATCH { background: var(--patch); }
+.uri { font-family: "IBM Plex Mono", monospace; font-size: 12px; word-break: break-all; color: var(--fg); }
+.ep-sum { grid-column: 2; font-size: 12.5px; color: var(--fg-muted); }
+.ep-body { padding: 0 12px 12px; border-top: 1px solid var(--line-soft); }
+.sect-k {
+  font-size: 10px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--fg-faint); margin: 12px 0 5px;
+}
+.ep-body p.desc { margin: 10px 0 0; font-size: 12.5px; color: var(--fg-muted); }
+pre {
+  margin: 0; background: var(--bg); border: 1px solid var(--line-soft); border-radius: 7px;
+  padding: 9px 11px; font-family: "IBM Plex Mono", monospace; font-size: 11.5px;
+  line-height: 1.55; overflow-x: auto; color: var(--fg);
+}
+.codes { display: flex; flex-wrap: wrap; gap: 6px; }
+.code-pill {
+  font-family: "IBM Plex Mono", monospace; font-size: 11px;
+  border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--fg-muted);
+}
+.code-pill.ok { border-color: color-mix(in srgb, var(--post) 45%, transparent); color: var(--post); }
+
+.legend {
+  margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line);
+  font-size: 12px; color: var(--fg-muted);
+}
+.legend b { color: var(--fg); font-weight: 600; }
+
+@media (max-width: 1180px) {
+  .frame { grid-template-columns: 200px minmax(0,1fr); }
+  .api { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); }
+}
+@media (max-width: 720px) {
+  .frame { grid-template-columns: minmax(0,1fr); }
+  .rail { position: static; border-right: 0; border-bottom: 1px solid var(--line); }
+  .stage { padding: 20px 14px 40px; }
+}
+</style>
+
+<header class="masthead">
+  <h1>Primary Practice Runner</h1>
+  <span class="sub">Clickable student flow, each screen annotated with the API it calls</span>
+  <span class="spacer"></span>
+  <span class="step-flag">Step 1 · prototype</span>
+</header>
+
+<div class="frame">
+
+  <nav class="rail" aria-label="Screens">
+    <div class="rail-group">
+      <div class="rail-label">Entry</div>
+      <button class="rail-btn" data-screen="signin"><span class="rail-num">01</span> Sign in</button>
+      <button class="rail-btn" data-screen="home"><span class="rail-num">02</span> Test library</button>
+      <button class="rail-btn" data-screen="intro"><span class="rail-num">03</span> Test brief</button>
+    </div>
+    <div class="rail-group">
+      <div class="rail-label">Taking the test</div>
+      <button class="rail-btn" data-screen="secintro"><span class="rail-num">04</span> Section rules</button>
+      <button class="rail-btn" data-screen="listening"><span class="rail-num">05</span> Listening</button>
+      <button class="rail-btn" data-screen="reading"><span class="rail-num">06</span> Reading</button>
+      <button class="rail-btn" data-screen="confirm"><span class="rail-num">07</span> Hand in</button>
+    </div>
+    <div class="rail-group">
+      <div class="rail-label">After</div>
+      <button class="rail-btn" data-screen="result"><span class="rail-num">08</span> Result</button>
+      <button class="rail-btn" data-screen="review"><span class="rail-num">09</span> Review answers</button>
+      <button class="rail-btn" data-screen="history"><span class="rail-num">10</span> History</button>
+    </div>
+    <div class="rail-group">
+      <div class="rail-label">Edge case</div>
+      <button class="rail-btn" data-screen="expired"><span class="rail-num">11</span> Time up</button>
+      <button class="rail-btn" data-screen="offline"><span class="rail-num">12</span> Save trouble</button>
+    </div>
+  </nav>
+
+  <main class="stage">
+    <div class="stage-head">
+      <h2 id="stageTitle">Sign in</h2>
+      <p id="stageNote">Tom opens the app on the family iPad.</p>
+    </div>
+
+    <div class="device-shell">
+      <div class="device">
+
+        <!-- 01 ─ Sign in ─────────────────────────────────── -->
+        <section class="screen is-active" id="s-signin">
+          <div class="center-pad">
+            <div style="font-size:31px;font-weight:800;letter-spacing:-.02em;">Primary Practice</div>
+            <p class="scr-sub" style="max-width:34ch;margin-bottom:18px;">Listening and reading practice tests for TOEFL Primary, Steps 1 and 2.</p>
+            <button class="btn google" data-goto="home">
+              <span class="g-mark" aria-hidden="true"></span> Continue with Google
+            </button>
+            <p style="font-size:12.5px;color:var(--d-faint);margin-top:16px;max-width:38ch;">
+              You will be taken to auth.icovn.me to sign in, then brought straight back here.
+            </p>
+          </div>
+        </section>
+
+        <!-- 02 ─ Library ─────────────────────────────────── -->
+        <section class="screen" id="s-home">
+          <div class="app-bar">
+            <button class="icon-btn" data-menu aria-expanded="false" aria-label="Open menu"><i></i><i></i><i></i></button>
+            <span class="brand">Primary Practice</span>
+            <span class="grow"></span>
+            <span style="font-size:13.5px;font-weight:700;">Tom</span>
+            <span class="avatar">T</span>
+          </div>
+          <div class="body-pad">
+            <h3 class="scr-title">Welcome back, Tom</h3>
+            <p class="scr-sub" style="margin-bottom:16px;">You have one test waiting.</p>
+
+            <div class="card" style="border-color:var(--d-teal);">
+              <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;">
+                <div style="flex:1 1 240px;min-width:0;">
+                  <p class="card-title">TOEFL Primary — Practice Test 04</p>
+                  <p class="card-meta">Step 1 · Listening 20 · Reading 20 · 50 minutes</p>
+                </div>
+                <button class="btn" data-goto="intro">Start test</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;">
+                <div style="flex:1 1 220px;min-width:0;">
+                  <p class="card-title">TOEFL Primary — Practice Test 03</p>
+                  <p class="card-meta">Tried once · best 36 / 40 (90%) · on 21 Aug</p>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button class="btn ghost sm" data-goto="result">See result</button>
+                  <button class="btn sm" data-goto="intro">Try again</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;">
+                <div style="flex:1 1 220px;min-width:0;">
+                  <p class="card-title">TOEFL Primary — Practice Test 02</p>
+                  <p class="card-meta">Tried once · best 33 / 40 (82.5%) · on 14 Aug</p>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button class="btn ghost sm" data-goto="result">See result</button>
+                  <button class="btn sm" data-goto="intro">Try again</button>
+                </div>
+              </div>
+            </div>
+
+            <button class="btn ghost sm" style="width:100%;margin-top:11px;">
+              Show more tests
+            </button>
+
+            <div style="margin-top:17px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <div class="stat-row" style="flex:1 1 auto;">
+                <div><div class="stat-k">Attempts</div><div class="stat-v">3</div></div>
+                <div><div class="stat-k">Average</div><div class="stat-v">82.5%</div></div>
+                <div><div class="stat-k">Best</div><div class="stat-v">90%</div></div>
+              </div>
+              <button class="btn ghost sm" data-goto="history">All attempts</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 03 ─ Brief ───────────────────────────────────── -->
+        <section class="screen" id="s-intro">
+          <div class="app-bar">
+            <button class="icon-btn" data-menu aria-expanded="false" aria-label="Open menu"><i></i><i></i><i></i></button>
+            <span class="brand">Primary Practice</span>
+            <span class="grow"></span>
+            <span class="avatar">T</span>
+          </div>
+          <div class="body-pad">
+            <h3 class="scr-title">Practice Test 04</h3>
+            <p class="scr-sub" style="margin-bottom:16px;">Step 1 · Two sections · 50 minutes · Attempt 1 of this test</p>
+
+            <div class="card">
+              <div style="display:flex;align-items:center;gap:11px;">
+                <span class="sec-chip listening">Listening</span>
+                <span style="font-size:14px;font-weight:700;">20 questions</span>
+                <span class="grow" style="flex:1 1 auto;"></span>
+                <span style="font-size:13.5px;color:var(--d-ink-2);">25 min</span>
+              </div>
+              <p class="card-meta" style="margin-top:7px;">Each recording plays once. You cannot go back to an earlier question.</p>
+            </div>
+            <div class="card">
+              <div style="display:flex;align-items:center;gap:11px;">
+                <span class="sec-chip reading">Reading</span>
+                <span style="font-size:14px;font-weight:700;">20 questions</span>
+                <span class="grow" style="flex:1 1 auto;"></span>
+                <span style="font-size:13.5px;color:var(--d-ink-2);">25 min</span>
+              </div>
+              <p class="card-meta" style="margin-top:7px;">Read the passages as often as you like and change any answer before you hand in.</p>
+            </div>
+
+            <div class="notice" style="margin-top:15px;">
+              Your answers save as you go. If the iPad closes, open the app again and you will carry on where you stopped.
+            </div>
+          </div>
+          <div class="nav-bar">
+            <button class="btn ghost sm" data-goto="home">Back</button>
+            <span class="grow"></span>
+            <button class="btn" data-goto="secintro">Start test</button>
+          </div>
+        </section>
+
+        <!-- 04 ─ Section rules ───────────────────────────── -->
+        <section class="screen" id="s-secintro">
+          <div class="app-bar">
+            <button class="icon-btn" data-menu aria-expanded="false" aria-label="Open menu"><i></i><i></i><i></i></button>
+            <span class="sec-chip listening">Listening</span>
+            <span class="grow"></span>
+            <span style="font-size:12.5px;font-weight:700;color:var(--d-ink-2);">25 min when you begin</span>
+          </div>
+          <div class="center-pad">
+            <p style="margin:0 0 4px;font-size:12.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--d-faint);">
+              Practice Test 04 · Attempt 1
+            </p>
+            <h3 class="scr-title">Listening — Part 1</h3>
+            <p class="scr-sub" style="max-width:40ch;">20 questions · 25 minutes</p>
+            <div style="margin-top:14px;max-width:430px;width:100%;text-align:left;">
+              <div style="font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--d-faint);margin-bottom:5px;">
+                Conditional · only when finalizedPriorAttempt ≠ null
+              </div>
+              <div class="notice" style="display:flex;gap:10px;align-items:flex-start;">
+                <span aria-hidden="true">⏱</span>
+                <span>Your last attempt ran out of time and was handed in for you.
+                  <button class="btn ghost sm" style="padding:3px 10px;font-size:12.5px;margin-left:4px;" data-goto="result">See it</button>
+                </span>
+              </div>
+            </div>
+            <div class="card" style="margin-top:16px;text-align:left;max-width:400px;">
+              <p style="margin:0 0 9px;font-weight:800;font-size:14px;">Before you begin</p>
+              <ul style="margin:0;padding-left:19px;font-size:14px;line-height:1.75;color:var(--d-ink-2);">
+                <li>Each recording plays <b>once</b>.</li>
+                <li>You cannot pause or rewind.</li>
+                <li>You cannot return to a question you have passed.</li>
+                <li>Put your headphones on now.</li>
+              </ul>
+            </div>
+            <button class="btn" style="margin-top:18px;" data-goto="listening">I'm ready</button>
+          </div>
+        </section>
+
+        <!-- 05 ─ Listening ───────────────────────────────── -->
+        <section class="screen" id="s-listening">
+          <div class="app-bar">
+            <button class="icon-btn" data-menu aria-expanded="false" aria-label="Open menu"><i></i><i></i><i></i></button>
+            <span class="sec-chip listening">Listening</span>
+            <span class="grow"></span>
+            <span class="save-flag"><span class="dotlet"></span> Saved</span>
+            <span class="timer">18:32</span>
+          </div>
+          <div class="body-pad">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:13px;">
+              <span class="q-count">Question 7 of 20</span>
+              <div class="pips" style="flex:1 1 auto;">
+                <span class="pip done"></span><span class="pip done"></span><span class="pip done"></span>
+                <span class="pip done"></span><span class="pip done"></span><span class="pip done"></span>
+                <span class="pip now"></span><span class="pip"></span><span class="pip"></span>
+                <span class="pip"></span><span class="pip"></span><span class="pip"></span>
+              </div>
+            </div>
+
+            <div class="audio-box">
+              <div class="wave" aria-hidden="true">
+                <i style="height:34%"></i><i style="height:66%"></i><i style="height:92%"></i><i style="height:48%"></i>
+                <i style="height:78%"></i><i style="height:100%"></i><i style="height:56%"></i><i style="height:84%"></i>
+                <i style="height:38%"></i><i style="height:70%"></i><i style="height:52%"></i><i style="height:88%"></i>
+                <i style="height:44%"></i><i style="height:74%"></i><i style="height:30%"></i><i style="height:62%"></i>
+              </div>
+              <button class="play-btn" id="playBtn">▶ Play recording</button>
+              <span class="plays-left" id="playsLeft">1 play left</span>
+            </div>
+
+            <p class="q-prompt">What does the boy want to do?</p>
+            <div class="choices" role="radiogroup" aria-label="Answers" aria-readonly="true">
+              <div class="choice locked" role="radio" aria-checked="false"><span class="dot"></span> Visit his friend</div>
+              <div class="choice locked" role="radio" aria-checked="true"><span class="dot"></span> Read a book</div>
+              <div class="choice locked" role="radio" aria-checked="false"><span class="dot"></span> Play football</div>
+              <div class="choice locked" role="radio" aria-checked="false"><span class="dot"></span> Go to school</div>
+            </div>
+            <p style="margin:10px 0 0;font-size:12.5px;color:var(--d-faint);display:flex;align-items:center;gap:6px;">
+              <span aria-hidden="true">🔒</span> Answer locked — this section does not allow changes.
+            </p>
+          </div>
+          <div class="nav-bar">
+            <button class="btn ghost sm" disabled style="opacity:.45;cursor:not-allowed;">← Previous</button>
+            <button class="nav-toggle" data-nav-toggle aria-expanded="false">▦ 7 of 40 answered <span class="chev">▼</span></button>
+            <span class="grow"></span>
+            <button class="btn sm" data-goto="reading">Next →</button>
+          </div>
+        </section>
+
+        <!-- 06 ─ Reading ─────────────────────────────────── -->
+        <section class="screen" id="s-reading">
+          <div class="app-bar">
+            <button class="icon-btn" data-menu aria-expanded="false" aria-label="Open menu"><i></i><i></i><i></i></button>
+            <span class="sec-chip reading">Reading</span>
+            <span class="grow"></span>
+            <span class="save-flag"><span class="dotlet"></span> Saved</span>
+            <span class="timer low">04:11</span>
+          </div>
+          <div class="body-pad">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:11px;">
+              <span class="q-count">Question 23 of 40</span>
+              <span class="grow" style="flex:1 1 auto;"></span>
+              <span style="font-size:12.5px;color:var(--d-faint);">Passage 1 · questions 21–24</span>
+            </div>
+
+            <div class="passage">
+              <h4>The School Trip</h4>
+              <p>On Friday, Class 4B went to the city farm. It was cold, so everyone wore a warm coat. Mrs Patel counted the children twice before the bus left.</p>
+              <p>At the farm the children fed the goats and watched a lamb that was only three days old. Sam wanted to hold it, but the farmer said it was too small.</p>
+              <p>They ate lunch inside the big red barn because it started to rain. On the bus home, nearly everybody fell asleep.</p>
+            </div>
+
+            <p class="q-prompt">Why did the class eat lunch inside the barn?</p>
+            <div class="choices" role="radiogroup" aria-label="Answers">
+              <button class="choice" role="radio" aria-checked="false"><span class="dot"></span> The goats were hungry</button>
+              <button class="choice" role="radio" aria-checked="true"><span class="dot"></span> It began to rain</button>
+              <button class="choice" role="radio" aria-checked="false"><span class="dot"></span> The bus was late</button>
+              <button class="choice" role="radio" aria-checked="false"><span class="dot"></span> The barn was warm</button>
+            </div>
+          </div>
+          <div class="nav-bar">
+            <button class="btn ghost sm">← Previous</button>
+            <button class="nav-toggle" data-nav-toggle aria-expanded="false">▦ 38 of 40 answered <span class="chev">▼</span></button>
+            <span class="grow"></span>
+            <button class="btn ghost sm" data-goto="confirm">Hand in</button>
+            <button class="btn sm" data-goto="confirm">Next →</button>
+          </div>
+        </section>
+
+        <!-- 07 ─ Confirm ─────────────────────────────────── -->
+        <section class="screen" id="s-confirm">
+          <div class="app-bar">
+            <button class="icon-btn" data-menu aria-expanded="false" aria-label="Open menu"><i></i><i></i><i></i></button>
+            <span class="brand">Practice Test 04</span>
+            <span class="grow"></span>
+            <span class="timer low">04:11</span>
+          </div>
+          <div class="center-pad">
+            <h3 class="scr-title">Hand in your test?</h3>
+            <p class="scr-sub" style="max-width:38ch;">Once you hand in you cannot change your answers.</p>
+            <div class="card" style="margin-top:15px;text-align:left;max-width:360px;width:100%;">
+              <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:14px;">
+                <span>Answered</span><b style="font-variant-numeric:tabular-nums;">38</b>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:14px;color:var(--d-red);">
+                <span>Not answered</span><b style="font-variant-numeric:tabular-nums;">2</b>
+              </div>
+            </div>
+            <div class="notice" style="margin-top:14px;max-width:400px;">
+              Questions 12 and 31 are still blank. You have 4 minutes left if you want to go back.
+            </div>
+            <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;justify-content:center;">
+              <button class="btn ghost" data-goto="reading">Keep working</button>
+              <button class="btn" data-goto="result">Hand in</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 08 ─ Result ──────────────────────────────────── -->
+        <section class="screen" id="s-result">
+          <div class="app-bar">
+            <button class="icon-btn" data-menu aria-expanded="false" aria-label="Open menu"><i></i><i></i><i></i></button>
+            <span class="brand">Practice Test 04</span>
+            <span class="grow"></span>
+            <span class="avatar">T</span>
+          </div>
+          <div class="body-pad">
+            <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;">
+              <div class="score-ring">
+                <div class="inner">
+                  <div style="text-align:center;">
+                    <div class="score-pct">90%</div>
+                    <div class="score-frac">36 / 40</div>
+                  </div>
+                </div>
+              </div>
+              <div style="flex:1 1 250px;min-width:0;">
+                <h3 class="scr-title" style="margin-bottom:2px;">Well done, Tom</h3>
+                <p class="scr-sub" style="margin-bottom:6px;">Your best score so far. Finished in 45:54.</p>
+                <p class="scr-sub" style="margin-bottom:14px;font-size:13px;">
+                  <b style="color:var(--d-green);">36 correct</b> ·
+                  <b style="color:var(--d-red);">2 wrong</b> ·
+                  <b>2 left blank</b> · 38 answered · handed in 25 Aug, 08:48
+                </p>
+
+                <div style="margin-bottom:11px;">
+                  <div style="display:flex;justify-content:space-between;font-size:13.5px;font-weight:700;margin-bottom:5px;">
+                    <span>Listening</span><span style="font-variant-numeric:tabular-nums;">18 / 20</span>
+                  </div>
+                  <div class="bar"><i style="width:90%;background:var(--d-teal);"></i></div>
+                </div>
+                <div>
+                  <div style="display:flex;justify-content:space-between;font-size:13.5px;font-weight:700;margin-bottom:5px;">
+                    <span>Reading</span><span style="font-variant-numeric:tabular-nums;">18 / 20</span>
+                  </div>
+                  <div class="bar"><i style="width:90%;background:var(--d-clay);"></i></div>
+                </div>
+              </div>
+            </div>
+            <p style="font-size:12px;color:var(--d-faint);margin-top:16px;">
+              Practice Test 04, version 2. This is a practice score, not an official TOEFL Primary scaled score.
+            </p>
+          </div>
+          <div class="nav-bar">
+            <button class="btn ghost sm" data-goto="home">Back to library</button>
+            <span class="grow"></span>
+            <button class="btn sm" data-goto="review">Review answers →</button>
+          </div>
+        </section>
+
+        <!-- 09 ─ Review ──────────────────────────────────── -->
+        <section class="screen" id="s-review">
+          <div class="app-bar">
+            <button class="icon-btn" data-menu aria-expanded="false" aria-label="Open menu"><i></i><i></i><i></i></button>
+            <span class="brand">Review</span>
+            <span class="sec-chip listening">Listening</span>
+            <span class="grow"></span>
+            <span style="font-size:13px;font-weight:700;color:var(--d-ink-2);">7 of 40</span>
+          </div>
+          <div class="body-pad">
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:9px;">
+              <span class="q-count">Question 7</span>
+              <span class="badge hi">Correct</span>
+              <span class="grow" style="flex:1 1 auto;"></span>
+              <button class="btn ghost sm" style="padding:5px 12px;font-size:12.5px;">▶ Replay audio</button>
+            </div>
+            <p class="q-prompt" style="margin-top:2px;">What does the boy want to do?</p>
+            <div class="choices">
+              <div class="choice" style="cursor:default;"><span class="dot"></span> Visit his friend</div>
+              <div class="choice correct" style="cursor:default;"><span class="dot"></span> Read a book
+                <span class="tick ok">✓ Your answer · correct</span></div>
+              <div class="choice" style="cursor:default;"><span class="dot"></span> Play football</div>
+              <div class="choice" style="cursor:default;"><span class="dot"></span> Go to school</div>
+            </div>
+            <div style="margin-top:13px;display:flex;gap:9px;align-items:center;">
+              <span style="font-size:12.5px;color:var(--d-faint);">Question 12 was left blank.</span>
+            </div>
+          </div>
+          <div class="nav-bar">
+            <button class="btn ghost sm" data-goto="result">← Back to result</button>
+            <button class="nav-toggle" data-nav-toggle aria-expanded="false">▦ Jump to question <span class="chev">▼</span></button>
+            <span class="grow"></span>
+            <button class="btn ghost sm">Previous</button>
+            <button class="btn sm">Next</button>
+          </div>
+        </section>
+
+        <!-- 10 ─ History ─────────────────────────────────── -->
+        <section class="screen" id="s-history">
+          <div class="app-bar">
+            <button class="icon-btn" data-menu aria-expanded="false" aria-label="Open menu"><i></i><i></i><i></i></button>
+            <span class="brand">Your attempts</span>
+            <span class="grow"></span>
+            <span class="avatar">T</span>
+          </div>
+          <div class="body-pad">
+            <h3 class="scr-title">Attempt history</h3>
+            <p class="scr-sub" style="margin-bottom:15px;">Every test you have finished, newest first.</p>
+            <div class="scroll-x">
+              <table class="hist">
+                <thead>
+                  <tr><th>Test</th><th>Date</th><th>Listening</th><th>Reading</th><th>Score</th><th>How it ended</th><th></th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="name">Practice Test 04</td><td>25 Aug</td><td>18 / 20</td><td>18 / 20</td>
+                    <td>36 / 40 <span class="badge hi">90%</span></td>
+                    <td style="color:var(--d-ink-2);font-size:13px;">Handed in</td>
+                    <td><button class="btn ghost sm" style="padding:4px 11px;font-size:12.5px;" data-goto="review">Review</button></td>
+                  </tr>
+                  <tr>
+                    <td class="name">Practice Test 03</td><td>21 Aug</td><td>17 / 20</td><td>19 / 20</td>
+                    <td>36 / 40 <span class="badge hi">90%</span></td>
+                    <td style="color:var(--d-amber);font-size:13px;font-weight:700;">Time ran out</td>
+                    <td><button class="btn ghost sm" style="padding:4px 11px;font-size:12.5px;" data-goto="review">Review</button></td>
+                  </tr>
+                  <tr>
+                    <td class="name">Practice Test 02</td><td>14 Aug</td><td>16 / 20</td><td>17 / 20</td>
+                    <td>33 / 40 <span class="badge mid">82.5%</span></td>
+                    <td style="color:var(--d-ink-2);font-size:13px;">Handed in</td>
+                    <td><button class="btn ghost sm" style="padding:4px 11px;font-size:12.5px;" data-goto="review">Review</button></td>
+                  </tr>
+                  <tr>
+                    <td class="name">Practice Test 01</td><td>7 Aug</td><td>14 / 20</td><td>16 / 20</td>
+                    <td>30 / 40 <span class="badge mid">75%</span></td>
+                    <td style="color:var(--d-ink-2);font-size:13px;">Handed in</td>
+                    <td><button class="btn ghost sm" style="padding:4px 11px;font-size:12.5px;" data-goto="review">Review</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <button class="btn ghost sm" style="width:100%;margin-top:12px;opacity:.5;cursor:not-allowed;" disabled>
+              No older attempts
+            </button>
+          </div>
+          <div class="nav-bar">
+            <button class="btn ghost sm" data-goto="home">Back to library</button>
+          </div>
+        </section>
+
+        <!-- 11 ─ Expired ─────────────────────────────────── -->
+        <section class="screen" id="s-expired">
+          <div class="app-bar">
+            <button class="icon-btn" data-menu aria-expanded="false" aria-label="Open menu"><i></i><i></i><i></i></button>
+            <span class="brand">Practice Test 04</span>
+            <span class="grow"></span>
+            <span class="timer low">00:00</span>
+          </div>
+          <div class="center-pad">
+            <h3 class="scr-title">Time is up</h3>
+            <p class="scr-sub" style="max-width:40ch;">
+              Your test was handed in automatically. Everything saved before time ran out has been kept and marked.
+            </p>
+            <div class="card" style="margin-top:15px;max-width:340px;width:100%;text-align:left;">
+              <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:14px;">
+                <span>Answered</span><b style="font-variant-numeric:tabular-nums;">38</b>
+              </div>
+              <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:14px;color:var(--d-ink-2);">
+                <span>Left blank</span><b style="font-variant-numeric:tabular-nums;">2</b>
+              </div>
+            </div>
+            <button class="btn" style="margin-top:18px;" data-goto="result">See your result</button>
+          </div>
+        </section>
+
+        <!-- 12 ─ Save trouble ────────────────────────────── -->
+        <section class="screen" id="s-offline">
+          <div class="app-bar">
+            <button class="icon-btn" data-menu aria-expanded="false" aria-label="Open menu"><i></i><i></i><i></i></button>
+            <span class="sec-chip reading">Reading</span>
+            <span class="grow"></span>
+            <span class="save-flag" style="color:var(--d-amber);">
+              <span class="dotlet" style="background:var(--d-amber);"></span> Saving…
+            </span>
+            <span class="timer">11:48</span>
+          </div>
+          <div class="body-pad">
+            <div class="notice" style="display:flex;gap:11px;align-items:flex-start;margin-bottom:15px;">
+              <span aria-hidden="true">📶</span>
+              <span>
+                <b>We can't reach the server right now.</b><br>
+                Keep answering — your answers are saved on this iPad and will be sent
+                as soon as the connection is back.
+              </span>
+            </div>
+
+            <div class="card">
+              <p class="card-title" style="margin-bottom:9px;">Waiting to be sent</p>
+              <div style="display:flex;flex-direction:column;gap:7px;font-size:13.5px;">
+                <div style="display:flex;align-items:center;gap:9px;">
+                  <span class="np-key answered" style="flex:none;"></span>
+                  <span style="flex:1 1 auto;">Questions 24, 25, 26</span>
+                  <span style="color:var(--d-faint);font-size:12.5px;">held locally</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:9px;">
+                  <span class="np-key" style="flex:none;background:var(--d-amber);border-color:var(--d-amber);"></span>
+                  <span style="flex:1 1 auto;">Question 27</span>
+                  <span style="color:var(--d-amber);font-size:12.5px;font-weight:700;">retrying in 4s</span>
+                </div>
+              </div>
+              <p style="margin:11px 0 0;font-size:12px;color:var(--d-faint);line-height:1.55;">
+                Nothing is lost if you close the app. These answers are written to this
+                device before they are sent, and go out on the next successful save.
+              </p>
+            </div>
+
+            <div class="card" style="border-color:var(--d-red);background:var(--d-red-bg);">
+              <p class="card-title" style="margin-bottom:5px;color:var(--d-red);">One saved answer was not accepted</p>
+              <p class="card-meta">
+                It was left over from an earlier version of this test, and that question no longer exists.
+                It has been kept for your teacher to look at, and will not be retried.
+              </p>
+            </div>
+          </div>
+          <div class="nav-bar">
+            <button class="btn ghost sm" data-goto="reading">← Back to the test</button>
+            <span class="grow"></span>
+            <button class="btn ghost sm">Try sending now</button>
+            <button class="btn sm" disabled style="opacity:.45;cursor:not-allowed;">Hand in</button>
+          </div>
+        </section>
+
+        <!-- ── Shared collapsible panels ───────────────────── -->
+        <div class="scrim" id="scrim"></div>
+
+        <aside class="drawer" id="drawer" aria-label="Menu" aria-hidden="true">
+          <div class="drawer-head">
+            <span class="avatar">T</span>
+            <span class="who">
+              <b>Tom</b>
+              <span>tom@…  ·  Step 1</span>
+            </span>
+          </div>
+          <button class="drawer-item" data-goto="home"><span class="gl">▦</span> Test library</button>
+          <button class="drawer-item" data-goto="history"><span class="gl">◷</span> Attempt history</button>
+          <div class="drawer-sep"></div>
+          <button class="drawer-item" id="exitTestItem" data-goto="home">
+            <span class="gl">⤺</span> Leave test
+          </button>
+          <p id="exitTestNote" style="margin:2px 10px 0;font-size:11.5px;line-height:1.5;color:var(--d-faint);">
+            The clock keeps running while you are away.
+          </p>
+          <div class="drawer-foot">
+            <div style="font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--d-faint);">Language</div>
+            <div class="lang-row">
+              <button class="lang" aria-pressed="true">EN</button>
+              <button class="lang" aria-pressed="false">FR</button>
+              <button class="lang" aria-pressed="false">DE</button>
+              <button class="lang" aria-pressed="false">ES</button>
+              <button class="lang" aria-pressed="false">IT</button>
+              <button class="lang" aria-pressed="false">JA</button>
+            </div>
+            <button class="drawer-item danger" style="margin-top:9px;" data-goto="signin">
+              <span class="gl">⏻</span> Sign out
+            </button>
+          </div>
+        </aside>
+
+        <aside class="navpanel" id="navpanel" aria-label="Question navigator" aria-hidden="true">
+          <h4 id="npTitle">Questions</h4>
+          <p class="np-sub" id="npSub"></p>
+          <div class="np-scroll" id="npScroll"></div>
+          <div class="np-legend" id="npLegend"></div>
+          <p class="np-locked-note" id="npNote" hidden></p>
+        </aside>
+
+      </div>
+    </div>
+  </main>
+
+  <aside class="api" aria-label="API for this screen">
+    <div class="api-head">
+      <h2>API on this screen</h2>
+      <span class="api-count" id="apiCount"></span>
+    </div>
+    <p class="api-note" id="apiNote"></p>
+    <div id="apiList"></div>
+
+    <div class="legend">
+      <p style="margin:0 0 7px;"><b>Never lose an answer.</b> Six rules, each earned from a real loss in a sibling survey app:</p>
+      <ol style="margin:0 0 13px;padding-left:19px;line-height:1.65;">
+        <li><b>Durable before sent.</b> Every answer is written to IndexedDB on tap and cleared only on a per-item ack, never on request completion.</li>
+        <li><b>Snapshot, not delta.</b> A flush sends every answer held for the open section, so an answer missed by one batch is carried by the next.</li>
+        <li><b>Per-item results, never all-or-nothing.</b> One rejected answer must not roll back the others in the same request.</li>
+        <li><b>The server keeps what it refuses.</b> Anything unapplied &mdash; unparseable, oversized, rejected &mdash; is persisted verbatim as a <code>failed_write</code> before the error is returned.</li>
+        <li><b>Retry only what is retryable.</b> Network and 5xx back off and retry; 4xx other than 429 stop dead and surface. A retried 409 is a storm, not a recovery.</li>
+        <li><b>Flush at end of life and before submit.</b> <code>pagehide</code> sends a keepalive snapshot; submit carries the queue&rsquo;s remainder in its own body.</li>
+      </ol>
+      <p style="margin:0 0 7px;"><b>Every request</b> carries <code>Authorization: Bearer &lt;jwt&gt;</code>, verified against the JWKS at <code>auth.icovn.me</code>. The <code>sub</code> claim resolves to the student; no user table is owned by this service beyond its own profile row.</p>
+      <p style="margin:0;"><b>Correctness is withheld until finalization:</b> <code>choice.isCorrect</code> never appears before an attempt is submitted or expired, and only via <code>/review</code>, which refuses one still in progress. <b>Capped media is withheld until claimed:</b> a play-limited stimulus carries no <code>mediaUrl</code> in the runner payload — a short-lived signed URL is issued only by a successful <code>/play</code>.</p>
+    </div>
+  </aside>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var SCREENS = {
+    signin: {
+      title: "Sign in",
+      note: "Tom opens the app on the family iPad. Identity is the Google account itself — profile and account are one and the same.",
+      apiNote: "No first-party call happens until the OIDC round trip completes and a token exists. Profile provisioning is a POST, not a side effect of a GET.",
+      endpoints: [
+        { verb: "GET", uri: "https://auth.icovn.me/auth", sum: "OIDC authorize (PKCE) — external",
+          desc: "Full-tab redirect issued by @liam-workspace/auth-client. Not an endpoint this service implements.",
+          req: "client_id=primary-practice\nredirect_uri=https://…/auth/callback\nresponse_type=code\nscope=openid email profile roles\ncode_challenge=<S256>\ncode_challenge_method=S256",
+          res: "302 → redirect_uri?code=<authorization_code>" },
+        { verb: "POST", uri: "https://auth.icovn.me/token", sum: "Exchange code for tokens — external",
+          desc: "PKCE verifier exchange. Returns the id_token whose sub becomes the student key.",
+          req: "grant_type=authorization_code\ncode=<code>\nredirect_uri=https://…/auth/callback\nclient_id=primary-practice\ncode_verifier=<verifier>",
+          res: "{\n  \"access_token\": \"eyJ…\",\n  \"id_token\": \"eyJ…\",\n  \"refresh_token\": \"…\",\n  \"expires_in\": 3600\n}" },
+        { verb: "POST", uri: "/api/session", sum: "Establish the session and provision the profile",
+          desc: "Called once by the OIDC callback route. Upserts the student row from the verified token claims (sub, email, name) and returns the profile. Provisioning lives here rather than on GET /api/me because a GET must be safe — it may not create state.",
+          req: "{}   // claims are read from the Bearer token, never the body",
+          res: "{\n  \"id\": \"stu_7Fq2…\",\n  \"displayName\": \"Tom\",\n  \"email\": \"tom@…\",\n  \"level\": \"primary-step-1\",\n  \"isAdmin\": false,\n  \"created\": true\n}",
+          codes: ["200 existing student", "201 provisioned", "401 token invalid or expired", "403 email not allowed"] },
+        { verb: "GET", uri: "/api/me", sum: "Read the signed-in student's profile",
+          desc: "Pure read, no side effects. Returns 404 if POST /api/session has not run for this sub. isAdmin is not rendered by any student screen — it gates the admin area, which is a separate spec — and session.created lets the callback route distinguish a first sign-in for onboarding.",
+          req: null,
+          res: "{\n  \"id\": \"stu_7Fq2…\",\n  \"displayName\": \"Tom\",\n  \"email\": \"tom@…\",\n  \"level\": \"primary-step-1\",\n  \"isAdmin\": false\n}",
+          codes: ["200", "401", "404 no profile — call POST /api/session"] }
+      ]
+    },
+    home: {
+      title: "Test library",
+      note: "Everything on this screen must arrive in one round trip — the card needs the test AND this student's standing against it. A finished test stays re-attemptable, so its card carries both See result and Try again.",
+      apiNote: "The catalog is the screen that most shapes the API: it needs per-test attempt state, not just test metadata, and it pages.",
+      endpoints: [
+        { verb: "GET", uri: "/api/tests", sum: "Published tests, paginated, with this student's standing",
+          desc: "Drives every card. inProgressAttemptId decides Start vs Continue; attemptCount and bestAttempt decide whether Try again and See result appear. The card renders bestAttempt entirely: pointsEarned / pointsPossible, percentage in brackets, submittedAt as the date, and attemptId as the See result target. A finished attempt never blocks a new one — only an in-progress attempt does — so re-attempting is POST /api/attempts again.",
+          req: "?limit=3&cursor=<opaque>   (default 20, max 50)",
+          res: "{\n  \"tests\": [        // page 1 of 2: 3 of 5, at limit=3\n    {\n      \"id\": \"tst_04\",\n      \"slug\": \"practice-test-04\",\n      \"title\": \"TOEFL Primary — Practice Test 04\",\n      \"level\": \"primary-step-1\",\n      \"durationSeconds\": 3000,\n      \"sections\": [\n        { \"type\": \"listening\", \"questionCount\": 20 },\n        { \"type\": \"reading\",   \"questionCount\": 20 }\n      ],\n      \"inProgressAttemptId\": null,\n      \"attemptCount\": 0,\n      \"bestAttempt\": null\n    },\n    {\n      \"id\": \"tst_03\",\n      \"slug\": \"practice-test-03\",\n      \"title\": \"TOEFL Primary — Practice Test 03\",\n      \"level\": \"primary-step-1\",\n      \"durationSeconds\": 3000,\n      \"sections\": [\n        { \"type\": \"listening\", \"questionCount\": 20 },\n        { \"type\": \"reading\",   \"questionCount\": 20 }\n      ],\n      \"inProgressAttemptId\": null,\n      \"attemptCount\": 1,\n      \"bestAttempt\": {\n        \"attemptId\": \"att_921…\",     // See result navigates here\n        \"submittedAt\": \"2026-08-21T09:14:02Z\",\n        \"pointsEarned\": 36,\n        \"pointsPossible\": 40,\n        \"percentage\": 90\n      }\n    },\n    {\n      \"id\": \"tst_02\",\n      \"slug\": \"practice-test-02\",\n      \"title\": \"TOEFL Primary — Practice Test 02\",\n      \"level\": \"primary-step-1\",\n      \"durationSeconds\": 3000,\n      \"sections\": [\n        { \"type\": \"listening\", \"questionCount\": 20 },\n        { \"type\": \"reading\",   \"questionCount\": 20 }\n      ],\n      \"inProgressAttemptId\": null,\n      \"attemptCount\": 1,\n      \"bestAttempt\": {\n        \"attemptId\": \"att_774…\",\n        \"submittedAt\": \"2026-08-14T10:02:55Z\",\n        \"pointsEarned\": 33,\n        \"pointsPossible\": 40,\n        \"percentage\": 82.5\n      }\n    }\n  ],\n  \"nextCursor\": \"eyJvIjozfQ\",\n  \"summary\": { \"attemptCount\": 3, \"averagePct\": 82.5, \"bestPct\": 90 }\n}",
+          codes: ["200", "400 bad cursor", "401"] },
+        { verb: "GET", uri: "/api/me", sum: "Profile for the app bar",
+          desc: "Cached client-side after sign-in; listed here because the header renders from it.",
+          req: null, res: "// identical shape and status set to the sign-in screen\n{\n  \"id\": \"stu_7Fq2…\",\n  \"displayName\": \"Tom\",\n  \"email\": \"tom@…\",\n  \"level\": \"primary-step-1\",\n  \"isAdmin\": false\n}",
+          codes: ["200", "401", "404 no profile — call POST /api/session"] }
+      ]
+    },
+    intro: {
+      title: "Test brief",
+      note: "The brief must state the rules truthfully, so it reads them from the same section rows the server later enforces.",
+      apiNote: "Start is idempotent: a second press returns the attempt already in progress rather than creating another.",
+      endpoints: [
+        { verb: "GET", uri: "/api/tests/{slug}", sum: "Section structure and rules — no questions",
+          desc: "Deliberately excludes questions and choices — nothing about the content reaches the device before an attempt exists. It DOES carry each section's title, rules and instructions, because the section-rules screen renders all of those before the student clicks I'm ready; the enter call echoes them back as the post-entry authority. The brief renders \"Attempt N of this test\" optimistically from attemptCount + 1. POST /api/attempts then returns the authoritative attemptNumber, and the section-rules screen renders THAT — so if another device started an attempt in between, the optimistic guess is corrected before the student answers anything.",
+          req: null,
+          res: "{\n  \"id\": \"tst_04\",\n  \"slug\": \"practice-test-04\",\n  \"title\": \"TOEFL Primary — Practice Test 04\",\n  \"durationSeconds\": 3000,\n  \"attemptCount\": 0,\n  \"inProgressAttemptId\": null,\n  \"sections\": [\n    {\n      \"id\": \"sec_L1\",\n      \"type\": \"listening\",\n      \"title\": \"Listening — Part 1\",\n      \"ordinal\": 1,\n      \"questionCount\": 20,\n      \"durationSeconds\": 1500,\n      \"navigation\": \"forward_only\",\n      \"allowAnswerChange\": false,\n      \"playback\": { \"maxPlays\": 1, \"allowPause\": false, \"allowSeek\": false },\n      \"instructions\": [ \"Put your headphones on now.\" ]\n    },\n    {\n      \"id\": \"sec_R1\",\n      \"type\": \"reading\",\n      \"title\": \"Reading\",\n      \"ordinal\": 2,\n      \"questionCount\": 20,\n      \"durationSeconds\": 1500,\n      \"navigation\": \"free\",\n      \"allowAnswerChange\": true,\n      \"playback\": null,   // reading has no timed media, so no caps apply\n      \"instructions\": []\n    }\n  ]\n}",
+          codes: ["200", "401", "404 unknown or unpublished slug"] },
+        { verb: "POST", uri: "/api/attempts", sum: "Start, resume, or re-attempt",
+          desc: "One call covers all three. The partial unique index constrains only status = 'in_progress', so previously submitted attempts never block a new one: Try again is this same request. The attempt row exists from here, but its clock does not: startedAt and expiresAt stay null until the first section entry, so a student can read the brief and the section rules untimed. If the in-progress attempt it finds is already past its deadline, that one is finalized and the new attempt created in the same transaction, and finalizedPriorAttempt reports what happened, so the next screen can tell the student rather than silently swallowing the news. A 410 would be wrong here: the subject of this request is the collection, not the stale attempt, and the caller asked for something to work on. Forcing a retry would also lose the news that an earlier attempt was just auto-submitted, unless the error carried it — at which point it is a success with extra information, which is what this is. Resuming a live attempt returns it with 200 and resumed true; re-attempting creates a fresh one with 201, pinned to the CURRENT version — which may differ from the version the earlier attempt used.",
+          req: "{ \"testId\": \"tst_04\" }",
+          res: "{\n  \"id\": \"att_A73…\",\n  \"attemptNumber\": 1,\n  \"status\": \"in_progress\",\n  \"createdAt\":  \"2026-08-25T08:02:11Z\",\n  \"startedAt\":  null,   // set by the first section entry\n  \"expiresAt\":  null,   // = startedAt + durationSeconds\n  \"serverTime\": \"2026-08-25T08:02:11Z\",\n  \"resumed\": false,\n  \"finalizedPriorAttempt\": null,\n  // when non-null: { id, status:\"expired\", submittedAt, resultUrl }\n  \"currentSectionId\": null,\n  \"currentQuestionId\": null\n}",
+          codes: ["201 new attempt", "200 resumed in-progress", "401", "409 test not published"] }
+      ]
+    },
+    secintro: {
+      title: "Section rules",
+      note: "Nothing on this screen has started a clock yet. Entering happens on \"I'm ready\"; until then the student is reading, not being timed. This is where the start response is finally consumed: the authoritative attemptNumber becomes the eyebrow, and finalizedPriorAttempt becomes the notice — shown here in its non-null branch, though this particular attempt is a first one.",
+      apiNote: "Every bullet on this screen comes from the response: three enforced rules (navigation plus the two playback caps) and one free-text instruction. Section deadlines are computed server-side; the device never proposes a time.",
+      endpoints: [
+        { verb: "POST", uri: "/api/attempts/{id}/sections/{sectionId}/enter", sum: "Start this section's clock and return its rules",
+          desc: "Fired by \"I'm ready\", NOT on screen load — this screen can offer a way out (See it), and its drawer correctly reads \"Nothing has started yet. The clock begins when you tap I'm ready.\" Starting the clock before the student commits would burn their time while they read the rules. Writes attempt_section.entered_at and expires_at. Idempotent — re-entering after a refresh returns the original deadline rather than extending it. The playback block and instructions echo what GET /tests/{slug} already supplied — this screen renders from that pre-click read; enter returns them again so a resume has one authoritative source. Playback values are section DEFAULTS, which individual stimuli may tighten but never loosen.",
+          req: "{}",
+          res: "{\n  \"sectionId\": \"sec_L1\",\n  \"title\": \"Listening — Part 1\",\n  \"type\": \"listening\",\n  \"questionCount\": 20,\n  \"enteredAt\":  \"2026-08-25T08:02:40Z\",\n  \"expiresAt\":  \"2026-08-25T08:27:40Z\",\n  \"serverTime\": \"2026-08-25T08:02:40Z\",\n  \"attemptStartedAt\": \"2026-08-25T08:02:40Z\",   // first entry starts the whole-test clock\n  \"attemptExpiresAt\": \"2026-08-25T08:52:40Z\",\n\n  \"navigation\": \"forward_only\",     // \"You cannot return to a question you have passed\"\n  \"allowAnswerChange\": false,\n\n  \"playback\": {\n    \"maxPlays\":   1,                 // \"Each recording plays once\"\n    \"allowPause\": false,             // \"You cannot pause…\"\n    \"allowSeek\":  false              // \"…or rewind\"\n  },\n\n  \"instructions\": [                  // author-supplied, free text\n    \"Put your headphones on now.\"\n  ]\n}",
+          codes: ["200", "401", "403 not your attempt", "409 previous section still open", "410 attempt expired"] }
+      ]
+    },
+    listening: {
+      title: "Listening",
+      note: "The screen that justifies the strictest parts of the design: one play, no going back, and a save on every tap.",
+      apiNote: "The play counter is a server-side write — a client-side count is defeated by a refresh. The navigator here is a read-only progress map: forward_only means it cannot move you.",
+      endpoints: [
+        { verb: "GET", uri: "/api/attempts/{id}", sum: "The runner payload",
+          desc: "The whole test as the student may see it, plus every answer recorded so far. This single read is what makes resume work after a reload. Two things are deliberately absent: isCorrect on any choice, and mediaUrl on any capped stimulus — the audio URL is issued only by the play endpoint, so the play counter cannot be walked around.",
+          req: null,
+          res: "{\n  \"id\": \"att_A73…\",\n  \"status\": \"in_progress\",\n  \"expiresAt\":  \"2026-08-25T08:52:40Z\",\n  \"serverTime\": \"2026-08-25T08:09:08Z\",\n  \"currentSectionId\": \"sec_L1\",\n  \"currentQuestionId\": \"qst_L07\",\n\n  \"questionCount\": 40,\n  \"answeredCount\": 7,\n  \"unansweredOrdinals\": [\n    8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,\n    21, 22, 23, 24, 25, 26, 27, 28, 29, 30,\n    31, 32, 33, 34, 35, 36, 37, 38, 39, 40\n  ],\n\n  \"sections\": [        // both sections always present; sec_R1 elided here\n    {\n      \"id\": \"sec_L1\",\n      \"type\": \"listening\",\n      \"status\": \"open\",\n      \"completedAt\": null,\n      \"navigation\": \"forward_only\",\n      \"allowAnswerChange\": false,\n      \"expiresAt\": \"2026-08-25T08:27:40Z\",\n      \"groups\": [\n        {\n          \"id\": \"grp_L07\",\n          \"stimulus\": {\n            \"id\": \"stm_L07\",\n            \"type\": \"audio\",\n            \"maxPlays\": 1,\n            \"playsUsed\": 0,\n            \"allowPause\": false,\n            \"allowSeek\": false\n            // NO mediaUrl. A URL here would let the student\n            // fetch the file directly and replay it, bypassing\n            // the play counter entirely.\n          },\n          \"questions\": [\n            {\n              \"id\": \"qst_L07\",\n              \"ordinal\": 7,\n              \"type\": \"single_choice\",\n              \"prompt\": \"What does the boy want to do?\",\n              \"choices\": [\n                { \"id\": \"ch_a\", \"label\": \"Visit his friend\" },\n                { \"id\": \"ch_b\", \"label\": \"Read a book\" },\n                { \"id\": \"ch_c\", \"label\": \"Play football\" },\n                { \"id\": \"ch_d\", \"label\": \"Go to school\" }\n              ]\n            }\n          ]\n        }\n      ]\n    }\n  ],\n  \"responses\": [        // all 7 recorded so far; 1–5 elided here\n    \"… qst_L01 … qst_L05 …\",\n    { \"questionId\": \"qst_L06\", \"selectedChoiceIds\": [\"ch_c\"],\n      \"clientInstanceId\": \"ci_9f3a…\", \"seq\": 405, \"answeredAt\": \"…:07.100Z\" },\n    { \"questionId\": \"qst_L07\", \"selectedChoiceIds\": [\"ch_b\"],\n      \"clientInstanceId\": \"ci_9f3a…\", \"seq\": 409, \"answeredAt\": \"…:10.220Z\" }\n  ]\n}",
+          codes: ["200", "401", "403 not your attempt", "410 attempt_expired — finalized on read"] },
+        { verb: "POST", uri: "/api/attempts/{id}/stimuli/{stimulusId}/play", sum: "Claim one play of the recording",
+          desc: "Increments stimulus_play.play_count and, only then, issues a short-lived signed URL for the file. This is the ONLY way to obtain audio for a capped stimulus, which is what makes the cap real. Called before playback begins, so a refresh mid-audio still consumes the play — the exam-faithful behaviour.",
+          req: "{}",
+          res: "{\n  \"stimulusId\": \"stm_L07\",\n  \"playsUsed\": 1,\n  \"playsRemaining\": 0,\n  \"mediaUrl\": \"/media/audio/l07.mp3?t=<sig>&exp=<unix>\",\n  \"urlExpiresAt\": \"2026-08-25T08:12:08Z\"\n}",
+          codes: ["200", "401", "403 not your attempt", "409 no plays remaining", "410 section_expired", "410 attempt_expired"] },
+        { verb: "PUT", uri: "/api/attempts/{id}/responses/{questionId}", sum: "Save one answer",
+          desc: "Full replacement of this question's answer. Written to the device queue BEFORE this request is attempted and cleared only when this response acks it, so a crash between tap and ack costs nothing. An empty selectedChoiceIds clears it. Ordering is guarded by (clientInstanceId, seq), NOT by answeredAt. clientInstanceId is minted once per install and stored beside the queue; seq only increases within that instance, across attempts as well as within one — a queue entry left by an earlier attempt therefore carries a LOWER seq than anything the current attempt has written. The server applies a write when seq exceeds the stored seq FOR THE SAME instance, and falls back to its own arrival order across different instances - the only sound rule, since two devices share no clock and answeredAt is client-supplied. answeredAt survives as a human-readable timestamp only.",
+          req: "{\n  \"clientInstanceId\": \"ci_9f3a…\",\n  \"seq\": 412,\n  \"selectedChoiceIds\": [\"ch_b\"],\n  \"answeredAt\": \"2026-08-25T08:09:10.220Z\",\n  \"timeSpentMs\": 4200\n}",
+          res: "{\n  \"questionId\": \"qst_L07\",\n  \"status\": \"applied\",\n  \"attempt\": {\n    \"expiresAt\": \"2026-08-25T08:52:40Z\",\n    \"sectionExpiresAt\": \"2026-08-25T08:27:40Z\",\n    \"serverTime\": \"2026-08-25T08:09:10Z\"\n  }\n}",
+          codes: ["200 applied", "200 ignored_stale", "401", "403 not your attempt", "409 answer_change_not_allowed", "409 navigation_locked", "410 section_expired", "410 attempt_expired", "413 payload too large — captured, capturedAs names the row"] },
+        { verb: "PATCH", uri: "/api/attempts/{id}/responses", sum: "Flush a queue of answers",
+          desc: "The body is a FULL SNAPSHOT of every answer held for ONE section, never a delta and never the whole attempt. Questions in other sections are untouched, which is exactly why this is PATCH and not PUT. A delta loses any answer that never made it into a batch, even when every request sent succeeds. Never all-or-nothing: one rejected item cannot roll back the rest. Because every item shares one section, section expiry is an ENVELOPE-level 410 rather than a per-item reason — a per-item section_expired could never be true of some items and not others in the same request. All three items shown are questions already answered, and all three outcomes differ. qst_L05 re-sends its stored selection with a NEWER stamp: the reorder guard passes and the content is unchanged, so it applies as a harmless touch — this is what a network retry looks like. qst_L06 re-sends with a LOWER seq than the stored one for this instance, so the guard discards it as ignored_stale. The rejection is the answer-change rule: qst_L07 was already saved as ch_b, and listening sets allowAnswerChange false, so switching to ch_c is refused. Re-sending ch_b would instead be an idempotent no-op — the rule tests the SELECTION, not the mere existence of a prior answer, or every network retry would fail.",
+          req: "{\n  \"clientInstanceId\": \"ci_9f3a…\",\n  \"responses\": [   // all 7 held for sec_L1; L01-L04 elided\n    { \"questionId\": \"qst_L05\", \"seq\": 418, \"selectedChoiceIds\": [\"ch_a\"], \"answeredAt\": \"…:12.000Z\" },\n    { \"questionId\": \"qst_L06\", \"seq\": 401, \"selectedChoiceIds\": [\"ch_c\"], \"answeredAt\": \"…:06.400Z\" },\n    { \"questionId\": \"qst_L07\", \"seq\": 421, \"selectedChoiceIds\": [\"ch_c\"], \"answeredAt\": \"…:13.400Z\" }\n  ]\n}",
+          res: "{\n  \"results\": [\n    \"… acks for qst_L01–qst_L04 …\",\n    { \"questionId\": \"qst_L05\", \"status\": \"applied\" },\n    { \"questionId\": \"qst_L06\", \"status\": \"ignored_stale\" },\n    { \"questionId\": \"qst_L07\", \"status\": \"rejected\",\n      \"reason\": \"answer_change_not_allowed\",\n      \"retryable\": false,\n      \"capturedAs\": \"fw_71c4…\" }\n  ],\n  \"attempt\": {\n    \"expiresAt\": \"2026-08-25T08:52:40Z\",\n    \"serverTime\": \"2026-08-25T08:09:14Z\"\n  }\n}",
+          codes: ["200 with per-item results — item failures never fail the envelope", "400 empty_batch", "400 mixed_sections — questions spanning two sections", "400 body unparseable — captured as failed_write", "401", "403 not your attempt", "410 section_expired — every item shares one section, so this is envelope-level", "410 attempt_expired", "413 payload too large — captured, capturedAs names the row"] },
+        { verb: "PUT", uri: "/api/attempts/{id}/position", sum: "Remember where the student is",
+          desc: "Discovered by the navigator: a student can move without answering, so position cannot ride along on a response write. Persists currentSectionId and currentQuestionId so a reload reopens the same question. Debounced and fire-and-forget — losing one costs a wrong landing spot, nothing more.",
+          req: "{ \"sectionId\": \"sec_L1\", \"questionId\": \"qst_L08\" }",
+          res: "204 No Content",
+          codes: ["204", "401", "403 not your attempt", "409 navigation_locked", "410 section_expired", "410 attempt_expired"] }
+      ]
+    },
+    reading: {
+      title: "Reading",
+      note: "Same two write endpoints, opposite rules. Free navigation and answer changes are section properties, not new API.",
+      apiNote: "Same endpoints as listening, opposite rules — proof the section rules belong in data rather than in routes. Here the navigator is a jump control, because navigation is free.",
+      endpoints: [
+        { verb: "PUT", uri: "/api/attempts/{id}/position", sum: "Jump to a question from the navigator",
+          desc: "Accepted here and refused in listening, from the same route — the difference is test_section.navigation, not a second endpoint. The navigator's interactivity is a rendering of whatever this call would allow.",
+          req: "{ \"sectionId\": \"sec_R1\", \"questionId\": \"qst_R31\" }",
+          res: "204 No Content",
+          codes: ["204", "401", "403 not your attempt", "409 navigation_locked", "410 attempt_expired"] },
+        { verb: "PATCH", uri: "/api/attempts/{id}/responses", sum: "Flush answers for the whole passage group",
+          desc: "The body is a FULL SNAPSHOT of every answer held for ONE section, never a delta and never the whole attempt. Questions in other sections are untouched, which is exactly why this is PATCH and not PUT. A delta loses any answer that never made it into a batch, even when every request sent succeeds. Never all-or-nothing: one rejected item cannot roll back the rest. Because every item shares one section, section expiry is an ENVELOPE-level 410 rather than a per-item reason — a per-item section_expired could never be true of some items and not others in the same request. Reading groups four questions under one passage, so a group is the natural moment to flush, but the payload is still the whole section.",
+          req: "{\n  \"clientInstanceId\": \"ci_9f3a…\",\n  \"responses\": [   // all 18 held for sec_R1; remaining items elided\n    { \"questionId\": \"qst_R21\", \"seq\": 604, \"selectedChoiceIds\": [\"ch_b\"], \"answeredAt\": \"…\" },\n    { \"questionId\": \"qst_R22\", \"seq\": 605, \"selectedChoiceIds\": [\"ch_d\"], \"answeredAt\": \"…\" },\n    { \"questionId\": \"qst_R23\", \"seq\": 606, \"selectedChoiceIds\": [\"ch_b\"], \"answeredAt\": \"…\" }\n  ]\n}",
+          res: "{\n  \"results\": [        // one ack per snapshot item; remainder elided\n    { \"questionId\": \"qst_R21\", \"status\": \"applied\" },\n    { \"questionId\": \"qst_R22\", \"status\": \"applied\" },\n    { \"questionId\": \"qst_R23\", \"status\": \"applied\" }\n  ],\n  \"attempt\": { \"serverTime\": \"2026-08-25T08:47:58Z\" }\n}",
+          codes: ["200 with per-item results — item failures never fail the envelope", "400 empty_batch", "400 mixed_sections — questions spanning two sections", "400 body unparseable — captured as failed_write", "401", "403 not your attempt", "410 section_expired — every item shares one section, so this is envelope-level", "410 attempt_expired", "413 payload too large — captured, capturedAs names the row"] },
+        { verb: "PUT", uri: "/api/attempts/{id}/responses/{questionId}", sum: "Change a single answer",
+          desc: "Permitted here because the reading section sets allowAnswerChange true. The identical call is refused in listening — the difference is data, not code.",
+          req: "{\n  \"clientInstanceId\": \"ci_9f3a…\",\n  \"seq\": 631,\n  \"selectedChoiceIds\": [\"ch_b\"],\n  \"answeredAt\": \"…\",\n  \"timeSpentMs\": 9100\n}",
+          res: "{\n  \"questionId\": \"qst_R23\",\n  \"status\": \"applied\",\n  \"attempt\": {\n    \"expiresAt\": \"2026-08-25T08:52:40Z\",\n    \"sectionExpiresAt\": \"2026-08-25T08:52:40Z\",\n    \"serverTime\": \"2026-08-25T08:47:59Z\"\n  }\n}",
+          codes: ["200 applied", "200 ignored_stale", "401", "403 not your attempt", "410 attempt_expired", "413 payload too large — captured, capturedAs names the row"] },
+        { verb: "GET", uri: "/api/attempts/{id}", sum: "Re-read after a reload",
+          desc: "The same canonical envelope listening returns — identical field set, including questionCount / answeredCount / unansweredOrdinals and per-section status; only the values differ. A passage stimulus carries bodyText and needs no play call, so it has no playback cap and no signed URL.",
+          req: null,
+          res: "{\n  \"id\": \"att_A73…\",\n  \"status\": \"in_progress\",\n  \"expiresAt\":  \"2026-08-25T08:52:40Z\",\n  \"serverTime\": \"2026-08-25T08:48:29Z\",\n  \"currentSectionId\": \"sec_R1\",\n  \"currentQuestionId\": \"qst_R23\",\n\n  \"questionCount\": 40,\n  \"answeredCount\": 38,\n  \"unansweredOrdinals\": [12, 31],\n\n  \"sections\": [\n    { \"id\": \"sec_L1\", \"type\": \"listening\",\n      \"status\": \"closed\",\n      \"completedAt\": \"2026-08-25T08:27:40Z\",\n      \"navigation\": \"forward_only\",\n      \"allowAnswerChange\": false,\n      \"expiresAt\": \"2026-08-25T08:27:40Z\",\n      \"groups\": [ \"… 20 questions, now read-only …\" ] },\n    {\n      \"id\": \"sec_R1\",\n      \"type\": \"reading\",\n      \"status\": \"open\",\n      \"completedAt\": null,\n      \"navigation\": \"free\",\n      \"allowAnswerChange\": true,\n      \"expiresAt\": \"2026-08-25T08:52:40Z\",\n      \"groups\": [\n        {\n          \"id\": \"grp_R1\",\n          \"stimulus\": {\n            \"id\": \"stm_R1\",\n            \"type\": \"passage\",\n            \"title\": \"The School Trip\",\n            \"bodyText\": \"On Friday, Class 4B went to the city farm…\",\n            \"maxPlays\": null\n          },\n          \"questions\": [ \"… questions 21–24 …\" ]\n        }\n      ]\n    }\n  ],\n  \"responses\": [ \"… 38 recorded answers …\" ]\n}",
+          codes: ["200", "401", "403 not your attempt", "410 attempt_expired"] }
+      ]
+    },
+    confirm: {
+      title: "Hand in",
+      note: "The blank-question count must be trustworthy, so it is derived from the same responses the server will grade.",
+      apiNote: "Submit is the only state transition the student can trigger, and it is irreversible. It is not the first call on this screen — the counts have to be re-read, or the dialog can promise a blank count that submit then contradicts.",
+      endpoints: [
+        { verb: "GET", uri: "/api/attempts/{id}", sum: "Re-read before showing the counts",
+          desc: "The same canonical envelope — no extra fields, no dedicated summary route. answeredCount and unansweredOrdinals are already part of it, computed server-side from responses against the question list; timeRemaining comes from expiresAt minus serverTime. Re-read rather than trusted from memory, because a batch flush may have been rejected since the last render.",
+          req: null,
+          res: "{\n  \"id\": \"att_A73…\",\n  \"status\": \"in_progress\",\n  \"expiresAt\":  \"2026-08-25T08:52:40Z\",\n  \"serverTime\": \"2026-08-25T08:48:29Z\",\n  \"questionCount\": 40,\n  \"answeredCount\": 38,\n  \"unansweredOrdinals\": [12, 31],\n  \"currentSectionId\": \"sec_R1\",\n  \"currentQuestionId\": \"qst_R23\",\n  \"sections\": [ \"… both, as always …\" ],\n  \"responses\": [ \"… all 38 …\" ]\n}",
+          codes: ["200", "401", "403 not your attempt", "410 attempt_expired"] },
+        { verb: "POST", uri: "/api/attempts/{id}/submit", sum: "Grade and finalize",
+          desc: "Accepts an OPTIONAL final responses array so the last answers and the hand-in are one request. Without it there is a race no client can close: answer, tap Hand in, and the debounced flush is still in flight, so the attempt is graded without the answer it is still carrying. The array is applied first, then grading runs, in one transaction. The client also refuses to submit while its queue is non-empty; this is the belt to that braces. Grades against the pinned test version, writes per-section and total scores, sets status submitted. Returns identity, finality and the final flush result — the score itself is read from GET /result, so there is exactly one shape the result screen renders whether it was reached from here, from the library, or from history. Idempotent: re-submitting returns the same row rather than regrading.",
+          req: "{\n  \"clientInstanceId\": \"ci_9f3a…\",\n  \"responses\": [ \"… whatever the queue still holds; may be empty …\" ]\n}",
+          res: "{\n  \"attemptId\": \"att_A73…\",\n  \"status\": \"submitted\",\n  \"submittedAt\": \"2026-08-25T08:48:34Z\",\n  \"resultUrl\": \"/api/attempts/att_A73…/result\",\n  \"finalFlush\": [ { \"questionId\": \"qst_R40\", \"status\": \"applied\" } ]\n}",
+          codes: ["200 already submitted", "201 submitted", "401", "403 not your attempt", "409 nothing answered", "410 attempt_expired — auto-submitted at the deadline", "413 payload too large — captured, capturedAs names the row"] }
+      ]
+    },
+    result: {
+      title: "Result",
+      note: "Reachable from three places — straight after submit, from the library, and from history — so it must be a plain GET, not submit's response.",
+      apiNote: "Scores are stored, but because the version is immutable they are a cache of a pure function over frozen content: re-grading under UNCHANGED rules reproduces the same totals. isPersonalBest is the exception - it is computed at read time against this student's other attempts, so a later attempt can flip it.",
+      endpoints: [
+        { verb: "GET", uri: "/api/attempts/{id}/result", sum: "Score breakdown for a finished attempt",
+          desc: "Totals and per-section rows read from attempt and attempt_section. Refuses an attempt still genuinely running, so a student cannot watch a live score. Same rule as /review: an in-progress attempt already past its deadline is finalized by this read and then returned with 200 — the result has just become available, so denying it would be perverse.",
+          req: null,
+          res: "{\n  \"attemptId\": \"att_A73…\",\n  \"test\": { \"title\": \"TOEFL Primary — Practice Test 04\", \"version\": 2 },\n  \"status\": \"submitted\",\n  \"submittedAt\": \"2026-08-25T08:48:34Z\",\n  \"elapsedSeconds\": 2754,\n  \"score\": {\n    \"pointsEarned\": 36, \"pointsPossible\": 40, \"percentage\": 90,\n    \"answered\": 38, \"unanswered\": 2,\n    \"correct\": 36, \"incorrect\": 2,\n    \"isPersonalBest\": true,\n    \"sections\": [\n      { \"title\": \"Listening\", \"type\": \"listening\",\n        \"pointsEarned\": 18, \"pointsPossible\": 20 },\n      { \"title\": \"Reading\", \"type\": \"reading\",\n        \"pointsEarned\": 18, \"pointsPossible\": 20 }\n    ]\n  }\n}",
+          codes: ["200", "401", "403 not your attempt", "409 attempt still in progress"] }
+      ]
+    },
+    review: {
+      title: "Review answers",
+      note: "The only screen where correctness crosses the wire — and only because the attempt is finished.",
+      apiNote: "A separate endpoint, not a flag on the runner payload — keeping the answer key on its own route means no query parameter can leak it mid-test. It must return every item, answered or not, because the navigator colours all 40 cells.",
+      endpoints: [
+        { verb: "GET", uri: "/api/attempts/{id}/review", sum: "Every question with the answer key",
+          desc: "Returns the content as it was at the pinned version, the student's selection, and isCorrect per choice — for EVERY question, answered or not, since a blank one is still jumpable from the navigator and must render its prompt, choices and answer. Media is freely replayable here: the attempt is over, so the play cap no longer applies. If the attempt is in-progress but already past its deadline, this request finalizes it and then returns the review — a 410 would be wrong, since the review is exactly what the caller asked for and it has just become available. 409 is reserved for an attempt genuinely still running.",
+          req: null,   // no filter: the navigator colours all 40 cells, so every item is always returned
+          res: "{\n  \"attemptId\": \"att_A73…\",\n  \"items\": [\n    {\n      \"questionId\": \"qst_L07\",\n      \"ordinal\": 7,\n      \"sectionId\": \"sec_L1\",\n      \"prompt\": \"What does the boy want to do?\",\n      \"outcome\": \"correct\",\n      \"stimulus\": {\n        \"id\": \"stm_L07\",\n        \"type\": \"audio\",\n        \"mediaUrl\": \"/media/audio/l07.mp3\",\n        \"replayable\": true\n      },\n      \"choices\": [\n        { \"id\": \"ch_a\", \"label\": \"Visit his friend\",\n          \"isCorrect\": false, \"selected\": false },\n        { \"id\": \"ch_b\", \"label\": \"Read a book\",\n          \"isCorrect\": true,  \"selected\": true },\n        { \"id\": \"ch_c\", \"label\": \"Play football\",\n          \"isCorrect\": false, \"selected\": false },\n        { \"id\": \"ch_d\", \"label\": \"Go to school\",\n          \"isCorrect\": false, \"selected\": false }\n      ]\n    },\n    {\n      \"questionId\": \"qst_L12\",\n      \"ordinal\": 12,\n      \"sectionId\": \"sec_L1\",\n      \"prompt\": \"Where are the children going?\",\n      \"outcome\": \"unanswered\",\n      \"stimulus\": { \"id\": \"stm_L12\", \"type\": \"audio\",\n                     \"mediaUrl\": \"/media/audio/l12.mp3\", \"replayable\": true },\n      \"choices\": [\n        { \"id\": \"ch_a\", \"label\": \"To the park\",\n          \"isCorrect\": false, \"selected\": false },\n        { \"id\": \"ch_b\", \"label\": \"To the library\",\n          \"isCorrect\": true,  \"selected\": false },\n        { \"id\": \"ch_c\", \"label\": \"To the shop\",\n          \"isCorrect\": false, \"selected\": false },\n        { \"id\": \"ch_d\", \"label\": \"To the beach\",\n          \"isCorrect\": false, \"selected\": false }\n      ]\n    }\n  ]\n}",
+          codes: ["200", "401", "403 not your attempt", "409 attempt still in progress"] }
+      ]
+    },
+    history: {
+      title: "History",
+      note: "Per-section columns come straight from attempt_section — the reason section scores were normalized instead of buried in a blob.",
+      apiNote: "This screen is the argument for storing section scores as rows: the table is one query, and trends are a GROUP BY away.",
+      endpoints: [
+        { verb: "GET", uri: "/api/attempts", sum: "This student's finished attempts",
+          desc: "Newest first, with per-section breakdown inline so the table needs no follow-up call per row. nextCursor drives the footer control — null disables it, as here. status renders as the How it ended column — the filter admits expired attempts, so the table has to say which ones ran out of time rather than presenting them as ordinary hand-ins.",
+          req: "?status=finished&limit=20&cursor=<opaque>\n// finished = submitted OR expired. An expired attempt is\n// graded and kept, so filtering it out would hide real results.",
+          res: "{\n  \"attempts\": [\n    {\n      \"id\": \"att_A73…\",\n      \"test\": { \"title\": \"TOEFL Primary — Practice Test 04\" },\n      \"submittedAt\": \"2026-08-25T08:48:34Z\",\n      \"status\": \"submitted\",\n      \"pointsEarned\": 36, \"pointsPossible\": 40, \"percentage\": 90,\n      \"sections\": [\n        { \"title\": \"Listening\", \"type\": \"listening\",\n          \"pointsEarned\": 18, \"pointsPossible\": 20 },\n        { \"title\": \"Reading\", \"type\": \"reading\",\n          \"pointsEarned\": 18, \"pointsPossible\": 20 }\n      ]\n    }\n  ],\n  \"nextCursor\": null        // last page: 4 rows under limit 20\n}",
+          codes: ["200", "400 bad cursor", "401"] }
+      ]
+    },
+    offline: {
+      title: "Save trouble",
+      note: "Designed against a real incident in awesome-survey, where answers were lost four different ways. The rule here: an answer is durable on the device BEFORE it is sent, and the server never discards a payload it cannot apply.",
+      apiNote: "Two additions the happy path does not need: a durable client queue, and a server-side capture of anything that could not be applied. Each rejected item names its capture id in capturedAs; the admin route that lists those captures is not called from a student screen.",
+      endpoints: [
+        { verb: "PATCH", uri: "/api/attempts/{id}/responses", sum: "Flush the durable queue (full snapshot, not a delta)",
+          desc: "The body is a FULL SNAPSHOT of every answer held for ONE section, never a delta and never the whole attempt. Questions in other sections are untouched, which is exactly why this is PATCH and not PUT. A delta loses any answer that never made it into a batch, even when every request sent succeeds. Never all-or-nothing: one rejected item cannot roll back the rest. Because every item shares one section, section expiry is an ENVELOPE-level 410 rather than a per-item reason — a per-item section_expired could never be true of some items and not others in the same request. The queue is written to IndexedDB before the request is attempted and cleared only on a per-item ack, so closing the app mid-flush loses nothing.",
+          req: "{\n  \"clientInstanceId\": \"ci_9f3a…\",\n  \"responses\": [        // every answer held for sec_R1, not just new ones\n    { \"questionId\": \"qst_R24\",    \"seq\": 512, \"selectedChoiceIds\": [\"ch_a\"], \"answeredAt\": \"…\" },\n    { \"questionId\": \"qst_R25\",    \"seq\": 513, \"selectedChoiceIds\": [\"ch_b\"], \"answeredAt\": \"…\" },\n    { \"questionId\": \"qst_R26\",    \"seq\": 514, \"selectedChoiceIds\": [\"ch_d\"], \"answeredAt\": \"…\" },\n    { \"questionId\": \"qst_R27\",    \"seq\": 515, \"selectedChoiceIds\": [\"ch_a\"], \"answeredAt\": \"…\" },\n    { \"questionId\": \"qst_R31_v1\", \"seq\": 188, \"selectedChoiceIds\": [\"ch_c\"], \"answeredAt\": \"…\" }\n  ]\n}",
+          res: "// 200 even when items fail. A 4xx on the envelope would\n// make the whole snapshot look unsent and trigger a retry storm.\n{\n  \"results\": [\n    { \"questionId\": \"qst_R24\", \"status\": \"applied\" },\n    { \"questionId\": \"qst_R25\", \"status\": \"applied\" },\n    { \"questionId\": \"qst_R26\", \"status\": \"applied\" },\n    { \"questionId\": \"qst_R27\", \"status\": \"applied\" },\n    { \"questionId\": \"qst_R31_v1\", \"status\": \"rejected\",\n      \"reason\": \"unknown_question\",\n      \"retryable\": false,\n      \"capturedAs\": \"fw_3d81…\" }   // kept, not discarded\n  ],\n  \"attempt\": { \"serverTime\": \"…\", \"expiresAt\": \"…\" }\n}",
+          codes: ["200 with per-item results — item failures never fail the envelope", "400 empty_batch", "400 mixed_sections — questions spanning two sections", "400 body unparseable — captured as failed_write", "401", "403 not your attempt", "410 section_expired — every item shares one section, so this is envelope-level", "410 attempt_expired", "413 payload too large — captured, capturedAs names the row"] },
+
+        { verb: "POST", uri: "/api/attempts/{id}/submit", sum: "Blocked here - the queue is not empty",
+          desc: "Identical contract to the one on the Hand in screen - same optional responses array, same finalFlush in the response. It is listed here to show the client-side guard: Hand in is DISABLED while unsent answers remain, so this call is not made from this state at all. The atomic body covers the narrower race where an answer lands in the queue AFTER the guard check but before the request goes out.",
+          req: "{\n  \"clientInstanceId\": \"ci_9f3a…\",\n  \"responses\": [ \"… whatever the queue still holds …\" ]\n}",
+          res: "{\n  \"attemptId\": \"att_A73…\",\n  \"status\": \"submitted\",\n  \"submittedAt\": \"…\",\n  \"resultUrl\": \"/api/attempts/att_A73…/result\",\n  \"finalFlush\": [ { \"questionId\": \"qst_R27\", \"status\": \"applied\" } ]\n}",
+          codes: ["200 already submitted", "201 submitted", "401", "403 not your attempt", "409 nothing answered", "410 attempt_expired", "413 payload too large — captured, capturedAs names the row"] },
+
+        { verb: "GET", uri: "/api/attempts/{id}", sum: "Resume without clobbering local edits",
+          desc: "The same canonical envelope every other screen reads. The client MERGES it over its queue rather than replacing state with it: for each question it keeps whichever of (server response, local queued answer) carries the higher seq for this clientInstanceId. awesome-survey's resume called setIdentity and wiped unsaved edits outright — a reconnect could therefore destroy work that a disconnect had preserved.",
+          req: null,
+          res: "// the canonical envelope; only the merge-relevant parts shown\n{\n  \"id\": \"att_A73…\",\n  \"status\": \"in_progress\",\n  \"expiresAt\": \"…\",\n  \"serverTime\": \"…\",\n  \"questionCount\": 40,\n  \"answeredCount\": 34,\n  \"unansweredOrdinals\": [ \"…\" ],\n  \"currentSectionId\": \"sec_R1\",\n  \"currentQuestionId\": \"qst_R27\",\n  \"sections\": [ \"… both, as always …\" ],\n  \"responses\": [\n    { \"questionId\": \"qst_R24\", \"selectedChoiceIds\": [\"ch_a\"],\n      \"clientInstanceId\": \"ci_9f3a…\", \"seq\": 512 }\n  ]\n}\n// client: for each question keep whichever of (server, local queue)\n// has the higher seq for this instance, then re-flush local winners.",
+          codes: ["200", "401", "403 not your attempt", "410 attempt_expired"] },
+
+      ]
+    },
+    expired: {
+      title: "Time up",
+      note: "Nothing schedules this. The attempt is finalized by whichever request next touches it after the deadline.",
+      apiNote: "Any of the write endpoints can return this state — expiry is discovered, not pushed.",
+      endpoints: [
+        { verb: "PUT", uri: "/api/attempts/{id}/responses/{questionId}", sum: "A late write triggers finalization",
+          desc: "The tap happened at 08:52:31, before the 08:52:40 deadline — but the request did not arrive until 08:53:04, and the server judges by its own clock on arrival. It has to: neither answeredAt nor seq says anything about whether time remained — seq orders writes within one client instance and nothing more, and answeredAt is display text. The server grades what it holds, sets status expired with submittedAt pinned to the deadline rather than to arrival, then refuses the write. The device navigates here on 410.",
+          req: "{\n  \"clientInstanceId\": \"ci_9f3a…\",\n  \"seq\": 903,\n  \"selectedChoiceIds\": [\"ch_b\"],\n  \"answeredAt\": \"2026-08-25T08:52:31Z\"   // tapped 9s before the deadline…\n}\n// …but the request only reached the server at 08:53:04.",
+          res: "410 Gone   ·   application/problem+json\n{\n  \"type\": \"attempt_expired\",\n  \"title\": \"Time is up\",\n  \"status\": 410,\n  \"detail\": \"Your test was handed in automatically.\",\n  \"retryable\": false,\n  \"attempt\": {\n    \"id\": \"att_A73…\",\n    \"status\": \"expired\",\n    \"submittedAt\": \"2026-08-25T08:52:40Z\",\n    \"resultUrl\": \"/api/attempts/att_A73…/result\"\n  }\n}",
+          codes: ["401", "403 not your attempt", "410 attempt_expired", "413 payload too large — captured, capturedAs names the row"] },
+        { verb: "GET", uri: "/api/attempts/{id}/result", sum: "The auto-graded result",
+          desc: "The same schema as a hand-in result, differing only in status. An expired attempt is graded on the answers it holds; blanks score zero. answered is returned explicitly rather than inferred from pointsPossible, since points need not equal question count.",
+          req: null,
+          res: "// identical schema to a hand-in result, status differs\n{\n  \"attemptId\": \"att_A73…\",\n  \"test\": { \"title\": \"TOEFL Primary — Practice Test 04\", \"version\": 2 },\n  \"status\": \"expired\",\n  \"submittedAt\": \"2026-08-25T08:52:40Z\",\n  \"elapsedSeconds\": 3000,\n  \"score\": {\n    \"pointsEarned\": 36, \"pointsPossible\": 40, \"percentage\": 90,\n    \"answered\": 38, \"unanswered\": 2,\n    \"correct\": 36, \"incorrect\": 2,\n    \"isPersonalBest\": true,\n    \"sections\": [ \"… same rows as a submitted result …\" ]\n  }\n}",
+          codes: ["200", "401", "403 not your attempt"] }
+      ]
+    }
+  };
+
+  var esc = function (s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  };
+
+  var listEl  = document.getElementById("apiList");
+  var noteEl  = document.getElementById("apiNote");
+  var countEl = document.getElementById("apiCount");
+  var titleEl = document.getElementById("stageTitle");
+  var stageNote = document.getElementById("stageNote");
+
+  function renderApi(key) {
+    var data = SCREENS[key];
+    if (!data) { return; }
+    titleEl.textContent = data.title;
+    stageNote.textContent = data.note;
+    noteEl.textContent = data.apiNote;
+    countEl.textContent = data.endpoints.length + (data.endpoints.length === 1 ? " endpoint" : " endpoints");
+
+    listEl.innerHTML = data.endpoints.map(function (ep, i) {
+      var parts = [];
+      parts.push('<details class="ep"' + (i === 0 ? " open" : "") + ">");
+      parts.push("<summary>");
+      parts.push('<span class="verb ' + ep.verb + '">' + ep.verb + "</span>");
+      parts.push('<span class="uri">' + esc(ep.uri) + "</span>");
+      parts.push('<span class="ep-sum">' + esc(ep.sum) + "</span>");
+      parts.push("</summary>");
+      parts.push('<div class="ep-body">');
+      if (ep.desc) { parts.push('<p class="desc">' + esc(ep.desc) + "</p>"); }
+      parts.push('<div class="sect-k">Request</div>');
+      parts.push("<pre>" + (ep.req ? esc(ep.req) : "— no body") + "</pre>");
+      parts.push('<div class="sect-k">Response</div>');
+      parts.push("<pre>" + esc(ep.res) + "</pre>");
+      if (ep.codes && ep.codes.length) {
+        parts.push('<div class="sect-k">Status</div><div class="codes">');
+        parts.push(ep.codes.map(function (c) {
+          var ok = /^2\d\d/.test(c);
+          return '<span class="code-pill' + (ok ? " ok" : "") + '">' + esc(c) + "</span>";
+        }).join(""));
+        parts.push("</div>");
+      }
+      parts.push("</div></details>");
+      return parts.join("");
+    }).join("");
+  }
+
+  /* ── Question navigator ─────────────────────────────────── */
+  var BLANKS = [12, 31], WRONG = [5, 27];
+  var has = function (arr, n) { return arr.indexOf(n) !== -1; };
+
+  var LEGEND = {
+    answered:  "Answered",
+    current:   "You are here",
+    blank:     "Not answered",
+    correct:   "Correct",
+    incorrect: "Wrong"
+  };
+
+  var NAV = {
+    listening: {
+      title: "Your progress",
+      sub: "Listening · question 7 of 20 · 7 answered",
+      note: "This section runs forward only, so the navigator shows where you are but cannot move you. Reading will let you jump freely.",
+      keys: ["answered", "current", "blank"],
+      state: function (n) {
+        if (n === 7) { return { cls: "current", off: true }; }
+        if (n < 7)   { return { cls: has(BLANKS, n) ? "blank" : "answered", off: true }; }
+        if (n === 8) { return { cls: "blank", off: true }; }
+        return { cls: "blank", off: true };
+      }
+    },
+    reading: {
+      title: "Jump to a question",
+      sub: "Reading · question 23 of 40",
+      note: "Listening is closed and cannot be reopened. Any reading question is still yours to change.",
+      keys: ["answered", "current", "blank"],
+      state: function (n) {
+        if (n === 23) { return { cls: "current", off: false }; }
+        if (n <= 20)  { return { cls: has(BLANKS, n) ? "blank" : "answered", off: true }; }
+        return { cls: has(BLANKS, n) ? "blank" : "answered", off: false };
+      }
+    },
+    review: {
+      title: "Jump to a question",
+      sub: "36 correct · 2 wrong · 2 left blank",
+      note: null,
+      keys: ["correct", "incorrect", "blank"],
+      state: function (n) {
+        if (has(BLANKS, n)) { return { cls: "blank", off: false }; }
+        if (has(WRONG, n))  { return { cls: "incorrect", off: false }; }
+        return { cls: "correct", off: false };
+      }
+    }
+  };
+
+  var npTitle  = document.getElementById("npTitle");
+  var npSub    = document.getElementById("npSub");
+  var npScroll = document.getElementById("npScroll");
+  var npLegend = document.getElementById("npLegend");
+  var npNote   = document.getElementById("npNote");
+  var drawer   = document.getElementById("drawer");
+  var navpanel = document.getElementById("navpanel");
+  var scrim    = document.getElementById("scrim");
+  var exitItem = document.getElementById("exitTestItem");
+  var exitNote = document.getElementById("exitTestNote");
+
+  function buildGroup(label, cls, from, to, model) {
+    var cells = [];
+    for (var n = from; n <= to; n++) {
+      var st = model.state(n);
+      cells.push(
+        '<button class="np-cell ' + st.cls + '"' + (st.off ? " disabled" : "") +
+        ' aria-label="Question ' + n + '">' + n + "</button>"
+      );
+    }
+    return '<div class="np-group"><div class="np-group-label ' + cls + '">' + label +
+           "</div><div class=\"np-grid\">" + cells.join("") + "</div></div>";
+  }
+
+  function renderNav(key) {
+    var model = NAV[key];
+    if (!model) { return false; }
+    npTitle.textContent = model.title;
+    npSub.textContent = model.sub;
+    npScroll.innerHTML =
+      buildGroup("Listening", "listening", 1, 20, model) +
+      buildGroup("Reading", "reading", 21, 40, model);
+    npLegend.innerHTML = model.keys.map(function (k) {
+      return '<span><i class="np-key ' + k + '"></i>' + LEGEND[k] + "</span>";
+    }).join("");
+    if (model.note) { npNote.textContent = model.note; npNote.hidden = false; }
+    else { npNote.hidden = true; }
+    return true;
+  }
+
+  function closePanels() {
+    drawer.classList.remove("open");
+    navpanel.classList.remove("open");
+    drawer.setAttribute("aria-hidden", "true");
+    navpanel.setAttribute("aria-hidden", "true");
+    scrim.classList.remove("on");
+    Array.prototype.forEach.call(
+      document.querySelectorAll("[data-menu],[data-nav-toggle]"),
+      function (b) { b.setAttribute("aria-expanded", "false"); }
+    );
+  }
+
+  function openPanel(el, btn) {
+    var isOpen = el.classList.contains("open");
+    closePanels();
+    if (isOpen) { return; }
+    el.classList.add("open");
+    el.setAttribute("aria-hidden", "false");
+    scrim.classList.add("on");
+    if (btn) { btn.setAttribute("aria-expanded", "true"); }
+  }
+
+  var IN_TEST = { secintro: 1, listening: 1, reading: 1, confirm: 1, offline: 1 };
+
+  function show(key) {
+    if (!SCREENS[key]) { return; }
+    closePanels();
+    Array.prototype.forEach.call(document.querySelectorAll(".screen"), function (el) {
+      el.classList.toggle("is-active", el.id === "s-" + key);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll(".rail-btn"), function (b) {
+      b.setAttribute("aria-current", String(b.dataset.screen === key));
+    });
+    renderNav(key);
+    var inTest = Boolean(IN_TEST[key]);
+    exitItem.hidden = !inTest;
+    exitNote.hidden = !inTest;
+    if (inTest) {
+      // secintro is pre-entry: startedAt and expiresAt are still null there.
+      exitNote.textContent = key === "secintro"
+        ? "Nothing has started yet. The clock begins when you tap I'm ready."
+        : "The clock keeps running while you are away.";
+    }
+    renderApi(key);
+    try { localStorage.setItem("pp.screen", key); } catch (e) { /* private mode */ }
+  }
+
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest) { return; }
+
+    var menuBtn = e.target.closest("[data-menu]");
+    if (menuBtn) { openPanel(drawer, menuBtn); return; }
+
+    var navBtn = e.target.closest("[data-nav-toggle]");
+    if (navBtn) { openPanel(navpanel, navBtn); return; }
+
+    if (e.target === scrim) { closePanels(); return; }
+
+    var cell = e.target.closest(".np-cell");
+    if (cell) {
+      if (!cell.disabled) { closePanels(); }
+      return;
+    }
+
+    var lang = e.target.closest(".lang");
+    if (lang) {
+      Array.prototype.forEach.call(document.querySelectorAll(".lang"), function (b) {
+        b.setAttribute("aria-pressed", String(b === lang));
+      });
+      return;
+    }
+
+    var rail = e.target.closest(".rail-btn");
+    if (rail) { show(rail.dataset.screen); return; }
+
+    var hot = e.target.closest("[data-goto]");
+    if (hot) { show(hot.dataset.goto); return; }
+
+    var choice = e.target.closest("button.choice");
+    if (choice) {
+      var group = choice.parentNode;
+      Array.prototype.forEach.call(group.querySelectorAll(".choice"), function (c) {
+        c.setAttribute("aria-checked", String(c === choice));
+      });
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { closePanels(); }
+  });
+
+  var playBtn = document.getElementById("playBtn");
+  if (playBtn) {
+    playBtn.addEventListener("click", function () {
+      playBtn.disabled = true;
+      playBtn.textContent = "▶ Playing…";
+      var left = document.getElementById("playsLeft");
+      left.textContent = "No plays left";
+      left.classList.add("spent");
+    });
+  }
+
+  var start = "signin";
+  try {
+    var saved = localStorage.getItem("pp.screen");
+    if (saved && SCREENS[saved]) { start = saved; }
+  } catch (e) { /* private mode */ }
+  show(start);
+}());
+</script>

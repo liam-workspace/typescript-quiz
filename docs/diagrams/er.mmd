@@ -4,19 +4,27 @@ erDiagram
     text subject_claim UK
     text email
     text display_name
-    text level
+    student_level level
+  }
+  MEDIA_ASSET {
+    uuid id PK
+    media_kind kind
+    text filename UK
+    text mime_type
+    bigint byte_size
+    text checksum
   }
   TEST {
     uuid id PK
     text slug UK
-    text title
-    text status
     uuid current_version_id FK
   }
   TEST_VERSION {
     uuid id PK
     uuid test_id FK
-    int version
+    int version UK
+    text title
+    student_level level
     int duration_seconds
     timestamptz published_at
   }
@@ -29,6 +37,14 @@ erDiagram
     int duration_seconds
     nav_mode navigation
     boolean allow_answer_change
+    int default_max_plays
+    boolean default_allow_pause
+    boolean default_allow_seek
+  }
+  SECTION_INSTRUCTION {
+    uuid test_section_id PK
+    int ordinal PK
+    text text
   }
   STIMULUS {
     uuid id PK
@@ -43,6 +59,7 @@ erDiagram
   }
   QUESTION_GROUP {
     uuid id PK
+    uuid test_version_id FK
     uuid test_section_id FK
     uuid stimulus_id FK
     int ordinal
@@ -51,7 +68,7 @@ erDiagram
     uuid id PK
     uuid test_version_id FK
     uuid question_group_id FK
-    text question_key
+    text question_key UK
     int ordinal
     text prompt
     question_type type
@@ -66,25 +83,24 @@ erDiagram
   }
   QUESTION_TAG {
     uuid question_id PK
-    text tag PK
-  }
-  MEDIA_ASSET {
-    uuid id PK
-    text kind
-    text filename
-    text mime_type
-    bigint byte_size
-    text checksum
+    int ordinal PK
+    text tag
   }
   ATTEMPT {
     uuid id PK
     uuid student_id FK
     uuid test_version_id FK
     attempt_status status
+    timestamptz created_at
     timestamptz started_at
     timestamptz expires_at
     timestamptz submitted_at
+    uuid current_section_id FK
     uuid current_question_id FK
+    int points_earned
+    int points_possible
+    numeric percentage
+    int question_count
   }
   ATTEMPT_SECTION {
     uuid attempt_id PK
@@ -92,13 +108,23 @@ erDiagram
     timestamptz entered_at
     timestamptz expires_at
     timestamptz completed_at
+    int points_earned
+    int points_possible
   }
   RESPONSE {
     uuid attempt_id PK
     uuid question_id PK
     uuid test_version_id FK
+    text client_instance_id
+    bigint client_seq
     timestamptz answered_at
     int time_spent_ms
+  }
+  RESPONSE_CLIENT_CURSOR {
+    uuid attempt_id PK
+    uuid question_id PK
+    text client_instance_id PK
+    bigint last_seq
   }
   RESPONSE_CHOICE {
     uuid attempt_id PK
@@ -108,18 +134,21 @@ erDiagram
   STIMULUS_PLAY {
     uuid attempt_id PK
     uuid stimulus_id PK
+    uuid test_version_id FK
     int play_count
+    timestamptz last_played_at
   }
   STUDENT ||--o{ ATTEMPT : takes
   TEST ||--o{ TEST_VERSION : "has version"
   TEST_VERSION ||--o{ TEST_SECTION : contains
   TEST_VERSION ||--o{ STIMULUS : owns
+  TEST_SECTION ||--o{ SECTION_INSTRUCTION : "instructs with"
   TEST_SECTION ||--o{ QUESTION_GROUP : contains
   STIMULUS ||--o{ QUESTION_GROUP : introduces
+  MEDIA_ASSET ||--o{ STIMULUS : "played by"
   QUESTION_GROUP ||--o{ QUESTION : contains
   QUESTION ||--o{ CHOICE : offers
   QUESTION ||--o{ QUESTION_TAG : "tagged with"
-  MEDIA_ASSET ||--o{ STIMULUS : "played by"
   TEST_VERSION ||--o{ ATTEMPT : "pinned by"
   ATTEMPT ||--o{ ATTEMPT_SECTION : times
   TEST_SECTION ||--o{ ATTEMPT_SECTION : "timed in"
@@ -127,5 +156,6 @@ erDiagram
   QUESTION ||--o{ RESPONSE : "answered by"
   RESPONSE ||--o{ RESPONSE_CHOICE : selects
   CHOICE ||--o{ RESPONSE_CHOICE : "selected as"
+  RESPONSE ||--o{ RESPONSE_CLIENT_CURSOR : "seq per device"
   ATTEMPT ||--o{ STIMULUS_PLAY : counts
   STIMULUS ||--o{ STIMULUS_PLAY : "counted in"

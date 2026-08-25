@@ -2,7 +2,7 @@
   "type": "er",
   "score_pct": 100.0,
   "hard_fail": [],
-  "node_count": 15,
+  "node_count": 17,
   "well_formed": [
     {
       "rule": "er_has_attributes",
@@ -30,7 +30,7 @@
     {
       "check": "complexity_within_cap",
       "pass": true,
-      "detail": "15/25"
+      "detail": "17/25"
     },
     {
       "check": "connector_crossings",

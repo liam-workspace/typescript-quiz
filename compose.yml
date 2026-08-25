@@ -5,14 +5,19 @@ services:
       - "3000:3000"
     volumes:
       - ./config:/app/config
+  # Local development only. Bound to loopback (127.0.0.1) so this database is
+  # never reachable from the LAN or shared wifi — it holds a child's test
+  # answers and scores. The host port is shifted to 5433 (off Postgres'
+  # default 5432) so this stack cannot collide with, or silently connect to,
+  # some other postgres already running on the machine.
   postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: pp
-      POSTGRES_PASSWORD: pp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pp}
       POSTGRES_DB: pp
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - pp-postgres:/var/lib/postgresql/data
     healthcheck:

@@ -6,6 +6,12 @@ export default defineConfig({
     builtin: true,
     node: true,
   },
+  // Packages/socket and packages/web are the old Razzia app: they're
+  // excluded from pnpm-workspace.yaml (still import the now-renamed
+  // @razzia/common) so they have no installed node_modules, which makes
+  // type-aware oxlint fail on them. They stay on disk for reference and
+  // are deleted in a later plan; ignored here in the meantime.
+  ignorePatterns: ["packages/socket/**", "packages/web/**"],
   jsPlugins: ["@stylistic/eslint-plugin"],
   options: {
     typeAware: true,

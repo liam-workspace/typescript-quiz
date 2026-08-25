@@ -36,8 +36,8 @@ importers:
   packages/common:
     dependencies:
       '@liam-workspace/platform':
-        specifier: file:/Users/liam/projects/typescript-libraries/packages/private/universal/platform
-        version: file:../typescript-libraries/packages/private/universal/platform
+        specifier: ^0.1.0
+        version: 0.1.0
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -55,14 +55,14 @@ importers:
   packages/db:
     dependencies:
       '@liam-public/node-config':
-        specifier: file:/Users/liam/projects/typescript-libraries/packages/public/server/node-config
-        version: file:../typescript-libraries/packages/public/server/node-config
+        specifier: ^0.1.0
+        version: 0.1.0
       '@liam-public/shared-core':
         specifier: ^0.2.1
         version: 0.2.1(@types/pg@8.23.1)
       '@liam-workspace/platform':
-        specifier: file:/Users/liam/projects/typescript-libraries/packages/private/universal/platform
-        version: file:../typescript-libraries/packages/private/universal/platform
+        specifier: ^0.1.0
+        version: 0.1.0
       '@pp/common':
         specifier: workspace:*
         version: link:../common
@@ -187,8 +187,8 @@ packages:
   '@liam-public/event-bus@0.1.0':
     resolution: {integrity: sha512-mkghGdOZbYRuoXkfZQpTfausw8HW4HcNJYN4esIJOR64OWGodWqqNdPjhzeNSkoDoceRsf2/vm2UaL2ODjLclg==}
 
-  '@liam-public/node-config@file:../typescript-libraries/packages/public/server/node-config':
-    resolution: {directory: ../typescript-libraries/packages/public/server/node-config, type: directory}
+  '@liam-public/node-config@0.1.0':
+    resolution: {integrity: sha512-eW17e/X9p0d7Ni2E+NlG1cS2TCG7Yprm+PsJ0iDR07HVwL1OB9/z30qIE6wTDLLqQmSxekv++NxmwqpftJl5RQ==}
 
   '@liam-public/node-postgres@0.2.0':
     resolution: {integrity: sha512-ouVdK6pbDzSQZ5mNDlhDn+di6lOiUn3qmJxBPTa3eWflGfmM0J0gA17ry71Yd0dLCnhWD+yUvr94ci0xln4ETw==}
@@ -197,8 +197,8 @@ packages:
     resolution: {integrity: sha512-nAu/FqXygxqOpDxy6f/peRuKv6PMKNEN5Q4vPS2U2QVAT1CBSkNwcEEjeMcsQoWBiIsEd0GAbdfkZHomOXwu+Q==}
     deprecated: Use capability-specific @liam packages instead.
 
-  '@liam-workspace/platform@file:../typescript-libraries/packages/private/universal/platform':
-    resolution: {directory: ../typescript-libraries/packages/private/universal/platform, type: directory}
+  '@liam-workspace/platform@0.1.0':
+    resolution: {integrity: sha512-dd6Pb8BzxgNBjmVkTBtO5TlcvcsfqgYlVfnNSiX76u/o8nJd5Sht/gEydsqxOrisTf6trDTDGQjVcNxd2eoNZA==, tarball: https://npm.pkg.github.com/download/@liam-workspace/platform/0.1.0/9a6edfe775c4f250460eb6ea41baae8e6f3d12b6}
 
   '@napi-rs/wasm-runtime@1.1.6':
     resolution: {integrity: sha512-ZLv/JdUfkvOy9eCnnBaGfiO+XimbjebAeO+MRQqD/B+FR1tnRN0tpKSJHRbE8sFfS6aqsXZ67TQjfwfsxULVbg==}
@@ -1940,7 +1940,7 @@ snapshots:
 
   '@liam-public/event-bus@0.1.0': {}
 
-  '@liam-public/node-config@file:../typescript-libraries/packages/public/server/node-config': {}
+  '@liam-public/node-config@0.1.0': {}
 
   '@liam-public/node-postgres@0.2.0(@types/pg@8.23.1)':
     dependencies:
@@ -1962,7 +1962,7 @@ snapshots:
       - '@types/pg'
       - pg-native
 
-  '@liam-workspace/platform@file:../typescript-libraries/packages/private/universal/platform': {}
+  '@liam-workspace/platform@0.1.0': {}
 
   '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
     dependencies:

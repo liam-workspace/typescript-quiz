@@ -1,12 +1,14 @@
 {
   "name": "@pp/common",
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "test": "vitest run"
   },
   "dependencies": {
-    "@liam-workspace/platform": "file:/Users/liam/projects/typescript-libraries/packages/private/universal/platform",
+    "@liam-workspace/platform": "^0.1.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

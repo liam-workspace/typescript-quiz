@@ -1,10 +1,10 @@
 # Database design
 
-| File | What it is |
-|---|---|
-| `schema.sql` | The design. Source of truth. Executed against PostgreSQL 16. |
+| File                  | What it is                                                       |
+| --------------------- | ---------------------------------------------------------------- |
+| `schema.sql`          | The design. Source of truth. Executed against PostgreSQL 16.     |
 | `invariants.test.sql` | Proves each claimed constraint rejects what it claims to reject. |
-| `../diagrams/er.*` | Generated view of the relational model (17 entities). |
+| `../diagrams/er.*`    | Generated view of the relational model (17 entities).            |
 
 ## Running the checks
 

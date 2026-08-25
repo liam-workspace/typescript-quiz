@@ -82,7 +82,6 @@ tags:
     description: Authoring and operational routes; require the admin role claim.
 
 paths:
-
   # ─────────────────────────────────────────────────────────── Session ──
   /session:
     post:
@@ -104,14 +103,26 @@ paths:
       responses:
         "200":
           description: Existing student.
-          content: { application/json: { schema: { $ref: "#/components/schemas/SessionResult" } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/SessionResult" } },
+            }
         "201":
           description: Student provisioned on first sign-in.
-          content: { application/json: { schema: { $ref: "#/components/schemas/SessionResult" } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/SessionResult" } },
+            }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403":
           description: Email not permitted by the allowlist.
-          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
 
   /me:
     get:
@@ -124,11 +135,19 @@ paths:
       responses:
         "200":
           description: The profile.
-          content: { application/json: { schema: { $ref: "#/components/schemas/Student" } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/Student" } },
+            }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404":
           description: No profile for this `sub` — call `POST /session` first.
-          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
 
   # ─────────────────────────────────────────────────────────── Catalog ──
   /tests:
@@ -178,7 +197,11 @@ paths:
       responses:
         "200":
           description: The test brief.
-          content: { application/json: { schema: { $ref: "#/components/schemas/TestBrief" } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/TestBrief" } },
+            }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
@@ -195,7 +218,12 @@ paths:
       parameters:
         - name: status
           in: query
-          schema: { type: string, enum: [finished, submitted, expired], default: finished }
+          schema:
+            {
+              type: string,
+              enum: [finished, submitted, expired],
+              default: finished,
+            }
         - { $ref: "#/components/parameters/Limit" }
         - { $ref: "#/components/parameters/Cursor" }
       responses:
@@ -243,14 +271,26 @@ paths:
       responses:
         "200":
           description: An in-progress attempt already existed; `resumed` is true.
-          content: { application/json: { schema: { $ref: "#/components/schemas/AttemptStart" } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/AttemptStart" } },
+            }
         "201":
           description: A new attempt was created.
-          content: { application/json: { schema: { $ref: "#/components/schemas/AttemptStart" } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/AttemptStart" } },
+            }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409":
           description: The test is not published.
-          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
 
   /attempts/{id}:
     get:
@@ -273,7 +313,11 @@ paths:
       responses:
         "200":
           description: The runner envelope.
-          content: { application/json: { schema: { $ref: "#/components/schemas/RunnerEnvelope" } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/RunnerEnvelope" } },
+            }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/NotYourAttempt" }
         "410": { $ref: "#/components/responses/AttemptExpired" }
@@ -300,12 +344,20 @@ paths:
       responses:
         "200":
           description: The section clock and its rules.
-          content: { application/json: { schema: { $ref: "#/components/schemas/SectionEntry" } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/SectionEntry" } },
+            }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/NotYourAttempt" }
         "409":
           description: A previous section is still open.
-          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
         "410": { $ref: "#/components/responses/AttemptExpired" }
 
   /attempts/{id}/stimuli/{stimulusId}/play:
@@ -326,12 +378,20 @@ paths:
       responses:
         "200":
           description: A play was claimed.
-          content: { application/json: { schema: { $ref: "#/components/schemas/PlayGrant" } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/PlayGrant" } },
+            }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/NotYourAttempt" }
         "409":
           description: No plays remaining.
-          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
         "410": { $ref: "#/components/responses/SectionOrAttemptExpired" }
 
   /attempts/{id}/responses/{questionId}:
@@ -359,12 +419,22 @@ paths:
       responses:
         "200":
           description: Applied, or discarded as stale. Both are successes.
-          content: { application/json: { schema: { $ref: "#/components/schemas/SingleResponseResult" } } }
+          content:
+            {
+              application/json:
+                {
+                  schema: { $ref: "#/components/schemas/SingleResponseResult" },
+                },
+            }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/NotYourAttempt" }
         "409":
-          description: '`answer_change_not_allowed` or `navigation_locked`. Never retry these.'
-          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+          description: "`answer_change_not_allowed` or `navigation_locked`. Never retry these."
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
         "410": { $ref: "#/components/responses/SectionOrAttemptExpired" }
         "413": { $ref: "#/components/responses/PayloadCaptured" }
 
@@ -396,13 +466,21 @@ paths:
       responses:
         "200":
           description: Per-item results. Item failures appear here, not as an HTTP error.
-          content: { application/json: { schema: { $ref: "#/components/schemas/FlushResult" } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/FlushResult" } },
+            }
         "400":
           description: |
             `empty_batch`, `mixed_sections` (questions spanning more than one section), or a body
             that could not be parsed. All three are captured as a `failed_write` before the error
             is returned — see `type`.
-          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/NotYourAttempt" }
         "410": { $ref: "#/components/responses/SectionOrAttemptExpired" }
@@ -438,8 +516,12 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/NotYourAttempt" }
         "409":
-          description: '`navigation_locked` — this section runs forward only.'
-          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+          description: "`navigation_locked` — this section runs forward only."
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
         "410": { $ref: "#/components/responses/SectionOrAttemptExpired" }
 
   /attempts/{id}/submit:
@@ -470,18 +552,30 @@ paths:
       responses:
         "200":
           description: Already submitted — the same row, not a regrade.
-          content: { application/json: { schema: { $ref: "#/components/schemas/SubmitResult" } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/SubmitResult" } },
+            }
         "201":
           description: Graded and finalized.
-          content: { application/json: { schema: { $ref: "#/components/schemas/SubmitResult" } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/SubmitResult" } },
+            }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/NotYourAttempt" }
         "409":
           description: Nothing answered.
-          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
         "410": { $ref: "#/components/responses/AttemptExpired" }
 
-  # ─────────────────────────────────────────────────────────── Results ──
+        # ─────────────────────────────────────────────────────────── Results ──
         "413": { $ref: "#/components/responses/PayloadCaptured" }
 
   /attempts/{id}/result:
@@ -508,7 +602,11 @@ paths:
       responses:
         "200":
           description: The result.
-          content: { application/json: { schema: { $ref: "#/components/schemas/AttemptResult" } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/AttemptResult" } },
+            }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/NotYourAttempt" }
         "409": { $ref: "#/components/responses/StillRunning" }
@@ -533,7 +631,11 @@ paths:
       responses:
         "200":
           description: The review items.
-          content: { application/json: { schema: { $ref: "#/components/schemas/ReviewPayload" } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/ReviewPayload" } },
+            }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/NotYourAttempt" }
         "409": { $ref: "#/components/responses/StillRunning" }
@@ -607,7 +709,11 @@ paths:
                   version: { type: integer }
         "400":
           description: The document failed validation — captured as a `failed_write`.
-          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/AdminOnly" }
         "413": { $ref: "#/components/responses/PayloadCaptured" }
@@ -665,7 +771,13 @@ paths:
                             sectionId: { type: string }
                             rule:
                               type: string
-                              enum: [too_few_choices, wrong_correct_count, missing_media_asset, duration_mismatch]
+                              enum:
+                                [
+                                  too_few_choices,
+                                  wrong_correct_count,
+                                  missing_media_asset,
+                                  duration_mismatch,
+                                ]
                             detail: { type: string }
 
   /admin/tests/{testId}/export:
@@ -685,7 +797,11 @@ paths:
       responses:
         "200":
           description: The interchange document.
-          content: { application/json: { schema: { $ref: "#/components/schemas/TestDocument" } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/TestDocument" } },
+            }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/AdminOnly" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -712,18 +828,29 @@ paths:
       responses:
         "201":
           description: Asset stored.
-          content: { application/json: { schema: { $ref: "#/components/schemas/MediaAsset" } } }
+          content:
+            {
+              application/json:
+                { schema: { $ref: "#/components/schemas/MediaAsset" } },
+            }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/AdminOnly" }
         "413":
           description: File too large.
-          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
         "415":
           description: Unsupported media type.
-          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
 
 components:
-
   securitySchemes:
     bearerAuth:
       type: http
@@ -769,19 +896,39 @@ components:
   responses:
     Unauthorized:
       description: Missing, invalid or expired token.
-      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+      content:
+        {
+          application/problem+json:
+            { schema: { $ref: "#/components/schemas/Problem" } },
+        }
     NotYourAttempt:
       description: The attempt belongs to another student.
-      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+      content:
+        {
+          application/problem+json:
+            { schema: { $ref: "#/components/schemas/Problem" } },
+        }
     AdminOnly:
       description: The token carries no admin role claim.
-      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+      content:
+        {
+          application/problem+json:
+            { schema: { $ref: "#/components/schemas/Problem" } },
+        }
     NotFound:
       description: No such resource, or it is not published.
-      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+      content:
+        {
+          application/problem+json:
+            { schema: { $ref: "#/components/schemas/Problem" } },
+        }
     BadCursor:
       description: The cursor could not be decoded.
-      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+      content:
+        {
+          application/problem+json:
+            { schema: { $ref: "#/components/schemas/Problem" } },
+        }
     PayloadCaptured:
       description: |
         The body exceeded the size limit and was NOT applied. It is captured as a `failed_write`
@@ -798,7 +945,11 @@ components:
                   capturedAs: { type: string }
     StillRunning:
       description: The attempt is genuinely still running, so no score may be read.
-      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+      content:
+        {
+          application/problem+json:
+            { schema: { $ref: "#/components/schemas/Problem" } },
+        }
     AttemptExpired:
       description: |
         The attempt was past its deadline. It has been finalized (graded, `status: expired`,
@@ -822,7 +973,6 @@ components:
               - { $ref: "#/components/schemas/AttemptExpiredProblem" }
 
   schemas:
-
     SectionExpiredProblem:
       type: object
       description: |
@@ -879,7 +1029,11 @@ components:
         id: { type: string }
         displayName: { type: string }
         email: { type: string, format: email }
-        level: { type: [string, "null"], enum: [primary-step-1, primary-step-2, null] }
+        level:
+          {
+            type: [string, "null"],
+            enum: [primary-step-1, primary-step-2, null],
+          }
         isAdmin: { type: boolean }
 
     SessionResult:
@@ -895,7 +1049,11 @@ components:
         id: { type: string }
         displayName: { type: string }
         email: { type: string, format: email }
-        level: { type: [string, "null"], enum: [primary-step-1, primary-step-2, null] }
+        level:
+          {
+            type: [string, "null"],
+            enum: [primary-step-1, primary-step-2, null],
+          }
         isAdmin: { type: boolean }
         created: { type: boolean }
 
@@ -909,7 +1067,8 @@ components:
 
     AttemptRef:
       type: object
-      required: [attemptId, submittedAt, pointsEarned, pointsPossible, percentage]
+      required:
+        [attemptId, submittedAt, pointsEarned, pointsPossible, percentage]
       properties:
         attemptId: { type: string }
         submittedAt: { type: string, format: date-time }
@@ -919,7 +1078,18 @@ components:
 
     TestCard:
       type: object
-      required: [id, slug, title, level, durationSeconds, sections, inProgressAttemptId, attemptCount, bestAttempt]
+      required:
+        [
+          id,
+          slug,
+          title,
+          level,
+          durationSeconds,
+          sections,
+          inProgressAttemptId,
+          attemptCount,
+          bestAttempt,
+        ]
       properties:
         id: { type: string }
         slug: { type: string }
@@ -956,13 +1126,23 @@ components:
       description: Section defaults. A stimulus may tighten these but never loosen them. Null where no timed media exists.
       required: [maxPlays, allowPause, allowSeek]
       properties:
-        maxPlays: { type: [integer, "null"], description: Null means unlimited. }
+        maxPlays:
+          { type: [integer, "null"], description: Null means unlimited. }
         allowPause: { type: boolean }
         allowSeek: { type: boolean }
 
     TestBrief:
       type: object
-      required: [id, slug, title, durationSeconds, attemptCount, inProgressAttemptId, sections]
+      required:
+        [
+          id,
+          slug,
+          title,
+          durationSeconds,
+          attemptCount,
+          inProgressAttemptId,
+          sections,
+        ]
       properties:
         id: { type: string }
         slug: { type: string }
@@ -974,7 +1154,19 @@ components:
           type: array
           items:
             type: object
-            required: [id, type, title, ordinal, questionCount, durationSeconds, navigation, allowAnswerChange, playback, instructions]
+            required:
+              [
+                id,
+                type,
+                title,
+                ordinal,
+                questionCount,
+                durationSeconds,
+                navigation,
+                allowAnswerChange,
+                playback,
+                instructions,
+              ]
             properties:
               id: { type: string }
               type: { $ref: "#/components/schemas/SectionType" }
@@ -992,7 +1184,18 @@ components:
 
     AttemptStart:
       type: object
-      required: [id, attemptNumber, status, createdAt, startedAt, expiresAt, serverTime, resumed, finalizedPriorAttempt]
+      required:
+        [
+          id,
+          attemptNumber,
+          status,
+          createdAt,
+          startedAt,
+          expiresAt,
+          serverTime,
+          resumed,
+          finalizedPriorAttempt,
+        ]
       properties:
         id: { type: string }
         attemptNumber: { type: integer }
@@ -1005,7 +1208,7 @@ components:
         expiresAt:
           type: [string, "null"]
           format: date-time
-          description: '`startedAt + durationSeconds`; null while `startedAt` is null.'
+          description: "`startedAt + durationSeconds`; null while `startedAt` is null."
         serverTime: { type: string, format: date-time }
         resumed: { type: boolean }
         currentSectionId: { type: [string, "null"] }
@@ -1032,7 +1235,20 @@ components:
 
     SectionEntry:
       type: object
-      required: [sectionId, title, type, questionCount, enteredAt, expiresAt, serverTime, navigation, allowAnswerChange, playback, instructions]
+      required:
+        [
+          sectionId,
+          title,
+          type,
+          questionCount,
+          enteredAt,
+          expiresAt,
+          serverTime,
+          navigation,
+          allowAnswerChange,
+          playback,
+          instructions,
+        ]
       properties:
         sectionId: { type: string }
         title: { type: string }
@@ -1135,7 +1351,17 @@ components:
 
     RunnerSection:
       type: object
-      required: [id, type, status, completedAt, navigation, allowAnswerChange, expiresAt, groups]
+      required:
+        [
+          id,
+          type,
+          status,
+          completedAt,
+          navigation,
+          allowAnswerChange,
+          expiresAt,
+          groups,
+        ]
       properties:
         id: { type: string }
         type: { $ref: "#/components/schemas/SectionType" }
@@ -1160,11 +1386,25 @@ components:
         seq:
           type: integer
           description: What the resume merge compares. Returned so the client can decide which side wins.
-        answeredAt: { type: string, format: date-time, description: Display text only. }
+        answeredAt:
+          { type: string, format: date-time, description: Display text only. }
 
     RunnerEnvelope:
       type: object
-      required: [id, status, expiresAt, serverTime, questionCount, answeredCount, unansweredOrdinals, currentSectionId, currentQuestionId, sections, responses]
+      required:
+        [
+          id,
+          status,
+          expiresAt,
+          serverTime,
+          questionCount,
+          answeredCount,
+          unansweredOrdinals,
+          currentSectionId,
+          currentQuestionId,
+          sections,
+          responses,
+        ]
       properties:
         id: { type: string }
         status: { type: string, enum: [in_progress] }
@@ -1227,7 +1467,6 @@ components:
             span more than one section is refused as `mixed_sections` and captured, because the
             envelope-level section rules cannot be evaluated against two sections at once.
 
-
     ItemAccepted:
       type: object
       description: The write landed, or was discarded as stale. Both are successes.
@@ -1250,7 +1489,13 @@ components:
         status: { type: string, const: rejected }
         reason:
           type: string
-          enum: [answer_change_not_allowed, navigation_locked, unknown_question, invalid]
+          enum:
+            [
+              answer_change_not_allowed,
+              navigation_locked,
+              unknown_question,
+              invalid,
+            ]
           description: Per-item conditions only. `section_expired` and `mixed_sections` are envelope-level.
         retryable:
           type: boolean
@@ -1339,7 +1584,18 @@ components:
 
     Score:
       type: object
-      required: [pointsEarned, pointsPossible, percentage, answered, unanswered, correct, incorrect, isPersonalBest, sections]
+      required:
+        [
+          pointsEarned,
+          pointsPossible,
+          percentage,
+          answered,
+          unanswered,
+          correct,
+          incorrect,
+          isPersonalBest,
+          sections,
+        ]
       properties:
         pointsEarned: { type: integer }
         pointsPossible: { type: integer }
@@ -1378,7 +1634,17 @@ components:
 
     AttemptHistoryRow:
       type: object
-      required: [id, test, submittedAt, status, pointsEarned, pointsPossible, percentage, sections]
+      required:
+        [
+          id,
+          test,
+          submittedAt,
+          status,
+          pointsEarned,
+          pointsPossible,
+          percentage,
+          sections,
+        ]
       properties:
         id: { type: string }
         test:
@@ -1481,7 +1747,11 @@ components:
       required: [id, reason, rawBody, receivedAt, replayedAt]
       properties:
         id: { type: string }
-        attemptId: { type: [string, "null"], description: Unresolved when the body itself was malformed. }
+        attemptId:
+          {
+            type: [string, "null"],
+            description: Unresolved when the body itself was malformed.,
+          }
         reason: { type: string }
         rawBody:
           type: string
@@ -1539,7 +1809,8 @@ components:
                     stimulus:
                       type: object
                       properties:
-                        type: { type: string, enum: [audio, passage, image, mixed] }
+                        type:
+                          { type: string, enum: [audio, passage, image, mixed] }
                         title: { type: string }
                         bodyText: { type: string }
                         mediaFilename: { type: string }
@@ -1556,7 +1827,11 @@ components:
                             type: string
                             description: Stable across versions, so item history survives a re-publish.
                           prompt: { type: string }
-                          type: { type: string, enum: [single_choice, multi_choice] }
+                          type:
+                            {
+                              type: string,
+                              enum: [single_choice, multi_choice],
+                            }
                           points: { type: integer }
                           tags:
                             type: array

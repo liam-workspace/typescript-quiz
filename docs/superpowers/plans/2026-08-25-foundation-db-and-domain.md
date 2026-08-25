@@ -31,44 +31,46 @@
 
 ## File Structure
 
-| File | Responsibility |
-|---|---|
-| `packages/common/package.json` | renamed to `@pp/common`; drops `socket.io` |
-| `packages/common/src/domain/test.ts` | Test / version / section / group / stimulus / question / choice types |
-| `packages/common/src/domain/attempt.ts` | Attempt, response, score, write-result types |
-| `packages/common/src/domain/ids.ts` | Branded id types so a `QuestionId` cannot be passed as an `AttemptId` |
-| `packages/common/src/interchange/test-document.ts` | Zod schema for the import/export document |
-| `packages/common/src/index.ts` | public surface |
-| `packages/db/package.json` | new `@pp/db` |
-| `packages/db/migrations/1000_enums_identity_media.cjs` | enums, `student`, `media_asset` |
-| `packages/db/migrations/1001_content.cjs` | test → choice, `section_instruction`, `question_tag` |
-| `packages/db/migrations/1002_attempts.cjs` | attempt, sections, responses, cursor, plays |
-| `packages/db/migrations/1003_durability_and_triggers.cjs` | `failed_write`, immutability triggers, `publication_violation` |
-| `.npmrc` | both registries; `GITHUB_TOKEN` for the `@liam-workspace` scope |
-| `packages/db/src/pool.ts` | `createRequestPool` / `createJobPool` over `shared-core`, with named `applicationName` |
-| `packages/db/src/config.ts` | `loadDbConfig()` over `@liam-public/node-config` |
-| `packages/common/src/domain/clock.ts` | re-exports `Clock` / `systemClock` / `createFixedClock` so no package imports `platform` twice |
-| `packages/db/src/migrate.ts` | `migrateToLatest(databaseUrl)` |
-| `packages/db/src/repositories/test-version.repository.ts` | `loadForRunner` / `loadForScoring` — the two deliberately separate projections |
-| `packages/db/src/repositories/test-import.repository.ts` | import a `TestDocument`, export one back |
-| `packages/db/src/index.ts` | public surface |
-| `packages/db/test/helpers/database.ts` | testcontainers harness shared by every db test |
-| `packages/db/test/constraints.test.ts` | proves each invariant rejects what it claims |
-| `packages/db/test/enum-parity.test.ts` | SQL enums == OpenAPI enums |
-| `packages/db/test/import-export.test.ts` | round trip deep-equal |
-| `compose.yml` | gains a `postgres` service |
-| `vitest.workspace.ts` | root test config |
+| File                                                      | Responsibility                                                                                 |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `packages/common/package.json`                            | renamed to `@pp/common`; drops `socket.io`                                                     |
+| `packages/common/src/domain/test.ts`                      | Test / version / section / group / stimulus / question / choice types                          |
+| `packages/common/src/domain/attempt.ts`                   | Attempt, response, score, write-result types                                                   |
+| `packages/common/src/domain/ids.ts`                       | Branded id types so a `QuestionId` cannot be passed as an `AttemptId`                          |
+| `packages/common/src/interchange/test-document.ts`        | Zod schema for the import/export document                                                      |
+| `packages/common/src/index.ts`                            | public surface                                                                                 |
+| `packages/db/package.json`                                | new `@pp/db`                                                                                   |
+| `packages/db/migrations/1000_enums_identity_media.cjs`    | enums, `student`, `media_asset`                                                                |
+| `packages/db/migrations/1001_content.cjs`                 | test → choice, `section_instruction`, `question_tag`                                           |
+| `packages/db/migrations/1002_attempts.cjs`                | attempt, sections, responses, cursor, plays                                                    |
+| `packages/db/migrations/1003_durability_and_triggers.cjs` | `failed_write`, immutability triggers, `publication_violation`                                 |
+| `.npmrc`                                                  | both registries; `GITHUB_TOKEN` for the `@liam-workspace` scope                                |
+| `packages/db/src/pool.ts`                                 | `createRequestPool` / `createJobPool` over `shared-core`, with named `applicationName`         |
+| `packages/db/src/config.ts`                               | `loadDbConfig()` over `@liam-public/node-config`                                               |
+| `packages/common/src/domain/clock.ts`                     | re-exports `Clock` / `systemClock` / `createFixedClock` so no package imports `platform` twice |
+| `packages/db/src/migrate.ts`                              | `migrateToLatest(databaseUrl)`                                                                 |
+| `packages/db/src/repositories/test-version.repository.ts` | `loadForRunner` / `loadForScoring` — the two deliberately separate projections                 |
+| `packages/db/src/repositories/test-import.repository.ts`  | import a `TestDocument`, export one back                                                       |
+| `packages/db/src/index.ts`                                | public surface                                                                                 |
+| `packages/db/test/helpers/database.ts`                    | testcontainers harness shared by every db test                                                 |
+| `packages/db/test/constraints.test.ts`                    | proves each invariant rejects what it claims                                                   |
+| `packages/db/test/enum-parity.test.ts`                    | SQL enums == OpenAPI enums                                                                     |
+| `packages/db/test/import-export.test.ts`                  | round trip deep-equal                                                                          |
+| `compose.yml`                                             | gains a `postgres` service                                                                     |
+| `vitest.workspace.ts`                                     | root test config                                                                               |
 
 ---
 
 ### Task 1: Workspace scaffold and test runner
 
 **Files:**
+
 - Create: `packages/db/package.json`, `packages/db/tsconfig.json`, `packages/db/src/index.ts`
 - Create: `vitest.workspace.ts`
 - Modify: `package.json` (root — add `test` scripts), `tsconfig.json` (paths), `packages/common/package.json`
 
 **Interfaces:**
+
 - Produces: workspace packages `@pp/db` and `@pp/common`; root scripts `pnpm test`, `pnpm test:db`.
 
 - [ ] **Step 1: Rename `common` and drop the dead socket dependency**
@@ -224,11 +226,13 @@ git commit -m "chore: scaffold @pp/db on shared-core, rename @razzia/common to @
 ### Task 2: PostgreSQL test harness
 
 **Files:**
+
 - Create: `packages/db/test/helpers/database.ts`
 - Create: `packages/db/test/harness.test.ts`
 - Modify: `compose.yml`
 
 **Interfaces:**
+
 - Produces: `withDatabase(fn)` — starts a throwaway PostgreSQL 16, runs migrations, hands `fn` a `pg.Pool`, tears down. Every later db test uses it.
 
 - [ ] **Step 1: Write the failing test**
@@ -260,7 +264,10 @@ Expected: FAIL — cannot resolve `./helpers/database.js`.
 
 ```ts
 import { createPool, waitForDatabase } from "@liam-public/shared-core"
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql"
+import {
+  PostgreSqlContainer,
+  type StartedPostgreSqlContainer,
+} from "@testcontainers/postgresql"
 import type pg from "pg"
 
 export interface DatabaseHandle {
@@ -286,7 +293,9 @@ export async function withDatabase(
   const pool = createPool(databaseUrl, { applicationName: "pp:test" })
 
   try {
-    await pool.query("DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;")
+    await pool.query(
+      "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;",
+    )
     // migrateToLatest arrives in Task 3; until then the harness only proves
     // connectivity.
     await fn(pool, { pool, databaseUrl })
@@ -338,12 +347,14 @@ git commit -m "test(db): testcontainers harness against PostgreSQL 16"
 ### Task 3: Migration 1000 — enums, identity, media
 
 **Files:**
+
 - Create: `packages/db/migrations/1000_enums_identity_media.cjs`
 - Create: `packages/db/src/migrate.ts`
 - Create: `packages/db/test/migrate.test.ts`
 - Modify: `packages/db/test/helpers/database.ts`
 
 **Interfaces:**
+
 - Produces: `migrateToLatest(databaseUrl: string): Promise<void>` — runs every migration in `packages/db/migrations` with `migrationsTable: 'pp_migrations'`.
 
 - [ ] **Step 1: Write the failing test**
@@ -375,7 +386,10 @@ describe("migration 1000", () => {
             ORDER BY e.enumsortorder`,
           [name],
         )
-        expect(rows.map((r) => r.label), name).toEqual(members)
+        expect(
+          rows.map((r) => r.label),
+          name,
+        ).toEqual(members)
       }
     })
   }, 120_000)
@@ -482,9 +496,9 @@ In `packages/db/test/helpers/database.ts`, replace the placeholder comment with:
 ```ts
 import { migrateToLatest } from "../../src/migrate.js"
 // …
-    await pool.query("DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;")
-    await migrateToLatest(databaseUrl)
-    await fn(pool, { pool, databaseUrl })
+await pool.query("DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;")
+await migrateToLatest(databaseUrl)
+await fn(pool, { pool, databaseUrl })
 ```
 
 - [ ] **Step 6: Run tests to verify they pass**
@@ -504,10 +518,12 @@ git commit -m "feat(db): migration 1000 — enums, student, media_asset"
 ### Task 4: Migration 1001 — authored content
 
 **Files:**
+
 - Create: `packages/db/migrations/1001_content.cjs`
 - Create: `packages/db/test/content-constraints.test.ts`
 
 **Interfaces:**
+
 - Produces: tables `test`, `test_version`, `test_section`, `section_instruction`, `stimulus`, `question_group`, `question`, `choice`, `question_tag` with the composite-FK discriminators later tasks depend on: `test_version(id, test_id)`, `test_section(id, test_version_id)`, `stimulus(id, test_version_id)`, `question_group(id, test_version_id)`, `question(id, test_version_id)`, `choice(id, question_id)`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -519,7 +535,9 @@ import { describe, expect, it } from "vitest"
 import { withDatabase } from "./helpers/database.js"
 
 async function seedTestWithOneDraft(pool: import("pg").Pool) {
-  await pool.query(`INSERT INTO test (id, slug) VALUES ('22222222-2222-2222-2222-222222222222','t04')`)
+  await pool.query(
+    `INSERT INTO test (id, slug) VALUES ('22222222-2222-2222-2222-222222222222','t04')`,
+  )
   await pool.query(
     `INSERT INTO test_version (id, test_id, version, title, duration_seconds)
      VALUES ('a0000000-0000-0000-0000-000000000001','22222222-2222-2222-2222-222222222222',1,'T04',3000)`,
@@ -659,11 +677,13 @@ git commit -m "feat(db): migration 1001 — authored content with version-scoped
 ### Task 5: Migration 1002 — attempts and responses
 
 **Files:**
+
 - Create: `packages/db/migrations/1002_attempts.cjs`
 - Create: `packages/db/test/attempt-constraints.test.ts`
 - Create: `packages/db/test/helpers/fixtures.ts`
 
 **Interfaces:**
+
 - Consumes: the content tables from Task 4.
 - Produces: `seedPublishedTest(pool): Promise<Fixture>` where
   `Fixture = { testId, versionId, listeningSectionId, readingSectionId, questionIds: string[], choiceIds: string[], studentId }`.
@@ -711,7 +731,10 @@ export async function seedPublishedTest(pool: pg.Pool): Promise<Fixture> {
      VALUES ($1,'sub-tom','tom@example.test','Tom')`,
     [studentId],
   )
-  await pool.query(`INSERT INTO test (id, slug) VALUES ($1,'practice-test-04')`, [testId])
+  await pool.query(
+    `INSERT INTO test (id, slug) VALUES ($1,'practice-test-04')`,
+    [testId],
+  )
   await pool.query(
     `INSERT INTO test_version (id, test_id, version, title, duration_seconds)
      VALUES ($1,$2,1,'TOEFL Primary — Practice Test 04',3000)`,
@@ -748,12 +771,23 @@ export async function seedPublishedTest(pool: pg.Pool): Promise<Fixture> {
             ($3,$6,1,'It began to rain',true), ($4,$6,2,'The bus was late',false)`,
     [c1, c2, c3, c4, q1, q2],
   )
-  await pool.query(`UPDATE test_version SET published_at = now() WHERE id = $1`, [versionId])
-  await pool.query(`UPDATE test SET current_version_id = $1 WHERE id = $2`, [versionId, testId])
+  await pool.query(
+    `UPDATE test_version SET published_at = now() WHERE id = $1`,
+    [versionId],
+  )
+  await pool.query(`UPDATE test SET current_version_id = $1 WHERE id = $2`, [
+    versionId,
+    testId,
+  ])
 
   return {
-    studentId, testId, versionId, listeningSectionId, readingSectionId,
-    questionIds: [q1, q2], choiceIds: [c1, c2, c3, c4],
+    studentId,
+    testId,
+    versionId,
+    listeningSectionId,
+    readingSectionId,
+    questionIds: [q1, q2],
+    choiceIds: [c1, c2, c3, c4],
   }
 }
 ```
@@ -767,17 +801,24 @@ import { describe, expect, it } from "vitest"
 import { withDatabase } from "./helpers/database.js"
 import { seedPublishedTest } from "./helpers/fixtures.js"
 
-const newAttempt = (pool: import("pg").Pool, f: { studentId: string; versionId: string }, id: string) =>
-  pool.query(`INSERT INTO attempt (id, student_id, test_version_id) VALUES ($1,$2,$3)`,
-    [id, f.studentId, f.versionId])
+const newAttempt = (
+  pool: import("pg").Pool,
+  f: { studentId: string; versionId: string },
+  id: string,
+) =>
+  pool.query(
+    `INSERT INTO attempt (id, student_id, test_version_id) VALUES ($1,$2,$3)`,
+    [id, f.studentId, f.versionId],
+  )
 
 describe("migration 1002 — attempts", () => {
   it("allows only one in-progress attempt per student per version", async () => {
     await withDatabase(async (pool) => {
       const f = await seedPublishedTest(pool)
       await newAttempt(pool, f, "f0000000-0000-0000-0000-000000000001")
-      await expect(newAttempt(pool, f, "f0000000-0000-0000-0000-000000000002"))
-        .rejects.toThrow(/attempt_one_active/)
+      await expect(
+        newAttempt(pool, f, "f0000000-0000-0000-0000-000000000002"),
+      ).rejects.toThrow(/attempt_one_active/)
     })
   }, 120_000)
 
@@ -856,7 +897,9 @@ describe("migration 1002 — attempts", () => {
           [sectionId, f.versionId],
         )
       await enter(f.listeningSectionId)
-      await expect(enter(f.readingSectionId)).rejects.toThrow(/attempt_section_one_open/)
+      await expect(enter(f.readingSectionId)).rejects.toThrow(
+        /attempt_section_one_open/,
+      )
     })
   }, 120_000)
 })
@@ -915,10 +958,12 @@ git commit -m "feat(db): migration 1002 — attempts, responses, plays"
 ### Task 6: Migration 1003 — durability, immutability, publication checks
 
 **Files:**
+
 - Create: `packages/db/migrations/1003_durability_and_triggers.cjs`
 - Create: `packages/db/test/durability.test.ts`
 
 **Interfaces:**
+
 - Produces: `failed_write` table; immutability triggers on every content table; the `publication_violation` view returning `(test_version_id, question_id, section_id, rule, detail)`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -939,7 +984,9 @@ describe("migration 1003 — durability and immutability", () => {
          VALUES ('not-a-uuid', 'PATCH /api/attempts/x/responses', 'unparseable', $1, $2)`,
         [notJson, Buffer.byteLength(notJson)],
       )
-      const { rows } = await pool.query<{ raw_body: string }>(`SELECT raw_body FROM failed_write`)
+      const { rows } = await pool.query<{ raw_body: string }>(
+        `SELECT raw_body FROM failed_write`,
+      )
       expect(rows[0].raw_body).toBe(notJson)
     })
   }, 120_000)
@@ -948,7 +995,9 @@ describe("migration 1003 — durability and immutability", () => {
     await withDatabase(async (pool) => {
       const f = await seedPublishedTest(pool)
       await expect(
-        pool.query(`UPDATE question SET prompt='tampered' WHERE id=$1`, [f.questionIds[0]]),
+        pool.query(`UPDATE question SET prompt='tampered' WHERE id=$1`, [
+          f.questionIds[0],
+        ]),
       ).rejects.toThrow(/published and immutable/)
     })
   }, 120_000)
@@ -962,8 +1011,11 @@ describe("migration 1003 — durability and immutability", () => {
         [f.testId],
       )
       await expect(
-        pool.query(`UPDATE test SET current_version_id='a0000000-0000-0000-0000-0000000000bb'
-                     WHERE id=$1`, [f.testId]),
+        pool.query(
+          `UPDATE test SET current_version_id='a0000000-0000-0000-0000-0000000000bb'
+                     WHERE id=$1`,
+          [f.testId],
+        ),
       ).rejects.toThrow(/published version of this test/)
     })
   }, 120_000)
@@ -974,30 +1026,42 @@ describe("migration 1003 — durability and immutability", () => {
       const draft = "a0000000-0000-0000-0000-0000000000cc"
       await pool.query(
         `INSERT INTO test_version (id, test_id, version, title, duration_seconds)
-         VALUES ($1, $2, 2, 'broken draft', 9999)`, [draft, f.testId])
+         VALUES ($1, $2, 2, 'broken draft', 9999)`,
+        [draft, f.testId],
+      )
       await pool.query(
         `INSERT INTO test_section (id, test_version_id, ordinal, title, type,
                                    duration_seconds, navigation, allow_answer_change)
          VALUES ('b000000c-0000-0000-0000-000000000001',$1,1,'L','listening',100,
-                 'forward_only',false)`, [draft])
+                 'forward_only',false)`,
+        [draft],
+      )
       await pool.query(
         `INSERT INTO question_group (id, test_version_id, test_section_id, ordinal)
          VALUES ('c000000c-0000-0000-0000-000000000001',$1,
-                 'b000000c-0000-0000-0000-000000000001',1)`, [draft])
+                 'b000000c-0000-0000-0000-000000000001',1)`,
+        [draft],
+      )
       await pool.query(
         `INSERT INTO question (id, test_version_id, question_group_id, question_key,
                                ordinal, prompt, type, points)
          VALUES ('d000000c-0000-0000-0000-000000000001',$1,
                  'c000000c-0000-0000-0000-000000000001','q1',1,'lonely','single_choice',1)`,
-        [draft])
+        [draft],
+      )
       await pool.query(
         `INSERT INTO choice (question_id, ordinal, label, is_correct)
-         VALUES ('d000000c-0000-0000-0000-000000000001',1,'only one',false)`)
+         VALUES ('d000000c-0000-0000-0000-000000000001',1,'only one',false)`,
+      )
 
       const { rows } = await pool.query<{ rule: string }>(
-        `SELECT rule FROM publication_violation WHERE test_version_id=$1 ORDER BY rule`, [draft])
+        `SELECT rule FROM publication_violation WHERE test_version_id=$1 ORDER BY rule`,
+        [draft],
+      )
       expect(rows.map((r) => r.rule)).toEqual([
-        "duration_mismatch", "too_few_choices", "wrong_correct_count",
+        "duration_mismatch",
+        "too_few_choices",
+        "wrong_correct_count",
       ])
     })
   }, 120_000)
@@ -1073,9 +1137,11 @@ git commit -m "feat(db): migration 1003 — failed_write, immutability triggers,
 ### Task 7: Enum parity guard
 
 **Files:**
+
 - Create: `packages/db/test/enum-parity.test.ts`
 
 **Interfaces:**
+
 - Consumes: the migrated database; `docs/api/openapi.yaml`.
 
 This task exists because the design has two sources of truth — Zod validators
@@ -1096,10 +1162,15 @@ const OPENAPI = resolve(process.cwd(), "../../docs/api/openapi.yaml")
 
 /** Members of a named enum as declared in openapi.yaml. */
 function openApiEnum(spec: string, schemaName: string): string[] {
-  const block = new RegExp(`    ${schemaName}:\\n      type: string\\n      enum: \\[([^\\]]*)\\]`)
+  const block = new RegExp(
+    `    ${schemaName}:\\n      type: string\\n      enum: \\[([^\\]]*)\\]`,
+  )
   const m = spec.match(block)
   if (!m) throw new Error(`no enum block for ${schemaName} in openapi.yaml`)
-  return m[1].split(",").map((s) => s.trim()).sort()
+  return m[1]
+    .split(",")
+    .map((s) => s.trim())
+    .sort()
 }
 
 describe("enum parity", () => {
@@ -1110,7 +1181,9 @@ describe("enum parity", () => {
         `SELECT enumlabel AS label FROM pg_enum e
            JOIN pg_type t ON t.oid = e.enumtypid WHERE t.typname='section_type'`,
       )
-      expect(rows.map((r) => r.label).sort()).toEqual(openApiEnum(spec, "SectionType"))
+      expect(rows.map((r) => r.label).sort()).toEqual(
+        openApiEnum(spec, "SectionType"),
+      )
     })
   }, 120_000)
 
@@ -1121,7 +1194,9 @@ describe("enum parity", () => {
         `SELECT enumlabel AS label FROM pg_enum e
            JOIN pg_type t ON t.oid = e.enumtypid WHERE t.typname='nav_mode'`,
       )
-      expect(rows.map((r) => r.label).sort()).toEqual(openApiEnum(spec, "NavigationMode"))
+      expect(rows.map((r) => r.label).sort()).toEqual(
+        openApiEnum(spec, "NavigationMode"),
+      )
     })
   }, 120_000)
 })
@@ -1158,6 +1233,7 @@ git commit -m "test(db): guard SQL/OpenAPI enum parity"
 ### Task 8: Domain types and the interchange format
 
 **Files:**
+
 - Create: `packages/common/src/domain/ids.ts`, `packages/common/src/domain/test.ts`, `packages/common/src/domain/attempt.ts`
 - Create: `packages/common/src/interchange/test-document.ts`
 - Create: `packages/common/src/index.ts`
@@ -1165,6 +1241,7 @@ git commit -m "test(db): guard SQL/OpenAPI enum parity"
 - Delete: `packages/common/src/types/`, `packages/common/src/validators/`, `packages/common/src/constants.ts`
 
 **Interfaces:**
+
 - Produces:
   - `type TestId, TestVersionId, SectionId, QuestionId, ChoiceId, AttemptId, StudentId` — branded strings.
   - `testDocumentSchema: z.ZodType<TestDocument>` and `type TestDocument`.
@@ -1223,7 +1300,9 @@ describe("testDocumentSchema", () => {
 
   it("rejects a question with fewer than two choices", () => {
     const bad = structuredClone(valid)
-    bad.sections[0].groups[0].questions[0].choices = [{ label: "only", isCorrect: true }]
+    bad.sections[0].groups[0].questions[0].choices = [
+      { label: "only", isCorrect: true },
+    ]
     expect(() => testDocumentSchema.parse(bad)).toThrow(/at least 2/i)
   })
 
@@ -1449,7 +1528,9 @@ const questionSchema = z
     type: z.enum(["single_choice", "multi_choice"]),
     points: z.number().int().positive(),
     tags: z.array(z.string().min(1)).optional(),
-    choices: z.array(choiceSchema).min(2, "a question needs at least 2 choices"),
+    choices: z
+      .array(choiceSchema)
+      .min(2, "a question needs at least 2 choices"),
   })
   .superRefine((q, ctx) => {
     const correct = q.choices.filter((c) => c.isCorrect).length
@@ -1460,7 +1541,10 @@ const questionSchema = z
       })
     }
     if (q.type === "multi_choice" && correct < 1) {
-      ctx.addIssue({ code: "custom", message: "a multi_choice question needs a correct choice" })
+      ctx.addIssue({
+        code: "custom",
+        message: "a multi_choice question needs a correct choice",
+      })
     }
   })
 
@@ -1506,10 +1590,16 @@ const sectionSchema = z
         })
       }
       if (st.allowPause === true && s.playback.allowPause === false) {
-        ctx.addIssue({ code: "custom", message: "a stimulus may only tighten allowPause" })
+        ctx.addIssue({
+          code: "custom",
+          message: "a stimulus may only tighten allowPause",
+        })
       }
       if (st.allowSeek === true && s.playback.allowSeek === false) {
-        ctx.addIssue({ code: "custom", message: "a stimulus may only tighten allowSeek" })
+        ctx.addIssue({
+          code: "custom",
+          message: "a stimulus may only tighten allowSeek",
+        })
       }
     }
   })
@@ -1567,11 +1657,13 @@ git commit -m "feat(common): exam domain types and the JSON interchange schema"
 ### Task 9: Import and export repository
 
 **Files:**
+
 - Create: `packages/db/src/repositories/test-import.repository.ts`
 - Create: `packages/db/test/import-export.test.ts`
 - Modify: `packages/db/src/index.ts`
 
 **Interfaces:**
+
 - Consumes: `TestDocument`, `testDocumentSchema` from Task 8; `withTransaction` from `@liam-public/node-postgres`.
 - Produces:
   - `importTestDocument(pool, doc: TestDocument): Promise<{ testId: string; versionId: string; version: number }>`
@@ -1585,7 +1677,10 @@ git commit -m "feat(common): exam domain types and the JSON interchange schema"
 import { describe, expect, it } from "vitest"
 import { testDocumentSchema, type TestDocument } from "@pp/common"
 import { withDatabase } from "./helpers/database.js"
-import { exportTestDocument, importTestDocument } from "../src/repositories/test-import.repository.js"
+import {
+  exportTestDocument,
+  importTestDocument,
+} from "../src/repositories/test-import.repository.js"
 
 const doc: TestDocument = testDocumentSchema.parse({
   title: "TOEFL Primary — Practice Test 04",
@@ -1605,9 +1700,15 @@ const doc: TestDocument = testDocumentSchema.parse({
         {
           questions: [
             {
-              questionKey: "q1", prompt: "A?", type: "single_choice", points: 1,
+              questionKey: "q1",
+              prompt: "A?",
+              type: "single_choice",
+              points: 1,
               tags: ["gist", "detail"],
-              choices: [{ label: "yes", isCorrect: true }, { label: "no", isCorrect: false }],
+              choices: [
+                { label: "yes", isCorrect: true },
+                { label: "no", isCorrect: false },
+              ],
             },
           ],
         },
@@ -1623,11 +1724,21 @@ const doc: TestDocument = testDocumentSchema.parse({
       instructions: [],
       groups: [
         {
-          stimulus: { type: "passage", title: "The School Trip", bodyText: "On Friday…" },
+          stimulus: {
+            type: "passage",
+            title: "The School Trip",
+            bodyText: "On Friday…",
+          },
           questions: [
             {
-              questionKey: "q2", prompt: "B?", type: "single_choice", points: 1,
-              choices: [{ label: "rain", isCorrect: true }, { label: "bus", isCorrect: false }],
+              questionKey: "q2",
+              prompt: "B?",
+              type: "single_choice",
+              points: 1,
+              choices: [
+                { label: "rain", isCorrect: true },
+                { label: "bus", isCorrect: false },
+              ],
             },
           ],
         },
@@ -1649,8 +1760,14 @@ describe("import / export", () => {
     await withDatabase(async (pool) => {
       const { versionId } = await importTestDocument(pool, doc)
       const out = await exportTestDocument(pool, versionId)
-      expect(out.sections[0].instructions).toEqual(["Put your headphones on now.", "Stay quiet."])
-      expect(out.sections[0].groups[0].questions[0].tags).toEqual(["gist", "detail"])
+      expect(out.sections[0].instructions).toEqual([
+        "Put your headphones on now.",
+        "Stay quiet.",
+      ])
+      expect(out.sections[0].groups[0].questions[0].tags).toEqual([
+        "gist",
+        "detail",
+      ])
     })
   }, 120_000)
 
@@ -1658,7 +1775,9 @@ describe("import / export", () => {
     await withDatabase(async (pool) => {
       const { versionId } = await importTestDocument(pool, doc)
       const { rows } = await pool.query<{ published_at: string | null }>(
-        `SELECT published_at FROM test_version WHERE id=$1`, [versionId])
+        `SELECT published_at FROM test_version WHERE id=$1`,
+        [versionId],
+      )
       expect(rows[0].published_at).toBeNull()
     })
   }, 120_000)
@@ -1717,8 +1836,13 @@ export async function importTestDocument(
                                    default_max_plays, default_allow_pause, default_allow_seek)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
         [
-          versionId, sIdx + 1, section.title, section.type, section.durationSeconds,
-          section.navigation, section.allowAnswerChange,
+          versionId,
+          sIdx + 1,
+          section.title,
+          section.type,
+          section.durationSeconds,
+          section.navigation,
+          section.allowAnswerChange,
           section.playback?.maxPlays ?? null,
           section.playback ? section.playback.allowPause : null,
           section.playback ? section.playback.allowSeek : null,
@@ -1740,7 +1864,9 @@ export async function importTestDocument(
           const st = group.stimulus
           const asset = st.mediaFilename
             ? await tx.query<{ id: string }>(
-                `SELECT id FROM media_asset WHERE filename = $1`, [st.mediaFilename])
+                `SELECT id FROM media_asset WHERE filename = $1`,
+                [st.mediaFilename],
+              )
             : null
           if (st.mediaFilename && asset!.rowCount === 0) {
             throw new Error(`media asset "${st.mediaFilename}" not found`)
@@ -1749,9 +1875,16 @@ export async function importTestDocument(
             `INSERT INTO stimulus (test_version_id, type, title, body_text, media_asset_id,
                                    max_plays, allow_pause, allow_seek)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-            [versionId, st.type, st.title ?? null, st.bodyText ?? null,
-             asset?.rows[0]?.id ?? null, st.maxPlays ?? null,
-             st.allowPause ?? null, st.allowSeek ?? null],
+            [
+              versionId,
+              st.type,
+              st.title ?? null,
+              st.bodyText ?? null,
+              asset?.rows[0]?.id ?? null,
+              st.maxPlays ?? null,
+              st.allowPause ?? null,
+              st.allowSeek ?? null,
+            ],
           )
           stimulusId = ins.rows[0].id
         }
@@ -1769,7 +1902,15 @@ export async function importTestDocument(
             `INSERT INTO question (test_version_id, question_group_id, question_key,
                                    ordinal, prompt, type, points)
              VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-            [versionId, groupId, q.questionKey, questionOrdinal, q.prompt, q.type, q.points],
+            [
+              versionId,
+              groupId,
+              q.questionKey,
+              questionOrdinal,
+              q.prompt,
+              q.type,
+              q.points,
+            ],
           )
           const questionId = qi.rows[0].id
 
@@ -1795,15 +1936,31 @@ export async function importTestDocument(
 }
 
 interface ExportRow {
-  s_ordinal: number; s_title: string; s_type: string; s_duration: number
-  s_navigation: string; s_allow_change: boolean
-  s_max_plays: number | null; s_allow_pause: boolean | null; s_allow_seek: boolean | null
+  s_ordinal: number
+  s_title: string
+  s_type: string
+  s_duration: number
+  s_navigation: string
+  s_allow_change: boolean
+  s_max_plays: number | null
+  s_allow_pause: boolean | null
+  s_allow_seek: boolean | null
   g_ordinal: number
-  st_type: string | null; st_title: string | null; st_body: string | null
-  st_filename: string | null; st_max_plays: number | null
-  st_allow_pause: boolean | null; st_allow_seek: boolean | null
-  q_ordinal: number; q_key: string; q_prompt: string; q_type: string; q_points: number
-  c_ordinal: number; c_label: string; c_correct: boolean
+  st_type: string | null
+  st_title: string | null
+  st_body: string | null
+  st_filename: string | null
+  st_max_plays: number | null
+  st_allow_pause: boolean | null
+  st_allow_seek: boolean | null
+  q_ordinal: number
+  q_key: string
+  q_prompt: string
+  q_type: string
+  q_points: number
+  c_ordinal: number
+  c_label: string
+  c_correct: boolean
 }
 
 /** The inverse of importTestDocument. Round-trip equality is a tested contract. */
@@ -1812,14 +1969,18 @@ export async function exportTestDocument(
   versionId: string,
 ): Promise<TestDocument> {
   const head = await pool.query<{
-    title: string; slug: string; level: string | null; duration_seconds: number
+    title: string
+    slug: string
+    level: string | null
+    duration_seconds: number
   }>(
     `SELECT tv.title, t.slug, tv.level, tv.duration_seconds
        FROM test_version tv JOIN test t ON t.id = tv.test_id
       WHERE tv.id = $1`,
     [versionId],
   )
-  if (head.rowCount === 0) throw new Error(`test_version ${versionId} not found`)
+  if (head.rowCount === 0)
+    throw new Error(`test_version ${versionId} not found`)
 
   const { rows } = await pool.query<ExportRow>(
     `SELECT ts.ordinal s_ordinal, ts.title s_title, ts.type::text s_type,
@@ -1872,8 +2033,14 @@ export async function exportTestDocument(
         playback:
           r.s_allow_pause === null
             ? null
-            : { maxPlays: r.s_max_plays, allowPause: r.s_allow_pause, allowSeek: r.s_allow_seek! },
-        instructions: instructions.rows.filter((i) => i.s_ordinal === r.s_ordinal).map((i) => i.text),
+            : {
+                maxPlays: r.s_max_plays,
+                allowPause: r.s_allow_pause,
+                allowSeek: r.s_allow_seek!,
+              },
+        instructions: instructions.rows
+          .filter((i) => i.s_ordinal === r.s_ordinal)
+          .map((i) => i.text),
         groups: [],
       }
     }
@@ -1887,9 +2054,15 @@ export async function exportTestDocument(
                 ...(r.st_title ? { title: r.st_title } : {}),
                 ...(r.st_body ? { bodyText: r.st_body } : {}),
                 ...(r.st_filename ? { mediaFilename: r.st_filename } : {}),
-                ...(r.st_max_plays !== null ? { maxPlays: r.st_max_plays } : {}),
-                ...(r.st_allow_pause !== null ? { allowPause: r.st_allow_pause } : {}),
-                ...(r.st_allow_seek !== null ? { allowSeek: r.st_allow_seek } : {}),
+                ...(r.st_max_plays !== null
+                  ? { maxPlays: r.st_max_plays }
+                  : {}),
+                ...(r.st_allow_pause !== null
+                  ? { allowPause: r.st_allow_pause }
+                  : {}),
+                ...(r.st_allow_seek !== null
+                  ? { allowSeek: r.st_allow_seek }
+                  : {}),
               },
             }
           : {}),
@@ -1898,7 +2071,9 @@ export async function exportTestDocument(
     }
     let question = group.questions.find((q) => q.questionKey === r.q_key)
     if (!question) {
-      const qTags = tags.rows.filter((t) => t.q_key === r.q_key).map((t) => t.tag)
+      const qTags = tags.rows
+        .filter((t) => t.q_key === r.q_key)
+        .map((t) => t.tag)
       question = {
         questionKey: r.q_key,
         prompt: r.q_prompt,
@@ -1951,11 +2126,13 @@ git commit -m "feat(db): import/export a TestDocument with order-preserving roun
 ### Task 10: Runner and scoring projections
 
 **Files:**
+
 - Create: `packages/db/src/repositories/test-version.repository.ts`
 - Create: `packages/db/test/projections.test.ts`
 - Modify: `packages/db/src/index.ts`
 
 **Interfaces:**
+
 - Consumes: `RunnerSection`, `ScoringQuestion` from Task 8; `seedPublishedTest` from Task 5.
 - Produces:
   - `loadForRunner(pool, versionId, attemptId): Promise<RunnerSection[]>` — **never** returns `isCorrect`, and returns no `mediaUrl` for a capped stimulus.
@@ -1974,7 +2151,10 @@ away; two functions make the runner router unable to reach the key at all.
 import { describe, expect, it } from "vitest"
 import { withDatabase } from "./helpers/database.js"
 import { seedPublishedTest } from "./helpers/fixtures.js"
-import { loadForRunner, loadForScoring } from "../src/repositories/test-version.repository.js"
+import {
+  loadForRunner,
+  loadForScoring,
+} from "../src/repositories/test-version.repository.js"
 
 describe("projections", () => {
   it("loadForRunner never returns isCorrect anywhere in the tree", async () => {
@@ -2003,7 +2183,10 @@ describe("projections", () => {
       const f = await seedPublishedTest(pool)
       const sections = await loadForRunner(pool, f.versionId, null)
       expect(sections.map((s) => s.type)).toEqual(["listening", "reading"])
-      const ordinals = sections.flatMap((s) => s.groups).flatMap((g) => g.questions).map((q) => q.ordinal)
+      const ordinals = sections
+        .flatMap((s) => s.groups)
+        .flatMap((g) => g.questions)
+        .map((q) => q.ordinal)
       expect(ordinals).toEqual([...ordinals].sort((a, b) => a - b))
     })
   }, 120_000)
@@ -2047,16 +2230,32 @@ export async function loadForRunner(
   attemptId: string | null,
 ): Promise<RunnerSection[]> {
   const { rows } = await pool.query<{
-    s_id: string; s_type: string; s_ordinal: number
-    s_navigation: string; s_allow_change: boolean
-    s_max_plays: number | null; s_allow_pause: boolean | null; s_allow_seek: boolean | null
-    g_id: string; g_ordinal: number
-    st_id: string | null; st_type: string | null; st_title: string | null
-    st_body: string | null; st_filename: string | null
-    st_max_plays: number | null; st_allow_pause: boolean | null; st_allow_seek: boolean | null
+    s_id: string
+    s_type: string
+    s_ordinal: number
+    s_navigation: string
+    s_allow_change: boolean
+    s_max_plays: number | null
+    s_allow_pause: boolean | null
+    s_allow_seek: boolean | null
+    g_id: string
+    g_ordinal: number
+    st_id: string | null
+    st_type: string | null
+    st_title: string | null
+    st_body: string | null
+    st_filename: string | null
+    st_max_plays: number | null
+    st_allow_pause: boolean | null
+    st_allow_seek: boolean | null
     plays_used: number | null
-    q_id: string; q_ordinal: number; q_type: string; q_prompt: string
-    c_id: string; c_ordinal: number; c_label: string
+    q_id: string
+    q_ordinal: number
+    q_type: string
+    q_prompt: string
+    c_id: string
+    c_ordinal: number
+    c_label: string
   }>(
     `SELECT ts.id s_id, ts.type::text s_type, ts.ordinal s_ordinal,
             ts.navigation::text s_navigation, ts.allow_answer_change s_allow_change,
@@ -2097,7 +2296,9 @@ export async function loadForRunner(
       }
     }
 
-    let group: RunnerGroup | undefined = section.groups.find((g) => g.id === r.g_id)
+    let group: RunnerGroup | undefined = section.groups.find(
+      (g) => g.id === r.g_id,
+    )
     if (!group) {
       const effectiveMaxPlays = r.st_id
         ? (r.st_max_plays ?? r.s_max_plays ?? null)
@@ -2154,8 +2355,14 @@ export async function loadForScoring(
   versionId: string,
 ): Promise<ScoringQuestion[]> {
   const { rows } = await pool.query<{
-    q_id: string; q_ordinal: number; q_type: string; q_prompt: string; q_points: number
-    c_id: string; c_label: string; c_correct: boolean
+    q_id: string
+    q_ordinal: number
+    q_type: string
+    q_prompt: string
+    q_points: number
+    c_id: string
+    c_label: string
+    c_correct: boolean
   }>(
     `SELECT q.id q_id, q.ordinal q_ordinal, q.type::text q_type, q.prompt q_prompt,
             q.points q_points, c.id c_id, c.label c_label, c.is_correct c_correct
@@ -2179,7 +2386,11 @@ export async function loadForScoring(
       }
       questions.push(q)
     }
-    q.choices.push({ id: r.c_id as never, label: r.c_label, isCorrect: r.c_correct })
+    q.choices.push({
+      id: r.c_id as never,
+      label: r.c_label,
+      isCorrect: r.c_correct,
+    })
   }
   return questions
 }
@@ -2190,7 +2401,10 @@ export async function loadForScoring(
 Append to `packages/db/src/index.ts`:
 
 ```ts
-export { loadForRunner, loadForScoring } from "./repositories/test-version.repository.js"
+export {
+  loadForRunner,
+  loadForScoring,
+} from "./repositories/test-version.repository.js"
 ```
 
 - [ ] **Step 5: Run tests to verify they pass**
@@ -2224,12 +2438,14 @@ Building it here means plan 2 starts with its connection policy already decided
 and tested, rather than inventing one under time pressure.
 
 **Files:**
+
 - Create: `packages/db/src/pool.ts`, `packages/db/src/config.ts`
 - Create: `packages/common/src/domain/clock.ts`
 - Create: `packages/db/test/pool.test.ts`
 - Modify: `packages/db/src/index.ts`, `packages/common/src/index.ts`
 
 **Interfaces:**
+
 - Produces:
   - `loadDbConfig(env?: Environment): DbConfig` where
     `DbConfig = { databaseUrl: string; requestTimeoutMs: number; jobTimeoutMs: number; poolMax: number }`
@@ -2290,7 +2506,9 @@ describe("pools", () => {
 describe("clock", () => {
   it("createFixedClock lets an expiry test assert instead of sleep", () => {
     const at = new Date("2026-08-25T08:52:40Z")
-    expect(createFixedClock(at).now().toISOString()).toBe("2026-08-25T08:52:40.000Z")
+    expect(createFixedClock(at).now().toISOString()).toBe(
+      "2026-08-25T08:52:40.000Z",
+    )
     expect(systemClock.now().getTime()).toBeGreaterThan(0)
   })
 })
@@ -2306,7 +2524,11 @@ Expected: FAIL — cannot resolve `../src/config.js`.
 `packages/db/src/config.ts`:
 
 ```ts
-import { nodeEnvironment, parseIntegerEnv, type Environment } from "@liam-public/node-config"
+import {
+  nodeEnvironment,
+  parseIntegerEnv,
+  type Environment,
+} from "@liam-public/node-config"
 
 export interface DbConfig {
   databaseUrl: string
@@ -2380,9 +2602,17 @@ export function createJobPool(cfg: DbConfig): pg.Pool {
  * Every deadline in this app is server-authoritative, and createFixedClock is
  * what turns an expiry test into an assertion rather than a 50-minute sleep.
  */
-export { type Clock, systemClock, createFixedClock } from "@liam-workspace/platform"
+export {
+  type Clock,
+  systemClock,
+  createFixedClock,
+} from "@liam-workspace/platform"
 export { type Result, ok, err } from "@liam-workspace/platform"
-export { NotFoundError, ValidationError, ConflictError } from "@liam-workspace/platform"
+export {
+  NotFoundError,
+  ValidationError,
+  ConflictError,
+} from "@liam-workspace/platform"
 ```
 
 Append to `packages/common/src/index.ts`:
@@ -2460,12 +2690,12 @@ the workspace waiting.
 
 ## Next plans
 
-| Plan | Covers | Depends on |
-|---|---|---|
-| 2 — API skeleton and auth | `packages/server` on **NestJS**, JWKS verification via `node-auth-server`, `AllExceptionsFilter` + `ObservabilityModule`, the `FailedWriteCaptureFilter` **in the same commit as the ValidationPipe**, session, catalog, attempt start, admin import/publish/media | this plan's repositories |
-| 3 — Runner read path | runner payload, section entry, play + signed URLs, position; delete `socket` | plan 2 |
-| 4 — Durable write path | queue, snapshot flush, reorder guard, `failed_write` capture, retry classification, submit and grading | plan 3 |
-| 5 — App | `packages/app` on `browser-react-ui` (not a component harvest), `auth-client` + `browser-react-auth` + `auth-fetch`, passkey enrolment via `browser-webauthn`, `vite-preset-pwa` offline shell, `browser-telemetry` traceparent, `i18n` + `text`, screens, navigator, menu, Docker | plan 4 |
+| Plan                      | Covers                                                                                                                                                                                                                                                                             | Depends on               |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| 2 — API skeleton and auth | `packages/server` on **NestJS**, JWKS verification via `node-auth-server`, `AllExceptionsFilter` + `ObservabilityModule`, the `FailedWriteCaptureFilter` **in the same commit as the ValidationPipe**, session, catalog, attempt start, admin import/publish/media                 | this plan's repositories |
+| 3 — Runner read path      | runner payload, section entry, play + signed URLs, position; delete `socket`                                                                                                                                                                                                       | plan 2                   |
+| 4 — Durable write path    | queue, snapshot flush, reorder guard, `failed_write` capture, retry classification, submit and grading                                                                                                                                                                             | plan 3                   |
+| 5 — App                   | `packages/app` on `browser-react-ui` (not a component harvest), `auth-client` + `browser-react-auth` + `auth-fetch`, passkey enrolment via `browser-webauthn`, `vite-preset-pwa` offline shell, `browser-telemetry` traceparent, `i18n` + `text`, screens, navigator, menu, Docker | plan 4                   |
 
 Plans 2–5 are written as each predecessor lands. Writing them now would mean
 inventing signatures for repositories that do not exist yet, and this plan's

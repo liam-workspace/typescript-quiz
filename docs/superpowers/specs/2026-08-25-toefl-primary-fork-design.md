@@ -18,14 +18,14 @@ This fork      Library → Student → Attempt → Sections → Submit → Resul
 This spec is the narrative. The precise contracts live beside it and are
 machine-checked; where they disagree with this document, they win.
 
-| Document | Status |
-|---|---|
-| `docs/prototype/index.html` | 12 clickable screens, API annotated per screen |
-| `docs/api/openapi.yaml` | 20 operations — `redocly lint` clean |
-| `docs/api/catalog.html` | resource-grouped view of the same catalog |
-| `docs/db/schema.sql` | the database design — executed against PostgreSQL 16 |
-| `docs/db/invariants.test.sql` | proves each constraint rejects what it claims |
-| `docs/diagrams/er.*` | 17-entity relational model, generated from the schema |
+| Document                                | Status                                                            |
+| --------------------------------------- | ----------------------------------------------------------------- |
+| `docs/prototype/index.html`             | 12 clickable screens, API annotated per screen                    |
+| `docs/api/openapi.yaml`                 | 20 operations — `redocly lint` clean                              |
+| `docs/api/catalog.html`                 | resource-grouped view of the same catalog                         |
+| `docs/db/schema.sql`                    | the database design — executed against PostgreSQL 16              |
+| `docs/db/invariants.test.sql`           | proves each constraint rejects what it claims                     |
+| `docs/diagrams/er.*`                    | 17-entity relational model, generated from the schema             |
 | `docs/architecture/library-adoption.md` | a verdict on all 47 packages in `~/projects/typescript-libraries` |
 
 ## 1. Scope
@@ -110,23 +110,23 @@ All 47 packages in `~/projects/typescript-libraries` were surveyed;
 `docs/architecture/library-adoption.md` — consult it before adding any
 dependency.
 
-| Concern | Package |
-|---|---|
-| Pooling, transactions, migrations, logging, HTTP, crypto, event bus | `@liam-public/shared-core` (umbrella over `node-postgres`) |
-| `Clock`, `Result`, domain errors | `@liam-workspace/platform` |
-| Environment parsing | `@liam-public/node-config` |
-| Browser OIDC + PKCE | `@liam-workspace/auth-client` |
-| React session binding | `@liam-public/browser-react-auth` |
-| Bearer + transparent refresh on 401 | `@liam-public/auth-fetch` |
-| Server token verification, passkey ceremony | `@liam-workspace/node-auth-server` |
-| Passkeys | `@liam-public/node-webauthn`, `@liam-public/browser-webauthn` |
-| NestJS filters, interceptors, observability | `@liam-public/node-nest-common`, `@liam-public/node-nest-observability` |
-| Tailwind v4 + Radix component kit | `@liam-public/browser-react-ui` |
-| Offline app-shell and API caching | `@liam-public/vite-preset-pwa` |
-| Browser → backend `traceparent`, Web Vitals | `@liam-public/browser-telemetry` |
-| Error boundary, error reporting, browser logging | `browser-react-error-boundary`, `browser-error-reporter`, `browser-logger` |
-| Locale text and formatting | `@liam-public/i18n`, `@liam-public/text` |
-| Frontend and i18n lint gates | `node-frontend-lint`, `node-i18n-lint` |
+| Concern                                                             | Package                                                                    |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Pooling, transactions, migrations, logging, HTTP, crypto, event bus | `@liam-public/shared-core` (umbrella over `node-postgres`)                 |
+| `Clock`, `Result`, domain errors                                    | `@liam-workspace/platform`                                                 |
+| Environment parsing                                                 | `@liam-public/node-config`                                                 |
+| Browser OIDC + PKCE                                                 | `@liam-workspace/auth-client`                                              |
+| React session binding                                               | `@liam-public/browser-react-auth`                                          |
+| Bearer + transparent refresh on 401                                 | `@liam-public/auth-fetch`                                                  |
+| Server token verification, passkey ceremony                         | `@liam-workspace/node-auth-server`                                         |
+| Passkeys                                                            | `@liam-public/node-webauthn`, `@liam-public/browser-webauthn`              |
+| NestJS filters, interceptors, observability                         | `@liam-public/node-nest-common`, `@liam-public/node-nest-observability`    |
+| Tailwind v4 + Radix component kit                                   | `@liam-public/browser-react-ui`                                            |
+| Offline app-shell and API caching                                   | `@liam-public/vite-preset-pwa`                                             |
+| Browser → backend `traceparent`, Web Vitals                         | `@liam-public/browser-telemetry`                                           |
+| Error boundary, error reporting, browser logging                    | `browser-react-error-boundary`, `browser-error-reporter`, `browser-logger` |
+| Locale text and formatting                                          | `@liam-public/i18n`, `@liam-public/text`                                   |
+| Frontend and i18n lint gates                                        | `node-frontend-lint`, `node-i18n-lint`                                     |
 
 There are no `users`, `sessions` or `password` tables to build. Identity is a
 verified JWT `sub`; admin is a role claim, which is why revoking admin at the
@@ -154,7 +154,7 @@ The rename is not cosmetic. `Quiz → Game → Player` becomes
 ```
 TEST ─▶ TEST_VERSION ─┬─▶ TEST_SECTION ─▶ QUESTION_GROUP ─▶ QUESTION ─┬─▶ CHOICE
                       │         │               ▲                     └─▶ QUESTION_TAG
-                      │         └─▶ SECTION_INSTRUCTION                 
+                      │         └─▶ SECTION_INSTRUCTION
                       └─▶ STIMULUS ────────────┘
                              ▲
                        MEDIA_ASSET
@@ -216,8 +216,7 @@ Decisions worth restating because they were argued and settled:
   attempt is finalized and the new one created in the same transaction,
   reported via `finalizedPriorAttempt` — no 410, no retry, and the news of an
   auto-submit is not swallowed.
-- **`GET /result` and `GET /review` finalize a past-deadline attempt and return
-  200.** The thing the caller asked for has just become available; denying it
+- **`GET /result` and `GET /review` finalize a past-deadline attempt and return 200.** The thing the caller asked for has just become available; denying it
   would be perverse. `409` is reserved for an attempt genuinely still running.
   Every other route refuses with `410` and carries the finalized attempt.
 - **The clock starts at first section entry, not at attempt creation.** Reading
@@ -237,7 +236,7 @@ Decisions worth restating because they were argued and settled:
 
 Derived from `_bluebik/awesome-survey`, which lost answers four ways: an
 all-or-nothing transaction that discarded non-conflicting answers alongside one
-conflict; a validation pipe that rejected payloads *before any handler ran*,
+conflict; a validation pipe that rejected payloads _before any handler ran_,
 leaving no trace; delta payloads that never carried what a missed batch
 dropped; and a resume that overwrote unsaved local edits.
 
@@ -249,7 +248,7 @@ dropped; and a resume that overwrote unsaved local edits.
    back the rest, and item failures never fail the envelope.
 4. **The server keeps what it refuses.** Anything unapplied — unparseable,
    oversized (413), rejected — is persisted verbatim as a `failed_write`
-   *before* the error is returned, with `capturedAs` naming the row. Oversized
+   _before_ the error is returned, with `capturedAs` naming the row. Oversized
    matters most: it loses the most data while logging the least, so the capture
    falls back to raw bytes when no parsed body exists.
 5. **Retry only what is retryable.** Network and 5xx back off; 4xx other than
@@ -282,44 +281,44 @@ The repository has **zero tests today** — no files, no runner, no script. This
 is net-new infrastructure. Match `typescript-libraries`: **vitest**, plus
 **testcontainers** for PostgreSQL.
 
-| Layer | Approach |
-|---|---|
-| Scoring | Pure unit tests over responses + questions. No database. |
-| Rule enforcement | Pure predicates: forward-only, answer-change, max-plays, expiry. |
+| Layer                | Approach                                                                                                                                                                          |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scoring              | Pure unit tests over responses + questions. No database.                                                                                                                          |
+| Rule enforcement     | Pure predicates: forward-only, answer-change, max-plays, expiry.                                                                                                                  |
 | **Constraint tests** | Real PostgreSQL. Port `docs/db/invariants.test.sql` to vitest: cross-version responses, foreign-question choices, double attempts, double open sections, published-content edits. |
-| Repositories | `loadForRunner()` never returns `is_correct` — asserted explicitly. |
-| Import/export | Round trip: import → export → deep-equal, including instruction and tag order. |
-| Durability | Reorder guard discards a lower `seq`; identical re-send is a no-op under `allow_answer_change: false`; a rejected item always names `capturedAs`. |
-| API | Contract tests including batch partial rejection and `mixed_sections`. |
-| Schema ↔ spec | A test asserting the SQL enum members equal the OpenAPI enum members, so the two cannot drift silently. |
+| Repositories         | `loadForRunner()` never returns `is_correct` — asserted explicitly.                                                                                                               |
+| Import/export        | Round trip: import → export → deep-equal, including instruction and tag order.                                                                                                    |
+| Durability           | Reorder guard discards a lower `seq`; identical re-send is a no-op under `allow_answer_change: false`; a rejected item always names `capturedAs`.                                 |
+| API                  | Contract tests including batch partial rejection and `mixed_sections`.                                                                                                            |
+| Schema ↔ spec        | A test asserting the SQL enum members equal the OpenAPI enum members, so the two cannot drift silently.                                                                           |
 
 The constraint tests matter more than they look: this design asserts guarantees
-the *database* makes, and an `ALTER TABLE … ADD UNIQUE` that silently did not
+the _database_ makes, and an `ALTER TABLE … ADD UNIQUE` that silently did not
 apply would leave real belief in protection that is not there.
 
 ## 7. Risks
 
-| Risk | Mitigation |
-|---|---|
-| PKCE redirects the whole tab; token expiry mid-attempt would bounce a child out of a running test | `auth-fetch` refreshes transparently on 401; a passkey re-auth needs no redirect at all; and answers are durable locally, so even a redirect cannot lose work |
+| Risk                                                                                                                                            | Mitigation                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PKCE redirects the whole tab; token expiry mid-attempt would bounce a child out of a running test                                               | `auth-fetch` refreshes transparently on 401; a passkey re-auth needs no redirect at all; and answers are durable locally, so even a redirect cannot lose work                       |
 | **NestJS's global `ValidationPipe` throws before any controller runs** — the exact mechanism by which awesome-survey lost answers with no trace | `FailedWriteCaptureFilter` is registered in the same commit as the pipe, falling back to `req.rawBody` when the parsed body is empty. Non-negotiable ordering, called out in plan 2 |
-| Two sources of truth — Zod validators for the interchange format, SQL for storage | The enum-parity test above; import/export round-trip tests |
-| Assembling a runner payload is a six-join read | One well-tested `TestVersionRepository.load()`; that shape must not leak upward |
-| A published test cites a deleted asset | `ON DELETE RESTRICT` on `stimulus.media_asset_id` |
-| Two attempts on one test may span versions and are not strictly comparable | History renders the version; `test_version.title` is what a pinned attempt reads |
-| Immutability triggers block a legitimate content fix | Fix by publishing a new version; that is what versions are for |
+| Two sources of truth — Zod validators for the interchange format, SQL for storage                                                               | The enum-parity test above; import/export round-trip tests                                                                                                                          |
+| Assembling a runner payload is a six-join read                                                                                                  | One well-tested `TestVersionRepository.load()`; that shape must not leak upward                                                                                                     |
+| A published test cites a deleted asset                                                                                                          | `ON DELETE RESTRICT` on `stimulus.media_asset_id`                                                                                                                                   |
+| Two attempts on one test may span versions and are not strictly comparable                                                                      | History renders the version; `test_version.title` is what a pinned attempt reads                                                                                                    |
+| Immutability triggers block a legitimate content fix                                                                                            | Fix by publishing a new version; that is what versions are for                                                                                                                      |
 
 ## 8. Build order
 
-| Phase | Deliverable |
-|---|---|
-| 0 | Scaffold `packages/{common,db}` on `shared-core` + `platform`; two registries in `.npmrc`; compose with Postgres; vitest + testcontainers. (`server` and `app` are scaffolded by the plans that first put code in them; `socket` and `web` are deleted in plan 3, so the repo stays runnable throughout) |
-| 1 | Migrations from `schema.sql`; repositories; constraint tests green |
-| 2 | Session, catalog and attempt-start endpoints; import/export/publish; seed a real test |
-| 3 | Runner payload, section entry, play, position; the listening and reading screens |
-| 4 | The durable write path: queue, snapshot flush, reorder guard, `failed_write`, retry classification |
-| 5 | Submit, grading, result, review, history |
-| 6 | Navigator, menu, i18n sweep, iPad polish, Docker deploy |
+| Phase | Deliverable                                                                                                                                                                                                                                                                                              |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Scaffold `packages/{common,db}` on `shared-core` + `platform`; two registries in `.npmrc`; compose with Postgres; vitest + testcontainers. (`server` and `app` are scaffolded by the plans that first put code in them; `socket` and `web` are deleted in plan 3, so the repo stays runnable throughout) |
+| 1     | Migrations from `schema.sql`; repositories; constraint tests green                                                                                                                                                                                                                                       |
+| 2     | Session, catalog and attempt-start endpoints; import/export/publish; seed a real test                                                                                                                                                                                                                    |
+| 3     | Runner payload, section entry, play, position; the listening and reading screens                                                                                                                                                                                                                         |
+| 4     | The durable write path: queue, snapshot flush, reorder guard, `failed_write`, retry classification                                                                                                                                                                                                       |
+| 5     | Submit, grading, result, review, history                                                                                                                                                                                                                                                                 |
+| 6     | Navigator, menu, i18n sweep, iPad polish, Docker deploy                                                                                                                                                                                                                                                  |
 
 Phase 4 is the one to resist compressing. Every rule in §5 exists because it
 was learned the expensive way somewhere else.

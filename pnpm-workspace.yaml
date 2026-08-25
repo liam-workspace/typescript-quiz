@@ -1,5 +1,13 @@
+# packages/socket and packages/web are the old Razzia app. They still import
+# "@razzia/common", which no longer exists (renamed to @pp/common in this
+# plan). They are intentionally left on disk for reference and are deleted
+# in a later plan. Globbing "packages/*" here would make pnpm try to
+# resolve their stale "@razzia/common": "workspace:*" dependency and fail
+# ERR_PNPM_WORKSPACE_PKG_NOT_FOUND for the whole workspace, so the list is
+# narrowed to just the live packages until that later plan removes them.
 packages:
-  - "packages/*"
+  - "packages/common"
+  - "packages/db"
 
 allowBuilds:
   cpu-features: true

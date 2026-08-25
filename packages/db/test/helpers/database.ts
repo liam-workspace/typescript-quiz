@@ -1,27 +1,23 @@
 import { createPool, waitForDatabase } from "@liam-public/node-postgres"
-import {
-  PostgreSqlContainer,
-  type StartedPostgreSqlContainer,
-} from "@testcontainers/postgresql"
 import type pg from "pg"
+import { inject } from "vitest"
 
 export interface DatabaseHandle {
   pool: pg.Pool
   databaseUrl: string
 }
 
-let container: StartedPostgreSqlContainer | undefined = undefined
-
 /**
- * One container per worker, reused across tests; each call gets a freshly
- * migrated schema. Starting a container per test would triple the suite time
- * for no isolation benefit, because we drop and rebuild the schema anyway.
+ * Every call shares the single PostgreSQL 16 container started once for the
+ * whole `vitest run` by test/helpers/global-setup.ts (published via
+ * vitest's provide/inject, read here with `inject("postgresConnectionUri")`).
+ * Each call still gets a freshly reset schema: the container is shared, not
+ * the data. `withDatabase` itself never starts or stops a container.
  */
 export async function withDatabase(
   fn: (pool: pg.Pool, handle: DatabaseHandle) => Promise<void>,
 ): Promise<void> {
-  container ??= await new PostgreSqlContainer("postgres:16-alpine").start()
-  const databaseUrl = container.getConnectionUri()
+  const databaseUrl = inject("postgresConnectionUri")
   // The same readiness poll the API uses at boot, so the test path and the
   // production path agree about what "the database is up" means.
   await waitForDatabase(databaseUrl, { retries: 20, delayMs: 250 })

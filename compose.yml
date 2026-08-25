@@ -5,3 +5,21 @@ services:
       - "3000:3000"
     volumes:
       - ./config:/app/config
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pp
+      POSTGRES_PASSWORD: pp
+      POSTGRES_DB: pp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pp-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pp -d pp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pp-postgres:

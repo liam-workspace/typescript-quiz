@@ -15,19 +15,30 @@ from npm.pkg.github.com and needs a `GITHUB_TOKEN`. Both scopes must be in
 
 ## Adopted — foundation (plan 1)
 
-| Package                      | Used for                                                                                                                                                                                                                                                     |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@liam-public/shared-core`   | **The umbrella.** Re-exports `createPool`, `withTransaction`, `runMigrations`, `waitForDatabase` from `node-postgres`, plus `createLogger` (pino), `createHttpClient` (undici), `createCrypto` and `createInMemoryEventBus`. One dependency instead of five. |
-| `@liam-public/node-postgres` | Reached through `shared-core`; named explicitly because the two-pool policy and `runMigrations`' scoped `migrationsTable` are load-bearing decisions, not incidental.                                                                                        |
-| `@liam-workspace/platform`   | `Clock` / `createFixedClock`, `Result`/`ok`/`err`, `NotFoundError`/`ValidationError`/`ConflictError`.                                                                                                                                                        |
-| `@liam-public/node-config`   | `parseIntegerEnv`, `parseBooleanEnv`, `parseCsvEnv` for `PORT`, `MEDIA_MAX_BYTES`, `ALLOWED_EMAILS`.                                                                                                                                                         |
-| `@liam-public/node-logger`   | Structured logging; also available via `shared-core`.                                                                                                                                                                                                        |
-| `@liam-public/event-bus`     | `DomainEventEnvelope` for `attempt.submitted`, `write.captured`.                                                                                                                                                                                             |
+| Package                      | Used for                                                                                                                                                                                                                                                                         |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@liam-public/node-postgres` | `^0.3.1`, direct dependency. `createPool`, `withTransaction`, `runMigrations`, `waitForDatabase`; named explicitly because the two-pool policy, `runMigrations`' scoped `migrationsTable`, and `createPool`'s `applicationName` knob are load-bearing decisions, not incidental. |
+| `@liam-workspace/platform`   | `Clock` / `createFixedClock`, `Result`/`ok`/`err`, `NotFoundError`/`ValidationError`/`ConflictError`.                                                                                                                                                                            |
+| `@liam-public/node-config`   | `parseIntegerEnv`, `parseBooleanEnv`, `parseCsvEnv` for `PORT`, `MEDIA_MAX_BYTES`, `ALLOWED_EMAILS`.                                                                                                                                                                             |
+| `@liam-public/node-logger`   | Structured logging.                                                                                                                                                                                                                                                              |
+| `@liam-public/event-bus`     | `DomainEventEnvelope` for `attempt.submitted`, `write.captured`.                                                                                                                                                                                                                 |
 
 `Clock` is the one worth calling out. Every clock in this app is
 server-authoritative, and `createFixedClock` turns expiry tests from
 `await sleep(50 * 60_000)` into an assertion. Nothing else in the design makes
 lazy expiry cheaply testable.
+
+**Reversal record.** `@liam-public/shared-core` was adopted first, as the
+umbrella re-export for `node-postgres`, `node-logger`, and friends. It was
+REVERSED during Task 2 of the foundation-db-and-domain plan: the npm registry
+marks `@liam-public/shared-core` deprecated ("Use capability-specific @liam
+packages instead"), and the published `shared-core@0.2.1` pins
+`@liam-public/node-postgres` to an exact `0.2.0` — not a range — whose
+`CreatePoolOptions` predates the `applicationName` knob. That silently dropped
+the ability to tag pooled connections with `application_name`, which
+`pg_stat_activity`-based incident triage depends on. The fix was to depend on
+`@liam-public/node-postgres@^0.3.1` directly instead of reaching it through the
+umbrella; the table above reflects that as the standing decision.
 
 ## Adopted — server (plan 2)
 
@@ -85,12 +96,12 @@ than an investigation.
 
 ## Adopted — tooling (plan 1, CI gates)
 
-| Package                            | Used for                                                                                                                |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `@liam-public/node-frontend-lint`  | Audits the layered React frontend: stateless components, one-way imports.                                               |
-| `@liam-public/node-i18n-lint`      | Detects hardcoded untranslated strings in TSX. With seven locales, the failure mode is silent.                          |
-| `@liam-public/node-dev-tools`      | Git / Docker / release workflow utilities for `scripts/`.                                                               |
-| `@liam-public/node-slack-notifier` | Ops alert on a `failed_write` spike. A capture nobody looks at is a log, not a safety net. Available via `shared-core`. |
+| Package                            | Used for                                                                                       |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `@liam-public/node-frontend-lint`  | Audits the layered React frontend: stateless components, one-way imports.                      |
+| `@liam-public/node-i18n-lint`      | Detects hardcoded untranslated strings in TSX. With seven locales, the failure mode is silent. |
+| `@liam-public/node-dev-tools`      | Git / Docker / release workflow utilities for `scripts/`.                                      |
+| `@liam-public/node-slack-notifier` | Ops alert on a `failed_write` spike. A capture nobody looks at is a log, not a safety net.     |
 
 ## Adopted later — the admin spec
 

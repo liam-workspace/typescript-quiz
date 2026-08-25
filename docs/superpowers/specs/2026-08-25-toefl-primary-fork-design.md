@@ -81,7 +81,7 @@ per-section history, live multiplayer, SCORM, LTI, Redis, cloud object storage.
 ```
 packages/
 ├── common/   domain types + Zod validators for the JSON interchange format
-├── db/       migrations + repositories  (@liam-public/shared-core)
+├── db/       migrations + repositories  (@liam-public/node-postgres)
 ├── server/   NestJS REST API + JWKS verification and passkey ceremony
 └── app/      Vite + React 19 SPA
 ```
@@ -110,23 +110,23 @@ All 47 packages in `~/projects/typescript-libraries` were surveyed;
 `docs/architecture/library-adoption.md` — consult it before adding any
 dependency.
 
-| Concern                                                             | Package                                                                    |
-| ------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Pooling, transactions, migrations, logging, HTTP, crypto, event bus | `@liam-public/shared-core` (umbrella over `node-postgres`)                 |
-| `Clock`, `Result`, domain errors                                    | `@liam-workspace/platform`                                                 |
-| Environment parsing                                                 | `@liam-public/node-config`                                                 |
-| Browser OIDC + PKCE                                                 | `@liam-workspace/auth-client`                                              |
-| React session binding                                               | `@liam-public/browser-react-auth`                                          |
-| Bearer + transparent refresh on 401                                 | `@liam-public/auth-fetch`                                                  |
-| Server token verification, passkey ceremony                         | `@liam-workspace/node-auth-server`                                         |
-| Passkeys                                                            | `@liam-public/node-webauthn`, `@liam-public/browser-webauthn`              |
-| NestJS filters, interceptors, observability                         | `@liam-public/node-nest-common`, `@liam-public/node-nest-observability`    |
-| Tailwind v4 + Radix component kit                                   | `@liam-public/browser-react-ui`                                            |
-| Offline app-shell and API caching                                   | `@liam-public/vite-preset-pwa`                                             |
-| Browser → backend `traceparent`, Web Vitals                         | `@liam-public/browser-telemetry`                                           |
-| Error boundary, error reporting, browser logging                    | `browser-react-error-boundary`, `browser-error-reporter`, `browser-logger` |
-| Locale text and formatting                                          | `@liam-public/i18n`, `@liam-public/text`                                   |
-| Frontend and i18n lint gates                                        | `node-frontend-lint`, `node-i18n-lint`                                     |
+| Concern                                          | Package                                                                    |
+| ------------------------------------------------ | -------------------------------------------------------------------------- |
+| Pooling, transactions, migrations                | `@liam-public/node-postgres`                                               |
+| `Clock`, `Result`, domain errors                 | `@liam-workspace/platform`                                                 |
+| Environment parsing                              | `@liam-public/node-config`                                                 |
+| Browser OIDC + PKCE                              | `@liam-workspace/auth-client`                                              |
+| React session binding                            | `@liam-public/browser-react-auth`                                          |
+| Bearer + transparent refresh on 401              | `@liam-public/auth-fetch`                                                  |
+| Server token verification, passkey ceremony      | `@liam-workspace/node-auth-server`                                         |
+| Passkeys                                         | `@liam-public/node-webauthn`, `@liam-public/browser-webauthn`              |
+| NestJS filters, interceptors, observability      | `@liam-public/node-nest-common`, `@liam-public/node-nest-observability`    |
+| Tailwind v4 + Radix component kit                | `@liam-public/browser-react-ui`                                            |
+| Offline app-shell and API caching                | `@liam-public/vite-preset-pwa`                                             |
+| Browser → backend `traceparent`, Web Vitals      | `@liam-public/browser-telemetry`                                           |
+| Error boundary, error reporting, browser logging | `browser-react-error-boundary`, `browser-error-reporter`, `browser-logger` |
+| Locale text and formatting                       | `@liam-public/i18n`, `@liam-public/text`                                   |
+| Frontend and i18n lint gates                     | `node-frontend-lint`, `node-i18n-lint`                                     |
 
 There are no `users`, `sessions` or `password` tables to build. Identity is a
 verified JWT `sub`; admin is a role claim, which is why revoking admin at the
@@ -310,15 +310,15 @@ apply would leave real belief in protection that is not there.
 
 ## 8. Build order
 
-| Phase | Deliverable                                                                                                                                                                                                                                                                                              |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Scaffold `packages/{common,db}` on `shared-core` + `platform`; two registries in `.npmrc`; compose with Postgres; vitest + testcontainers. (`server` and `app` are scaffolded by the plans that first put code in them; `socket` and `web` are deleted in plan 3, so the repo stays runnable throughout) |
-| 1     | Migrations from `schema.sql`; repositories; constraint tests green                                                                                                                                                                                                                                       |
-| 2     | Session, catalog and attempt-start endpoints; import/export/publish; seed a real test                                                                                                                                                                                                                    |
-| 3     | Runner payload, section entry, play, position; the listening and reading screens                                                                                                                                                                                                                         |
-| 4     | The durable write path: queue, snapshot flush, reorder guard, `failed_write`, retry classification                                                                                                                                                                                                       |
-| 5     | Submit, grading, result, review, history                                                                                                                                                                                                                                                                 |
-| 6     | Navigator, menu, i18n sweep, iPad polish, Docker deploy                                                                                                                                                                                                                                                  |
+| Phase | Deliverable                                                                                                                                                                                                                                                                                                |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Scaffold `packages/{common,db}` on `node-postgres` + `platform`; two registries in `.npmrc`; compose with Postgres; vitest + testcontainers. (`server` and `app` are scaffolded by the plans that first put code in them; `socket` and `web` are deleted in plan 3, so the repo stays runnable throughout) |
+| 1     | Migrations from `schema.sql`; repositories; constraint tests green                                                                                                                                                                                                                                         |
+| 2     | Session, catalog and attempt-start endpoints; import/export/publish; seed a real test                                                                                                                                                                                                                      |
+| 3     | Runner payload, section entry, play, position; the listening and reading screens                                                                                                                                                                                                                           |
+| 4     | The durable write path: queue, snapshot flush, reorder guard, `failed_write`, retry classification                                                                                                                                                                                                         |
+| 5     | Submit, grading, result, review, history                                                                                                                                                                                                                                                                   |
+| 6     | Navigator, menu, i18n sweep, iPad polish, Docker deploy                                                                                                                                                                                                                                                    |
 
 Phase 4 is the one to resist compressing. Every rule in §5 exists because it
 was learned the expensive way somewhere else.

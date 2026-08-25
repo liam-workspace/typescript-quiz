@@ -6,7 +6,7 @@
 
 **Architecture:** A pnpm workspace gains two new packages. `@pp/common` holds domain types and the Zod validators for the import/export document; it has no runtime dependencies beyond `zod`. `@pp/db` holds `node-pg-migrate` migrations transcribed from the reviewed `docs/db/schema.sql`, plus repositories that own every SQL statement — no SQL leaves this package. Tests run against a throwaway PostgreSQL 16 via testcontainers, so constraint tests exercise real triggers and real composite foreign keys rather than mocks.
 
-**Tech Stack:** Node 24, pnpm 10.16, TypeScript 6, PostgreSQL 16, `@liam-public/shared-core` (umbrella over `node-postgres`: pooling, transactions, `runMigrations`, pino logging, undici HTTP, in-memory event bus), `@liam-workspace/platform` (`Clock`, `Result`, domain errors), `@liam-public/node-config`, `node-pg-migrate`, Zod 4, Vitest 4, `@testcontainers/postgresql`, oxlint, prettier.
+**Tech Stack:** Node 24, pnpm 10.16, TypeScript 6, PostgreSQL 16, `@liam-public/node-postgres` (pooling, transactions, `runMigrations`), `@liam-workspace/platform` (`Clock`, `Result`, domain errors), `@liam-public/node-config`, `node-pg-migrate`, Zod 4, Vitest 4, `@testcontainers/postgresql`, oxlint, prettier.
 
 **Spec:** `docs/superpowers/specs/2026-08-25-toefl-primary-fork-design.md`
 **Library adoption map:** `docs/architecture/library-adoption.md` — a verdict on all 47 packages in `~/projects/typescript-libraries`. Consult it before adding any dependency; six are declined on grounds that adopting them would make this design worse.
@@ -31,33 +31,33 @@
 
 ## File Structure
 
-| File                                                      | Responsibility                                                                                 |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `packages/common/package.json`                            | renamed to `@pp/common`; drops `socket.io`                                                     |
-| `packages/common/src/domain/test.ts`                      | Test / version / section / group / stimulus / question / choice types                          |
-| `packages/common/src/domain/attempt.ts`                   | Attempt, response, score, write-result types                                                   |
-| `packages/common/src/domain/ids.ts`                       | Branded id types so a `QuestionId` cannot be passed as an `AttemptId`                          |
-| `packages/common/src/interchange/test-document.ts`        | Zod schema for the import/export document                                                      |
-| `packages/common/src/index.ts`                            | public surface                                                                                 |
-| `packages/db/package.json`                                | new `@pp/db`                                                                                   |
-| `packages/db/migrations/1000_enums_identity_media.cjs`    | enums, `student`, `media_asset`                                                                |
-| `packages/db/migrations/1001_content.cjs`                 | test → choice, `section_instruction`, `question_tag`                                           |
-| `packages/db/migrations/1002_attempts.cjs`                | attempt, sections, responses, cursor, plays                                                    |
-| `packages/db/migrations/1003_durability_and_triggers.cjs` | `failed_write`, immutability triggers, `publication_violation`                                 |
-| `.npmrc`                                                  | both registries; `GITHUB_TOKEN` for the `@liam-workspace` scope                                |
-| `packages/db/src/pool.ts`                                 | `createRequestPool` / `createJobPool` over `shared-core`, with named `applicationName`         |
-| `packages/db/src/config.ts`                               | `loadDbConfig()` over `@liam-public/node-config`                                               |
-| `packages/common/src/domain/clock.ts`                     | re-exports `Clock` / `systemClock` / `createFixedClock` so no package imports `platform` twice |
-| `packages/db/src/migrate.ts`                              | `migrateToLatest(databaseUrl)`                                                                 |
-| `packages/db/src/repositories/test-version.repository.ts` | `loadForRunner` / `loadForScoring` — the two deliberately separate projections                 |
-| `packages/db/src/repositories/test-import.repository.ts`  | import a `TestDocument`, export one back                                                       |
-| `packages/db/src/index.ts`                                | public surface                                                                                 |
-| `packages/db/test/helpers/database.ts`                    | testcontainers harness shared by every db test                                                 |
-| `packages/db/test/constraints.test.ts`                    | proves each invariant rejects what it claims                                                   |
-| `packages/db/test/enum-parity.test.ts`                    | SQL enums == OpenAPI enums                                                                     |
-| `packages/db/test/import-export.test.ts`                  | round trip deep-equal                                                                          |
-| `compose.yml`                                             | gains a `postgres` service                                                                     |
-| `vitest.workspace.ts`                                     | root test config                                                                               |
+| File                                                      | Responsibility                                                                                        |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `packages/common/package.json`                            | renamed to `@pp/common`; drops `socket.io`                                                            |
+| `packages/common/src/domain/test.ts`                      | Test / version / section / group / stimulus / question / choice types                                 |
+| `packages/common/src/domain/attempt.ts`                   | Attempt, response, score, write-result types                                                          |
+| `packages/common/src/domain/ids.ts`                       | Branded id types so a `QuestionId` cannot be passed as an `AttemptId`                                 |
+| `packages/common/src/interchange/test-document.ts`        | Zod schema for the import/export document                                                             |
+| `packages/common/src/index.ts`                            | public surface                                                                                        |
+| `packages/db/package.json`                                | new `@pp/db`                                                                                          |
+| `packages/db/migrations/1000_enums_identity_media.cjs`    | enums, `student`, `media_asset`                                                                       |
+| `packages/db/migrations/1001_content.cjs`                 | test → choice, `section_instruction`, `question_tag`                                                  |
+| `packages/db/migrations/1002_attempts.cjs`                | attempt, sections, responses, cursor, plays                                                           |
+| `packages/db/migrations/1003_durability_and_triggers.cjs` | `failed_write`, immutability triggers, `publication_violation`                                        |
+| `.npmrc`                                                  | both registries; `GITHUB_TOKEN` for the `@liam-workspace` scope                                       |
+| `packages/db/src/pool.ts`                                 | `createRequestPool` / `createJobPool` over `@liam-public/node-postgres`, with named `applicationName` |
+| `packages/db/src/config.ts`                               | `loadDbConfig()` over `@liam-public/node-config`                                                      |
+| `packages/common/src/domain/clock.ts`                     | re-exports `Clock` / `systemClock` / `createFixedClock` so no package imports `platform` twice        |
+| `packages/db/src/migrate.ts`                              | `migrateToLatest(databaseUrl)`                                                                        |
+| `packages/db/src/repositories/test-version.repository.ts` | `loadForRunner` / `loadForScoring` — the two deliberately separate projections                        |
+| `packages/db/src/repositories/test-import.repository.ts`  | import a `TestDocument`, export one back                                                              |
+| `packages/db/src/index.ts`                                | public surface                                                                                        |
+| `packages/db/test/helpers/database.ts`                    | testcontainers harness shared by every db test                                                        |
+| `packages/db/test/constraints.test.ts`                    | proves each invariant rejects what it claims                                                          |
+| `packages/db/test/enum-parity.test.ts`                    | SQL enums == OpenAPI enums                                                                            |
+| `packages/db/test/import-export.test.ts`                  | round trip deep-equal                                                                                 |
+| `compose.yml`                                             | gains a `postgres` service                                                                            |
+| `vitest.workspace.ts`                                     | root test config                                                                                      |
 
 ---
 
@@ -107,7 +107,7 @@
   },
   "dependencies": {
     "@liam-public/node-config": "^0.2.0",
-    "@liam-public/shared-core": "^0.2.1",
+    "@liam-public/node-postgres": "^0.3.1",
     "@liam-workspace/platform": "^0.1.0",
     "@pp/common": "workspace:*",
     "node-pg-migrate": "^7.9.0",
@@ -123,10 +123,13 @@
 }
 ```
 
-> `shared-core` re-exports `createPool`, `withTransaction`, `runMigrations`,
-> `waitForDatabase` from `node-postgres`, so `node-postgres` is NOT listed
-> separately — one dependency, not two, and no chance of the two resolving to
-> different versions.
+> `@liam-public/node-postgres` is depended on directly. An umbrella
+> re-export package was tried first during Task 2 and REVERSED: it is marked
+> deprecated on the registry, and its newest published version pinned
+> `node-postgres` to an exact older release whose `CreatePoolOptions` predated
+> the `applicationName` knob this plan relies on (see
+> `packages/db/src/pool.ts` and the Task 2 harness below). See
+> `docs/architecture/library-adoption.md` for the full reversal record.
 >
 > If a `@liam-*` package is not yet published, add it as a `file:` dependency
 > pointing into `~/projects/typescript-libraries/packages/...` and say so in the
@@ -206,19 +209,17 @@ export GITHUB_TOKEN=<a classic PAT with read:packages>
 ```bash
 pnpm install
 pnpm -r exec tsc --noEmit
-node -e "import('@liam-public/shared-core').then(m => console.log(Object.keys(m).sort().join(' ')))"
+node -e "import('@liam-public/node-postgres').then(m => console.log(Object.keys(m).sort().join(' ')))"
 ```
 
 Expected: install succeeds, no type errors, and the last command prints a list
-including `createPool`, `runMigrations`, `withTransaction`, `waitForDatabase`,
-`createLogger`. If it does not, the umbrella assumption is wrong — stop and
-depend on `@liam-public/node-postgres` directly rather than working around it.
+including `createPool`, `runMigrations`, `withTransaction`, `waitForDatabase`.
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add .npmrc package.json tsconfig.json vitest.workspace.ts packages/common/package.json packages/db pnpm-lock.yaml
-git commit -m "chore: scaffold @pp/db on shared-core, rename @razzia/common to @pp/common"
+git commit -m "chore: scaffold @pp/db on node-postgres, rename @razzia/common to @pp/common"
 ```
 
 ---
@@ -263,7 +264,7 @@ Expected: FAIL — cannot resolve `./helpers/database.js`.
 `packages/db/test/helpers/database.ts`:
 
 ```ts
-import { createPool, waitForDatabase } from "@liam-public/shared-core"
+import { createPool, waitForDatabase } from "@liam-public/node-postgres"
 import {
   PostgreSqlContainer,
   type StartedPostgreSqlContainer,
@@ -472,7 +473,7 @@ exports.down = (pgm) => {
 `packages/db/src/migrate.ts`:
 
 ```ts
-import { runMigrations } from "@liam-public/shared-core"
+import { runMigrations } from "@liam-public/node-postgres"
 import { fileURLToPath } from "node:url"
 import { dirname, resolve } from "node:path"
 
@@ -1794,7 +1795,7 @@ Expected: FAIL — cannot resolve `test-import.repository.js`.
 `packages/db/src/repositories/test-import.repository.ts`:
 
 ```ts
-import { withTransaction } from "@liam-public/shared-core"
+import { withTransaction } from "@liam-public/node-postgres"
 import type { TestDocument } from "@pp/common"
 import type pg from "pg"
 
@@ -2556,7 +2557,7 @@ export function loadDbConfig(env: Environment = nodeEnvironment()): DbConfig {
 `packages/db/src/pool.ts`:
 
 ```ts
-import { createPool } from "@liam-public/shared-core"
+import { createPool } from "@liam-public/node-postgres"
 import type pg from "pg"
 import type { DbConfig } from "./config.js"
 

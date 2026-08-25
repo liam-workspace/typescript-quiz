@@ -1,4 +1,4 @@
-import { createPool, waitForDatabase } from "@liam-public/shared-core"
+import { createPool, waitForDatabase } from "@liam-public/node-postgres"
 import {
   PostgreSqlContainer,
   type StartedPostgreSqlContainer,
@@ -25,10 +25,7 @@ export async function withDatabase(
   // The same readiness poll the API uses at boot, so the test path and the
   // production path agree about what "the database is up" means.
   await waitForDatabase(databaseUrl, { retries: 20, delayMs: 250 })
-  // The installed @liam-public/shared-core@0.2.1 pins @liam-public/node-postgres
-  // to 0.2.0, whose CreatePoolOptions predates the applicationName knob, so it
-  // is omitted here rather than passed as a no-op.
-  const pool = createPool(databaseUrl)
+  const pool = createPool(databaseUrl, { applicationName: "pp:test" })
 
   try {
     await pool.query(

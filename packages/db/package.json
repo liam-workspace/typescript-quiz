@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@liam-public/node-config": "^0.1.0",
-    "@liam-public/shared-core": "^0.2.1",
+    "@liam-public/node-postgres": "^0.3.1",
     "@liam-workspace/platform": "^0.1.0",
     "@pp/common": "workspace:*",
     "node-pg-migrate": "^7.9.0",

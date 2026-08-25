@@ -67,10 +67,9 @@ Three of these change earlier decisions:
 
 **`browser-react-ui` replaces the harvest.** Plan 1 said to copy Razzia's
 `components/*` into `packages/app`. It shouldn't: Razzia is already Tailwind v4
-
-- Radix, so the kit is the same stack with the same primitives, already tested
-  and maintained. `sheet` is literally the collapsible drawer the prototype
-  draws by hand. Only `QuestionMedia` and `branding.ts` are still worth copying.
+and Radix, so the kit is the same stack with the same primitives, already tested
+and maintained. `sheet` is literally the collapsible drawer the prototype draws
+by hand. Only `QuestionMedia` and `branding.ts` are still worth copying.
 
 **`vite-preset-pwa` is not a nice-to-have here.** The durability design assumes
 a child keeps answering while the network is gone. A service worker with an

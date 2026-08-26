@@ -66,9 +66,6 @@ importers:
       '@liam-public/node-postgres':
         specifier: ^0.3.1
         version: 0.3.1(@types/pg@8.23.1)
-      '@liam-workspace/platform':
-        specifier: ^0.1.0
-        version: 0.1.0
       '@pp/common':
         specifier: workspace:*
         version: link:../common

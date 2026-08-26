@@ -57,7 +57,6 @@
 | `packages/db/test/enum-parity.test.ts`                    | SQL enums == OpenAPI enums                                                                            |
 | `packages/db/test/import-export.test.ts`                  | round trip deep-equal                                                                                 |
 | `compose.yml`                                             | gains a `postgres` service                                                                            |
-| `vitest.workspace.ts`                                     | root test config                                                                                      |
 
 ---
 

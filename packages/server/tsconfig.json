@@ -6,12 +6,10 @@
     "moduleResolution": "nodenext",
     "strict": true,
     "skipLibCheck": true,
-    "noEmit": false,
-    "outDir": "./dist",
-    "rootDir": "./src",
+    "noEmit": true,
     "verbatimModuleSyntax": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true
   },
-  "include": ["src"]
+  "include": ["src", "test"]
 }

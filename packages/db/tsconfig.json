@@ -6,11 +6,9 @@
     "moduleResolution": "nodenext",
     "strict": true,
     "skipLibCheck": true,
-    "noEmit": false,
+    "noEmit": true,
     "declaration": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
     "verbatimModuleSyntax": true
   },
-  "include": ["src"]
+  "include": ["src", "test"]
 }

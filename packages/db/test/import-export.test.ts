@@ -97,6 +97,22 @@ describe("import / export", () => {
     })
   }, 120_000)
 
+  // `toEqual` treats a key holding `undefined` and an absent key as equal,
+  // so the round-trip test above cannot catch a group that comes back with a
+  // `stimulus: undefined` property instead of no `stimulus` key at all.
+  // This test inspects the key set directly instead.
+  it("omits the stimulus key entirely for a group with no stimulus", async () => {
+    await withDatabase(async (pool) => {
+      const { versionId } = await importTestDocument(pool, doc)
+      const out = await exportTestDocument(pool, versionId)
+      const [section] = out.sections
+      const [group] = section.groups
+
+      expect(Object.keys(group)).toEqual(["questions"])
+      expect("stimulus" in group).toBe(false)
+    })
+  }, 120_000)
+
   it("creates a DRAFT — importing does not publish", async () => {
     await withDatabase(async (pool) => {
       const { versionId } = await importTestDocument(pool, doc)

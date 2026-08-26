@@ -333,8 +333,10 @@ export async function exportTestDocument(
     let group = section.groups[r.g_ordinal - 1] as Group | undefined
 
     if (!group) {
+      const stimulus = toStimulus(r)
+
       group = {
-        stimulus: toStimulus(r),
+        ...(stimulus ? { stimulus } : {}),
         questions: [],
       }
       section.groups[r.g_ordinal - 1] = group

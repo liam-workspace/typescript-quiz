@@ -8,8 +8,8 @@ import {
   type RunnerQuestion,
   type RunnerSection,
   type RunnerStimulus,
-  type ScoringQuestion,
 } from "@pp/common"
+import type { ScoringQuestion } from "@pp/common/scoring"
 import type pg from "pg"
 
 interface RunnerRow {

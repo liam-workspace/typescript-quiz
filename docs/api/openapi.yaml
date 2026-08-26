@@ -1826,10 +1826,10 @@ components:
                       type: object
                       properties:
                         type: { $ref: "#/components/schemas/StimulusType" }
-                        title: { type: string }
-                        bodyText: { type: string }
-                        mediaFilename: { type: string }
-                        maxPlays: { type: [integer, "null"] }
+                        title: { type: string, minLength: 1 }
+                        bodyText: { type: string, minLength: 1 }
+                        mediaFilename: { type: string, minLength: 1 }
+                        maxPlays: { type: integer, minimum: 1 }
                         allowPause: { type: boolean }
                         allowSeek: { type: boolean }
                     questions:

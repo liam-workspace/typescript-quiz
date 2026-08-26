@@ -1343,7 +1343,51 @@ Section structure, rules and instructions. **No questions** — this is the scre
 
 **Interfaces:**
 
-- Produces: `loadTestBrief(db, slug): Promise<TestBriefRow | null>` matching the `TestBrief` schema.
+- Produces:
+
+  ```ts
+  export interface TestBriefRow {
+    id: string
+    slug: string
+    title: string
+    durationSeconds: number
+    // Per-student, which is why this query needs studentId.
+    attemptCount: number
+    inProgressAttemptId: string | null
+    sections: {
+      id: string
+      type: SectionType
+      title: string
+      ordinal: number
+      questionCount: number
+      durationSeconds: number
+      navigation: "free" | "forward_only"
+      allowAnswerChange: boolean
+      // Null where the section has no timed media.
+      playback: {
+        maxPlays: number | null
+        allowPause: boolean
+        allowSeek: boolean
+      } | null
+      instructions: string[]
+    }[]
+  }
+  export async function loadTestBrief(
+    db: PgQueryable,
+    input: { slug: string; studentId: string },
+  ): Promise<TestBriefRow | null>
+  ```
+
+  **The signature previously took only `slug`, and could not have worked.**
+  `TestBrief` requires `attemptCount` and `inProgressAttemptId`, both of which
+  are facts about THIS student's attempts on the test — the same per-student
+  standing `GET /tests` computes. Without `studentId` the query cannot produce
+  two of its own required fields. Resolve the student with
+  `findStudentBySubject` exactly as Task 7 does.
+
+  `attemptCount` comes from `count(*)`, which node-postgres returns as a
+  **string**; convert with `Number(...)` at the repository boundary and assert
+  `typeof` in the test. Same trap as Task 7.
 
 - [ ] **Step 1: Write the failing test, including the negative that matters**
 
@@ -1355,11 +1399,14 @@ it("404s for an unpublished slug", …)
 
 The second case must serialize the whole response and assert no question prompt from the fixture appears in it — `JSON.stringify(res.body)` and `expect(...).not.toContain(fixture.firstQuestionPrompt)`. Asserting the absence of a `questions` KEY is weaker: it passes against a payload that leaks prompts under some other name.
 
-- [ ] **Step 2–4:** run-fail, implement, run-pass, gates, commit.
+A fourth case, because `instructions` and `playback` are the fields most
+likely to be silently dropped by a join that returns no rows:
 
-```bash
-git commit -m "feat(server): serve the untimed test brief without questions"
+```ts
+it("carries each section's instructions in order and its playback rules", …)
 ```
+
+- [ ] **Step 2–4:** run-fail, implement, run-pass, gates.
 
 ---
 

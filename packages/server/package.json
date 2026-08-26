@@ -29,6 +29,7 @@
     "@testcontainers/postgresql": "^11.0.0",
     "@types/node": "^26.0.1",
     "@types/supertest": "^6.0.2",
+    "jose": "^6.0.0",
     "supertest": "^7.0.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.0"

@@ -8,6 +8,9 @@ jobs:
     name: Format, lint & test
     runs-on: ubuntu-latest
     if: github.actor != 'dependabot[bot]' || contains(github.event.pull_request.labels.*.name, 'javascript')
+    permissions:
+      contents: read
+      packages: read
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -26,6 +29,16 @@ jobs:
       # npm.pkg.github.com requires a token even for public packages, and
       # .npmrc reads it from NODE_AUTH_TOKEN. Without this the install of
       # @liam-workspace/platform fails 401 and every PR dies here.
+      #
+      # secrets.GITHUB_TOKEN is scoped to THIS repository, but
+      # @liam-workspace/platform is published from a different repository in
+      # the same account, so its package registry read is what actually
+      # authorizes the download -- not this repo's `permissions:` block
+      # alone. If install fails 403 (not 401) here, it means this
+      # repository has not been granted read access to that package: either
+      # add this repository under that package's "Manage Actions access"
+      # settings, or replace NODE_AUTH_TOKEN below with a PAT that has
+      # `read:packages` scope.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
         env:

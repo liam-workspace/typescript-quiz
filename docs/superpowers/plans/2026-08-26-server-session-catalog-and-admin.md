@@ -1637,15 +1637,45 @@ Multipart upload to `config.mediaRoot`, capped at `config.mediaMaxBytes` (`413` 
 
 Compute a SHA-256 checksum server-side; never trust a client-supplied one. Accepted kinds come from the `media_kind` enum — reuse it rather than restating the values, so the enum-parity guard keeps covering them.
 
-Write the file only after the row commits. A file on disk with no row is invisible garbage; a row with no file is a broken reference the export would happily emit.
+**The client-supplied `filename` must never reach the filesystem as a path.**
+It is attacker-controlled text: `../../etc/passwd`, `../main.js`, an absolute
+path, or a name with a NUL byte all escape `config.mediaRoot`, and this route
+is reachable by anyone holding an admin token. Derive the stored path from the
+`media_asset.id` (a `gen_random_uuid()`) plus an extension whitelisted from the
+`kind`, and keep the client's `filename` as **metadata only** — the column
+exists so an author recognises their file, not so the server can trust it.
+Resolve the final path and assert it is still inside `mediaRoot` before
+writing; a test must attempt a traversing filename and assert nothing is
+written outside the root.
 
-- [ ] **Step 2: Tests** — accepts an mp3 and returns its id; rejects an oversized file with 413; rejects a duplicate filename with 409; rejects a non-admin with 403.
+`/media` is served statically (plan 3 Task 4), so a stored file is content this
+origin will hand back. Pin the served `Content-Type` from the validated `kind`
+rather than echoing the upload's, and do not accept a `kind` the enum does not
+name — `media_kind` is `('audio', 'image')` and nothing else.
 
-- [ ] **Step 3–4:** implement, run, gates, commit.
+**Ordering — the previous instruction here contradicted its own reasoning.**
+It said "write the file only after the row commits", then explained that "a
+row with no file is a broken reference the export would happily emit". Row-
+first produces exactly that broken reference whenever the file write fails.
+Do it the other way round, coordinated by the transaction:
 
-```bash
-git commit -m "feat(server): accept media uploads with a server-computed checksum"
-```
+1. open a transaction and INSERT the row (the `UNIQUE (filename)` conflict
+   surfaces here as the `409`, before any bytes are written),
+2. stream the file to its resolved path,
+3. COMMIT.
+
+A failure at step 2 rolls back — no row, no file. A failure at step 3 leaves an
+orphaned file, which is invisible garbage and cleanable. The asymmetry is the
+point: an orphan file is harmless, a dangling row is a broken reference in
+every export.
+
+`byte_size` is `bigint`, so node-postgres returns it as a **string**. Convert
+with `Number(...)` at the repository boundary and assert `typeof` in the test,
+as with `attemptCount` in Tasks 7-8.
+
+- [ ] **Step 2: Tests** — accepts an mp3 and returns its id; rejects an oversized file with `413`; rejects a duplicate filename with `409`; rejects a non-admin with `403`; **admits an admin** (the positive case, without which a guard that refused everyone would pass all of the above); and **refuses a traversing filename**, asserting no file appears outside `mediaRoot`.
+
+- [ ] **Step 3–4:** implement, run, gates. Do not run `git add -A` and do not commit from a step.
 
 ---
 

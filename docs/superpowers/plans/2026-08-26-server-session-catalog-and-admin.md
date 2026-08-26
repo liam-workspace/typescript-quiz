@@ -822,7 +822,67 @@ Mount two probe controllers inside the test module — one behind `JwksGuard`, o
 Run: `pnpm --filter @pp/server test auth`
 Expected: FAIL — the guards do not exist.
 
-- [ ] **Step 4: Implement the guards**
+- [ ] **Step 4a: The injection token and the AuthModule**
+
+Neither of these had a step before, only a Files-block mention, and the
+AuthModule is where this task's whole testability seam lives.
+
+`packages/server/src/auth/tokens.ts`:
+
+```ts
+export const JWKS_VERIFIER = "JWKS_VERIFIER"
+```
+
+`packages/server/src/auth/auth.module.ts` — `@Global()`, so feature modules
+can use the guards without re-importing it and building a second verifier
+(which would mean a second JWKS cache):
+
+```ts
+import { Global, Module } from "@nestjs/common"
+import { createJwksVerifier } from "@liam-workspace/node-auth-server"
+import { loadServerConfig } from "../config.js"
+import { JWKS_VERIFIER } from "./tokens.js"
+
+@Global()
+@Module({
+  providers: [
+    {
+      provide: JWKS_VERIFIER,
+      useFactory: () =>
+        createJwksVerifier({ jwksUrl: loadServerConfig().jwksUrl }),
+    },
+  ],
+  exports: [JWKS_VERIFIER],
+})
+export class AuthModule {}
+```
+
+The test does NOT reach inside this factory. It overrides the whole
+`JWKS_VERIFIER` provider with its own `createJwksVerifier({ jwksUrl, fetchFn })`
+built on the in-process JWKS from Step 1. That is the seam — production reads a
+real URL over the network, tests inject `fetchFn` and never touch one.
+
+Import `AuthModule` in `AppModule`.
+
+- [ ] **Step 4b: Implement the guards**
+
+**Verified in 0.5.1's `dist/index.js` before writing this — read it before you
+change the guard.** `verify` **never throws**. For a missing or malformed
+`Bearer`, a non-RS256 alg, an unknown `kid`, a bad signature, an unparseable
+payload, or an expired token, it _returns_ `EMPTY` — a claims object whose
+every field is null/empty and whose `sub` is `null`.
+
+Two consequences:
+
+1. The `try/catch` below is effectively dead code. Keep it as a belt-and-braces
+   measure, but it is not what rejects bad tokens.
+2. **`if (!claims.sub)` is the ONLY load-bearing check.** Delete it — or
+   "simplify" the guard to rely on the catch — and every invalid, expired or
+   forged token is admitted as an anonymous user with `sub: null`. That is an
+   authentication bypass, not a style regression.
+
+Note also that `exp` is only enforced when it is a number, so a token minted
+without an `exp` never expires. Step 1's helper sets one; keep it.
 
 `packages/server/src/auth/jwks.guard.ts`:
 
@@ -874,8 +934,10 @@ Run: `pnpm --filter @pp/server test auth` → PASS, all four.
 
 ```bash
 pnpm lint && pnpm format && pnpm typecheck && pnpm test
-git add -A && git commit -m "feat(server): verify bearer tokens against JWKS and guard admin routes"
 ```
+
+Do NOT commit and do NOT run `git add`. Leave the work uncommitted; the
+reviewer stages by explicit path and writes the commit.
 
 ---
 

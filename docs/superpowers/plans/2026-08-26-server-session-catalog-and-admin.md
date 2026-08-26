@@ -1337,6 +1337,27 @@ Publication runs the cross-row checks column constraints cannot express, then ma
 **Interfaces:**
 
 - Consumes: `importTestDocument`, `exportTestDocument` (plan 1); `loadForScoring` via `@pp/db/scoring` (Task 5) for the export's answer key; `JOB_POOL`; `AdminGuard`.
+
+**Finish the boundary Task 5 started.** Task 5 fenced `loadForScoring` behind
+`@pp/db/scoring`, but `exportTestDocument` **also emits the answer key** —
+verified: `test-import.repository.ts:356` pushes `isCorrect` onto every choice,
+and the `TestDocument` schema requires it (`test-document.ts:13`). It is still
+reachable from `@pp/db`'s default barrel, so Task 5's own rationale — nothing
+stops a future student-facing route from importing it — applies to it just as
+much.
+
+`AdminGuard` protects the _route_; it does nothing about the _import_. Move
+both interchange functions behind an admin-only entry point (`@pp/db/admin`,
+or extend `@pp/db/scoring` if you would rather have one fenced surface), and
+extend `packages/db/test/boundary.test.ts` with a case asserting
+`exportTestDocument` is absent from the default barrel — mirroring the
+`loadForScoring` case, which is already proven to fail when the leak is
+reintroduced.
+
+Note `importTestDocument` is the write direction and carries no disclosure
+risk on its own, but it shares the module and the same admin-only lifecycle,
+so fence them together rather than splitting the pair.
+
 - Produces:
 
   ```ts

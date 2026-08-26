@@ -42,12 +42,18 @@ const questionSchema = z
     }
   })
 
+// `.min(1)` on the three text fields, and no `.nullable()` on maxPlays, both
+// keep ONE spelling of "absent". Export omits an empty column rather than
+// emitting "", and omits an inherited cap rather than emitting null, so
+// accepting either on import would make the round trip lossy. Note maxPlays
+// here means "inherit the section default when absent" -- a different meaning
+// from playbackSchema.maxPlays above, where null means "unlimited".
 const stimulusSchema = z.object({
   type: z.enum(["audio", "passage", "image", "mixed"]),
-  title: z.string().optional(),
-  bodyText: z.string().optional(),
-  mediaFilename: z.string().optional(),
-  maxPlays: z.number().int().positive().nullable().optional(),
+  title: z.string().min(1).optional(),
+  bodyText: z.string().min(1).optional(),
+  mediaFilename: z.string().min(1).optional(),
+  maxPlays: z.number().int().positive().optional(),
   allowPause: z.boolean().optional(),
   allowSeek: z.boolean().optional(),
 })
@@ -78,7 +84,6 @@ const sectionSchema = z
       }
 
       if (
-        st.maxPlays !== null &&
         st.maxPlays !== undefined &&
         s.playback.maxPlays !== null &&
         st.maxPlays > s.playback.maxPlays

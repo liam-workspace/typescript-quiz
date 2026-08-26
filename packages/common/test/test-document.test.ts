@@ -36,6 +36,42 @@ const valid = {
   ],
 }
 
+/**
+ * `valid` with its only stimulus (and optionally its only section playback)
+ * overridden. Returns `unknown` on purpose: these cases are about inputs the
+ * schema must REJECT, which by definition do not fit the parsed type.
+ */
+function docWith(
+  stimulus: Record<string, unknown>,
+  playback: Record<string, unknown> = {},
+): unknown {
+  const doc = structuredClone(valid)
+  const [section] = doc.sections
+  const [group] = section.groups
+
+  return {
+    ...doc,
+    sections: [
+      {
+        ...section,
+        playback: { ...section.playback, ...playback },
+        groups: [{ ...group, stimulus: { ...group.stimulus, ...stimulus } }],
+      },
+    ],
+  }
+}
+
+/** Dotted path of the first issue raised, for a document that must be rejected. */
+function firstIssuePath(input: unknown): string {
+  const result = testDocumentSchema.safeParse(input)
+
+  if (result.success) {
+    throw new Error("expected the document to be rejected, but it parsed")
+  }
+
+  return result.error.issues[0].path.map(String).join(".")
+}
+
 describe("testDocumentSchema", () => {
   it("accepts a well-formed document", () => {
     expect(testDocumentSchema.parse(valid).sections[0].instructions).toEqual([
@@ -68,5 +104,38 @@ describe("testDocumentSchema", () => {
     // Section default is 1.
     bad.sections[0].groups[0].stimulus.maxPlays = 3
     expect(() => testDocumentSchema.parse(bad)).toThrow(/tighten/i)
+  })
+
+  // "Absent" must have exactly one spelling, or the import/export round trip
+  // is not identity: export omits an empty text column rather than emitting
+  // "", and omits an inherited cap rather than emitting null.
+  it.each([
+    { field: "title", value: "" },
+    { field: "bodyText", value: "" },
+    { field: "mediaFilename", value: "" },
+  ])("rejects an empty-string stimulus $field", ({ field, value }) => {
+    expect(firstIssuePath(docWith({ [field]: value }))).toBe(
+      `sections.0.groups.0.stimulus.${field}`,
+    )
+  })
+
+  it("rejects an explicit null stimulus maxPlays", () => {
+    expect(firstIssuePath(docWith({ maxPlays: null }))).toBe(
+      "sections.0.groups.0.stimulus.maxPlays",
+    )
+  })
+
+  // The same key one level up keeps its null: on a section playback, null
+  // means "unlimited", which is a value, not an absence.
+  it("still accepts a null playback maxPlays on a section", () => {
+    const parsed = testDocumentSchema.parse(
+      docWith({ maxPlays: 3 }, { maxPlays: null }),
+    )
+
+    expect(parsed.sections[0].playback).toEqual({
+      maxPlays: null,
+      allowPause: false,
+      allowSeek: false,
+    })
   })
 })

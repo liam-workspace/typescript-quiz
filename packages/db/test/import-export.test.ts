@@ -71,6 +71,52 @@ const doc: TestDocument = testDocumentSchema.parse({
   ],
 })
 
+// Every optional stimulus field present at its boundary. An empty-string
+// title or an explicit `maxPlays: null` are deliberately NOT expressible:
+// the schema rejects both so that "absent" has exactly one spelling on
+// either side of the trip.
+const edgeDoc: TestDocument = testDocumentSchema.parse({
+  title: "E",
+  slug: "edge-case-01",
+  durationSeconds: 100,
+  sections: [
+    {
+      title: "S",
+      type: "listening",
+      durationSeconds: 100,
+      navigation: "free",
+      allowAnswerChange: true,
+      playback: { maxPlays: 1, allowPause: false, allowSeek: false },
+      instructions: [],
+      groups: [
+        {
+          stimulus: {
+            type: "mixed",
+            title: "T",
+            bodyText: "B",
+            mediaFilename: "edge.mp3",
+            maxPlays: 1,
+            allowPause: false,
+            allowSeek: false,
+          },
+          questions: [
+            {
+              questionKey: "q1",
+              prompt: "P?",
+              type: "single_choice",
+              points: 1,
+              choices: [
+                { label: "a", isCorrect: true },
+                { label: "b", isCorrect: false },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+})
+
 describe("import / export", () => {
   it("round-trips a document unchanged", async () => {
     await withDatabase(async (pool) => {
@@ -122,6 +168,65 @@ describe("import / export", () => {
       )
 
       expect(rows[0].published_at).toBeNull()
+    })
+  }, 120_000)
+
+  // The `doc` fixture above leaves most stimulus fields absent, so it cannot
+  // catch a field that is dropped on the way out. This one carries EVERY
+  // optional stimulus field at its boundary: one-character strings (the
+  // shortest the schema accepts), the smallest legal cap, and both playback
+  // booleans false. A `mixed` stimulus is used because it is the one type the
+  // database requires to carry body text AND a media asset at once.
+  it("round-trips a stimulus with every optional field at its boundary", async () => {
+    await withDatabase(async (pool) => {
+      await pool.query(
+        `INSERT INTO media_asset (kind, filename, mime_type, byte_size, checksum)
+         VALUES ('audio','edge.mp3','audio/mpeg',1,'feed')`,
+      )
+
+      const { versionId } = await importTestDocument(pool, edgeDoc)
+      const out = await exportTestDocument(pool, versionId)
+
+      expect(out).toEqual(edgeDoc)
+
+      // The other direction: re-importing what was exported must produce a
+      // document that exports identically, so the trip is stable and not
+      // merely equal once. The first draft has to go first -- a slug may
+      // hold only one unpublished version (test_version_one_draft) -- which
+      // is exactly the "import, spot a typo, import again" path.
+      const removed = await pool.query(`DELETE FROM test_version WHERE id=$1`, [
+        versionId,
+      ])
+      expect(removed.rowCount).toBe(1)
+
+      const again = await importTestDocument(pool, out)
+      expect(await exportTestDocument(pool, again.versionId)).toEqual(edgeDoc)
+    })
+  }, 120_000)
+
+  it("keeps the boundary stimulus's key set exactly", async () => {
+    await withDatabase(async (pool) => {
+      await pool.query(
+        `INSERT INTO media_asset (kind, filename, mime_type, byte_size, checksum)
+         VALUES ('audio','edge.mp3','audio/mpeg',1,'feed')`,
+      )
+
+      const { versionId } = await importTestDocument(pool, edgeDoc)
+      const out = await exportTestDocument(pool, versionId)
+      const [section] = out.sections
+      const [group] = section.groups
+      const { stimulus } = group
+
+      expect(stimulus).toBeDefined()
+      expect(Object.keys(stimulus ?? {}).sort()).toEqual([
+        "allowPause",
+        "allowSeek",
+        "bodyText",
+        "maxPlays",
+        "mediaFilename",
+        "title",
+        "type",
+      ])
     })
   }, 120_000)
 })

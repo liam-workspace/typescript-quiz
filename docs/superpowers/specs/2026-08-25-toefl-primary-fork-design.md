@@ -177,10 +177,14 @@ single structural change that makes the app suitable for language exams.
 **A published `test_version` is immutable.** Attempts pin a version, so editing
 a test can never move a score already recorded. Enforced by triggers.
 
-**Nothing may cross a version boundary.** Every content and attempt table
-carries `test_version_id` and every parent link is a composite foreign key
-including it, so an answer to a question from a different version is
-unrepresentable. A plain single-column FK would accept one.
+**Nothing may cross a version boundary.** Every content and attempt row is
+fenced to exactly one `test_version` — most tables carry `test_version_id`
+directly and link to their parent through a composite foreign key including
+it; the leaf tables (`choice`, `question_tag`, `section_instruction`,
+`response_client_cursor`, `response_choice`) inherit the fence through a
+composite key to a parent that carries one. Either way an answer to a question
+from a different version is unrepresentable. A plain single-column FK would
+accept one.
 
 Both are proven by `docs/db/invariants.test.sql`, not merely asserted.
 

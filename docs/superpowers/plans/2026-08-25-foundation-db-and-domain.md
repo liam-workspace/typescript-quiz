@@ -2598,9 +2598,10 @@ export function createJobPool(cfg: DbConfig): pg.Pool {
 ```ts
 /**
  * Re-exported so no other package imports @liam-workspace/platform for a clock.
- * Service code takes a Clock; nothing calls new Date() or Date.now() directly.
- * Every deadline in this app is server-authoritative, and createFixedClock is
- * what turns an expiry test into an assertion rather than a 50-minute sleep.
+ * Service code takes a Clock; nothing here constructs a date or reads the wall
+ * clock directly. Every deadline in this app is server-authoritative, and
+ * createFixedClock is what turns an expiry test into an assertion rather than a
+ * 50-minute sleep.
  */
 export {
   type Clock,
@@ -2670,7 +2671,7 @@ git commit -m "feat(db): two-pool connection policy, env config, and the Clock s
 - [ ] No SQL outside `packages/db/src/`.
 - [ ] No new code under `@razzia/*`.
 - [ ] No hand-rolled pool, logger, env parser or clock — each comes from `~/projects/typescript-libraries`. Any decline is recorded in `docs/architecture/library-adoption.md`.
-- [ ] No `new Date()` or `Date.now()` outside `systemClock`. Check with `grep -rn "new Date()\|Date.now()" packages/*/src` — expect no hits.
+- [ ] No `new Date()` or `Date.now()` outside `systemClock`. Check with `grep -rn "new Date()\|Date.now()" packages/common/src packages/db/src` — expect no hits. (The two live packages by name, not `packages/*/src`: the latter also sweeps `packages/socket`, the old Razzia app this plan deliberately leaves untouched and out of the workspace.)
 
 ## What this plan deliberately does not do
 

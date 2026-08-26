@@ -1,6 +1,13 @@
 import { type DbConfig, loadDbConfig } from "./config.js"
 import { createJobPool, createRequestPool } from "./pool.js"
 import {
+  finalizeExpiredAttempt,
+  loadOwnedAttempt,
+  loadRunningOwnedAttempt,
+  type AttemptRow,
+  type FinalizedAttemptRow,
+} from "./repositories/attempt.repository.js"
+import {
   InvalidCursorError,
   listPublishedTests,
   loadTestBrief,
@@ -31,6 +38,8 @@ export type {
   TestCardRow,
 }
 
+export type { AttemptRow, FinalizedAttemptRow }
+
 export {
   loadDbConfig,
   createJobPool,
@@ -41,4 +50,7 @@ export {
   listPublishedTests,
   loadTestBrief,
   InvalidCursorError,
+  loadOwnedAttempt,
+  finalizeExpiredAttempt,
+  loadRunningOwnedAttempt,
 }

@@ -77,7 +77,7 @@ when the parsed body is empty, exactly as their rescue filter does.
 | `@liam-public/browser-logger`               | Scoped levels with remote forwarding.                                                                                                |
 | `@liam-public/browser-telemetry`            | W3C `traceparent` propagation browser → backend, plus Core Web Vitals.                                                               |
 | `@liam-public/vite-preset-pwa`              | Offline app-shell, `NetworkFirst` API caching, standalone manifest.                                                                  |
-| `@liam-public/i18n`                         | `MultilingualText`, `translate` across the seven locales.                                                                            |
+| `@liam-public/i18n`                         | `MultilingualText`, `translate` across the six locales.                                                                              |
 | `@liam-public/text`                         | `formatPercentage`, `formatNumber`, `selectText` for scores and dates.                                                               |
 | `@liam-public/http-client`                  | Universal fetch client under `auth-fetch`.                                                                                           |
 
@@ -103,12 +103,12 @@ than an investigation.
 
 ## Adopted — tooling (plan 1, CI gates)
 
-| Package                            | Used for                                                                                       |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `@liam-public/node-frontend-lint`  | Audits the layered React frontend: stateless components, one-way imports.                      |
-| `@liam-public/node-i18n-lint`      | Detects hardcoded untranslated strings in TSX. With seven locales, the failure mode is silent. |
-| `@liam-public/node-dev-tools`      | Git / Docker / release workflow utilities for `scripts/`.                                      |
-| `@liam-public/node-slack-notifier` | Ops alert on a `failed_write` spike. A capture nobody looks at is a log, not a safety net.     |
+| Package                            | Used for                                                                                     |
+| ---------------------------------- | -------------------------------------------------------------------------------------------- |
+| `@liam-public/node-frontend-lint`  | Audits the layered React frontend: stateless components, one-way imports.                    |
+| `@liam-public/node-i18n-lint`      | Detects hardcoded untranslated strings in TSX. With six locales, the failure mode is silent. |
+| `@liam-public/node-dev-tools`      | Git / Docker / release workflow utilities for `scripts/`.                                    |
+| `@liam-public/node-slack-notifier` | Ops alert on a `failed_write` spike. A capture nobody looks at is a log, not a safety net.   |
 
 ## Adopted later — the admin spec
 

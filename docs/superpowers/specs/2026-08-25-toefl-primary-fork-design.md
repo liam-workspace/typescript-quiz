@@ -94,7 +94,7 @@ the collapsible drawer the prototype draws by hand. Copying Razzia's
 
 What is still worth harvesting from `packages/web` is the parts the kit does
 not cover: `vite.config.ts`, the tsconfigs, the TanStack router plugin,
-`i18n.ts` with all seven locale trees, `QuestionMedia.tsx` and `branding.ts`.
+`i18n.ts` with all six locale trees (de, en, es, fr, it, ja), `QuestionMedia.tsx` and `branding.ts`.
 Left behind: `features/game/**`, the Zustand game stores, the socket context,
 `PinInput`, `qrcode.react`, `react-confetti`, `use-sound`.
 

@@ -3,7 +3,7 @@ exports.shorthands = undefined
 
 exports.up = (pgm) => {
   pgm.sql(`
--- docs/db/schema.sql lines 528-753, verbatim
+-- docs/db/schema.sql lines 544-769, verbatim
 --  DURABILITY
 -- =====================================================================
 

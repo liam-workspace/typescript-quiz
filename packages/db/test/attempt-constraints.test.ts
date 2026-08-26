@@ -188,4 +188,127 @@ describe("migration 1002 — attempts", () => {
       ).rejects.toThrow(/attempt_section_counts_reconcile/)
     })
   }, 120_000)
+
+  // Same widening, second of the three columns the arithmetic never
+  // mentions: all five OTHER columns present and valid, points_possible
+  // alone omitted.
+  it("refuses a completed section missing points_possible", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      await newAttempt(pool, f, "f0000000-0000-0000-0000-000000000001")
+      await expect(
+        pool.query(
+          `INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id,
+                                        expires_at, completed_at,
+                                        points_earned, answered_count,
+                                        unanswered_count, correct_count, incorrect_count)
+           VALUES ('f0000000-0000-0000-0000-000000000001',$1,$2,
+                   now()+interval '25 min', now(), 1, 1, 0, 1, 0)`,
+          [f.listeningSectionId, f.versionId],
+        ),
+      ).rejects.toThrow(/attempt_section_counts_reconcile/)
+    })
+  }, 120_000)
+
+  // Third of the three: all five OTHER columns present and valid,
+  // unanswered_count alone omitted.
+  it("refuses a completed section missing unanswered_count", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      await newAttempt(pool, f, "f0000000-0000-0000-0000-000000000001")
+      await expect(
+        pool.query(
+          `INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id,
+                                        expires_at, completed_at,
+                                        points_earned, points_possible, answered_count,
+                                        correct_count, incorrect_count)
+           VALUES ('f0000000-0000-0000-0000-000000000001',$1,$2,
+                   now()+interval '25 min', now(), 1, 2, 1, 1, 0)`,
+          [f.listeningSectionId, f.versionId],
+        ),
+      ).rejects.toThrow(/attempt_section_counts_reconcile/)
+    })
+  }, 120_000)
+
+  // Guard attempt_section_running_is_ungraded: the fail-open shape F12/F13
+  // already cost this branch two findings, one table over. An OPEN section
+  // (completed_at IS NULL) must carry no numbers at all -- before this
+  // constraint existed, correct_count=9/incorrect_count=9/answered_count=1
+  // on a section nobody had finished was accepted (verified).
+  it("refuses an open section carrying counts", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      await newAttempt(pool, f, "f0000000-0000-0000-0000-000000000001")
+      await expect(
+        pool.query(
+          `INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id,
+                                        expires_at, correct_count, incorrect_count, answered_count)
+           VALUES ('f0000000-0000-0000-0000-000000000001',$1,$2,
+                   now()+interval '25 min', 9, 9, 1)`,
+          [f.listeningSectionId, f.versionId],
+        ),
+      ).rejects.toThrow(/attempt_section_running_is_ungraded/)
+    })
+  }, 120_000)
+
+  it("accepts an open section carrying no counts", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      await newAttempt(pool, f, "f0000000-0000-0000-0000-000000000001")
+      await pool.query(
+        `INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id, expires_at)
+         VALUES ('f0000000-0000-0000-0000-000000000001',$1,$2, now()+interval '25 min')`,
+        [f.listeningSectionId, f.versionId],
+      )
+
+      const { rows } = await pool.query<{ correct_count: number | null }>(
+        `SELECT correct_count FROM attempt_section
+          WHERE attempt_id='f0000000-0000-0000-0000-000000000001'`,
+      )
+      expect(rows[0].correct_count).toBeNull()
+    })
+  }, 120_000)
+
+  // Guard attempt_section_points_sane: a completed section's points_earned
+  // must fall within [0, points_possible] -- mirrors attempt_points_sane on
+  // the attempt table, one table over.
+  it("refuses a completed section with points_earned over points_possible", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      await newAttempt(pool, f, "f0000000-0000-0000-0000-000000000001")
+      await expect(
+        pool.query(
+          `INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id,
+                                        expires_at, completed_at,
+                                        points_earned, points_possible, answered_count,
+                                        unanswered_count, correct_count, incorrect_count)
+           VALUES ('f0000000-0000-0000-0000-000000000001',$1,$2,
+                   now()+interval '25 min', now(), 5, 2, 1, 0, 1, 0)`,
+          [f.listeningSectionId, f.versionId],
+        ),
+      ).rejects.toThrow(/attempt_section_points_sane/)
+    })
+  }, 120_000)
+
+  it("accepts a completed section with points_earned within range", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      await newAttempt(pool, f, "f0000000-0000-0000-0000-000000000001")
+      await pool.query(
+        `INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id,
+                                      expires_at, completed_at,
+                                      points_earned, points_possible, answered_count,
+                                      unanswered_count, correct_count, incorrect_count)
+         VALUES ('f0000000-0000-0000-0000-000000000001',$1,$2,
+                 now()+interval '25 min', now(), 2, 2, 1, 0, 1, 0)`,
+        [f.listeningSectionId, f.versionId],
+      )
+
+      const { rows } = await pool.query<{ points_earned: number }>(
+        `SELECT points_earned FROM attempt_section
+          WHERE attempt_id='f0000000-0000-0000-0000-000000000001'`,
+      )
+      expect(rows[0].points_earned).toBe(2)
+    })
+  }, 120_000)
 })

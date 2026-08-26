@@ -3,7 +3,7 @@ exports.shorthands = undefined
 
 exports.up = (pgm) => {
   pgm.sql(`
--- docs/db/schema.sql lines 286-526, verbatim
+-- docs/db/schema.sql lines 286-542, verbatim
 --  ATTEMPTS
 -- =====================================================================
 
@@ -147,6 +147,22 @@ CREATE TABLE attempt_section (
             AND correct_count IS NOT NULL AND incorrect_count IS NOT NULL
             AND correct_count + incorrect_count = answered_count
         )
+    ),
+    -- The pair above guards a COMPLETED section's breakdown; these two guard
+    -- the OPEN side, mirroring attempt_running_is_ungraded and
+    -- attempt_points_sane on the attempt table. Without them an open
+    -- attempt_section (completed_at IS NULL) could carry any numbers at all
+    -- -- verified accepted before this pair existed: correct_count=9,
+    -- incorrect_count=9, answered_count=1 on a section nobody has finished.
+    CONSTRAINT attempt_section_running_is_ungraded CHECK (
+        completed_at IS NOT NULL OR (
+            points_earned IS NULL AND points_possible IS NULL
+            AND answered_count IS NULL AND unanswered_count IS NULL
+            AND correct_count IS NULL AND incorrect_count IS NULL
+        )
+    ),
+    CONSTRAINT attempt_section_points_sane CHECK (
+        completed_at IS NULL OR (points_earned BETWEEN 0 AND points_possible)
     )
 );
 

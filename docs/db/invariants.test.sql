@@ -65,6 +65,9 @@ VALUES ('f0000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-00000000
 \echo '--- 7b SECOND open section MUST FAIL'
 INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id, expires_at)
 VALUES ('f0000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-000000000003','a0000000-0000-0000-0000-000000000002',now()+interval '25 min');
+\echo '--- 7c open section carrying counts MUST FAIL'
+UPDATE attempt_section SET correct_count=9, incorrect_count=9, answered_count=1
+ WHERE attempt_id='f0000000-0000-0000-0000-000000000001' AND test_section_id='b0000000-0000-0000-0000-000000000002';
 \echo '--- 8 expired attempt not pinned to deadline MUST FAIL'
 UPDATE attempt SET status='expired', submitted_at=now()+interval '99 min',
   points_earned=1,points_possible=2,percentage=50,answered_count=1,unanswered_count=1,
@@ -83,11 +86,22 @@ VALUES ('f0000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-00000000
 INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id, expires_at, completed_at,
                              points_possible, answered_count, unanswered_count, correct_count, incorrect_count)
 VALUES ('f0000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-000000000003','a0000000-0000-0000-0000-000000000002',now()+interval '25 min',now(),2,1,0,1,0);
-\echo '--- 11c completed section with the whole breakdown MUST SUCCEED'
+\echo '--- 11c completed section missing points_possible MUST FAIL'
+INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id, expires_at, completed_at,
+                             points_earned, answered_count, unanswered_count, correct_count, incorrect_count)
+VALUES ('f0000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-000000000003','a0000000-0000-0000-0000-000000000002',now()+interval '25 min',now(),1,1,0,1,0);
+\echo '--- 11d completed section missing unanswered_count MUST FAIL'
+INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id, expires_at, completed_at,
+                             points_earned, points_possible, answered_count, correct_count, incorrect_count)
+VALUES ('f0000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-000000000003','a0000000-0000-0000-0000-000000000002',now()+interval '25 min',now(),1,2,1,1,0);
+\echo '--- 11e completed section with the whole breakdown MUST SUCCEED'
 INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id, expires_at, completed_at,
                              points_earned, points_possible, answered_count, unanswered_count,
                              correct_count, incorrect_count)
 VALUES ('f0000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-000000000003','a0000000-0000-0000-0000-000000000002',now()+interval '25 min',now(),1,2,1,0,1,0);
+\echo '--- 11f completed section with points_earned over points_possible MUST FAIL'
+UPDATE attempt_section SET points_earned=5
+ WHERE attempt_id='f0000000-0000-0000-0000-000000000001' AND test_section_id='b0000000-0000-0000-0000-000000000003';
 \echo '--- 12 publication violations on a NEW draft'
 INSERT INTO test_version (id, test_id, version, title, duration_seconds)
 VALUES ('a0000000-0000-0000-0000-000000000003','22222222-2222-2222-2222-222222222222',3,'T04 draft',9999);

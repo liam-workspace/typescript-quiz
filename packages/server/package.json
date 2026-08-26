@@ -1,0 +1,36 @@
+{
+  "name": "@pp/server",
+  "type": "module",
+  "private": true,
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@liam-public/node-config": "^0.1.0",
+    "@liam-public/node-logger": "^0.1.0",
+    "@liam-public/node-nest-common": "^0.1.1",
+    "@liam-public/node-postgres": "^0.3.1",
+    "@liam-workspace/node-auth-server": "^0.5.1",
+    "@liam-workspace/platform": "^0.1.0",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "@pp/common": "workspace:*",
+    "@pp/db": "workspace:*",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^11.0.0",
+    "@testcontainers/postgresql": "^11.0.0",
+    "@types/node": "^26.0.1",
+    "@types/supertest": "^6.0.2",
+    "supertest": "^7.0.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.0"
+  }
+}

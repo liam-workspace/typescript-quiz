@@ -8,6 +8,7 @@
 packages:
   - "packages/common"
   - "packages/db"
+  - "packages/server"
 
 allowBuilds:
   cpu-features: true

@@ -26,7 +26,7 @@
   - `@liam-public/node-postgres` `^0.3.1`
   - `@liam-workspace/platform` `^0.1.0`
 - **Never add a dependency without checking `docs/architecture/library-adoption.md` first.** Six packages are declined there with reasons; `@liam-public/node-nest-cache` (Redis) and `@liam-public/node-drizzle-postgres` are both out of scope for v1.
-- **All four gates pass before every commit:** `pnpm lint`, `pnpm format`, `pnpm -r exec tsc --noEmit`, `pnpm test`. Run `pnpm test` only from the repo root and never concurrently with another test process — the db suite shares one Testcontainers `globalSetup`.
+- **All four gates pass before every commit:** `pnpm lint`, `pnpm format`, `pnpm typecheck`, `pnpm test`. `typecheck` is `pnpm build && pnpm -r exec tsc --noEmit` — the build is a PREREQUISITE, not a convenience: after Task 1 the packages typecheck against each other's `dist/*.d.ts`, which does not exist on a clean checkout until something builds it. Task 1 adds the script. Run `pnpm test` only from the repo root and never concurrently with another test process — the db suite shares one Testcontainers `globalSetup`.
 - **`docs/api/openapi.yaml` is the contract.** A response shape that disagrees with it is a defect in the code, not in the spec, unless this plan says otherwise in so many words. `redocly lint docs/api/openapi.yaml` must stay clean if you touch it.
 - **`docs/db/schema.sql` is the schema authority** and `packages/db/migrations/*.cjs` are its transcription; they are currently byte-identical over the ranges named in each migration's header. Change one, change the other, and preserve `schema.sql`'s line count or re-anchor every header pointer.
 - **oxlint `no-duplicate-imports` fires per additional import/export STATEMENT naming a source, not per specifier.** Curating a module's exports has exactly one clean shape here: a single merged `import { … } from "src"`, then `export type { … }` / `export { … }` with NO trailing `from`.
@@ -197,8 +197,11 @@ In the root `package.json`:
 
 ```json
     "build": "pnpm --filter @pp/common build && pnpm --filter @pp/db build",
+    "typecheck": "pnpm build && pnpm -r exec tsc --noEmit",
     "test": "pnpm build && pnpm --filter @pp/common test && pnpm --filter @pp/db test",
 ```
+
+`typecheck` builds first for the same reason `test` does. Once Step 7 removes the root `paths` mapping, `@pp/db` resolves `@pp/common` through its manifest to `dist/index.d.ts` — so a bare `tsc --noEmit` on a clean checkout fails with "Cannot find module '@pp/common'" before it checks a single line of your code.
 
 The build is part of `test` because Task 1's loadability test asserts against `dist/`; without it the test would pass or fail on whatever was built last.
 
@@ -223,7 +226,7 @@ Then add to `loadable.test.ts` a case that runs `migrateToLatest` against the te
 - [ ] **Step 10: Gates and commit**
 
 ```bash
-pnpm lint && pnpm format && pnpm -r exec tsc --noEmit && pnpm test
+pnpm lint && pnpm format && pnpm typecheck && pnpm test
 git add -A
 git commit -m "build: emit dist so Node can load @pp/common and @pp/db"
 ```
@@ -517,7 +520,7 @@ Expected: PASS.
 - [ ] **Step 8: Gates and commit**
 
 ```bash
-pnpm lint && pnpm format && pnpm -r exec tsc --noEmit && pnpm test
+pnpm lint && pnpm format && pnpm typecheck && pnpm test
 git add -A
 git commit -m "feat(server): scaffold NestJS with config, health and lint overrides"
 ```
@@ -698,7 +701,7 @@ Run: `pnpm --filter @pp/server test`
 Expected: PASS — both pool names present, `pp_migrations` populated.
 
 ```bash
-pnpm lint && pnpm format && pnpm -r exec tsc --noEmit && pnpm test
+pnpm lint && pnpm format && pnpm typecheck && pnpm test
 git add -A && git commit -m "feat(server): gate boot on the database and provide both pools"
 ```
 
@@ -837,7 +840,7 @@ export class JwksGuard implements CanActivate {
 Run: `pnpm --filter @pp/server test auth` → PASS, all four.
 
 ```bash
-pnpm lint && pnpm format && pnpm -r exec tsc --noEmit && pnpm test
+pnpm lint && pnpm format && pnpm typecheck && pnpm test
 git add -A && git commit -m "feat(server): verify bearer tokens against JWKS and guard admin routes"
 ```
 
@@ -899,7 +902,7 @@ Same shape for `@pp/common`.
 - [ ] **Step 4: Run, gates, commit**
 
 ```bash
-pnpm lint && pnpm format && pnpm -r exec tsc --noEmit && pnpm test
+pnpm lint && pnpm format && pnpm typecheck && pnpm test
 git add -A && git commit -m "refactor: put the answer key behind its own entry point"
 ```
 
@@ -1005,7 +1008,7 @@ The third case must assert `expect(res.body).not.toHaveProperty("created")` — 
 - [ ] **Step 7: Run, gates, commit**
 
 ```bash
-pnpm lint && pnpm format && pnpm -r exec tsc --noEmit && pnpm test
+pnpm lint && pnpm format && pnpm typecheck && pnpm test
 git add -A && git commit -m "feat(server): provision the student profile from verified claims"
 ```
 
@@ -1362,7 +1365,7 @@ git commit -m "build: ship the server image and give compose a runnable api serv
 
 ## Definition of Done
 
-- [ ] `pnpm lint`, `pnpm format`, `pnpm -r exec tsc --noEmit`, `pnpm test` all exit 0
+- [ ] `pnpm lint`, `pnpm format`, `pnpm typecheck`, `pnpm test` all exit 0
 - [ ] `redocly lint docs/api/openapi.yaml` clean
 - [ ] `docker compose build api` succeeds and `GET /health` answers from the running container
 - [ ] `grep -rn "new Date()\|Date\.now()" packages/{common,db,server}/src` reports only comments, never a call

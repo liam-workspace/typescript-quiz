@@ -240,7 +240,7 @@ The lint configuration is part of this task, not a separate one: five oxlint rul
 **Files:**
 
 - Create: `packages/server/package.json`, `packages/server/tsconfig.json`
-- Create: `packages/server/vitest.config.ts` and `packages/server/test/helpers/global-setup.ts` (see Step 3b — the server suite needs its own container from its first test, not from Task 3)
+- Create: `packages/server/vitest.config.ts` (no globalSetup — Task 3 adds the container, see Step 3b)
 - Create: `packages/server/src/main.ts`, `src/app.module.ts`, `src/config.ts`
 - Create: `packages/server/src/health/health.controller.ts`, `src/health/health.module.ts`
 - Create: `packages/server/test/health.e2e.test.ts`
@@ -344,11 +344,7 @@ Append to the existing `overrides` array in `oxlint.config.ts`:
 
 `experimentalDecorators` and `emitDecoratorMetadata` are what make Nest's constructor injection resolve at runtime. Without the second, every injected provider arrives `undefined` with no error at build time.
 
-- [ ] **Step 3b: Give the server suite its own PostgreSQL container**
-
-`@pp/db` starts one container per `vitest run` via a `globalSetup` and publishes its URL with `provide`/`inject`. The server package is a separate vitest project, so it needs the same arrangement — copy the pattern, do not import across packages.
-
-`packages/server/test/helpers/global-setup.ts` mirrors `packages/db/test/helpers/global-setup.ts`: start one `postgres:16-alpine` testcontainer, `provide("postgresConnectionUri", uri)`, stop it on teardown.
+- [ ] **Step 3b: A vitest config with NO database container**
 
 `packages/server/vitest.config.ts`:
 
@@ -356,14 +352,6 @@ Append to the existing `overrides` array in `oxlint.config.ts`:
 import { defineConfig } from "vitest/config"
 
 export default defineConfig({
-  test: {
-    // One container for the whole run, mirroring @pp/db. Files run one at a
-    // time because they share that container's `public` schema and each
-    // resets it -- two files at once race on DROP SCHEMA and the migrations
-    // lock. Tests within a file already run sequentially.
-    globalSetup: ["./test/helpers/global-setup.ts"],
-    fileParallelism: false,
-  },
   resolve: {
     alias: {
       "@pp/common": new URL("../common/src/index.ts", import.meta.url).pathname,
@@ -373,7 +361,9 @@ export default defineConfig({
 })
 ```
 
-The health test in Step 4 does not touch the database, so it passes with or without this. Set it up here anyway: Task 3's first test needs it, and a container appearing halfway through a plan is how the plan-1 harness singleton bug got in.
+No `globalSetup` here on purpose. This task's only test mounts `HealthModule` alone and never touches Postgres, so starting a container for it would make the task unverifiable anywhere Docker is unavailable — for no benefit. **Task 3 adds the container**, because Task 3 is where database access arrives.
+
+The aliases keep the inner test loop resolving `@pp/common`/`@pp/db` from `src`, matching what Task 1 did for the other two packages.
 
 - [ ] **Step 3c: Register the package in the workspace NOW, before any test step**
 
@@ -543,7 +533,8 @@ Spec §2 Deployment: `waitForDatabase` gates API boot so ordering is not a compo
 - Create: `packages/server/src/database/database.module.ts`, `src/database/tokens.ts`
 - Create: `packages/server/test/helpers/app.ts` (shared e2e harness — every later task uses it)
 - Create: `packages/server/test/database.e2e.test.ts`
-- Modify: `packages/server/vitest.config.ts` (created in Task 2 — do NOT create it again)
+- Create: `packages/server/test/helpers/global-setup.ts` — one PostgreSQL 16 Testcontainer per `vitest run`, publishing its URI via `project.provide("postgresConnectionUri", …)`. Mirror `packages/db/test/helpers/global-setup.ts`; do not import across packages.
+- Modify: `packages/server/vitest.config.ts` (created in Task 2 — do NOT create it again). Add `globalSetup: ["./test/helpers/global-setup.ts"]` and `fileParallelism: false`, keeping the existing `resolve.alias` block. Task 2 deliberately shipped it without a container because its health test needs no database; this task is where database access arrives, so this is where the container belongs. `fileParallelism: false` is load-bearing: files share the container's `public` schema and each resets it, so two at once race on `DROP SCHEMA` and the migrations lock.
 - Modify: `packages/server/src/main.ts`, `src/app.module.ts`
 
 **Interfaces:**

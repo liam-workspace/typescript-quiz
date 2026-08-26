@@ -307,6 +307,8 @@ Append to the existing `overrides` array in `oxlint.config.ts`:
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@nestjs/testing": "^11.0.0",
+    "@testcontainers/postgresql": "^11.0.0",
     "@types/node": "^26.0.1",
     "@types/supertest": "^6.0.2",
     "supertest": "^7.0.0",
@@ -372,6 +374,12 @@ export default defineConfig({
 ```
 
 The health test in Step 4 does not touch the database, so it passes with or without this. Set it up here anyway: Task 3's first test needs it, and a container appearing halfway through a plan is how the plan-1 harness singleton bug got in.
+
+- [ ] **Step 3c: Register the package in the workspace NOW, before any test step**
+
+Add `- "packages/server"` to `pnpm-workspace.yaml`, then `pnpm install`.
+
+This comes BEFORE the red-first step on purpose. `pnpm --filter @pp/server test` against a package that is not a workspace member does not fail — it prints "No projects matched the filters" and **exits 0**. A run-to-verify-it-fails step that cannot fail is worse than no step at all, because it manufactures confidence exactly where the safeguard was meant to be.
 
 - [ ] **Step 4: Write the failing health test**
 
@@ -506,12 +514,11 @@ await bootstrap()
 
 Database gating is deliberately absent here — Task 3 adds it, with a test.
 
-- [ ] **Step 7: Register the package and re-run**
+- [ ] **Step 7: Wire the root scripts and re-run**
 
-Add `- "packages/server"` to `pnpm-workspace.yaml`. Extend the root `build` and `test` scripts to include `@pp/server`. Then:
+The package is already a workspace member (Step 3c). Extend the root `build` and `test` scripts to include `@pp/server`, keeping the order `common` → `db` → `server` — each builds against the previous one's `dist`. Then:
 
 ```bash
-pnpm install
 pnpm --filter @pp/server test
 ```
 

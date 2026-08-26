@@ -806,14 +806,21 @@ Confirm how 0.5.1 derives `isAdmin` from a token before trusting `roles: ["admin
 
 - [ ] **Step 2: Write the failing auth test**
 
-`packages/server/test/auth.e2e.test.ts` — four cases, each of which must be able to fail:
+`packages/server/test/auth.e2e.test.ts` — five cases, each of which must be able to fail:
 
 ```ts
 it("rejects a request with no Authorization header", …)      // 401
 it("rejects a token signed by a different key", …)           // 401
 it("admits a valid token and exposes its sub", …)            // 200, body.sub matches
 it("refuses a non-admin on an admin route", …)               // 403
+it("admits an admin on an admin route", …)                   // 200
 ```
+
+The fifth case is not symmetry for its own sake. Without it the suite is
+401/401/200/403 and **nothing asserts an admin is admitted**, so an AdminGuard
+that refuses everyone passes all four — verified by mutation. Tasks 10–12 add
+the real admin routes, so that failure would be an admin lockout discovered in
+production. Bracket the guard in both directions.
 
 Mount two probe controllers inside the test module — one behind `JwksGuard`, one behind both guards — rather than depending on a feature route that does not exist yet.
 

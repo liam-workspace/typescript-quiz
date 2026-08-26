@@ -1,6 +1,6 @@
 import { asChoiceId, asQuestionId } from "@pp/common"
 import { scoreAttempt, type RecordedAnswer } from "@pp/common/scoring"
-import type { PgQueryable } from "@liam-public/node-postgres"
+import { withTransaction, type PgQueryable } from "@liam-public/node-postgres"
 import type pg from "pg"
 import { loadForScoring } from "../scoring.js"
 
@@ -217,4 +217,158 @@ export async function loadRunningOwnedAttempt(
   })
 
   return { attempt: null, finalized }
+}
+
+/** Thrown when a slug has no published version -- the caller maps this to 404. */
+export class TestNotFoundError extends Error {}
+
+export interface StartResult {
+  attempt: {
+    id: string
+    attemptNumber: number
+    createdAt: Date
+    startedAt: Date | null
+    expiresAt: Date | null
+    currentSectionId: string | null
+    currentQuestionId: string | null
+  }
+  resumed: boolean
+  finalizedPriorAttempt: { id: string; submittedAt: Date } | null
+}
+
+interface AttemptStartRow {
+  id: string
+  created_at: Date
+  started_at: Date | null
+  expires_at: Date | null
+  current_section_id: string | null
+  current_question_id: string | null
+}
+
+function toStartAttempt(
+  row: AttemptStartRow,
+  attemptNumber: number,
+): StartResult["attempt"] {
+  return {
+    id: row.id,
+    attemptNumber,
+    createdAt: row.created_at,
+    startedAt: row.started_at,
+    expiresAt: row.expires_at,
+    currentSectionId: row.current_section_id,
+    currentQuestionId: row.current_question_id,
+  }
+}
+
+async function countAttempts(
+  db: PgQueryable,
+  input: { studentId: string; versionId: string },
+): Promise<number> {
+  const { rows } = await db.query<{ count: string }>(
+    `SELECT count(*) AS count FROM attempt WHERE student_id = $1 AND test_version_id = $2`,
+    [input.studentId, input.versionId],
+  )
+  const [row] = rows
+
+  return Number(row.count)
+}
+
+/**
+ * One endpoint, three behaviours (spec §4): resume a live attempt,
+ * finalize a stale one and start fresh in its place, or start fresh with
+ * nothing to replace. The finalize-then-create step runs in one
+ * transaction with the read that decided it needed to happen: splitting
+ * them would leave a window with no in-progress attempt for this
+ * (student, version), and a concurrent Start could create a second new
+ * attempt in that gap. `attempt_one_active` (a partial unique index on
+ * `status = 'in_progress'`) is the backstop the controller relies on for
+ * the remaining race -- two callers reaching this function at once.
+ */
+export async function startOrResumeAttempt(
+  db: PgQueryable,
+  input: { studentId: string; slug: string; now: Date },
+): Promise<StartResult> {
+  const { rows: versionRows } = await db.query<{ version_id: string }>(
+    `SELECT tv.id AS version_id
+       FROM test t
+       JOIN test_version tv ON tv.id = t.current_version_id AND tv.published_at IS NOT NULL
+      WHERE t.slug = $1`,
+    [input.slug],
+  )
+
+  if (versionRows.length === 0) {
+    throw new TestNotFoundError(input.slug)
+  }
+
+  const [{ version_id: versionId }] = versionRows
+
+  return withTransaction(db as pg.Pool, (tx) =>
+    startOrResumeInTransaction(tx, {
+      studentId: input.studentId,
+      versionId,
+      now: input.now,
+    }),
+  )
+}
+
+async function startOrResumeInTransaction(
+  tx: PgQueryable,
+  input: { studentId: string; versionId: string; now: Date },
+): Promise<StartResult> {
+  const { rows: activeRows } = await tx.query<AttemptStartRow>(
+    `SELECT id, created_at, started_at, expires_at, current_section_id, current_question_id
+       FROM attempt
+      WHERE student_id = $1 AND test_version_id = $2 AND status = 'in_progress'`,
+    [input.studentId, input.versionId],
+  )
+
+  // Rule 2: `expires_at IS NULL` means untimed, not expired -- an attempt
+  // created but never entered has no deadline yet and must resume rather
+  // than be finalized.
+  if (activeRows.length > 0) {
+    const [active] = activeRows
+
+    if (!active.expires_at || active.expires_at > input.now) {
+      const attemptNumber = await countAttempts(tx, input)
+
+      return {
+        attempt: toStartAttempt(active, attemptNumber),
+        resumed: true,
+        finalizedPriorAttempt: null,
+      }
+    }
+
+    const finalized = await finalizeExpiredAttempt(tx, {
+      attemptId: active.id,
+      now: input.now,
+    })
+
+    return createAttempt(tx, input, {
+      id: finalized.id,
+      submittedAt: finalized.submittedAt,
+    })
+  }
+
+  return createAttempt(tx, input, null)
+}
+
+async function createAttempt(
+  tx: PgQueryable,
+  input: { studentId: string; versionId: string },
+  finalizedPriorAttempt: { id: string; submittedAt: Date } | null,
+): Promise<StartResult> {
+  const { rows: created } = await tx.query<AttemptStartRow>(
+    `INSERT INTO attempt (student_id, test_version_id, status)
+     VALUES ($1, $2, 'in_progress')
+     RETURNING id, created_at, started_at, expires_at, current_section_id, current_question_id`,
+    [input.studentId, input.versionId],
+  )
+  const [row] = created
+  const attemptNumber = await countAttempts(tx, input)
+
+  return {
+    attempt: toStartAttempt(row, attemptNumber),
+    resumed: false,
+    finalizedPriorAttempt,
+  }
 }

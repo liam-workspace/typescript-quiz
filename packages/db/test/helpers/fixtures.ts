@@ -3,6 +3,7 @@ import type pg from "pg"
 export interface Fixture {
   studentId: string
   testId: string
+  slug: string
   versionId: string
   listeningSectionId: string
   readingSectionId: string
@@ -27,6 +28,7 @@ export interface Fixture {
 export async function seedPublishedTest(pool: pg.Pool): Promise<Fixture> {
   const studentId = "11111111-1111-1111-1111-111111111111"
   const testId = "22222222-2222-2222-2222-222222222222"
+  const slug = "practice-test-04"
   const versionId = "a0000000-0000-0000-0000-000000000001"
   const listeningSectionId = "b0000000-0000-0000-0000-000000000001"
   const readingSectionId = "b0000000-0000-0000-0000-000000000002"
@@ -47,10 +49,7 @@ export async function seedPublishedTest(pool: pg.Pool): Promise<Fixture> {
      VALUES ($1,'sub-tom','tom@example.test','Tom')`,
     [studentId],
   )
-  await pool.query(
-    `INSERT INTO test (id, slug) VALUES ($1,'practice-test-04')`,
-    [testId],
-  )
+  await pool.query(`INSERT INTO test (id, slug) VALUES ($1,$2)`, [testId, slug])
   await pool.query(
     `INSERT INTO test_version (id, test_id, version, title, duration_seconds)
      VALUES ($1,$2,1,'TOEFL Primary — Practice Test 04',3000)`,
@@ -128,6 +127,7 @@ export async function seedPublishedTest(pool: pg.Pool): Promise<Fixture> {
   return {
     studentId,
     testId,
+    slug,
     versionId,
     listeningSectionId,
     readingSectionId,

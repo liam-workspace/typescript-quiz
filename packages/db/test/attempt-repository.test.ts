@@ -6,6 +6,8 @@ import {
   finalizeExpiredAttempt,
   loadOwnedAttempt,
   loadRunningOwnedAttempt,
+  startOrResumeAttempt,
+  TestNotFoundError,
 } from "../src/repositories/attempt.repository.js"
 import { withDatabase } from "./helpers/database.js"
 import { seedPublishedTest, type Fixture } from "./helpers/fixtures.js"
@@ -68,6 +70,32 @@ async function recordCorrectAnswer(
      VALUES ($1, $2, $3)`,
     [attemptId, f.questionIds[0], f.choiceIds[0]],
   )
+}
+
+/**
+ * A fully graded, already-submitted attempt -- the "finished" case that
+ * `startOrResumeAttempt` must never treat as blocking a new one. Carries
+ * every graded column so `attempt_finished_is_graded` is satisfied.
+ */
+async function insertFinishedAttempt(
+  pool: pg.Pool,
+  f: Fixture,
+): Promise<string> {
+  const id = randomUUID()
+
+  await pool.query(
+    `INSERT INTO attempt (
+       id, student_id, test_version_id, status, started_at, expires_at,
+       submitted_at, points_earned, points_possible, percentage,
+       answered_count, unanswered_count, correct_count, incorrect_count, question_count
+     ) VALUES (
+       $1, $2, $3, 'submitted', now() - interval '1 hour', now() - interval '30 minutes',
+       now() - interval '30 minutes', 2, 2, 100, 2, 0, 2, 0, 2
+     )`,
+    [id, f.studentId, f.versionId],
+  )
+
+  return id
 }
 
 interface RawAttemptRow {
@@ -351,6 +379,182 @@ describe("attempt repository", () => {
       await expect(
         finalizeExpiredAttempt(pool, { attemptId: missing, now: new Date() }),
       ).rejects.toThrow(missing)
+    })
+  }, 120_000)
+
+  // -- startOrResumeAttempt --
+
+  it("creates the first attempt with resumed: false and a null clock", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+
+      const result = await startOrResumeAttempt(pool, {
+        studentId: f.studentId,
+        slug: f.slug,
+        now: new Date(),
+      })
+
+      expect(result.resumed).toBe(false)
+      expect(result.finalizedPriorAttempt).toBeNull()
+      expect(result.attempt.attemptNumber).toBe(1)
+      expect(result.attempt.startedAt).toBeNull()
+      expect(result.attempt.expiresAt).toBeNull()
+      expect(result.attempt.currentSectionId).toBeNull()
+      expect(result.attempt.currentQuestionId).toBeNull()
+      expect(typeof result.attempt.id).toBe("string")
+
+      const row = await readAttemptRow(pool, result.attempt.id)
+      expect(row.status).toBe("in_progress")
+    })
+  }, 120_000)
+
+  it("resumes an existing in-progress attempt rather than creating a second", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const attemptId = randomUUID()
+      await insertAttempt(pool, f, {
+        id: attemptId,
+        startedAt: "now()",
+        expiresAt: "now() + interval '25 minutes'",
+      })
+
+      const result = await startOrResumeAttempt(pool, {
+        studentId: f.studentId,
+        slug: f.slug,
+        now: new Date(),
+      })
+
+      expect(result.resumed).toBe(true)
+      expect(result.finalizedPriorAttempt).toBeNull()
+      expect(result.attempt.id).toBe(attemptId)
+      expect(result.attempt.attemptNumber).toBe(1)
+
+      // Not fired: exactly one attempt row exists for this (student, version)
+      // -- the "second attempt" the test name rules out.
+      const { rows } = await pool.query<{ count: string }>(
+        `SELECT count(*) AS count FROM attempt WHERE student_id = $1 AND test_version_id = $2`,
+        [f.studentId, f.versionId],
+      )
+      expect(Number(rows[0].count)).toBe(1)
+    })
+  }, 120_000)
+
+  it("resumes an UNSTARTED attempt rather than treating a null expiry as expired", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const attemptId = randomUUID()
+      await insertAttempt(pool, f, {
+        id: attemptId,
+        startedAt: "NULL",
+        expiresAt: null,
+      })
+
+      const result = await startOrResumeAttempt(pool, {
+        studentId: f.studentId,
+        slug: f.slug,
+        now: new Date(),
+      })
+
+      expect(result.resumed).toBe(true)
+      expect(result.finalizedPriorAttempt).toBeNull()
+      expect(result.attempt.id).toBe(attemptId)
+      expect(result.attempt.startedAt).toBeNull()
+      expect(result.attempt.expiresAt).toBeNull()
+
+      const row = await readAttemptRow(pool, attemptId)
+      expect(row.status).toBe("in_progress")
+    })
+  }, 120_000)
+
+  it("finalizes an expired attempt and starts a new one in one call", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const staleId = randomUUID()
+      // Default insertAttempt window: started an hour ago, expired ten
+      // minutes ago, status still 'in_progress'.
+      await insertAttempt(pool, f, { id: staleId })
+
+      const result = await startOrResumeAttempt(pool, {
+        studentId: f.studentId,
+        slug: f.slug,
+        now: new Date(),
+      })
+
+      expect(result.resumed).toBe(false)
+      expect(result.finalizedPriorAttempt?.id).toBe(staleId)
+      expect(result.attempt.id).not.toBe(staleId)
+      expect(result.attempt.attemptNumber).toBe(2)
+      expect(result.attempt.startedAt).toBeNull()
+      expect(result.attempt.expiresAt).toBeNull()
+
+      const staleRow = await readAttemptRow(pool, staleId)
+      expect(staleRow.status).toBe("expired")
+
+      const newRow = await readAttemptRow(pool, result.attempt.id)
+      expect(newRow.status).toBe("in_progress")
+    })
+  }, 120_000)
+
+  it("pins the finalized attempt's submittedAt to its deadline, not to now", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const staleId = randomUUID()
+      await insertAttempt(pool, f, { id: staleId })
+
+      const { rows: expected } = await pool.query<{ expires_at: Date }>(
+        `SELECT expires_at FROM attempt WHERE id = $1`,
+        [staleId],
+      )
+
+      // Well past the deadline -- if the clock leaked in, submittedAt would
+      // land here instead of at expires_at.
+      const farFuture = createFixedClock(new Date(Date.now() + 60 * 60 * 1000))
+      const result = await startOrResumeAttempt(pool, {
+        studentId: f.studentId,
+        slug: f.slug,
+        now: farFuture.now(),
+      })
+
+      expect(result.finalizedPriorAttempt?.submittedAt.toISOString()).toBe(
+        expected[0].expires_at.toISOString(),
+      )
+    })
+  }, 120_000)
+
+  it("lets a finished attempt be re-attempted", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      await insertFinishedAttempt(pool, f)
+
+      const result = await startOrResumeAttempt(pool, {
+        studentId: f.studentId,
+        slug: f.slug,
+        now: new Date(),
+      })
+
+      expect(result.resumed).toBe(false)
+      // Not fired: the prior attempt is already 'submitted', not a stale
+      // 'in_progress' row, so there is nothing here for this call to finalize.
+      expect(result.finalizedPriorAttempt).toBeNull()
+      expect(result.attempt.attemptNumber).toBe(2)
+
+      const row = await readAttemptRow(pool, result.attempt.id)
+      expect(row.status).toBe("in_progress")
+    })
+  }, 120_000)
+
+  it("throws TestNotFoundError naming the slug when the test is not published", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const missingSlug = "does-not-exist"
+
+      await expect(
+        startOrResumeAttempt(pool, {
+          studentId: f.studentId,
+          slug: missingSlug,
+          now: new Date(),
+        }),
+      ).rejects.toThrow(TestNotFoundError)
     })
   }, 120_000)
 })

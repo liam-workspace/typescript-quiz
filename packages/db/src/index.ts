@@ -4,8 +4,11 @@ import {
   finalizeExpiredAttempt,
   loadOwnedAttempt,
   loadRunningOwnedAttempt,
+  startOrResumeAttempt,
+  TestNotFoundError,
   type AttemptRow,
   type FinalizedAttemptRow,
+  type StartResult,
 } from "./repositories/attempt.repository.js"
 import {
   InvalidCursorError,
@@ -38,7 +41,7 @@ export type {
   TestCardRow,
 }
 
-export type { AttemptRow, FinalizedAttemptRow }
+export type { AttemptRow, FinalizedAttemptRow, StartResult }
 
 export {
   loadDbConfig,
@@ -53,4 +56,6 @@ export {
   loadOwnedAttempt,
   finalizeExpiredAttempt,
   loadRunningOwnedAttempt,
+  startOrResumeAttempt,
+  TestNotFoundError,
 }

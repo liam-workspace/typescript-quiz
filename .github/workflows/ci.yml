@@ -5,7 +5,7 @@ on:
 
 jobs:
   checks:
-    name: Lint & Format
+    name: Format, lint & test
     runs-on: ubuntu-latest
     if: github.actor != 'dependabot[bot]' || contains(github.event.pull_request.labels.*.name, 'javascript')
     steps:
@@ -23,11 +23,23 @@ jobs:
           node-version: 25
           cache: pnpm
 
+      # npm.pkg.github.com requires a token even for public packages, and
+      # .npmrc reads it from NODE_AUTH_TOKEN. Without this the install of
+      # @liam-workspace/platform fails 401 and every PR dies here.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check formatting
         run: pnpm format
 
       - name: Lint
         run: pnpm lint
+
+      # The db suite starts a PostgreSQL 16 container through Testcontainers,
+      # which ubuntu-latest supports out of the box -- no `services:` block is
+      # needed, and adding one would give the suite a second database it does
+      # not use.
+      - name: Test
+        run: pnpm test

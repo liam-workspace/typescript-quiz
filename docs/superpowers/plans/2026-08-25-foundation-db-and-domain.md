@@ -22,7 +22,7 @@
 - `failed_write.raw_body` is **`text`, never `jsonb`**, and the table has **no foreign keys**. Its job is holding bodies that failed to parse.
 - Ordering is **`(client_instance_id, client_seq)`**, never `answered_at`. `answered_at` is display text with no authority.
 - **Reach for `~/projects/typescript-libraries` before writing infrastructure.** If a utility exists there, use it; if you decline one, record the reason in `docs/architecture/library-adoption.md`. Hand-rolling a pool, a logger, an env parser or a clock is a plan violation.
-- **`@liam-public/*` resolves from npmjs.org; `@liam-workspace/*` from npm.pkg.github.com** and needs `GITHUB_TOKEN`. Both scopes must be in `.npmrc` before install resolves (Task 1).
+- **`@liam-public/*` resolves from npmjs.org; `@liam-workspace/*` from npm.pkg.github.com** and needs `NODE_AUTH_TOKEN` — the variable `.npmrc` reads, and the one `actions/setup-node` sets. Both scopes must be in `.npmrc` before install resolves (Task 1).
 - **Never call `new Date()` or `Date.now()` in service code.** Take a `Clock` from `@liam-workspace/platform`. Expiry is the core of this app and `createFixedClock` is what makes it testable without sleeping.
 - Commit after every task with a `feat:` / `test:` / `chore:` message.
 - `pnpm lint` and `pnpm format` must pass before each commit.
@@ -44,7 +44,7 @@
 | `packages/db/migrations/1001_content.cjs`                 | test → choice, `section_instruction`, `question_tag`                                                  |
 | `packages/db/migrations/1002_attempts.cjs`                | attempt, sections, responses, cursor, plays                                                           |
 | `packages/db/migrations/1003_durability_and_triggers.cjs` | `failed_write`, immutability triggers, `publication_violation`                                        |
-| `.npmrc`                                                  | both registries; `GITHUB_TOKEN` for the `@liam-workspace` scope                                       |
+| `.npmrc`                                                  | both registries; `NODE_AUTH_TOKEN` for the `@liam-workspace` scope                                    |
 | `packages/db/src/pool.ts`                                 | `createRequestPool` / `createJobPool` over `@liam-public/node-postgres`, with named `applicationName` |
 | `packages/db/src/config.ts`                               | `loadDbConfig()` over `@liam-public/node-config`                                                      |
 | `packages/common/src/domain/clock.ts`                     | re-exports `Clock` / `systemClock` / `createFixedClock` so no package imports `platform` twice        |
@@ -194,14 +194,14 @@ Create `.npmrc` at the repo root:
 ```
 @liam-public:registry=https://registry.npmjs.org/
 @liam-workspace:registry=https://npm.pkg.github.com/
-//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
 ```
 
 Add `.npmrc` to `.gitignore` only if you inline a literal token; the
-`${GITHUB_TOKEN}` form above is safe to commit. Export the token first:
+`${NODE_AUTH_TOKEN}` form above is safe to commit. Export the token first:
 
 ```bash
-export GITHUB_TOKEN=<a classic PAT with read:packages>
+export NODE_AUTH_TOKEN=<a classic PAT with read:packages>
 ```
 
 - [ ] **Step 6: Install and verify the workspace resolves**

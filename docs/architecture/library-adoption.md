@@ -8,7 +8,8 @@ why in one line. Everything else is either adopted now, adopted in a named
 later plan, or has no subject matter in common with this app.
 
 **Registries.** `@liam-public/*` resolves from npmjs.org; `@liam-workspace/*`
-from npm.pkg.github.com and needs a `GITHUB_TOKEN`. Both scopes must be in
+from npm.pkg.github.com and needs a `NODE_AUTH_TOKEN` — the name `.npmrc`
+actually reads, and the one `actions/setup-node` sets. Both scopes must be in
 `.npmrc` before `pnpm install` will resolve anything below.
 
 ---

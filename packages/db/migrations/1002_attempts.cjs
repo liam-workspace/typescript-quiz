@@ -3,7 +3,7 @@ exports.shorthands = undefined
 
 exports.up = (pgm) => {
   pgm.sql(`
--- docs/db/schema.sql lines 286-507, verbatim
+-- docs/db/schema.sql lines 286-516, verbatim
 --  ATTEMPTS
 -- =====================================================================
 
@@ -126,8 +126,17 @@ CREATE TABLE attempt_section (
         REFERENCES test_section (id, test_version_id) ON DELETE RESTRICT,
 
     CONSTRAINT attempt_section_expiry_after_entry CHECK (expires_at > entered_at),
+    -- Completion implies the counts EXIST and reconcile. Without the
+    -- IS NOT NULL half, all-NULL counts make the arithmetic evaluate to
+    -- NULL, and a CHECK evaluating to NULL passes -- so a section the
+    -- database called complete could carry no counts at all. The
+    -- shape mirrors attempt_finished_is_graded on the attempt table above.
     CONSTRAINT attempt_section_counts_reconcile CHECK (
-        completed_at IS NULL OR correct_count + incorrect_count = answered_count
+        completed_at IS NULL OR (
+            answered_count IS NOT NULL AND correct_count IS NOT NULL
+            AND incorrect_count IS NOT NULL
+            AND correct_count + incorrect_count = answered_count
+        )
     )
 );
 

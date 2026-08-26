@@ -104,4 +104,62 @@ describe("migration 1002 — attempts", () => {
       )
     })
   }, 120_000)
+
+  // `correct_count + incorrect_count = answered_count` evaluates to NULL when
+  // the counts are NULL, and a CHECK that evaluates to NULL passes — so the
+  // constraint used to accept a completed section with no counts at all.
+  // These three pin completion => the counts exist AND reconcile.
+  it("refuses a completed section with NULL counts", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      await newAttempt(pool, f, "f0000000-0000-0000-0000-000000000001")
+      await expect(
+        pool.query(
+          `INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id,
+                                        expires_at, completed_at)
+           VALUES ('f0000000-0000-0000-0000-000000000001',$1,$2,
+                   now()+interval '25 min', now())`,
+          [f.listeningSectionId, f.versionId],
+        ),
+      ).rejects.toThrow(/attempt_section_counts_reconcile/)
+    })
+  }, 120_000)
+
+  it("refuses a completed section whose counts do not reconcile", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      await newAttempt(pool, f, "f0000000-0000-0000-0000-000000000001")
+      await expect(
+        pool.query(
+          `INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id,
+                                        expires_at, completed_at,
+                                        answered_count, correct_count, incorrect_count)
+           VALUES ('f0000000-0000-0000-0000-000000000001',$1,$2,
+                   now()+interval '25 min', now(), 5, 1, 0)`,
+          [f.listeningSectionId, f.versionId],
+        ),
+      ).rejects.toThrow(/attempt_section_counts_reconcile/)
+    })
+  }, 120_000)
+
+  it("accepts a completed section whose counts reconcile", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      await newAttempt(pool, f, "f0000000-0000-0000-0000-000000000001")
+      await pool.query(
+        `INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id,
+                                      expires_at, completed_at,
+                                      answered_count, correct_count, incorrect_count)
+         VALUES ('f0000000-0000-0000-0000-000000000001',$1,$2,
+                 now()+interval '25 min', now(), 1, 1, 0)`,
+        [f.listeningSectionId, f.versionId],
+      )
+
+      const { rows } = await pool.query<{ answered_count: number }>(
+        `SELECT answered_count FROM attempt_section
+          WHERE attempt_id='f0000000-0000-0000-0000-000000000001'`,
+      )
+      expect(rows[0].answered_count).toBe(1)
+    })
+  }, 120_000)
 })

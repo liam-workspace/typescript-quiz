@@ -405,8 +405,17 @@ CREATE TABLE attempt_section (
         REFERENCES test_section (id, test_version_id) ON DELETE RESTRICT,
 
     CONSTRAINT attempt_section_expiry_after_entry CHECK (expires_at > entered_at),
+    -- Completion implies the counts EXIST and reconcile. Without the
+    -- IS NOT NULL half, all-NULL counts make the arithmetic evaluate to
+    -- NULL, and a CHECK evaluating to NULL passes -- so a section the
+    -- database called complete could carry no counts at all. The
+    -- shape mirrors attempt_finished_is_graded on the attempt table above.
     CONSTRAINT attempt_section_counts_reconcile CHECK (
-        completed_at IS NULL OR correct_count + incorrect_count = answered_count
+        completed_at IS NULL OR (
+            answered_count IS NOT NULL AND correct_count IS NOT NULL
+            AND incorrect_count IS NOT NULL
+            AND correct_count + incorrect_count = answered_count
+        )
     )
 );
 
@@ -581,7 +590,11 @@ BEGIN
         RAISE EXCEPTION 'test_version % is published and immutable', OLD.id
             USING ERRCODE = 'restrict_violation';
     END IF;
-    RETURN NEW;
+    -- COALESCE, not NEW: this trigger is BEFORE UPDATE OR DELETE, and on a
+    -- DELETE, NEW is NULL. A BEFORE ROW trigger returning NULL cancels the
+    -- row operation, so RETURN NEW here would silently swallow every DELETE
+    -- of a draft version instead of performing it.
+    RETURN COALESCE(NEW, OLD);
 END;
 $$;
 

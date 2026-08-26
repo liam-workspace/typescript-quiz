@@ -3,7 +3,7 @@ exports.shorthands = undefined
 
 exports.up = (pgm) => {
   pgm.sql(`
--- docs/db/schema.sql lines 509-730, verbatim
+-- docs/db/schema.sql lines 518-743, verbatim
 --  DURABILITY
 -- =====================================================================
 
@@ -79,7 +79,11 @@ BEGIN
         RAISE EXCEPTION 'test_version % is published and immutable', OLD.id
             USING ERRCODE = 'restrict_violation';
     END IF;
-    RETURN NEW;
+    -- COALESCE, not NEW: this trigger is BEFORE UPDATE OR DELETE, and on a
+    -- DELETE, NEW is NULL. A BEFORE ROW trigger returning NULL cancels the
+    -- row operation, so RETURN NEW here would silently swallow every DELETE
+    -- of a draft version instead of performing it.
+    RETURN COALESCE(NEW, OLD);
 END;
 $$;
 

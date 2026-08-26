@@ -76,7 +76,14 @@ UPDATE attempt SET status='expired', submitted_at=expires_at,
 \echo '--- 9 editing a PUBLISHED question MUST FAIL'
 UPDATE question SET prompt='tampered' WHERE id='d0000000-0000-0000-0000-000000000001';
 \echo '--- 10 deleting a media asset in use MUST FAIL (none cited here; skipped)'
-\echo '--- 11 publication violations on a NEW draft'
+\echo '--- 11 completed section with NULL counts MUST FAIL'
+INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id, expires_at, completed_at)
+VALUES ('f0000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-000000000003','a0000000-0000-0000-0000-000000000002',now()+interval '25 min',now());
+\echo '--- 11b completed section whose counts reconcile MUST SUCCEED'
+INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id, expires_at, completed_at,
+                             answered_count, correct_count, incorrect_count)
+VALUES ('f0000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-000000000003','a0000000-0000-0000-0000-000000000002',now()+interval '25 min',now(),1,1,0);
+\echo '--- 12 publication violations on a NEW draft'
 INSERT INTO test_version (id, test_id, version, title, duration_seconds)
 VALUES ('a0000000-0000-0000-0000-000000000003','22222222-2222-2222-2222-222222222222',3,'T04 draft',9999);
 INSERT INTO test_section (id, test_version_id, ordinal, title, type, duration_seconds, navigation, allow_answer_change)

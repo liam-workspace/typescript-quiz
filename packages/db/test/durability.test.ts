@@ -8,6 +8,25 @@ function ruleOf(row: { rule: string }): string {
   return row.rule
 }
 
+interface SqlError {
+  code?: string
+  message: string
+}
+
+/**
+ * The error a failing statement raised, so a test can assert its SQLSTATE and
+ * its message without `expect.stringMatching` (which types as `any`).
+ */
+async function errorFrom(statement: Promise<unknown>): Promise<SqlError> {
+  try {
+    await statement
+  } catch (raised) {
+    return raised as SqlError
+  }
+
+  throw new Error("expected the statement to be rejected, but it succeeded")
+}
+
 describe("migration 1003 — durability and immutability", () => {
   it("stores a body that is not valid JSON", async () => {
     await withDatabase(async (pool) => {
@@ -96,6 +115,66 @@ describe("migration 1003 — durability and immutability", () => {
         "too_few_choices",
         "wrong_correct_count",
       ])
+    })
+  }, 120_000)
+
+  // A BEFORE ROW trigger that returns NULL cancels the row operation, so a
+  // guard function ending in `RETURN NEW;` silently swallows every DELETE
+  // (on DELETE, NEW is NULL). These three tests pin both halves of the
+  // guard: a draft is deletable, a published version is not — on either
+  // statement kind.
+  it("deletes a DRAFT test_version", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const draft = "a0000000-0000-0000-0000-0000000000dd"
+      await pool.query(
+        `INSERT INTO test_version (id, test_id, version, title, duration_seconds)
+         VALUES ($1, $2, 2, 'draft to delete', 3000)`,
+        [draft, f.testId],
+      )
+
+      const deleted = await pool.query(`DELETE FROM test_version WHERE id=$1`, [
+        draft,
+      ])
+      expect(deleted.rowCount).toBe(1)
+
+      const { rows } = await pool.query<{ id: string }>(
+        `SELECT id FROM test_version WHERE id=$1`,
+        [draft],
+      )
+      expect(rows).toHaveLength(0)
+    })
+  }, 120_000)
+
+  it("refuses to UPDATE a published test_version", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const error = await errorFrom(
+        pool.query(`UPDATE test_version SET title='tampered' WHERE id=$1`, [
+          f.versionId,
+        ]),
+      )
+
+      expect(error.code).toBe("23001")
+      expect(error.message).toMatch(/published and immutable/)
+    })
+  }, 120_000)
+
+  it("refuses to DELETE a published test_version", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const error = await errorFrom(
+        pool.query(`DELETE FROM test_version WHERE id=$1`, [f.versionId]),
+      )
+
+      expect(error.code).toBe("23001")
+      expect(error.message).toMatch(/published and immutable/)
+
+      const { rows } = await pool.query<{ id: string }>(
+        `SELECT id FROM test_version WHERE id=$1`,
+        [f.versionId],
+      )
+      expect(rows).toHaveLength(1)
     })
   }, 120_000)
 })

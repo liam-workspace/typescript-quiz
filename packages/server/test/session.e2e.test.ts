@@ -44,7 +44,7 @@ describe("POST /session and GET /me", () => {
     const token = await a.mint({ sub: SUB, email: EMAIL })
 
     const res = await request(a.http.getHttpServer() as App)
-      .post("/session")
+      .post("/api/session")
       .set("Authorization", `Bearer ${token}`)
       .expect(201)
 
@@ -59,13 +59,13 @@ describe("POST /session and GET /me", () => {
     const token = await a.mint({ sub: `${SUB}-idem`, email: EMAIL })
 
     const first = await request(a.http.getHttpServer() as App)
-      .post("/session")
+      .post("/api/session")
       .set("Authorization", `Bearer ${token}`)
       .expect(201)
 
     // The contract distinguishes these: 201 provisions, 200 recognises.
     const second = await request(a.http.getHttpServer() as App)
-      .post("/session")
+      .post("/api/session")
       .set("Authorization", `Bearer ${token}`)
       .expect(200)
 
@@ -82,7 +82,7 @@ describe("POST /session and GET /me", () => {
     })
 
     await request(a.http.getHttpServer() as App)
-      .post("/session")
+      .post("/api/session")
       .set("Authorization", `Bearer ${token}`)
       .expect(403)
   })
@@ -92,12 +92,12 @@ describe("POST /session and GET /me", () => {
     const token = await a.mint({ sub: `${SUB}-me`, email: EMAIL })
 
     await request(a.http.getHttpServer() as App)
-      .post("/session")
+      .post("/api/session")
       .set("Authorization", `Bearer ${token}`)
       .expect(201)
 
     const res = await request(a.http.getHttpServer() as App)
-      .get("/me")
+      .get("/api/me")
       .set("Authorization", `Bearer ${token}`)
       .expect(200)
 
@@ -112,7 +112,7 @@ describe("POST /session and GET /me", () => {
     const token = await a.mint({ sub: `${SUB}-unprovisioned`, email: EMAIL })
 
     await request(a.http.getHttpServer() as App)
-      .get("/me")
+      .get("/api/me")
       .set("Authorization", `Bearer ${token}`)
       .expect(404)
   })
@@ -128,13 +128,13 @@ describe("POST /session and GET /me", () => {
     const admin = await a.mint({ sub, email: EMAIL, isAdmin: true })
 
     const first = await request(a.http.getHttpServer() as App)
-      .post("/session")
+      .post("/api/session")
       .set("Authorization", `Bearer ${plain}`)
       .expect(201)
     expect(body(first).isAdmin).toBe(false)
 
     const elevated = await request(a.http.getHttpServer() as App)
-      .get("/me")
+      .get("/api/me")
       .set("Authorization", `Bearer ${admin}`)
       .expect(200)
     expect(body(elevated).isAdmin).toBe(true)
@@ -145,7 +145,7 @@ describe("POST /session and GET /me", () => {
     const a = ready()
 
     await request(a.http.getHttpServer() as App)
-      .get("/me")
+      .get("/api/me")
       .expect(401)
   })
 })

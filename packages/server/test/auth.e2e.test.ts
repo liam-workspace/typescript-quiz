@@ -61,6 +61,9 @@ describe("authentication guards", () => {
       .compile()
 
     app = moduleRef.createNestApplication()
+    // These probes stand in for real controllers, which production serves
+    // under the contract's /api prefix. Mirror it so the probe is faithful.
+    app.setGlobalPrefix("api", { exclude: ["health"] })
     await app.init()
   })
 
@@ -74,7 +77,7 @@ describe("authentication guards", () => {
     }
 
     await request(app.getHttpServer() as App)
-      .get("/auth-probe")
+      .get("/api/auth-probe")
       .expect(401)
   })
 
@@ -89,7 +92,7 @@ describe("authentication guards", () => {
     })
 
     await request(app.getHttpServer() as App)
-      .get("/auth-probe")
+      .get("/api/auth-probe")
       .set("Authorization", `Bearer ${token}`)
       .expect(401)
   })
@@ -105,7 +108,7 @@ describe("authentication guards", () => {
     })
 
     const response = await request(app.getHttpServer() as App)
-      .get("/auth-probe")
+      .get("/api/auth-probe")
       .set("Authorization", `Bearer ${token}`)
       .expect(200)
 
@@ -123,7 +126,7 @@ describe("authentication guards", () => {
     })
 
     await request(app.getHttpServer() as App)
-      .get("/admin-probe")
+      .get("/api/admin-probe")
       .set("Authorization", `Bearer ${token}`)
       .expect(403)
   })
@@ -140,7 +143,7 @@ describe("authentication guards", () => {
     })
 
     await request(app.getHttpServer() as App)
-      .get("/admin-probe")
+      .get("/api/admin-probe")
       .set("Authorization", `Bearer ${token}`)
       .expect(200)
   })

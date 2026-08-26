@@ -54,6 +54,10 @@ export async function createTestApp(
 
   const moduleRef = await builder.compile()
   const http = moduleRef.createNestApplication()
+  // Mirror main.ts. Without this the suite would assert paths production
+  // never serves -- the tests would agree with the code and both would
+  // disagree with the contract.
+  http.setGlobalPrefix("api", { exclude: ["health"] })
   // Mirror main.ts: without this, tests exercise a different error pipeline
   // than production and any assertion on an error body would be fiction.
   http.useGlobalFilters(new AllExceptionsFilter())

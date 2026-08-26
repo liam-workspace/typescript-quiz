@@ -12,6 +12,10 @@ async function bootstrap(): Promise<void> {
   await migrateToLatest(config.databaseUrl)
 
   const app = await NestFactory.create(AppModule)
+  // The contract (openapi.yaml) declares `servers: [{ url: /api }]`, so every operation in
+  // the contract lives under /api. /health is excluded: it is the container
+  // healthcheck's target and is not part of the published contract.
+  app.setGlobalPrefix("api", { exclude: ["health"] })
   app.useGlobalFilters(new AllExceptionsFilter())
   await app.listen(config.port)
 }

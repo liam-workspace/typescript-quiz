@@ -231,7 +231,7 @@ describe("GET /tests", () => {
     const a = ready()
 
     await request(a.http.getHttpServer() as App)
-      .get("/tests")
+      .get("/api/tests")
       .expect(401)
   })
 
@@ -240,7 +240,7 @@ describe("GET /tests", () => {
     const token = await a.mint({ sub: `${SUB}-unprovisioned`, email: EMAIL })
 
     await request(a.http.getHttpServer() as App)
-      .get("/tests")
+      .get("/api/tests")
       .set("Authorization", `Bearer ${token}`)
       .expect(404)
   })
@@ -250,7 +250,7 @@ describe("GET /tests", () => {
     const token = await a.mint({ sub: `${SUB}-listing`, email: EMAIL })
 
     await request(a.http.getHttpServer() as App)
-      .post("/session")
+      .post("/api/session")
       .set("Authorization", `Bearer ${token}`)
       .expect(201)
 
@@ -261,7 +261,7 @@ describe("GET /tests", () => {
     })
 
     const res = await request(a.http.getHttpServer() as App)
-      .get("/tests")
+      .get("/api/tests")
       .set("Authorization", `Bearer ${token}`)
       .expect(200)
 
@@ -284,11 +284,11 @@ describe("GET /tests", () => {
     const token = await a.mint({ sub: `${SUB}-in-progress`, email: EMAIL })
 
     await request(a.http.getHttpServer() as App)
-      .post("/session")
+      .post("/api/session")
       .set("Authorization", `Bearer ${token}`)
       .expect(201)
     const me = await request(a.http.getHttpServer() as App)
-      .get("/me")
+      .get("/api/me")
       .set("Authorization", `Bearer ${token}`)
       .expect(200)
     const studentId = (me.body as { id: string }).id
@@ -304,7 +304,7 @@ describe("GET /tests", () => {
     })
 
     const res = await request(a.http.getHttpServer() as App)
-      .get("/tests")
+      .get("/api/tests")
       .set("Authorization", `Bearer ${token}`)
       .expect(200)
 
@@ -318,18 +318,18 @@ describe("GET /tests", () => {
     const token = await a.mint({ sub: `${SUB}-bad-limit`, email: EMAIL })
 
     await request(a.http.getHttpServer() as App)
-      .post("/session")
+      .post("/api/session")
       .set("Authorization", `Bearer ${token}`)
       .expect(201)
 
     await request(a.http.getHttpServer() as App)
-      .get("/tests")
+      .get("/api/tests")
       .query({ limit: 51 })
       .set("Authorization", `Bearer ${token}`)
       .expect(400)
 
     await request(a.http.getHttpServer() as App)
-      .get("/tests")
+      .get("/api/tests")
       .query({ limit: 0 })
       .set("Authorization", `Bearer ${token}`)
       .expect(400)
@@ -340,12 +340,12 @@ describe("GET /tests", () => {
     const token = await a.mint({ sub: `${SUB}-bad-cursor`, email: EMAIL })
 
     await request(a.http.getHttpServer() as App)
-      .post("/session")
+      .post("/api/session")
       .set("Authorization", `Bearer ${token}`)
       .expect(201)
 
     await request(a.http.getHttpServer() as App)
-      .get("/tests")
+      .get("/api/tests")
       .query({ cursor: "not-a-valid-cursor!!" })
       .set("Authorization", `Bearer ${token}`)
       .expect(400)
@@ -376,7 +376,7 @@ describe("GET /tests/{slug}", () => {
     const token = await a.mint({ sub: `${SUB}-brief`, email: EMAIL })
 
     await request(a.http.getHttpServer() as App)
-      .post("/session")
+      .post("/api/session")
       .set("Authorization", `Bearer ${token}`)
       .expect(201)
 
@@ -388,7 +388,7 @@ describe("GET /tests/{slug}", () => {
     })
 
     const res = await request(a.http.getHttpServer() as App)
-      .get(`/tests/${slug}`)
+      .get(`/api/tests/${slug}`)
       .set("Authorization", `Bearer ${token}`)
       .expect(200)
 
@@ -412,7 +412,7 @@ describe("GET /tests/{slug}", () => {
     const token = await a.mint({ sub: `${SUB}-brief-redaction`, email: EMAIL })
 
     await request(a.http.getHttpServer() as App)
-      .post("/session")
+      .post("/api/session")
       .set("Authorization", `Bearer ${token}`)
       .expect(201)
 
@@ -424,7 +424,7 @@ describe("GET /tests/{slug}", () => {
     })
 
     const res = await request(a.http.getHttpServer() as App)
-      .get(`/tests/${slug}`)
+      .get(`/api/tests/${slug}`)
       .set("Authorization", `Bearer ${token}`)
       .expect(200)
 
@@ -439,7 +439,7 @@ describe("GET /tests/{slug}", () => {
     const token = await a.mint({ sub: `${SUB}-brief-404`, email: EMAIL })
 
     await request(a.http.getHttpServer() as App)
-      .post("/session")
+      .post("/api/session")
       .set("Authorization", `Bearer ${token}`)
       .expect(201)
 
@@ -452,12 +452,12 @@ describe("GET /tests/{slug}", () => {
     })
 
     await request(a.http.getHttpServer() as App)
-      .get(`/tests/${draftSlug}`)
+      .get(`/api/tests/${draftSlug}`)
       .set("Authorization", `Bearer ${token}`)
       .expect(404)
 
     await request(a.http.getHttpServer() as App)
-      .get(`/tests/does-not-exist-${randomUUID()}`)
+      .get(`/api/tests/does-not-exist-${randomUUID()}`)
       .set("Authorization", `Bearer ${token}`)
       .expect(404)
   })
@@ -470,7 +470,7 @@ describe("GET /tests/{slug}", () => {
     })
 
     await request(a.http.getHttpServer() as App)
-      .post("/session")
+      .post("/api/session")
       .set("Authorization", `Bearer ${token}`)
       .expect(201)
 
@@ -483,7 +483,7 @@ describe("GET /tests/{slug}", () => {
     })
 
     const res = await request(a.http.getHttpServer() as App)
-      .get(`/tests/${slug}`)
+      .get(`/api/tests/${slug}`)
       .set("Authorization", `Bearer ${token}`)
       .expect(200)
 

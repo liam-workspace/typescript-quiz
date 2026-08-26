@@ -1,5 +1,12 @@
 import { type DbConfig, loadDbConfig } from "./config.js"
 import { createJobPool, createRequestPool } from "./pool.js"
+import {
+  InvalidCursorError,
+  listPublishedTests,
+  type ListPublishedTestsResult,
+  type StudentSummary,
+  type TestCardRow,
+} from "./repositories/catalog.repository.js"
 import { loadForRunner } from "./repositories/test-version.repository.js"
 import {
   findStudentBySubject,
@@ -15,6 +22,8 @@ export type { DbConfig }
 
 export type { StudentRow }
 
+export type { ListPublishedTestsResult, StudentSummary, TestCardRow }
+
 export {
   loadDbConfig,
   createJobPool,
@@ -22,4 +31,6 @@ export {
   loadForRunner,
   upsertStudentBySubject,
   findStudentBySubject,
+  listPublishedTests,
+  InvalidCursorError,
 }

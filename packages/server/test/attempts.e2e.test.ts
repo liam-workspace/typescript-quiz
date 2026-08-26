@@ -6,18 +6,24 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { REQUEST_POOL } from "../src/database/tokens.js"
 import { createTestApp, type TestApp } from "./helpers/app.js"
 
+/** Mirrors openapi.yaml's `AttemptStart`, which is flat. */
 interface AttemptStartBody {
-  attempt: {
-    id: string
-    attemptNumber: number
-    createdAt: string
-    startedAt: string | null
-    expiresAt: string | null
-    currentSectionId: string | null
-    currentQuestionId: string | null
-  }
+  id: string
+  attemptNumber: number
+  status: string
+  createdAt: string
+  startedAt: string | null
+  expiresAt: string | null
+  serverTime: string
   resumed: boolean
-  finalizedPriorAttempt: { id: string; submittedAt: string } | null
+  currentSectionId: string | null
+  currentQuestionId: string | null
+  finalizedPriorAttempt: {
+    id: string
+    status: string
+    submittedAt: string
+    resultUrl: string
+  } | null
 }
 
 function body(res: { body: unknown }): AttemptStartBody {
@@ -182,10 +188,14 @@ describe("POST /attempts", () => {
 
     expect(parsed.resumed).toBe(false)
     expect(parsed.finalizedPriorAttempt).toBeNull()
-    expect(parsed.attempt.attemptNumber).toBe(1)
-    expect(parsed.attempt.startedAt).toBeNull()
-    expect(parsed.attempt.expiresAt).toBeNull()
-    expect(typeof parsed.attempt.id).toBe("string")
+    expect(parsed.attemptNumber).toBe(1)
+    expect(parsed.startedAt).toBeNull()
+    expect(parsed.expiresAt).toBeNull()
+    expect(typeof parsed.id).toBe("string")
+    // Contract fields that exist only in the wire shape, so nothing else pins
+    // them: AttemptStart requires both, and `status` is `enum: [in_progress]`.
+    expect(parsed.status).toBe("in_progress")
+    expect(Number.isNaN(Date.parse(parsed.serverTime))).toBe(false)
   })
 
   it("resumes rather than duplicating when called twice back to back", async () => {
@@ -201,19 +211,20 @@ describe("POST /attempts", () => {
       .send({ slug })
       .expect(201)
 
+    // The contract splits these: 201 created, 200 an existing attempt resumed.
     const second = await request(a.http.getHttpServer() as App)
       .post("/api/attempts")
       .set("Authorization", `Bearer ${token}`)
       .send({ slug })
-      .expect(201)
+      .expect(200)
 
     expect(body(second).resumed).toBe(true)
     expect(body(second).finalizedPriorAttempt).toBeNull()
-    expect(body(second).attempt.id).toBe(body(first).attempt.id)
+    expect(body(second).id).toBe(body(first).id)
 
     const { rows } = await pool.query<{ count: string }>(
       `SELECT count(*) AS count FROM attempt WHERE id = $1`,
-      [body(first).attempt.id],
+      [body(first).id],
     )
     expect(Number(rows[0].count)).toBe(1)
   })
@@ -239,8 +250,14 @@ describe("POST /attempts", () => {
 
     expect(parsed.resumed).toBe(false)
     expect(parsed.finalizedPriorAttempt?.id).toBe(staleId)
-    expect(parsed.attempt.id).not.toBe(staleId)
-    expect(parsed.attempt.attemptNumber).toBe(2)
+    // FinalizedAttempt requires status and resultUrl; status is `const:
+    // expired` because both of its uses are expiry-driven.
+    expect(parsed.finalizedPriorAttempt?.status).toBe("expired")
+    expect(parsed.finalizedPriorAttempt?.resultUrl).toBe(
+      `/api/attempts/${staleId}/result`,
+    )
+    expect(parsed.id).not.toBe(staleId)
+    expect(parsed.attemptNumber).toBe(2)
 
     const { rows } = await pool.query<{ status: string }>(
       `SELECT status FROM attempt WHERE id = $1`,
@@ -272,7 +289,7 @@ describe("POST /attempts", () => {
     // Not fired: the prior attempt is already 'submitted', so there is
     // nothing here for this request to finalize.
     expect(parsed.finalizedPriorAttempt).toBeNull()
-    expect(parsed.attempt.attemptNumber).toBe(2)
+    expect(parsed.attemptNumber).toBe(2)
   })
 
   it("does not 500 when two starts race for the same (student, version)", async () => {
@@ -293,13 +310,23 @@ describe("POST /attempts", () => {
         .send({ slug }),
     ])
 
-    expect(first.status).toBe(201)
-    expect(second.status).toBe(201)
-    expect(body(first).attempt.id).toBe(body(second).attempt.id)
+    // Whichever wins the race creates (201); the loser finds the winner's row
+    // and resumes it (200). The pair is asserted as a set because which one
+    // wins is genuinely non-deterministic -- what must hold is that exactly
+    // one created, neither 500'd, and both describe the SAME attempt.
+    expect([first.status, second.status].sort((x, y) => x - y)).toEqual([
+      200, 201,
+    ])
+    expect(body(first).id).toBe(body(second).id)
+    expect(
+      [body(first).resumed, body(second).resumed].sort(
+        (x, y) => Number(x) - Number(y),
+      ),
+    ).toEqual([false, true])
 
     const { rows } = await pool.query<{ count: string }>(
       `SELECT count(*) AS count FROM attempt WHERE id = $1`,
-      [body(first).attempt.id],
+      [body(first).id],
     )
     expect(Number(rows[0].count)).toBe(1)
   })

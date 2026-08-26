@@ -20,6 +20,57 @@ interface StatusSettable {
   status(code: number): unknown
 }
 
+/**
+ * The contract's `AttemptStart` is FLAT; the repository's `StartResult` nests
+ * the attempt because that is the shape the database work produces. Mapping
+ * here keeps the wire contract from dictating the repository's internals, the
+ * same split `toStudentView` makes for `GET /me`.
+ */
+interface AttemptStartView {
+  id: string
+  attemptNumber: number
+  status: "in_progress"
+  createdAt: Date
+  startedAt: Date | null
+  expiresAt: Date | null
+  serverTime: Date
+  resumed: boolean
+  currentSectionId: string | null
+  currentQuestionId: string | null
+  finalizedPriorAttempt: {
+    id: string
+    status: "expired"
+    submittedAt: Date
+    resultUrl: string
+  } | null
+}
+
+function toAttemptStartView(
+  result: StartResult,
+  serverTime: Date,
+): AttemptStartView {
+  const prior = result.finalizedPriorAttempt
+
+  return {
+    ...result.attempt,
+    // A freshly started or resumed attempt is in_progress by construction:
+    // an expired one is finalized and replaced before this returns.
+    status: "in_progress",
+    serverTime,
+    resumed: result.resumed,
+    finalizedPriorAttempt: prior
+      ? {
+          id: prior.id,
+          // FinalizedAttempt.status is `const: expired` -- both of its uses
+          // are expiry-driven, so there is nothing else it can be.
+          status: "expired",
+          submittedAt: prior.submittedAt,
+          resultUrl: `/api/attempts/${prior.id}/result`,
+        }
+      : null,
+  }
+}
+
 @Controller("attempts")
 @UseGuards(JwksGuard)
 export class AttemptsController {
@@ -36,12 +87,14 @@ export class AttemptsController {
     @CurrentStudent() claims: JwtClaims,
     @Body("slug") slug: string | undefined,
     @Res({ passthrough: true }) res: StatusSettable,
-  ): Promise<StartResult> {
+  ): Promise<AttemptStartView> {
     const result = await this.attempts.start(subjectOf(claims), slug)
 
-    res.status(201)
+    // 201 provisions, 200 recognises -- the contract distinguishes them so a
+    // client can tell a fresh attempt from a resumed one without comparing ids.
+    res.status(result.resumed ? 200 : 201)
 
-    return result
+    return toAttemptStartView(result, this.attempts.now())
   }
 }
 

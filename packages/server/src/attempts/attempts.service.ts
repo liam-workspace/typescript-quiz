@@ -43,6 +43,11 @@ export class AttemptsService {
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
+  /** The contract's `serverTime`: authoritative, and the only clock a client may trust. */
+  now(): Date {
+    return this.clock.now()
+  }
+
   async start(
     subjectClaim: string,
     slug: string | undefined,

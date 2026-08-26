@@ -313,4 +313,44 @@ describe("attempt repository", () => {
       expect(row.status).toBe("expired")
     })
   }, 120_000)
+
+  it("is idempotent when another request already finalized the attempt", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const attemptId = randomUUID()
+      await insertAttempt(pool, f, { id: attemptId })
+
+      const first = await finalizeExpiredAttempt(pool, {
+        attemptId,
+        now: new Date(),
+      })
+      const second = await finalizeExpiredAttempt(pool, {
+        attemptId,
+        now: new Date(),
+      })
+
+      // Two racing callers must agree on when the attempt was finalized.
+      expect(second.submittedAt).toEqual(first.submittedAt)
+      expect(second.status).toBe("expired")
+
+      // Deliberately NOT asserted by planting a sentinel score and checking it
+      // survives: attempt_counts_reconcile, attempt_expired_pins_deadline and
+      // attempt_points_sane between them reject every inconsistent row I tried
+      // to write, so a "corrupted" grade cannot be staged at all. The database
+      // already forbids the state this test would have been looking for.
+    })
+  }, 120_000)
+
+  it("names the attempt when asked to finalize one that does not exist", async () => {
+    await withDatabase(async (pool) => {
+      const missing = randomUUID()
+
+      // `rows[0]` types as non-undefined because noUncheckedIndexedAccess is
+      // off, so without an explicit guard this died on a TypeError several
+      // lines later instead of saying what was wrong.
+      await expect(
+        finalizeExpiredAttempt(pool, { attemptId: missing, now: new Date() }),
+      ).rejects.toThrow(missing)
+    })
+  }, 120_000)
 })

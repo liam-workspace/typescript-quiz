@@ -97,6 +97,14 @@ export async function finalizeExpiredAttempt(
        FROM attempt WHERE id = $1`,
     [input.attemptId],
   )
+
+  if (existing.length === 0) {
+    // `rows[0]` types as non-undefined because noUncheckedIndexedAccess is off,
+    // so without this an unknown id dies on a TypeError several lines later
+    // instead of saying what went wrong.
+    throw new Error(`attempt ${input.attemptId} does not exist`)
+  }
+
   const [attempt] = existing
 
   if (attempt.status !== "in_progress") {
@@ -146,7 +154,7 @@ export async function finalizeExpiredAttempt(
             points_earned = $2, points_possible = $3, percentage = $4,
             answered_count = $5, unanswered_count = $6,
             correct_count = $7, incorrect_count = $8, question_count = $9
-      WHERE id = $1
+      WHERE id = $1 AND status = 'in_progress'
       RETURNING submitted_at`,
     [
       input.attemptId,
@@ -160,6 +168,15 @@ export async function finalizeExpiredAttempt(
       score.questionCount,
     ],
   )
+
+  if (rows.length === 0) {
+    // Another request finalized this attempt between our SELECT and this
+    // UPDATE. The status predicate above is what makes that a no-op rather
+    // than a second grade; re-read to report what actually landed, so two
+    // racing callers agree on submitted_at.
+    return finalizeExpiredAttempt(db, input)
+  }
+
   const [row] = rows
 
   return {

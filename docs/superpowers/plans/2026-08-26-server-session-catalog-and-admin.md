@@ -1451,7 +1451,25 @@ One endpoint, three behaviours, argued and settled in spec §4. A partial unique
 
 1. Resolve the slug to the test's `current_version_id`; `404` if unpublished.
 2. If an `in_progress` attempt exists for this student and version AND it has not expired (`expires_at IS NULL OR expires_at > now`), return it with `resumed: true`. **`expires_at IS NULL` means untimed, not expired** — an attempt created but never entered has no deadline yet and must resume, not be finalized. Getting this backwards would expire every attempt the moment the student read the brief.
-3. If an `in_progress` attempt exists and HAS expired, finalize it (status `expired`, `submitted_at` pinned to `expires_at`, **never to arrival**) and create a new one in the SAME transaction, returning `finalizedPriorAttempt`.
+3. If an `in_progress` attempt exists and HAS expired, finalize it and create a new one in the SAME transaction, returning `finalizedPriorAttempt`.
+
+   **Do NOT hand-roll the finalization here — the obvious version cannot
+   work.** Setting `status = 'expired'` and `submitted_at` alone violates
+   `attempt_finished_is_graded` (`docs/db/schema.sql:344`), which requires
+   `points_earned`, `points_possible`, `percentage`, `answered_count`,
+   `unanswered_count`, `correct_count`, `incorrect_count` and
+   `question_count` to ALL be non-null the moment `status` leaves
+   `in_progress`. An expired attempt is a graded attempt; there is no cheaper
+   path.
+
+   Call `finalizeExpiredAttempt` from **plan 3's Task 1**
+   (`docs/superpowers/plans/2026-08-27-runner-payload-and-screens.md`), which
+   builds the grading kernel for exactly this reason — every phase-3 endpoint
+   carries a `410 attempt_expired — finalized by this request`, so any
+   endpoint that can observe an expired attempt must be able to grade it.
+   **That task is executed BEFORE this one**; see the ledger's ruling P3-a.
+   `submitted_at` still pins to `expires_at`, never to arrival.
+
 4. Otherwise create a new attempt with `resumed: false`.
 5. `attemptNumber` is the count of this student's attempts on this version, including the new one.
 6. `started_at` and `expires_at` stay NULL — the clock starts at first section entry. `attempt_clock_paired` enforces all-or-nothing, so setting one without the other is a constraint violation.

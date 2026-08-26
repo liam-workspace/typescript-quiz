@@ -2679,11 +2679,14 @@ No HTTP server, no React, no auth.
 
 **Deliberate deviation from spec §8 phase 0:** the spec folds "delete `socket`
 and `web`" into phase 0. This plan does not. `packages/socket` and
-`packages/web` stay present and building; they are deleted in plan 3, once
-`packages/app` can replace them. Deleting them here would leave the repository
-with no runnable application across two whole plans, and a fork nobody can run
-is a fork nobody can sanity-check. The spec's intent — that they do not survive
-to v1 — is unchanged.
+`packages/web` stay present on disk, deliberately outside the pnpm workspace
+and outside oxlint's scope; they do not build on this branch, and neither does
+the Docker image that copies their `dist/` output. They are deleted in plan 3,
+once `packages/app` can replace them. Deleting them here would leave the
+repository with no runnable application across two whole plans, and a fork
+nobody can run is a fork nobody can sanity-check. The spec's intent — that they
+do not survive to v1 — is unchanged. What that leaves broken, and who fixes it,
+is recorded in `docs/architecture/plan-2-preconditions.md`.
 
 Also deferred from phase 0: the `server` and `app` package scaffolds. They are
 created by the plans that first put code in them, so no empty package sits in

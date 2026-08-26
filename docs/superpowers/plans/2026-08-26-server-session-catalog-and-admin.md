@@ -1130,6 +1130,36 @@ const UPSERT = `
 
 - [ ] **Step 4: Run the repository test** → PASS.
 
+- [ ] **Step 4b: Give the e2e harness an auth seam — it has none**
+
+`createTestApp` (Task 3) takes only `{ now }`. Every route from here on is
+behind `JwksGuard`, and `AppModule` builds a real verifier from
+`loadServerConfig().jwksUrl`, so as it stands **no e2e test can authenticate**.
+This was not specified anywhere and every remaining task needs it.
+
+Extend `test/helpers/app.ts` to reuse Task 4's `createTokenFactory`:
+
+```ts
+export interface TestApp {
+  readonly http: INestApplication
+  get: INestApplication["get"]
+  mint(claims: {
+    sub: string
+    email: string
+    isAdmin?: boolean
+  }): Promise<string>
+  close(): Promise<void>
+}
+```
+
+`createTestApp` builds a `TokenFactory`, overrides the `JWKS_VERIFIER` provider
+with `createJwksVerifier({ jwksUrl, fetchFn })` exactly as `auth.e2e.test.ts`
+does, and exposes `mint` so tests can get a bearer for a given subject. Keep
+the `CLOCK` override.
+
+Also set `process.env.ALLOWED_EMAILS` in the harness — see the allowlist note
+below, or every session test will 403.
+
 - [ ] **Step 5: Write the failing e2e test**
 
 `packages/server/test/session.e2e.test.ts`:
@@ -1145,7 +1175,40 @@ The third case must assert `expect(res.body).not.toHaveProperty("created")` — 
 
 - [ ] **Step 6: Implement the controller and service**
 
-`POST /session` → `201` with `SessionResult`; `GET /me` → `200` with `Student`, `404 student_not_provisioned` when the subject has no row (a valid token whose owner never called `POST /session`).
+**Three corrections to this step, from reading `docs/api/openapi.yaml` rather
+than trusting the sentence that used to be here.**
+
+_Status codes._ `POST /session` is **`201` only when it provisions** and
+**`200` when the student already existed** (openapi.yaml lines 104-116). The
+earlier wording said `201` flat, which would have violated the contract on
+every call after the first. Drive the status off the repository's `created`
+flag. `GET /me` → `200` with `Student`, `404 student_not_provisioned` when the
+subject has no row (a valid token whose owner never called `POST /session`).
+
+_The allowlist, which was missing entirely._ The contract defines
+**`403` when the email is not permitted by the allowlist**, and no step
+implemented it. Use `isEmailAllowed(email, config.allowedEmails)` from
+`@liam-workspace/node-auth-server` — verified signature, and it supports both
+exact lowercase matches and `*@domain` wildcards. **An empty `allowedEmails`
+rejects everything** (it returns `dynamicAllowlist?.has(...) ?? false`), which
+is the right fail-closed default but means the harness must set
+`ALLOWED_EMAILS` or every test 403s. This is the only thing standing between a
+valid Google token from any account and a provisioned student row, so it needs
+its own e2e case:
+
+```ts
+it("POST /session refuses an email outside the allowlist", …)   // 403
+```
+
+_Do not leak `pictureUrl`._ `StudentRow` carries it because the column exists,
+but both `Student` and `SessionResult` are `additionalProperties: false` and
+neither lists it. The response projection must drop it. The `GET /me` case
+already asserts `not.toHaveProperty("created")`; assert the same for
+`pictureUrl`.
+
+`isAdmin` comes from the claims on every response, never from the database —
+there is no admin column, and the contract's `isAdmin` must reflect the token
+presented on THIS request so a revoked role takes effect immediately.
 
 `isAdmin` comes from the claims on every response, never from the database — there is no admin column, and the contract's `isAdmin` must reflect the token presented on THIS request so a revoked role takes effect immediately.
 
@@ -1153,8 +1216,9 @@ The third case must assert `expect(res.body).not.toHaveProperty("created")` — 
 
 ```bash
 pnpm lint && pnpm format && pnpm typecheck && pnpm test
-git add -A && git commit -m "feat(server): provision the student profile from verified claims"
 ```
+
+Do NOT run `git add -A`. Stage by explicit path.
 
 ---
 

@@ -205,6 +205,29 @@ describe("projections", () => {
     })
   }, 120_000)
 
+  // Per-attempt progress lives in attempt_section, which this query does not
+  // join. The projection used to emit status/completedAt/expiresAt as
+  // constants regardless of attemptId; this pins the key set so they cannot
+  // come back as lies rather than as a join.
+  it("loadForRunner sections carry no per-attempt progress fields", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const sections = await loadForRunner(pool, f.versionId, null)
+
+      expect(sections.length).toBeGreaterThan(0)
+
+      for (const section of sections) {
+        expect(Object.keys(section).sort()).toEqual([
+          "allowAnswerChange",
+          "groups",
+          "id",
+          "navigation",
+          "type",
+        ])
+      }
+    })
+  }, 120_000)
+
   it("loadForScoring returns the answer key", async () => {
     await withDatabase(async (pool) => {
       const f = await seedPublishedTest(pool)

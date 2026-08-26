@@ -1,5 +1,6 @@
 import {
   asChoiceId,
+  asGroupId,
   asQuestionId,
   asSectionId,
   asStimulusId,
@@ -57,8 +58,11 @@ interface ScoringRow {
  * when the stimulus's effective max_plays is null. A capped stimulus's URL is
  * issued by POST /play, which increments a play counter this query only reads.
  *
- * `attemptId` is optional so a preview can load a version with no attempt; when
- * present it supplies playsUsed from stimulus_play.
+ * `attemptId` supplies exactly one thing: playsUsed, read from stimulus_play.
+ * Pass null to load a version with no attempt (a preview), and playsUsed is 0
+ * throughout. Nothing else in the returned tree depends on it -- per-attempt
+ * section progress lives in attempt_section, which this query does not join
+ * and RunnerSection does not claim to carry.
  */
 export async function loadForRunner(
   pool: pg.Pool,
@@ -114,11 +118,8 @@ function findOrCreateSection(
   const section: RunnerSection = {
     id: asSectionId(r.s_id),
     type: r.s_type as RunnerSection["type"],
-    status: "pending",
-    completedAt: null,
     navigation: r.s_navigation as RunnerSection["navigation"],
     allowAnswerChange: r.s_allow_change,
-    expiresAt: null,
     groups: [],
   }
 
@@ -128,14 +129,14 @@ function findOrCreateSection(
 }
 
 function findOrCreateGroup(section: RunnerSection, r: RunnerRow): RunnerGroup {
-  const existing = section.groups.find((g) => g.id === r.g_id)
+  const existing = section.groups.find((g) => g.id === asGroupId(r.g_id))
 
   if (existing) {
     return existing
   }
 
   const group: RunnerGroup = {
-    id: r.g_id,
+    id: asGroupId(r.g_id),
     ...(r.st_id ? { stimulus: buildStimulus(r, r.st_id) } : {}),
     questions: [],
   }

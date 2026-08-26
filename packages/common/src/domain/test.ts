@@ -1,4 +1,10 @@
-import type { ChoiceId, QuestionId, SectionId, StimulusId } from "./ids.js"
+import type {
+  ChoiceId,
+  GroupId,
+  QuestionId,
+  SectionId,
+  StimulusId,
+} from "./ids.js"
 
 export type SectionType = "listening" | "reading" | "vocabulary" | "grammar"
 
@@ -42,19 +48,22 @@ export interface RunnerStimulus {
 }
 
 export interface RunnerGroup {
-  id: string
+  id: GroupId
   stimulus?: RunnerStimulus
   questions: RunnerQuestion[]
 }
 
+/**
+ * Per-attempt progress (status, completedAt, expiresAt) is deliberately
+ * absent: it lives in attempt_section, which nothing in plan 1 creates, so a
+ * projection built from content alone cannot know it. A type that omits what
+ * it cannot know beats one that fills it with constants.
+ */
 export interface RunnerSection {
   id: SectionId
   type: SectionType
-  status: "pending" | "open" | "closed"
-  completedAt: string | null
   navigation: NavigationMode
   allowAnswerChange: boolean
-  expiresAt: string | null
   groups: RunnerGroup[]
 }
 

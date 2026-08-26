@@ -12,6 +12,8 @@ export type SectionId = Branded<string, "SectionId">
 
 export type StimulusId = Branded<string, "StimulusId">
 
+export type GroupId = Branded<string, "GroupId">
+
 export type QuestionId = Branded<string, "QuestionId">
 
 export type ChoiceId = Branded<string, "ChoiceId">
@@ -27,6 +29,8 @@ export const asTestVersionId = (v: string) => v as TestVersionId
 export const asSectionId = (v: string) => v as SectionId
 
 export const asStimulusId = (v: string) => v as StimulusId
+
+export const asGroupId = (v: string) => v as GroupId
 
 export const asQuestionId = (v: string) => v as QuestionId
 

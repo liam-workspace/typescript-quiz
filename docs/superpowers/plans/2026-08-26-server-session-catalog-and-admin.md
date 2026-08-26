@@ -650,7 +650,11 @@ import { CLOCK } from "../../src/database/tokens.js"
 
 export interface TestApp {
   readonly http: INestApplication
-  get<T>(token: string): T
+  // NOT `get<T>(token: string): T`. An unconstrained type parameter used
+  // only in return position is a disguised `as any` -- the caller names the
+  // type and nothing checks it -- and oxlint's
+  // no-unnecessary-type-parameters rejects it. Reuse Nest's real signature.
+  get: INestApplication["get"]
   close(): Promise<void>
 }
 
@@ -671,7 +675,7 @@ export async function createTestApp(
 
   return {
     http,
-    get: <T>(token: string) => moduleRef.get<T>(token),
+    get: http.get.bind(http),
     close: () => http.close(),
   }
 }

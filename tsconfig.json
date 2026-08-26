@@ -3,12 +3,6 @@
     "noEmit": true,
     "noErrorTruncation": true,
     "esModuleInterop": true,
-    "paths": {
-      "@pp/common": ["./packages/common/src/index.ts"],
-      "@pp/common/*": ["./packages/common/src/*"],
-      "@pp/db": ["./packages/db/src/index.ts"],
-      "@pp/db/*": ["./packages/db/src/*"]
-    },
     "strict": true,
     "strictNullChecks": true
   }

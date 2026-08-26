@@ -1,6 +1,12 @@
 import { defineConfig } from "vitest/config"
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@pp/common": new URL("../common/src/index.ts", import.meta.url).pathname,
+      "@pp/db": new URL("../db/src/index.ts", import.meta.url).pathname,
+    },
+  },
   test: {
     // One PostgreSQL 16 container for the whole `vitest run`, not one per
     // test file. See test/helpers/global-setup.ts.

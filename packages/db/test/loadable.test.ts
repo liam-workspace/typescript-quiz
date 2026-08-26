@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
-import { describe, expect, it } from "vitest"
+import { createPool, waitForDatabase } from "@liam-public/node-postgres"
+import { describe, expect, inject, it } from "vitest"
 
 const run = promisify(execFile)
 
@@ -27,4 +28,36 @@ describe("built output", () => {
     ])
     expect(stdout.trim()).toBe("function")
   })
+
+  it("runs migrateToLatest from the built package against a real database", async () => {
+    const databaseUrl = inject("postgresConnectionUri")
+    await waitForDatabase(databaseUrl, { retries: 20, delayMs: 250 })
+    const pool = createPool(databaseUrl, { applicationName: "pp:test" })
+
+    try {
+      await pool.query(
+        "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;",
+      )
+
+      // `migrateToLatest` resolves its migrations directory relative to its
+      // own compiled location (`resolve(here, "../migrations")`). Running it
+      // from the *built* @pp/db package, in a plain Node subprocess with no
+      // access to this repo's `src/`, is what actually exercises that the
+      // path still lands on packages/db/migrations from `dist/`.
+      await run("node", [
+        "--input-type=module",
+        "-e",
+        'const { migrateToLatest } = await import("@pp/db"); await migrateToLatest(process.argv[1])',
+        "--",
+        databaseUrl,
+      ])
+
+      const { rows } = await pool.query<{ exists: boolean }>(
+        "SELECT to_regclass('public.pp_migrations') IS NOT NULL AS exists",
+      )
+      expect(rows[0]?.exists).toBe(true)
+    } finally {
+      await pool.end()
+    }
+  }, 120_000)
 })

@@ -178,17 +178,21 @@ single structural change that makes the app suitable for language exams.
 a test can never move a score already recorded. Enforced by triggers.
 
 **Nothing may cross a version boundary.** Every content and attempt row is
-fenced to exactly one `test_version` — most tables carry `test_version_id`
-directly and link to their parent through a composite foreign key including
-it, which pins that row to a single version. The leaf tables (`choice`,
-`question_tag`, `section_instruction`, `response_client_cursor`,
-`response_choice`) carry no `test_version_id` of their own; each has exactly
-one parent, and that parent is itself pinned to one version by a composite key
-higher up, so the fence holds transitively — a `choice` cannot reach a second
-version because its only parent, `question`, cannot. `response_choice`
-additionally composite-FKs on `(choice_id, question_id)`, which pins a
-different invariant — that the choice belongs to the same question the
-response answered — not version fencing.
+fenced to exactly one `test_version`. Most tables carry `test_version_id`
+directly and reach their parent through a composite foreign key including it,
+which pins the row to a single version. The five leaf tables carry no
+`test_version_id` of their own and inherit the fence transitively instead.
+Four of them — `choice`, `question_tag`, `section_instruction` and
+`response_client_cursor` — have exactly one parent, itself already pinned, so
+a `choice` cannot reach a second version because its only parent, `question`,
+cannot; the leaf's own FK does not need to repeat the version column, and for
+three of the four it is a plain single-column FK. `response_choice` is the
+one leaf with two parents: `(attempt_id, question_id)` to `response` and
+`(choice_id, question_id)` to `choice`. Both are composite and both include
+`question_id`, so the answered question and the selected choice's question
+are the same column value — the two paths cannot disagree. That second FK
+pins a further invariant beyond version fencing: you cannot select a choice
+belonging to a different question.
 
 Both are proven by `docs/db/invariants.test.sql`, not merely asserted.
 

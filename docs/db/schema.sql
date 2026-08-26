@@ -12,11 +12,11 @@
 --     editing a test can never move a score that has already been
 --     recorded. Immutability is enforced by triggers, not convention.
 --
---  2. Nothing may cross a version boundary. Every content and attempt
---     table carries test_version_id and every parent link is a COMPOSITE
---     foreign key including it, so "an answer to a question from a
---     different version of this test" is unrepresentable rather than
---     merely discouraged.
+--  2. Nothing may cross a version boundary. Most tables carry
+--     test_version_id and reach their parent through a COMPOSITE foreign
+--     key including it; the five leaf tables carry none and inherit the
+--     fence transitively through already-pinned parents. Unrepresentable
+--     rather than merely discouraged; docs/db/README.md has the argument.
 -- =====================================================================
 
 BEGIN;

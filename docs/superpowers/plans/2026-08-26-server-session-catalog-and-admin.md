@@ -1239,13 +1239,66 @@ The catalog is the screen that most shapes the API: it needs per-test attempt st
 
   ```ts
   export interface TestCardRow {
-    /* mirrors the TestCard schema */
+    id: string
+    slug: string
+    title: string
+    level: "primary-step-1" | "primary-step-2" | null
+    durationSeconds: number
+    sections: { type: SectionType; questionCount: number }[]
+    inProgressAttemptId: string | null
+    attemptCount: number
+    bestAttempt: {
+      attemptId: string
+      submittedAt: string
+      pointsEarned: number
+      pointsPossible: number
+      percentage: number
+    } | null
   }
   export async function listPublishedTests(
     db: PgQueryable,
     input: { studentId: string; limit: number; cursor: string | null },
-  ): Promise<{ tests: TestCardRow[]; nextCursor: string | null }>
+  ): Promise<{
+    tests: TestCardRow[]
+    nextCursor: string | null
+    summary: { attemptCount: number; averagePct: number; bestPct: number }
+  }>
   ```
+
+**Two contract facts this task previously got wrong. Both checked against
+`docs/api/openapi.yaml` and a live database, not inferred.**
+
+_The response has THREE required keys, not two._ `GET /tests` returns
+`required: [tests, nextCursor, summary]`, where `summary` is a
+`StudentSummary` — `{ attemptCount, averagePct, bestPct }` across ALL of this
+student's attempts, not per test and not per page. The interface above used to
+return only `{ tests, nextCursor }`, which would have shipped a response
+missing a required field on every call. It is a separate aggregate query; do
+not try to derive it from the current page, which would give a different
+answer per page.
+
+_Postgres hands back strings where the contract says numbers._ Verified
+against a real database:
+
+```
+SELECT 85.25::numeric(5,2) AS pct, count(*)::bigint AS cnt
+  ->  typeof pct === "string", value "85.25"
+  ->  typeof cnt === "string"
+```
+
+node-postgres returns `numeric` and `bigint` as strings to avoid precision
+loss. So `percentage` (`numeric(5,2)`), `attemptCount` (`count(*)`) and both
+`StudentSummary` averages (`avg(...)`) arrive as strings, while the contract
+declares `type: number` / `type: integer`. Convert at the repository boundary
+with `Number(...)`. Left alone this emits `"85.25"` and `"3"` where clients
+expect numbers — a schema-validating client rejects the response, and a
+frontend doing arithmetic silently concatenates strings.
+
+`points_earned` and `points_possible` are plain `integer` columns and come
+back as numbers; they need no conversion. **Assert on the TYPE in the
+repository tests** (`expect(typeof card.attemptCount).toBe("number")`), not
+just the value — `toBe(3)` fails against `"3"` but `toEqual` on a whole object
+can be written in ways that do not.
 
 - [ ] **Step 1: Query design, decided here so no implementer invents one**
 
@@ -1273,9 +1326,8 @@ The fourth is the one that would silently regress: a `LEFT JOIN` without a `stat
 
 - [ ] **Step 5: e2e test, gates, commit**
 
-```bash
-git commit -m "feat(server): serve the paginated catalog with per-student standing"
-```
+Do NOT run `git add -A` and do NOT commit. Leave the work uncommitted; the
+reviewer stages by explicit path and writes the commit.
 
 ---
 

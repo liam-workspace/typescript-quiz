@@ -981,6 +981,46 @@ it("exposes it from the scoring entry point", async () => {
 
 Assert on the runtime key set, not on types — a type-only check would pass against a barrel that still re-exports the value at runtime, which is exactly the failure being prevented.
 
+**Two things verified during pre-flight; do not rediscover them the hard way.**
+
+_Resolution._ Under vitest, bare `@pp/db` hits the `resolve.alias` and loads
+`packages/db/src/index.ts`, so case 1 tests the SOURCE barrel — which is what
+we want. But `@pp/db/scoring` is NOT swallowed by that alias (checked: it
+falls through to Node resolution with `Cannot find package '@pp/db/scoring'`),
+so once the export exists it will load `dist/scoring.js` — the BUILT artifact.
+That works, because `pnpm test` builds first. The footgun is
+`pnpm --filter @pp/db test` on its own, which does not build: it would read a
+stale `dist`. Add explicit subpath aliases to both vitest configs so tests
+read source consistently:
+
+```ts
+      "@pp/db/scoring": new URL("../db/src/scoring.ts", import.meta.url).pathname,
+      "@pp/common/scoring": new URL("../common/src/scoring.ts", import.meta.url).pathname,
+```
+
+List the subpath entries BEFORE the bare ones.
+
+_The two halves need different enforcement._ `loadForScoring` is a value, so
+the runtime `Object.keys` assertion above genuinely pins it. `ScoringChoice`
+and `ScoringQuestion` are interfaces — erased at runtime, so no runtime
+assertion can see them and `Object.keys` is useless for that half. Pin it at
+the type level instead:
+
+```ts
+// @ts-expect-error -- ScoringChoice must NOT be reachable from the default barrel
+import type { ScoringChoice as _Leaked } from "@pp/common"
+```
+
+If the type ever leaks back into the barrel the import stops erroring and
+`@ts-expect-error` itself becomes the error ("Unused '@ts-expect-error'
+directive"). This is newly enforceable: before `63a7943` test files were
+outside every tsconfig and `pnpm typecheck` never looked at them.
+
+Note the types live in `src/domain/test.ts`, which the barrel re-exports with
+`export *`. They must physically move to `src/scoring.ts`, or the barrel must
+stop using `export *` for that file — leaving them in place and adding a
+second entry point exports them from both.
+
 - [ ] **Step 2: Run it to verify the first case fails**
 
 Run: `pnpm --filter @pp/db test boundary`
@@ -1005,8 +1045,10 @@ Same shape for `@pp/common`.
 
 ```bash
 pnpm lint && pnpm format && pnpm typecheck && pnpm test
-git add -A && git commit -m "refactor: put the answer key behind its own entry point"
 ```
+
+Do NOT commit and do NOT run `git add`. Leave the work uncommitted; the
+reviewer stages by explicit path and writes the commit.
 
 ---
 

@@ -824,7 +824,7 @@ paths:
               required: [file, kind]
               properties:
                 file: { type: string, format: binary }
-                kind: { type: string, enum: [audio, image] }
+                kind: { $ref: "#/components/schemas/MediaKind" }
       responses:
         "201":
           description: Asset stored.
@@ -1094,7 +1094,7 @@ components:
         id: { type: string }
         slug: { type: string }
         title: { type: string }
-        level: { type: string, enum: [primary-step-1, primary-step-2] }
+        level: { $ref: "#/components/schemas/StudentLevel" }
         durationSeconds: { type: integer }
         sections:
           type: array
@@ -1120,6 +1120,22 @@ components:
     NavigationMode:
       type: string
       enum: [free, forward_only]
+
+    QuestionType:
+      type: string
+      enum: [single_choice, multi_choice]
+
+    StimulusType:
+      type: string
+      enum: [audio, passage, image, mixed]
+
+    MediaKind:
+      type: string
+      enum: [audio, image]
+
+    StudentLevel:
+      type: string
+      enum: [primary-step-1, primary-step-2]
 
     Playback:
       type: [object, "null"]
@@ -1293,7 +1309,7 @@ components:
       properties:
         id: { type: string }
         ordinal: { type: integer }
-        type: { type: string, enum: [single_choice, multi_choice] }
+        type: { $ref: "#/components/schemas/QuestionType" }
         prompt: { type: string }
         choices:
           type: array
@@ -1308,7 +1324,7 @@ components:
       additionalProperties: false
       properties:
         id: { type: string }
-        type: { type: string, enum: [audio, passage, image, mixed] }
+        type: { $ref: "#/components/schemas/StimulusType" }
         title: { type: string }
         bodyText: { type: string, description: Present for a passage. }
         maxPlays: { type: integer, minimum: 1 }
@@ -1325,7 +1341,7 @@ components:
       additionalProperties: false
       properties:
         id: { type: string }
-        type: { type: string, enum: [audio, passage, image, mixed] }
+        type: { $ref: "#/components/schemas/StimulusType" }
         title: { type: string }
         bodyText: { type: string, description: Present for a passage. }
         maxPlays: { type: "null" }
@@ -1768,7 +1784,7 @@ components:
       required: [id, kind, filename, mimeType, byteSize, checksum]
       properties:
         id: { type: string }
-        kind: { type: string, enum: [audio, image] }
+        kind: { $ref: "#/components/schemas/MediaKind" }
         filename: { type: string }
         mimeType: { type: string }
         byteSize: { type: integer }
@@ -1783,7 +1799,7 @@ components:
       properties:
         title: { type: string }
         slug: { type: string }
-        level: { type: string, enum: [primary-step-1, primary-step-2] }
+        level: { $ref: "#/components/schemas/StudentLevel" }
         durationSeconds: { type: integer }
         sections:
           type: array
@@ -1809,8 +1825,7 @@ components:
                     stimulus:
                       type: object
                       properties:
-                        type:
-                          { type: string, enum: [audio, passage, image, mixed] }
+                        type: { $ref: "#/components/schemas/StimulusType" }
                         title: { type: string }
                         bodyText: { type: string }
                         mediaFilename: { type: string }
@@ -1827,11 +1842,7 @@ components:
                             type: string
                             description: Stable across versions, so item history survives a re-publish.
                           prompt: { type: string }
-                          type:
-                            {
-                              type: string,
-                              enum: [single_choice, multi_choice],
-                            }
+                          type: { $ref: "#/components/schemas/QuestionType" }
                           points: { type: integer }
                           tags:
                             type: array

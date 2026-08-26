@@ -1539,6 +1539,20 @@ Note `importTestDocument` is the write direction and carries no disclosure
 risk on its own, but it shares the module and the same admin-only lifecycle,
 so fence them together rather than splitting the pair.
 
+**The move is collateral-free — both facts verified, so do not hedge:**
+
+1. `test-import.repository.ts` exports **exactly** those two functions and
+   nothing else, so deleting `export * from "./repositories/test-import.repository.js"`
+   from `packages/db/src/index.ts` removes precisely the two intended symbols.
+2. The only consumer today is `packages/db/test/import-export.test.ts`, and it
+   already imports from the relative source path
+   (`../src/repositories/test-import.repository.js`), not from `@pp/db`. It
+   keeps working untouched.
+
+`finalizeExpiredAttempt` stays in the default barrel deliberately: it reads
+the answer key internally but returns only aggregate counts, never per-question
+correctness, so it discloses nothing a student may not see.
+
 - Produces:
 
   ```ts

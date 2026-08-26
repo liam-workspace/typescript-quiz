@@ -1,9 +1,12 @@
+import { type DbConfig, loadDbConfig } from "./config.js"
+import { createJobPool, createRequestPool } from "./pool.js"
+
 export { migrateToLatest } from "./migrate.js"
 
 export * from "./repositories/test-import.repository.js"
 
 export * from "./repositories/test-version.repository.js"
 
-export * from "./config.js"
+export type { DbConfig }
 
-export * from "./pool.js"
+export { loadDbConfig, createJobPool, createRequestPool }

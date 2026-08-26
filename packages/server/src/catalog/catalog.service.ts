@@ -9,7 +9,9 @@ import {
   findStudentBySubject,
   InvalidCursorError,
   listPublishedTests,
+  loadTestBrief,
   type ListPublishedTestsResult,
+  type TestBriefRow,
 } from "@pp/db"
 import { REQUEST_POOL } from "../database/tokens.js"
 
@@ -65,5 +67,24 @@ export class CatalogService {
 
       throw error
     }
+  }
+
+  async getBrief(subjectClaim: string, slug: string): Promise<TestBriefRow> {
+    const student = await findStudentBySubject(this.pool, subjectClaim)
+
+    if (!student) {
+      throw new NotFoundException("student_not_provisioned")
+    }
+
+    const brief = await loadTestBrief(this.pool, {
+      slug,
+      studentId: student.id,
+    })
+
+    if (!brief) {
+      throw new NotFoundException("test_not_found")
+    }
+
+    return brief
   }
 }

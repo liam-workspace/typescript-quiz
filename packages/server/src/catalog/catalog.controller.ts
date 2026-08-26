@@ -2,11 +2,12 @@ import type { JwtClaims } from "@liam-workspace/node-auth-server"
 import {
   Controller,
   Get,
+  Param,
   Query,
   UnauthorizedException,
   UseGuards,
 } from "@nestjs/common"
-import type { ListPublishedTestsResult } from "@pp/db"
+import type { ListPublishedTestsResult, TestBriefRow } from "@pp/db"
 import { CurrentStudent } from "../auth/current-student.decorator.js"
 import { JwksGuard } from "../auth/jwks.guard.js"
 import { CatalogService } from "./catalog.service.js"
@@ -23,6 +24,14 @@ export class CatalogController {
     @Query("cursor") cursor?: string,
   ): Promise<ListPublishedTestsResult> {
     return this.catalog.list(subjectOf(claims), limit, cursor ?? null)
+  }
+
+  @Get(":slug")
+  getBrief(
+    @CurrentStudent() claims: JwtClaims,
+    @Param("slug") slug: string,
+  ): Promise<TestBriefRow> {
+    return this.catalog.getBrief(subjectOf(claims), slug)
   }
 }
 

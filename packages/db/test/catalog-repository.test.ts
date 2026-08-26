@@ -3,6 +3,7 @@ import type pg from "pg"
 import { describe, expect, it } from "vitest"
 import {
   listPublishedTests,
+  loadTestBrief,
   type TestCardRow,
 } from "../src/repositories/catalog.repository.js"
 import { withDatabase } from "./helpers/database.js"
@@ -297,6 +298,99 @@ describe("catalog repository", () => {
 
       expect(overlap).toHaveLength(0)
       expect([...page1Ids, ...page2Ids].sort()).toEqual(allIds)
+    })
+  }, 120_000)
+})
+
+describe("loadTestBrief", () => {
+  it("returns sections, rules and instructions for a published test", async () => {
+    await withDatabase(async (pool) => {
+      const fixture = await seedPublishedTest(pool)
+
+      const brief = await loadTestBrief(pool, {
+        slug: "practice-test-04",
+        studentId: fixture.studentId,
+      })
+
+      expect(brief?.id).toBe(fixture.testId)
+      expect(brief?.slug).toBe("practice-test-04")
+      expect(brief?.title).toBe("TOEFL Primary — Practice Test 04")
+      expect(brief?.durationSeconds).toBe(3000)
+      expect(brief?.attemptCount).toBe(0)
+      expect(typeof brief?.attemptCount).toBe("number")
+      expect(brief?.inProgressAttemptId).toBeNull()
+      expect(brief?.sections).toHaveLength(2)
+      expect(brief?.sections[0]?.type).toBe("listening")
+      expect(brief?.sections[0]?.questionCount).toBe(1)
+      expect(brief?.sections[1]?.type).toBe("reading")
+      expect(brief?.sections[1]?.questionCount).toBe(1)
+    })
+  }, 120_000)
+
+  it("carries NO question or choice text anywhere in the payload", async () => {
+    await withDatabase(async (pool) => {
+      const fixture = await seedPublishedTest(pool)
+
+      const brief = await loadTestBrief(pool, {
+        slug: "practice-test-04",
+        studentId: fixture.studentId,
+      })
+      const serialized = JSON.stringify(brief)
+
+      expect(serialized).not.toContain("What does the boy want to do?")
+      expect(serialized).not.toContain("Why did the class eat inside?")
+      expect(serialized).not.toContain("Read a book")
+      expect(serialized).not.toContain("It began to rain")
+    })
+  }, 120_000)
+
+  it("404s for an unpublished slug", async () => {
+    await withDatabase(async (pool) => {
+      const fixture = await seedPublishedTest(pool)
+      await insertDraftTest(pool, {
+        slug: "still-drafting",
+        title: "Not Ready Yet",
+      })
+
+      const draftBrief = await loadTestBrief(pool, {
+        slug: "still-drafting",
+        studentId: fixture.studentId,
+      })
+      const missingBrief = await loadTestBrief(pool, {
+        slug: "does-not-exist",
+        studentId: fixture.studentId,
+      })
+
+      expect(draftBrief).toBeNull()
+      expect(missingBrief).toBeNull()
+    })
+  }, 120_000)
+
+  it("carries each section's instructions in order and its playback rules", async () => {
+    await withDatabase(async (pool) => {
+      const fixture = await seedPublishedTest(pool)
+
+      const brief = await loadTestBrief(pool, {
+        slug: "practice-test-04",
+        studentId: fixture.studentId,
+      })
+      const [listening, reading] = brief?.sections ?? []
+
+      expect(listening.title).toBe("Listening — Part 1")
+      expect(listening.navigation).toBe("forward_only")
+      expect(listening.allowAnswerChange).toBe(false)
+      expect(listening.instructions).toEqual(["Put your headphones on now."])
+      expect(listening.playback).toEqual({
+        maxPlays: 1,
+        allowPause: false,
+        allowSeek: false,
+      })
+
+      expect(reading.title).toBe("Reading")
+      expect(reading.navigation).toBe("free")
+      expect(reading.allowAnswerChange).toBe(true)
+      expect(reading.instructions).toEqual([])
+      expect(reading.playback).toBeNull()
     })
   }, 120_000)
 })

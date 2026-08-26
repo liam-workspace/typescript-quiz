@@ -3,8 +3,10 @@ import { createJobPool, createRequestPool } from "./pool.js"
 import {
   InvalidCursorError,
   listPublishedTests,
+  loadTestBrief,
   type ListPublishedTestsResult,
   type StudentSummary,
+  type TestBriefRow,
   type TestCardRow,
 } from "./repositories/catalog.repository.js"
 import { loadForRunner } from "./repositories/test-version.repository.js"
@@ -22,7 +24,12 @@ export type { DbConfig }
 
 export type { StudentRow }
 
-export type { ListPublishedTestsResult, StudentSummary, TestCardRow }
+export type {
+  ListPublishedTestsResult,
+  StudentSummary,
+  TestBriefRow,
+  TestCardRow,
+}
 
 export {
   loadDbConfig,
@@ -32,5 +39,6 @@ export {
   upsertStudentBySubject,
   findStudentBySubject,
   listPublishedTests,
+  loadTestBrief,
   InvalidCursorError,
 }

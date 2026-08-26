@@ -556,6 +556,35 @@ export const JOB_POOL = "JOB_POOL"
 export const CLOCK = "CLOCK"
 ```
 
+- [ ] **Step 1b: Create the container globalSetup and wire it into vitest.config.ts — BEFORE any test step**
+
+This must happen before Step 3 runs anything. Task 2 shipped `vitest.config.ts`
+with no container because its health test needs no database; this task is where
+database access arrives. A test step that runs before the container exists
+cannot produce the red it claims to.
+
+`packages/server/test/helpers/global-setup.ts` — mirror
+`packages/db/test/helpers/global-setup.ts`, including the `declare module
+"vitest"` augmentation that types `postgresConnectionUri`, without which
+`inject("postgresConnectionUri")` does not typecheck. Do NOT import the db
+package's copy across the package boundary; duplicate it.
+
+Then modify `packages/server/vitest.config.ts` — it already exists, do not
+recreate it. Keep the existing `resolve.alias` block verbatim and add:
+
+```ts
+  test: {
+    globalSetup: ["./test/helpers/global-setup.ts"],
+    // Files share the container's `public` schema and each resets it, so two
+    // at once race on DROP SCHEMA and the migrations lock.
+    fileParallelism: false,
+  },
+```
+
+Verify before moving on: `pnpm --filter @pp/server test` must still pass its
+existing health test with the container now booting. If Docker is unavailable
+in your environment, say so and stop — do not report a gate you did not run.
+
 - [ ] **Step 2: Write the failing test — two pools, distinguishable at the database**
 
 `packages/server/test/database.e2e.test.ts`:
@@ -700,8 +729,10 @@ Expected: PASS — both pool names present, `pp_migrations` populated.
 
 ```bash
 pnpm lint && pnpm format && pnpm typecheck && pnpm test
-git add -A && git commit -m "feat(server): gate boot on the database and provide both pools"
 ```
+
+Do NOT commit and do NOT run `git add`. Leave the work uncommitted in the
+working tree; the reviewer stages by explicit path and writes the commit.
 
 ---
 

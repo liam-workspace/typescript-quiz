@@ -5,3 +5,5 @@ export * from "./domain/test.js"
 export * from "./domain/attempt.js"
 
 export * from "./interchange/test-document.js"
+
+export * from "./domain/clock.js"

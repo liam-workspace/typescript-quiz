@@ -13,10 +13,14 @@
     "test:db": "pnpm --filter @pp/db test",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
+    "lint:frontend": "frontend-lint packages/app/src || true",
+    "lint:i18n": "i18n-lint packages/app/src || true",
     "format": "prettier --check . --log-level warn",
     "format:fix": "prettier --write . --log-level warn"
   },
   "devDependencies": {
+    "@liam-public/node-frontend-lint": "^0.4.0",
+    "@liam-public/node-i18n-lint": "^0.2.0",
     "@stylistic/eslint-plugin": "latest",
     "dotenv-cli": "^11.0.0",
     "oxlint": "latest",

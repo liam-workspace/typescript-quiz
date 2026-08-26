@@ -8,6 +8,12 @@ importers:
 
   .:
     devDependencies:
+      '@liam-public/node-frontend-lint':
+        specifier: ^0.4.0
+        version: 0.4.0(typescript@6.0.3)
+      '@liam-public/node-i18n-lint':
+        specifier: ^0.2.0
+        version: 0.2.0(typescript@6.0.3)
       '@stylistic/eslint-plugin':
         specifier: latest
         version: 5.10.0(eslint@10.3.0)
@@ -186,6 +192,18 @@ packages:
 
   '@liam-public/node-config@0.1.0':
     resolution: {integrity: sha512-eW17e/X9p0d7Ni2E+NlG1cS2TCG7Yprm+PsJ0iDR07HVwL1OB9/z30qIE6wTDLLqQmSxekv++NxmwqpftJl5RQ==}
+
+  '@liam-public/node-frontend-lint@0.4.0':
+    resolution: {integrity: sha512-3tQpNRVR5cyrfwqGmih79yHNhMNk6bH4tM7U/T322gt3ZRbCG8uSENATKfMw6skXKekvbzWVfnXcMxoI4tnUxg==}
+    hasBin: true
+    peerDependencies:
+      typescript: '>=5.0.0'
+
+  '@liam-public/node-i18n-lint@0.2.0':
+    resolution: {integrity: sha512-aae0Pf2pdu8GbWVhHG50vSVu+IoDRHLnn7U56IkGPEcWmMIYHUw4AnYUURvsJy2CU/rxkutF6PlNp4v/2VE1Zg==}
+    hasBin: true
+    peerDependencies:
+      typescript: '>=5.0.0'
 
   '@liam-public/node-postgres@0.3.1':
     resolution: {integrity: sha512-M6m8VgdG8FW9/u4t7V6MUO3panoe1BnWNKqDUa2hYMF864w+dgvNEnkNzIwtpNow8lrobDPv9oRZyl2YxFQKgg==}
@@ -1833,6 +1851,14 @@ snapshots:
       - supports-color
 
   '@liam-public/node-config@0.1.0': {}
+
+  '@liam-public/node-frontend-lint@0.4.0(typescript@6.0.3)':
+    dependencies:
+      typescript: 6.0.3
+
+  '@liam-public/node-i18n-lint@0.2.0(typescript@6.0.3)':
+    dependencies:
+      typescript: 6.0.3
 
   '@liam-public/node-postgres@0.3.1(@types/pg@8.23.1)':
     dependencies:

@@ -125,6 +125,8 @@ describe("migration 1002 — attempts", () => {
     })
   }, 120_000)
 
+  // Every column present, so the only thing left to fail is the arithmetic:
+  // 1 + 0 is not 5.
   it("refuses a completed section whose counts do not reconcile", async () => {
     await withDatabase(async (pool) => {
       const f = await seedPublishedTest(pool)
@@ -133,9 +135,10 @@ describe("migration 1002 — attempts", () => {
         pool.query(
           `INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id,
                                         expires_at, completed_at,
-                                        answered_count, correct_count, incorrect_count)
+                                        points_earned, points_possible, answered_count,
+                                        unanswered_count, correct_count, incorrect_count)
            VALUES ('f0000000-0000-0000-0000-000000000001',$1,$2,
-                   now()+interval '25 min', now(), 5, 1, 0)`,
+                   now()+interval '25 min', now(), 1, 2, 5, 0, 1, 0)`,
           [f.listeningSectionId, f.versionId],
         ),
       ).rejects.toThrow(/attempt_section_counts_reconcile/)
@@ -149,9 +152,10 @@ describe("migration 1002 — attempts", () => {
       await pool.query(
         `INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id,
                                       expires_at, completed_at,
-                                      answered_count, correct_count, incorrect_count)
+                                      points_earned, points_possible, answered_count,
+                                      unanswered_count, correct_count, incorrect_count)
          VALUES ('f0000000-0000-0000-0000-000000000001',$1,$2,
-                 now()+interval '25 min', now(), 1, 1, 0)`,
+                 now()+interval '25 min', now(), 1, 2, 1, 0, 1, 0)`,
         [f.listeningSectionId, f.versionId],
       )
 
@@ -160,6 +164,28 @@ describe("migration 1002 — attempts", () => {
           WHERE attempt_id='f0000000-0000-0000-0000-000000000001'`,
       )
       expect(rows[0].answered_count).toBe(1)
+    })
+  }, 120_000)
+
+  // Widening the same guard to the other three columns: the arithmetic only
+  // mentions answered/correct/incorrect, so a constraint that stopped there
+  // would still let a completed section carry a NULL points_earned -- which
+  // is precisely what the per-section breakdown reads.
+  it("refuses a completed section missing points_earned", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      await newAttempt(pool, f, "f0000000-0000-0000-0000-000000000001")
+      await expect(
+        pool.query(
+          `INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id,
+                                        expires_at, completed_at,
+                                        points_possible, answered_count,
+                                        unanswered_count, correct_count, incorrect_count)
+           VALUES ('f0000000-0000-0000-0000-000000000001',$1,$2,
+                   now()+interval '25 min', now(), 2, 1, 0, 1, 0)`,
+          [f.listeningSectionId, f.versionId],
+        ),
+      ).rejects.toThrow(/attempt_section_counts_reconcile/)
     })
   }, 120_000)
 })

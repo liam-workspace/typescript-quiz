@@ -79,10 +79,15 @@ UPDATE question SET prompt='tampered' WHERE id='d0000000-0000-0000-0000-00000000
 \echo '--- 11 completed section with NULL counts MUST FAIL'
 INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id, expires_at, completed_at)
 VALUES ('f0000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-000000000003','a0000000-0000-0000-0000-000000000002',now()+interval '25 min',now());
-\echo '--- 11b completed section whose counts reconcile MUST SUCCEED'
+\echo '--- 11b completed section missing points_earned MUST FAIL'
 INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id, expires_at, completed_at,
-                             answered_count, correct_count, incorrect_count)
-VALUES ('f0000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-000000000003','a0000000-0000-0000-0000-000000000002',now()+interval '25 min',now(),1,1,0);
+                             points_possible, answered_count, unanswered_count, correct_count, incorrect_count)
+VALUES ('f0000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-000000000003','a0000000-0000-0000-0000-000000000002',now()+interval '25 min',now(),2,1,0,1,0);
+\echo '--- 11c completed section with the whole breakdown MUST SUCCEED'
+INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id, expires_at, completed_at,
+                             points_earned, points_possible, answered_count, unanswered_count,
+                             correct_count, incorrect_count)
+VALUES ('f0000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-000000000003','a0000000-0000-0000-0000-000000000002',now()+interval '25 min',now(),1,2,1,0,1,0);
 \echo '--- 12 publication violations on a NEW draft'
 INSERT INTO test_version (id, test_id, version, title, duration_seconds)
 VALUES ('a0000000-0000-0000-0000-000000000003','22222222-2222-2222-2222-222222222222',3,'T04 draft',9999);

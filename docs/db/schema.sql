@@ -405,15 +405,25 @@ CREATE TABLE attempt_section (
         REFERENCES test_section (id, test_version_id) ON DELETE RESTRICT,
 
     CONSTRAINT attempt_section_expiry_after_entry CHECK (expires_at > entered_at),
-    -- Completion implies the counts EXIST and reconcile. Without the
-    -- IS NOT NULL half, all-NULL counts make the arithmetic evaluate to
+    -- Completion implies the WHOLE breakdown exists and reconciles. Without
+    -- the IS NOT NULL half, all-NULL columns make the arithmetic evaluate to
     -- NULL, and a CHECK evaluating to NULL passes -- so a section the
-    -- database called complete could carry no counts at all. The
-    -- shape mirrors attempt_finished_is_graded on the attempt table above.
+    -- database called complete could carry no numbers at all. All six are
+    -- guarded, not only the three the arithmetic mentions: the per-section
+    -- breakdown reads points_earned off a completed section, and a guard
+    -- covering half its columns is the same fail-open shape three columns
+    -- over. Mirrors attempt_finished_is_graded on the attempt table above.
+    --
+    -- answered_count + unanswered_count is NOT reconciled against a total
+    -- here the way attempt_counts_reconcile uses question_count: this table
+    -- has no per-section question total to check against, and inventing a
+    -- column to make the symmetry work would be adding schema to satisfy a
+    -- constraint rather than a requirement.
     CONSTRAINT attempt_section_counts_reconcile CHECK (
         completed_at IS NULL OR (
-            answered_count IS NOT NULL AND correct_count IS NOT NULL
-            AND incorrect_count IS NOT NULL
+            points_earned IS NOT NULL AND points_possible IS NOT NULL
+            AND answered_count IS NOT NULL AND unanswered_count IS NOT NULL
+            AND correct_count IS NOT NULL AND incorrect_count IS NOT NULL
             AND correct_count + incorrect_count = answered_count
         )
     )

@@ -12,10 +12,11 @@ from npm.pkg.github.com and needs a `NODE_AUTH_TOKEN` — the name `.npmrc`
 actually reads, and the one `actions/setup-node` sets. Both scopes must be in
 `.npmrc` before `pnpm install` will resolve anything below.
 
-**Carried into plan 2.** Five things this plan leaves undone on purpose — the
+**Carried into plan 2.** Six things this plan leaves undone on purpose — the
 packages not being loadable by Node, the lint config's quarrel with NestJS,
-`moduleResolution`, the Scoring/Runner entry point, and the broken image build
-— are written down in `docs/architecture/plan-2-preconditions.md`.
+`moduleResolution`, the Scoring/Runner entry point, the three runner fields the
+wire contract carries but the projection does not, and the broken image build —
+are written down in `docs/architecture/plan-2-preconditions.md`.
 
 ---
 

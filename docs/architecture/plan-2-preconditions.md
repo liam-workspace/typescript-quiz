@@ -1,6 +1,6 @@
 # What plan 2 inherits
 
-Five things plan 1 leaves undone on purpose. Each was found late, judged out of
+Six things plan 1 leaves undone on purpose. Each was found late, judged out of
 scope for a foundation plan, and deferred — but deferring silently is how a
 known problem becomes a surprise. Each section says what is true today, why it
 was not fixed here, and the concrete first action plan 2 owes it.
@@ -76,7 +76,27 @@ projection: there is no module boundary, only a convention and a docstring.
 explicit task to draw that boundary — a separate entry point (or a lint rule
 naming who may import what) rather than a comment asking nicely.
 
-## 5. The Docker image and `pnpm build`/`dev`/`start` are broken
+## 5. The wire contract carries three fields the projection does not
+
+`docs/api/openapi.yaml`'s `RunnerSection` schema requires `status`,
+`completedAt` and `expiresAt`. The `RunnerSection` **projection** in
+`packages/common/src/domain/test.ts` no longer has them: `loadForRunner`
+invented them as constants (`"pending"`, `null`, `null`) on every section
+regardless of attempt, so they were dropped rather than filled in with a
+speculative `attempt_section` join that plan 1 has no rows for.
+
+This is not drift to be reconciled by editing one side. The three fields
+genuinely belong in the HTTP response, and the layers are allowed to differ:
+the projection is what the content query can know, the response is what the
+student needs. What must not happen is someone reading them off the projection
+and finding nothing there.
+
+**First action (whoever builds the runner endpoint):** compose the three from
+attempt state — `attempt_section` — alongside the projection, rather than
+expecting `loadForRunner` to supply them. If they ever do become part of the
+projection, it is with a real join, not constants.
+
+## 6. The Docker image and `pnpm build`/`dev`/`start` are broken
 
 `Dockerfile` copies the `packages/web` and `packages/socket` manifests but not
 `packages/db`, then installs against a `pnpm-workspace.yaml` that lists

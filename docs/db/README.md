@@ -28,12 +28,18 @@ question raises.
 
 **Nothing may cross a version boundary.** Every content and attempt row is
 fenced to exactly one `test_version`: most tables carry `test_version_id` and
-link to their parent through a COMPOSITE foreign key including it, and the
-leaf tables (`choice`, `question_tag`, `section_instruction`,
-`response_client_cursor`, `response_choice`) inherit the fence through a
-composite key to a parent that carries one. "An answer to a question from a
-different version of this test" is unrepresentable rather than merely
-discouraged — a plain single-column FK would accept one happily.
+link to their parent through a COMPOSITE foreign key including it, which pins
+that row to a single version. The leaf tables (`choice`, `question_tag`,
+`section_instruction`, `response_client_cursor`, `response_choice`) carry no
+`test_version_id` of their own; each has exactly one parent, and that parent
+is itself pinned to one version by a composite key higher up, so the fence
+holds transitively rather than needing to be repeated on the leaf's own FK — a
+`choice` cannot reach a second version because its only parent, `question`,
+cannot. "An answer to a question from a different version of this test" is
+unrepresentable rather than merely discouraged. `response_choice` additionally
+composite-FKs on `(choice_id, question_id)`, which pins a different
+invariant — that the choice belongs to the same question the response
+answered — not version fencing.
 
 ## What is deliberately outside the relational model
 

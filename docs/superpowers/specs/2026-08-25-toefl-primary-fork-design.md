@@ -180,11 +180,15 @@ a test can never move a score already recorded. Enforced by triggers.
 **Nothing may cross a version boundary.** Every content and attempt row is
 fenced to exactly one `test_version` — most tables carry `test_version_id`
 directly and link to their parent through a composite foreign key including
-it; the leaf tables (`choice`, `question_tag`, `section_instruction`,
-`response_client_cursor`, `response_choice`) inherit the fence through a
-composite key to a parent that carries one. Either way an answer to a question
-from a different version is unrepresentable. A plain single-column FK would
-accept one.
+it, which pins that row to a single version. The leaf tables (`choice`,
+`question_tag`, `section_instruction`, `response_client_cursor`,
+`response_choice`) carry no `test_version_id` of their own; each has exactly
+one parent, and that parent is itself pinned to one version by a composite key
+higher up, so the fence holds transitively — a `choice` cannot reach a second
+version because its only parent, `question`, cannot. `response_choice`
+additionally composite-FKs on `(choice_id, question_id)`, which pins a
+different invariant — that the choice belongs to the same question the
+response answered — not version fencing.
 
 Both are proven by `docs/db/invariants.test.sql`, not merely asserted.
 

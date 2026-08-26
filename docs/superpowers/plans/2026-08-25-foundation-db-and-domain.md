@@ -11,6 +11,21 @@
 **Spec:** `docs/superpowers/specs/2026-08-25-toefl-primary-fork-design.md`
 **Library adoption map:** `docs/architecture/library-adoption.md` — a verdict on all 47 packages in `~/projects/typescript-libraries`. Consult it before adding any dependency; six are declined on grounds that adopting them would make this design worse.
 
+## Post-execution amendments
+
+This plan is a record of what was executed and is not rewritten to match
+post-hoc fixes. The final review changed a few things after this plan ran;
+see `docs/architecture/plan-2-preconditions.md` for the full inherited list.
+
+- Task 1's `vitest.workspace.ts` (created and `git add`ed per this plan's body)
+  was deleted in a later fix — the workspace no longer uses it.
+- `RunnerSection` lost three fields the plan's body still shows it carrying —
+  the projection was found to invent fields the wire contract does not send.
+- Stimulus `maxPlays` is no longer `.nullable().optional()` — it is a
+  required positive integer, to match `openapi.yaml`.
+- Any `sed -n 'N,Mp' docs/db/schema.sql` line offsets quoted in this plan's
+  body are stale; `schema.sql` has grown since they were captured.
+
 ## Global Constraints
 
 - Node **>= 24**, pnpm **>= 10.16** (existing repo floor; do not lower).
@@ -18,7 +33,7 @@
 - Relative imports in Node packages carry the **`.js` extension** (`"type": "module"`, `verbatimModuleSyntax: true`).
 - **`docs/db/schema.sql` is the authority.** Migrations transcribe it. If a migration and the schema disagree, the schema is right and the migration is a bug.
 - **No SQL outside `packages/db/src/`.** Services and routes call repositories.
-- **A published `test_version` is immutable**, and **nothing may cross a version boundary** (spec §3). Every table carries `test_version_id` and every parent link is a composite FK including it.
+- **A published `test_version` is immutable**, and **nothing may cross a version boundary** (spec §3). Most tables carry `test_version_id` directly and link to their parent through a composite FK including it; the five leaf tables (`choice`, `question_tag`, `section_instruction`, `response_client_cursor`, `response_choice`) carry no `test_version_id` of their own and reach the fence transitively through their one parent, which is itself pinned to a single version.
 - `failed_write.raw_body` is **`text`, never `jsonb`**, and the table has **no foreign keys**. Its job is holding bodies that failed to parse.
 - Ordering is **`(client_instance_id, client_seq)`**, never `answered_at`. `answered_at` is display text with no authority.
 - **Reach for `~/projects/typescript-libraries` before writing infrastructure.** If a utility exists there, use it; if you decline one, record the reason in `docs/architecture/library-adoption.md`. Hand-rolling a pool, a logger, an env parser or a clock is a plan violation.

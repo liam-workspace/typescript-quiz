@@ -288,7 +288,7 @@ export function ReviewScreen({ review }: ReviewScreenProps) {
                       ordinal: item.ordinal,
                       outcome: itemOutcome,
                     })}
-                    className={`grid size-10 place-items-center rounded-lg border text-sm font-extrabold tabular-nums transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 ${
+                    className={`grid size-11 touch-manipulation place-items-center rounded-lg border text-sm font-extrabold tabular-nums transition select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 ${
                       index === currentIndex
                         ? "border-stone-900 bg-stone-900 text-white"
                         : outcomeClasses(item.outcome)
@@ -303,7 +303,12 @@ export function ReviewScreen({ review }: ReviewScreenProps) {
         </CardContent>
 
         <CardFooter className="flex flex-wrap items-center gap-3 border-t border-stone-200 bg-white px-5 sm:px-8">
-          <Button asChild variant="outline" size="sm">
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="h-11 min-w-11 touch-manipulation select-none"
+          >
             <a href={`/attempts/${review.attemptId}/result`}>
               {t("review.backToResult")}
             </a>
@@ -312,6 +317,7 @@ export function ReviewScreen({ review }: ReviewScreenProps) {
             <Button
               variant="outline"
               size="sm"
+              className="h-11 min-w-11 touch-manipulation select-none"
               disabled={atFirst}
               onClick={() => setCurrentIndex((index) => index - 1)}
             >
@@ -319,6 +325,7 @@ export function ReviewScreen({ review }: ReviewScreenProps) {
             </Button>
             <Button
               size="sm"
+              className="h-11 min-w-11 touch-manipulation select-none"
               disabled={atLast}
               onClick={() => setCurrentIndex((index) => index + 1)}
             >

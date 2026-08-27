@@ -182,7 +182,12 @@ export function HistoryScreen({ initialPage }: HistoryScreenProps) {
                         </span>
                       </td>
                       <td className="px-4 py-4 text-right">
-                        <Button asChild variant="outline" size="sm">
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="h-11 min-w-11 touch-manipulation select-none"
+                        >
                           <a href={`/attempts/${attempt.id}/review`}>
                             {t("history.review")}
                           </a>
@@ -199,7 +204,7 @@ export function HistoryScreen({ initialPage }: HistoryScreenProps) {
             type="button"
             variant="outline"
             size="sm"
-            className="mt-4 w-full"
+            className="mt-4 h-11 w-full touch-manipulation select-none"
             disabled={nextCursor === null || loading}
             aria-busy={loading}
             onClick={loadMore}
@@ -221,7 +226,12 @@ export function HistoryScreen({ initialPage }: HistoryScreenProps) {
         </CardContent>
 
         <CardFooter className="border-t border-stone-200 bg-white px-5 sm:px-8">
-          <Button asChild variant="outline" size="sm">
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="h-11 min-w-11 touch-manipulation select-none"
+          >
             <a href="/">{t("history.backToLibrary")}</a>
           </Button>
         </CardFooter>

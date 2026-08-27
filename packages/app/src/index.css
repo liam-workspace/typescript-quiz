@@ -1,1 +1,27 @@
 @import "tailwindcss";
+
+/*
+ * Tailwind v4's automatic content scan does not look inside node_modules,
+ * so utility classes that appear ONLY inside @liam-public/browser-react-ui's
+ * pre-built dist JS (e.g. Sheet's `fixed`/`inset-y-0`/`w-72`/`z-50` and
+ * Button's `bg-primary`/`h-9` variants) were never generated into this
+ * app's CSS -- verified against the compiled output while checking
+ * QuestionNavigator/AppMenu's SheetContent for task 7's device-emulation
+ * pass: the Sheet rendered with `position: static` (the `.fixed` class
+ * happened to exist only by accident, via the word "fixed" inside an
+ * unrelated code comment) and sat wherever it fell in normal document
+ * flow instead of pinned to a viewport edge, so its clip/overflow
+ * behaviour was never actually testable. This makes the kit's classes a
+ * scan source without changing which classes render -- a strict
+ * completion of, not a redesign of, the app's existing Tailwind output.
+ */
+@source "../node_modules/@liam-public/browser-react-ui/dist";
+
+@layer base {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}

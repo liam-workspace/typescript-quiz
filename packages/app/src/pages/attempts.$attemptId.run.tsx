@@ -420,7 +420,7 @@ export function RunScreen({
           type="button"
           aria-label={t("menu.openLabel")}
           aria-expanded={panel === "menu"}
-          className="size-11 touch-manipulation rounded-md text-xl font-bold hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+          className="size-11 touch-manipulation rounded-md text-xl font-bold select-none hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
           onClick={() => {
             setPanel((current) => (current === "menu" ? null : "menu"))
           }}
@@ -439,7 +439,7 @@ export function RunScreen({
           type="button"
           aria-label={t("navigator.openLabel")}
           aria-expanded={panel === "navigator"}
-          className="size-11 touch-manipulation rounded-md text-xl font-bold hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+          className="size-11 touch-manipulation rounded-md text-xl font-bold select-none hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
           onClick={() => {
             setPanel((current) =>
               current === "navigator" ? null : "navigator",

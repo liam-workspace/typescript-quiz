@@ -150,10 +150,19 @@ export function ResultScreen({ result }: ResultScreenProps) {
         </CardContent>
 
         <CardFooter className="flex flex-wrap justify-between gap-3 border-t border-stone-200 bg-white px-6 sm:px-10">
-          <Button asChild variant="outline" size="sm">
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="h-11 min-w-11 touch-manipulation select-none"
+          >
             <a href="/">{t("result.backToLibrary")}</a>
           </Button>
-          <Button asChild size="sm">
+          <Button
+            asChild
+            size="sm"
+            className="h-11 min-w-11 touch-manipulation select-none"
+          >
             <a href={`/attempts/${result.attemptId}/review`}>
               {t("result.reviewAnswers")}
             </a>

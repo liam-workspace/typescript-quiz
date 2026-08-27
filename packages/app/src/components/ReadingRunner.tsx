@@ -146,10 +146,27 @@ export function ReadingRunner({
 
       <div>
         {hasPrevious ? (
-          <Button onClick={onPrevious}>{t("runner.previous")}</Button>
+          <Button
+            className="h-11 min-w-11 touch-manipulation select-none"
+            onClick={onPrevious}
+          >
+            {t("runner.previous")}
+          </Button>
         ) : null}
-        {hasNext ? <Button onClick={onNext}>{t("runner.next")}</Button> : null}
-        <Button onClick={onHandIn}>{t("runner.handIn")}</Button>
+        {hasNext ? (
+          <Button
+            className="h-11 min-w-11 touch-manipulation select-none"
+            onClick={onNext}
+          >
+            {t("runner.next")}
+          </Button>
+        ) : null}
+        <Button
+          className="h-11 min-w-11 touch-manipulation select-none"
+          onClick={onHandIn}
+        >
+          {t("runner.handIn")}
+        </Button>
       </div>
     </div>
   )

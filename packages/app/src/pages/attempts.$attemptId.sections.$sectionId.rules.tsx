@@ -162,6 +162,7 @@ export function SectionRulesScreen({
         </CardContent>
       </Card>
       <Button
+        className="h-11 min-w-11 touch-manipulation select-none"
         data-testid="ready-button"
         onClick={handleReady}
         disabled={outcome.status === "entering"}

@@ -137,8 +137,20 @@ export function ListeningRunner({
       {/* No Previous button: this component is only ever rendered for a
           listening section, which spec section 1.4 requires to run
           forward_only. */}
-      {hasNext ? <Button onClick={onNext}>{t("runner.next")}</Button> : null}
-      <Button onClick={onHandIn}>{t("runner.handIn")}</Button>
+      {hasNext ? (
+        <Button
+          className="h-11 min-w-11 touch-manipulation select-none"
+          onClick={onNext}
+        >
+          {t("runner.next")}
+        </Button>
+      ) : null}
+      <Button
+        className="h-11 min-w-11 touch-manipulation select-none"
+        onClick={onHandIn}
+      >
+        {t("runner.handIn")}
+      </Button>
     </div>
   )
 }

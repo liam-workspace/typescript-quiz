@@ -75,14 +75,14 @@ export function AppMenu({
 
         <button
           type="button"
-          className="size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-stone-800 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+          className="size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-stone-800 select-none hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
           onClick={onGoLibrary}
         >
           {t("menu.library")}
         </button>
         <button
           type="button"
-          className="size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-stone-800 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+          className="size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-stone-800 select-none hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
           onClick={onGoHistory}
         >
           {t("menu.history")}
@@ -93,7 +93,7 @@ export function AppMenu({
             <hr className="my-2 border-stone-200" />
             <button
               type="button"
-              className="size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-stone-800 hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+              className="size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-stone-800 select-none hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
               onClick={onLeaveTest}
             >
               {t("menu.leaveTest")}
@@ -126,7 +126,7 @@ export function AppMenu({
                   key={language}
                   type="button"
                   aria-pressed={selected}
-                  className={`size-11 touch-manipulation rounded-md border text-xs font-bold uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 ${
+                  className={`size-11 touch-manipulation rounded-md border text-xs font-bold uppercase select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 ${
                     selected
                       ? "border-teal-700 bg-teal-100 text-teal-900"
                       : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
@@ -142,7 +142,7 @@ export function AppMenu({
           </div>
           <button
             type="button"
-            className="mt-2 size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-red-600 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="mt-2 size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-red-600 select-none hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
             onClick={() => {
               onSignOut()
             }}

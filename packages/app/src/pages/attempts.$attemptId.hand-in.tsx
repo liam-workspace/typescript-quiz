@@ -263,8 +263,14 @@ export function HandInScreen({
           ) : null}
         </CardContent>
       </Card>
-      <Button onClick={handleKeepWorking}>{t("handIn.keepWorking")}</Button>
       <Button
+        className="h-11 min-w-11 touch-manipulation select-none"
+        onClick={handleKeepWorking}
+      >
+        {t("handIn.keepWorking")}
+      </Button>
+      <Button
+        className="h-11 min-w-11 touch-manipulation select-none"
         data-testid="hand-in-button"
         onClick={handleSubmit}
         disabled={disabled}

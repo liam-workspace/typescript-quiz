@@ -70,6 +70,35 @@ describe("ChoiceList", () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
+  // The four tests around this one all passed while the radio was rendered
+  // completely unstyled -- a control with no size, no border and no
+  // indicator, so a child could tap an answer and see nothing change. They
+  // check aria-checked and onSelect, which are just as true of an invisible
+  // control. jsdom cannot lay out or compute styles, so this asserts the
+  // weaker thing it CAN: that the control is styled at all, and that the
+  // row carries a selected-state hook. It would have failed on the
+  // unstyled version, which the others would not.
+  it("gives the radio a visible size and the row a selected-state style", () => {
+    render(
+      <ChoiceList
+        choices={choices}
+        selectedId={null}
+        onSelect={vi.fn()}
+        locked={false}
+      />,
+    )
+
+    const [radio] = screen.getAllByRole("radio")
+
+    expect(radio.className).toMatch(/size-\d/)
+    expect(radio.className).toContain("data-[state=checked]:")
+
+    const row = radio.closest("label")
+
+    expect(row?.className).toContain("data-state=checked")
+    expect(row?.className).toMatch(/min-h-11/)
+  })
+
   it("renders a lock indicator when locked is true", () => {
     render(
       <ChoiceList

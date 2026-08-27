@@ -59,6 +59,8 @@ export function QuestionMedia({
     return (
       <div className="audio-box">
         <button
+          type="button"
+          className="h-11 min-w-11 touch-manipulation rounded-md border border-teal-700 bg-teal-50 px-4 text-sm font-bold text-teal-900 select-none disabled:cursor-not-allowed disabled:opacity-55"
           onClick={handlePlay}
           disabled={
             playing ||

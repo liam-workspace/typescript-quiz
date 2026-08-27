@@ -33,9 +33,22 @@ export function ChoiceList({
         disabled={locked}
       >
         {choices.map((choice) => (
-          <label key={choice.id} className="flex items-center gap-2">
-            <RadioGroup.Item value={choice.id}>
-              <RadioGroup.Indicator />
+          // Radix primitives ship unstyled: `RadioGroup.Item` with no
+          // className renders a button with no size, no border and no
+          // indicator, so a child could select an answer and see NOTHING
+          // change. Every assertion here still passed -- they check
+          // aria-checked and onSelect, which are true of an invisible
+          // control too. These are the prototype's `.choice` rules
+          // (docs/prototype/index.html), including the selected state.
+          <label
+            key={choice.id}
+            className="mb-2 flex min-h-11 w-full cursor-pointer touch-manipulation items-center gap-3 rounded-xl border-[1.5px] border-stone-300 bg-white px-4 py-3 text-[15px] has-[[data-state=checked]]:border-teal-700 has-[[data-state=checked]]:bg-teal-50 has-[[data-state=checked]]:font-bold"
+          >
+            <RadioGroup.Item
+              value={choice.id}
+              className="grid size-5 shrink-0 place-items-center rounded-full border-[1.5px] border-stone-400 bg-white data-[state=checked]:border-teal-700 data-[state=checked]:bg-teal-700"
+            >
+              <RadioGroup.Indicator className="block size-1.5 rounded-full bg-white" />
             </RadioGroup.Item>
             {choice.label}
           </label>

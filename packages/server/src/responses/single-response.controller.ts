@@ -1,0 +1,115 @@
+import type { PgPool } from "@liam-public/node-postgres"
+import type { JwtClaims } from "@liam-workspace/node-auth-server"
+import { writeResponse } from "@pp/db"
+import {
+  Body,
+  Controller,
+  Inject,
+  Param,
+  Put,
+  Req,
+  UnauthorizedException,
+  UseFilters,
+  UseGuards,
+} from "@nestjs/common"
+import { CurrentStudent } from "../auth/current-student.decorator.js"
+import { JwksGuard } from "../auth/jwks.guard.js"
+import { REQUEST_POOL } from "../database/tokens.js"
+import type { CapturedRequest } from "../http/raw-body-json.middleware.js"
+import { SingleResponseWriteDto } from "./dto.js"
+import { ResponseHttpExceptionFilter } from "./response-http-exception.filter.js"
+import {
+  ResponseWriteService,
+  sectionExpiredError,
+} from "./response-write.service.js"
+
+interface SingleResponseResult {
+  questionId: string
+  status: "applied" | "ignored_stale"
+  attempt: {
+    expiresAt: string | null
+    sectionExpiresAt: string | null
+    serverTime: string
+  }
+}
+
+@Controller("attempts/:id/responses")
+@UseGuards(JwksGuard)
+@UseFilters(ResponseHttpExceptionFilter)
+export class SingleResponseController {
+  constructor(
+    private readonly responseWrites: ResponseWriteService,
+    @Inject(REQUEST_POOL) private readonly pool: PgPool,
+  ) {}
+
+  @Put(":questionId")
+  async save(
+    @CurrentStudent() claims: JwtClaims,
+    @Param("id") attemptId: string,
+    @Param("questionId") questionId: string,
+    @Body() body: SingleResponseWriteDto,
+    @Req() req: CapturedRequest,
+  ): Promise<SingleResponseResult> {
+    const { attempt, now } = await this.responseWrites.assertOwnsAttempt(
+      subjectOf(claims),
+      attemptId,
+    )
+    const rules = await this.responseWrites.resolveSectionRules(
+      attempt,
+      questionId,
+    )
+
+    if (rules.sectionExpiresAt && rules.sectionExpiresAt <= now) {
+      throw sectionExpiredError()
+    }
+
+    if (rules.navigationLocked) {
+      throw await this.responseWrites.captureRejection(req, {
+        attemptId,
+        body,
+        now,
+        reason: "navigation_locked",
+      })
+    }
+
+    const outcome = await writeResponse(this.pool, {
+      attemptId,
+      questionId,
+      testVersionId: attempt.testVersionId,
+      clientInstanceId: body.clientInstanceId,
+      seq: body.seq,
+      selectedChoiceIds: body.selectedChoiceIds,
+      answeredAt: body.answeredAt ? new Date(body.answeredAt) : null,
+      timeSpentMs: body.timeSpentMs ?? null,
+      allowAnswerChange: rules.allowAnswerChange,
+      now,
+    })
+
+    if (outcome.kind === "rejected") {
+      throw await this.responseWrites.captureRejection(req, {
+        attemptId,
+        body,
+        now,
+        reason: outcome.reason,
+      })
+    }
+
+    return {
+      questionId,
+      status: outcome.kind,
+      attempt: {
+        expiresAt: rules.attemptExpiresAt?.toISOString() ?? null,
+        sectionExpiresAt: rules.sectionExpiresAt?.toISOString() ?? null,
+        serverTime: now.toISOString(),
+      },
+    }
+  }
+}
+
+function subjectOf(claims: JwtClaims): string {
+  if (!claims.sub) {
+    throw new UnauthorizedException("invalid_token")
+  }
+
+  return claims.sub
+}

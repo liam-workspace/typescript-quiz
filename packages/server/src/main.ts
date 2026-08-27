@@ -5,13 +5,18 @@ import { NestFactory } from "@nestjs/core"
 import { migrateToLatest } from "@pp/db"
 import { AppModule } from "./app.module.js"
 import { loadServerConfig } from "./config.js"
+import { createRawBodyJsonMiddleware } from "./http/raw-body-json.middleware.js"
 
 async function bootstrap(): Promise<void> {
   const config = loadServerConfig()
   await waitForDatabase(config.databaseUrl, { retries: 30, delayMs: 1000 })
   await migrateToLatest(config.databaseUrl)
 
-  const app = await NestFactory.create(AppModule)
+  // `bodyParser: false` + the middleware below replaces Nest's default body
+  // parser app-wide, so raw bytes are captured before any size check or
+  // JSON.parse can reject a request -- see raw-body-json.middleware.ts.
+  const app = await NestFactory.create(AppModule, { bodyParser: false })
+  app.use(createRawBodyJsonMiddleware(config.requestBodyMaxBytes))
   // The contract (openapi.yaml) declares `servers: [{ url: /api }]`, so every operation in
   // the contract lives under /api. /health is excluded: it is the container
   // healthcheck's target and is not part of the published contract.

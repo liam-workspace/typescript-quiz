@@ -13,6 +13,7 @@ export interface ServerConfig {
   mediaMaxBytes: number
   allowedEmails: string[]
   mediaSigningSecret: string
+  requestBodyMaxBytes: number
 }
 
 function required(env: Environment, key: string): string {
@@ -39,5 +40,13 @@ export function loadServerConfig(
     // would actually ship with, which makes signed URLs forgeable by anyone
     // who has read the source.
     mediaSigningSecret: required(env, "MEDIA_SIGNING_SECRET"),
+    // 256 KiB: generous for a section snapshot of dozens of answers, small
+    // enough that a runaway client cannot hold a connection open
+    // indefinitely.
+    requestBodyMaxBytes: parseIntegerEnv(
+      env,
+      "REQUEST_BODY_MAX_BYTES",
+      262_144,
+    ),
   }
 }

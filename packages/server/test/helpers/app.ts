@@ -8,6 +8,7 @@ import { inject } from "vitest"
 import { AppModule } from "../../src/app.module.js"
 import { JWKS_VERIFIER } from "../../src/auth/tokens.js"
 import { CLOCK } from "../../src/database/tokens.js"
+import { createRawBodyJsonMiddleware } from "../../src/http/raw-body-json.middleware.js"
 import { createTokenFactory } from "./token.js"
 
 const JWKS_URL = "https://auth.test/.well-known/jwks.json"
@@ -56,7 +57,11 @@ export async function createTestApp(
   }
 
   const moduleRef = await builder.compile()
-  const http = moduleRef.createNestApplication()
+  const http = moduleRef.createNestApplication({ bodyParser: false })
+  // Mirror main.ts: without this, e2e tests exercise a different body
+  // pipeline than production, and any assertion on rawBody/failed_write
+  // capture would be fiction.
+  http.use(createRawBodyJsonMiddleware(262_144))
   // Mirror main.ts. Without this the suite would assert paths production
   // never serves -- the tests would agree with the code and both would
   // disagree with the contract.

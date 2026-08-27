@@ -646,8 +646,9 @@ describe("attempt repository", () => {
 
       // Section 1 must be closed before section 2 can be entered --
       // enterSection refuses a second OPEN section by design (Decision 2).
-      // Closing it is normally a side effect of the phase-4/5 write path;
-      // simulated directly here since that path does not exist yet.
+      // Closed here by direct SQL to isolate THIS test to the entry rules;
+      // the test below proves enterSection closes an expired section itself,
+      // which is what makes a two-section attempt finishable in production.
       await closeSection(pool, attemptId, f.listeningSectionId)
 
       const secondNow = new Date(firstNow.getTime() + 60 * 1000)
@@ -719,6 +720,94 @@ describe("attempt repository", () => {
         [attemptId],
       )
       expect(Number(rows[0].count)).toBe(1)
+    })
+  }, 120_000)
+
+  // The defect this closes: NOTHING in the codebase ever wrote
+  // attempt_section.completed_at. enterSection refused unconditionally
+  // whenever any section was open, without asking whether its clock had run
+  // out -- so a child finished the listening section and could never enter
+  // reading. A two-section test was unfinishable.
+  //
+  // It stayed invisible because the tests above close section 1 with direct
+  // SQL, via a helper whose own comment called itself "a stand-in for the
+  // phase-4/5 write path this task does not implement". A helper that fakes
+  // missing production code makes that code's absence unobservable. This
+  // test deliberately uses NO such helper.
+  it("closes a section whose clock has run out, so the next section can be entered", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const attemptId = randomUUID()
+
+      await insertAttempt(pool, f, {
+        id: attemptId,
+        startedAt: "NULL",
+        expiresAt: null,
+      })
+
+      const firstNow = new Date("2026-08-27T09:00:00.000Z")
+      const first = await enterSection(pool, {
+        attemptId,
+        sectionId: f.listeningSectionId,
+        now: firstNow,
+      })
+
+      if (!first.ok) {
+        throw new Error("expected the first enterSection to succeed")
+      }
+
+      // Still inside its clock: the refusal is correct here, and is what
+      // stops a child skipping a section that still has time on it.
+      const tooSoon = await enterSection(pool, {
+        attemptId,
+        sectionId: f.readingSectionId,
+        now: new Date(first.entry.expiresAt.getTime() - 1000),
+      })
+
+      expect(tooSoon).toEqual({ ok: false, reason: "section_still_open" })
+
+      // One second past the section deadline, the same call succeeds.
+      const afterDeadline = new Date(first.entry.expiresAt.getTime() + 1000)
+      const second = await enterSection(pool, {
+        attemptId,
+        sectionId: f.readingSectionId,
+        now: afterDeadline,
+      })
+
+      if (!second.ok) {
+        throw new Error(
+          "expected reading to be enterable once listening expired",
+        )
+      }
+
+      const { rows } = await pool.query<{
+        completed_at: Date | null
+        points_possible: number | null
+        answered_count: number | null
+        correct_count: number | null
+        incorrect_count: number | null
+        expires_at: Date
+      }>(
+        `SELECT completed_at, points_possible, answered_count,
+                correct_count, incorrect_count, expires_at
+           FROM attempt_section
+          WHERE attempt_id = $1 AND test_section_id = $2`,
+        [attemptId, f.listeningSectionId],
+      )
+      const [closed] = rows
+
+      // Pinned to the deadline, not to when someone next touched the
+      // attempt -- the section ended when its clock did.
+      expect(closed.completed_at?.toISOString()).toBe(
+        closed.expires_at.toISOString(),
+      )
+      // And closed HONESTLY: attempt_section_counts_reconcile refuses a
+      // completed_at without the full breakdown, so these being present is
+      // the constraint confirming the write, not decoration.
+      expect(closed.points_possible).not.toBeNull()
+      expect(closed.answered_count).toBe(0)
+      expect(closed.correct_count).toBe(0)
+      expect(closed.incorrect_count).toBe(0)
     })
   }, 120_000)
 

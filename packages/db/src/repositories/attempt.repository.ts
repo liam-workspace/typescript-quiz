@@ -5,6 +5,7 @@ import {
   canSetPosition,
   gradeAttempt,
   isPastDeadline,
+  isQuestionCorrect,
   type GradableResponse,
   type GradableSection,
   type SectionScore,
@@ -770,8 +771,37 @@ async function enterSectionInTransaction(
     }
   }
 
-  if (openRows.length > 0) {
+  // A section whose clock has run out is over, whether or not anything has
+  // noticed yet. Nothing else in this codebase ever writes
+  // attempt_section.completed_at, so without this an attempt's FIRST
+  // section stays open forever and every later "I'm ready" is refused --
+  // a two-section test could never be finished. Closed lazily on next
+  // touch, the same shape loadRunningOwnedAttempt uses for whole attempts.
+  //
+  // The 409 is kept for the case that is genuinely a refusal: a section
+  // still inside its own clock. That statement is now true instead of
+  // permanent.
+  // `.find` rather than `openRows[0]`: noUncheckedIndexedAccess is off in
+  // this workspace, so an index would be typed non-undefined and the honest
+  // runtime guard would read as dead code to the linter. `find` returns
+  // `T | undefined` truthfully.
+  const stillTicking = openRows.find(
+    (row) => !isPastDeadline(row.expires_at, input.now),
+  )
+
+  if (stillTicking) {
     return { ok: false, reason: "section_still_open" }
+  }
+
+  const expired = openRows.find((row) =>
+    isPastDeadline(row.expires_at, input.now),
+  )
+
+  if (expired) {
+    await closeExpiredSection(tx, {
+      attemptId: input.attemptId,
+      sectionId: expired.test_section_id,
+    })
   }
 
   const { rows: contextRows } = await tx.query<EnterSectionContextDbRow>(
@@ -1035,4 +1065,87 @@ async function createAttempt(
     resumed: false,
     finalizedPriorAttempt,
   }
+}
+
+/**
+ * Closes one section that is past its deadline, writing its score
+ * breakdown in the same statement.
+ *
+ * `attempt_section_counts_reconcile` refuses a `completed_at` unless
+ * points_earned/possible AND all four counts are present and
+ * correct + incorrect = answered. That constraint is the reason this
+ * function grades rather than just stamping a timestamp: a section recorded
+ * as finished without an honest account of what happened in it is exactly
+ * the fail-open shape the constraint exists to stop.
+ *
+ * `completed_at` is pinned to `expires_at` in SQL, never to `now`. The
+ * section ended when its clock ended, not when someone next touched the
+ * attempt -- the same reasoning as `attempt_expired_pins_deadline`, and the
+ * same reason it is done in SQL: round-tripping a Postgres microsecond
+ * timestamp through a millisecond JS Date truncates it.
+ *
+ * Correctness comes from `isQuestionCorrect`, the one exact-match rule,
+ * rather than a second comparison written here -- two copies would drift on
+ * precisely the case that matters most, a partial multi_choice selection.
+ */
+async function closeExpiredSection(
+  tx: PgQueryable,
+  input: { attemptId: string; sectionId: string },
+): Promise<void> {
+  const { rows: attemptRows } = await tx.query<{ test_version_id: string }>(
+    `SELECT test_version_id FROM attempt WHERE id = $1`,
+    [input.attemptId],
+  )
+  const [attemptRow] = attemptRows
+
+  const questions = (
+    await loadForScoring(tx, attemptRow.test_version_id)
+  ).filter((question) => question.sectionId === input.sectionId)
+  const responses = await loadResponsesForGrading(tx, input.attemptId)
+  const byQuestion = new Map(responses.map((r) => [r.questionId, r]))
+
+  let pointsEarned = 0
+  let pointsPossible = 0
+  let answered = 0
+  let correct = 0
+
+  for (const question of questions) {
+    pointsPossible += question.points
+    const response = byQuestion.get(question.id)
+
+    if (!response || response.selectedChoiceIds.length === 0) {
+      continue
+    }
+
+    answered += 1
+
+    if (isQuestionCorrect(question, response.selectedChoiceIds)) {
+      correct += 1
+      pointsEarned += question.points
+    }
+  }
+
+  await tx.query(
+    `UPDATE attempt_section
+        SET completed_at     = expires_at,
+            points_earned    = $3,
+            points_possible  = $4,
+            answered_count   = $5,
+            unanswered_count = $6,
+            correct_count    = $7,
+            incorrect_count  = $8
+      WHERE attempt_id = $1
+        AND test_section_id = $2
+        AND completed_at IS NULL`,
+    [
+      input.attemptId,
+      input.sectionId,
+      pointsEarned,
+      pointsPossible,
+      answered,
+      questions.length - answered,
+      correct,
+      answered - correct,
+    ],
+  )
 }

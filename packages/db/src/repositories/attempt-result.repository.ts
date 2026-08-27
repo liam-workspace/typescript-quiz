@@ -13,6 +13,11 @@ import { loadForScoring } from "../scoring.js"
 export type AttemptResultOutcome =
   | { kind: "not_found" }
   | { kind: "still_running" }
+  // In progress, but the clock has run out. A read must finalize it rather
+  // than refuse -- 409 is StillRunning, and an attempt past its deadline is
+  // not running. `expiresAt` is carried out so the caller pins submitted_at
+  // to the DEADLINE, never to the moment of the late read.
+  | { kind: "expired_unfinalized"; expiresAt: Date }
   | {
       kind: "ready"
       result: {
@@ -34,6 +39,7 @@ interface AttemptResultDbRow {
   test_version: number
   status: "in_progress" | "submitted" | "expired"
   submitted_at: Date | null
+  expires_at: Date | null
   elapsed_seconds: number
   points_earned: number | null
   points_possible: number | null
@@ -121,6 +127,7 @@ export async function loadAttemptResult(
             tv.version AS test_version,
             a.status,
             a.submitted_at,
+            a.expires_at,
             CASE
               WHEN a.started_at IS NULL OR a.submitted_at IS NULL THEN 0
               ELSE GREATEST(
@@ -156,6 +163,12 @@ export async function loadAttemptResult(
   const [row] = rows
 
   if (row.status === "in_progress") {
+    if (row.expires_at !== null && row.expires_at <= input.now) {
+      return { kind: "expired_unfinalized", expiresAt: row.expires_at }
+    }
+
+    // `expires_at IS NULL` means untimed, not expired: an attempt created but
+    // never entered has no deadline yet.
     return { kind: "still_running" }
   }
 

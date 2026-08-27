@@ -185,7 +185,7 @@ describe("GET /api/attempts/:id/result", () => {
     expect(JSON.stringify(response.body)).not.toContain(correctChoiceMarker)
   })
 
-  it("409s without finalizing an unsubmitted past-deadline attempt", async () => {
+  it("finalizes a past-deadline attempt on read and returns 200, per the contract", async () => {
     const context = ready()
     const { fixture, token } = await setup()
     await context.pool.query(
@@ -209,12 +209,20 @@ describe("GET /api/attempts/:id/result", () => {
       fixture.attemptId,
     ])
 
-    expect(response.status).toBe(409)
-    expect(response.body).toMatchObject({
-      type: "still_running",
-      status: 409,
-      retryable: false,
-    })
-    expect(rows).toEqual([{ status: "in_progress", submitted_at: null }])
+    // OpenAPI's getResult prose: "An in-progress attempt already past
+    // its deadline is finalized by this read and then returned with 200 --
+    // the result has just become available, so denying it would be perverse."
+    // 409 is StillRunning, and this attempt is not running: its clock ran out.
+    // Refusing here means a child whose timed test expired taps to see their
+    // score and gets an error instead.
+    expect(response.status).toBe(200)
+
+    // Finalized AT the deadline, never at the moment of the late read.
+    expect(rows).toEqual([
+      {
+        status: "expired",
+        submitted_at: new Date("2026-08-27T09:59:00.000Z"),
+      },
+    ])
   })
 })

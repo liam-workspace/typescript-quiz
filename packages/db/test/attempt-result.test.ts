@@ -113,7 +113,7 @@ describe("loadAttemptResult", () => {
     })
   }, 120_000)
 
-  it("does not finalize an unsubmitted attempt after its deadline", async () => {
+  it("reports a past-deadline attempt as expired_unfinalized, and writes nothing", async () => {
     await withDatabase(async (pool) => {
       const fixture = await seedPublishedTest(pool)
       const attemptId = await insertAttempt(pool, fixture, {
@@ -132,7 +132,13 @@ describe("loadAttemptResult", () => {
         [attemptId],
       )
 
-      expect(result).toEqual({ kind: "still_running" })
+      // A repository read never writes -- finalizing is the service's job,
+      // using the idempotent finalizeAttempt. But it must report the two
+      // cases DIFFERENTLY, because they mean opposite things to a caller:
+      // "still running" is a refusal (409 StillRunning), while a spent clock
+      // means the result has just become available and must be finalized and
+      // returned, not denied.
+      expect(result).toEqual({ kind: "expired_unfinalized", expiresAt: PAST })
       expect(rows).toEqual([
         { status: "in_progress", submitted_at: null, points_earned: null },
       ])

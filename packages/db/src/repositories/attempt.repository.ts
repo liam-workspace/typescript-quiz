@@ -1,4 +1,9 @@
-import { asChoiceId, asQuestionId } from "@pp/common"
+import {
+  asChoiceId,
+  asQuestionId,
+  canSetPosition,
+  isPastDeadline,
+} from "@pp/common"
 import { scoreAttempt, type RecordedAnswer } from "@pp/common/scoring"
 import { withTransaction, type PgQueryable } from "@liam-public/node-postgres"
 import type pg from "pg"
@@ -207,7 +212,7 @@ export async function loadRunningOwnedAttempt(
 
   if (
     attempt.status === "in_progress" &&
-    (!attempt.expiresAt || attempt.expiresAt > input.now)
+    !isPastDeadline(attempt.expiresAt, input.now)
   ) {
     return { attempt, finalized: null }
   }
@@ -291,14 +296,16 @@ async function setPositionInTransaction(
 
   const [context] = rows
 
-  if (context.section_expires_at <= input.now) {
+  if (isPastDeadline(context.section_expires_at, input.now)) {
     throw new SectionExpiredError()
   }
 
   if (
-    context.navigation === "forward_only" &&
-    context.current_ordinal !== null &&
-    context.target_ordinal < context.current_ordinal
+    !canSetPosition(
+      context.navigation,
+      context.current_ordinal,
+      context.target_ordinal,
+    )
   ) {
     return { ok: false, reason: "navigation_locked" }
   }
@@ -623,7 +630,7 @@ async function startOrResumeInTransaction(
   if (activeRows.length > 0) {
     const [active] = activeRows
 
-    if (!active.expires_at || active.expires_at > input.now) {
+    if (!isPastDeadline(active.expires_at, input.now)) {
       const attemptNumber = await countAttempts(tx, input)
 
       return {

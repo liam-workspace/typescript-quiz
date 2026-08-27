@@ -3,6 +3,7 @@ import {
   type PgPool,
   type PgQueryable,
 } from "@liam-public/node-postgres"
+import { canAcceptAnswerChange } from "@pp/common"
 
 export type WriteOutcome =
   | { kind: "applied" }
@@ -43,17 +44,6 @@ function rejectionReasonFor(
   }
 
   return null
-}
-
-function sameSelection(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) {
-    return false
-  }
-
-  const sortedA = a.map((id) => id.toLowerCase()).sort()
-  const sortedB = b.map((id) => id.toLowerCase()).sort()
-
-  return sortedA.every((id, index) => id === sortedB[index])
 }
 
 /**
@@ -132,9 +122,14 @@ export async function writeResponse(
       )
       const existingIds = existing.rows.map((row) => row.choice_id)
       const hasExistingAnswer = existingIds.length > 0
-      const identical = sameSelection(existingIds, input.selectedChoiceIds)
 
-      if (!input.allowAnswerChange && hasExistingAnswer && !identical) {
+      if (
+        !canAcceptAnswerChange(
+          input.allowAnswerChange,
+          hasExistingAnswer ? existingIds : null,
+          input.selectedChoiceIds,
+        )
+      ) {
         return { kind: "rejected", reason: "answer_change_not_allowed" }
       }
 

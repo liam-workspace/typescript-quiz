@@ -1,4 +1,5 @@
 import type { PgQueryable } from "@liam-public/node-postgres"
+import { remainingPlays } from "@pp/common"
 
 export interface PlayClaimResult {
   playsUsed: number
@@ -131,8 +132,7 @@ export async function claimPlay(
     ok: true,
     claim: {
       playsUsed,
-      playsRemaining:
-        effectiveMaxPlays === null ? null : effectiveMaxPlays - playsUsed,
+      playsRemaining: remainingPlays(effectiveMaxPlays, playsUsed),
       filename: cap.filename,
     },
   }

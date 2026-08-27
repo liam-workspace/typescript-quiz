@@ -1,5 +1,6 @@
 import type { PgPool } from "@liam-public/node-postgres"
 import { HttpStatus } from "@nestjs/common"
+import { canSetPosition, isPastDeadline } from "@pp/common"
 import type { AttemptRow } from "@pp/db"
 import { ProblemException } from "../attempts/problem.exception.js"
 
@@ -66,15 +67,16 @@ export async function resolveSectionRules(
     allowAnswerChange: row.allow_answer_change,
     attemptExpiresAt: attempt.expiresAt,
     sectionExpiresAt: row.section_expires_at,
-    navigationLocked:
-      row.navigation === "forward_only" &&
-      row.current_ordinal !== null &&
-      row.question_ordinal < row.current_ordinal,
+    navigationLocked: !canSetPosition(
+      row.navigation,
+      row.current_ordinal,
+      row.question_ordinal,
+    ),
   }
 }
 
 export function mapWriteConflict(rules: SectionRules, now: Date): void {
-  if (rules.sectionExpiresAt && rules.sectionExpiresAt <= now) {
+  if (isPastDeadline(rules.sectionExpiresAt, now)) {
     throw new ProblemException({
       type: "section_expired",
       title: "The section's clock ran out.",

@@ -1,10 +1,31 @@
 services:
-  razzia:
-    image: ralex91/razzia:latest
+  # Serves the REST API and /media (the built SPA is served from this same
+  # process once plan 6's deploy task lands). Boot ordering against postgres
+  # is handled by `waitForDatabase` in the application itself — `depends_on`
+  # only waits for the container to start, not for postgres to accept
+  # connections.
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      secrets:
+        - node_auth_token
     ports:
       - "3000:3000"
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://pp:${POSTGRES_PASSWORD:-pp}@postgres:5432/pp
+      JWKS_URL: ${JWKS_URL:-https://auth.icovn.me/.well-known/jwks.json}
+      # Comma-separated allowlist checked at sign-in; leaving it unset
+      # rejects every sign-in, so set it in the environment or a .env file.
+      ALLOWED_EMAILS: ${ALLOWED_EMAILS:-}
+      MEDIA_ROOT: /media
+      MEDIA_MAX_BYTES: ${MEDIA_MAX_BYTES:-20971520}
     volumes:
-      - ./config:/app/config
+      - pp-media:/media
+    depends_on:
+      - postgres
+
   # Local development only. Bound to loopback (127.0.0.1) so this database is
   # never reachable from the LAN or shared wifi — it holds a child's test
   # answers and scores. The host port is shifted to 5433 (off Postgres'
@@ -28,3 +49,8 @@ services:
 
 volumes:
   pp-postgres:
+  pp-media:
+
+secrets:
+  node_auth_token:
+    environment: NODE_AUTH_TOKEN

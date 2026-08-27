@@ -35,6 +35,11 @@ import {
   type PlayClaimResult,
 } from "./repositories/media-play.repository.js"
 import {
+  loadResponse,
+  writeResponse,
+  type WriteOutcome,
+} from "./repositories/response.repository.js"
+import {
   loadRunnerEnvelope,
   type RunnerEnvelopeRow,
 } from "./repositories/runner.repository.js"
@@ -67,6 +72,8 @@ export type { PlayClaimResult }
 
 export type { FailedWriteRow }
 
+export type { WriteOutcome }
+
 export {
   loadDbConfig,
   createJobPool,
@@ -90,4 +97,6 @@ export {
   claimPlay,
   isFilenameCapped,
   insertFailedWrite,
+  loadResponse,
+  writeResponse,
 }

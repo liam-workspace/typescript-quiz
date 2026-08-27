@@ -12,6 +12,9 @@
  * `publishDraftVersion` and `resolveVersionId` belong to the same admin-only
  * lifecycle (import, publish, export) and have no other caller, so they are
  * exposed only from here too, never from the default barrel.
+ *
+ * `recordMediaAsset` joins them for the same reason, not a disclosure one:
+ * `POST /admin/media` is admin-only and has no other caller either.
  */
 import {
   exportTestDocument,
@@ -23,13 +26,19 @@ import {
   resolveVersionId,
   type PublishViolation,
 } from "./repositories/publish.repository.js"
+import {
+  recordMediaAsset,
+  type MediaAssetRow,
+  type MediaKind,
+} from "./repositories/media.repository.js"
 
-export type { PublishViolation }
+export type { PublishViolation, MediaAssetRow, MediaKind }
 
 export {
   DraftNotFoundError,
   exportTestDocument,
   importTestDocument,
   publishDraftVersion,
+  recordMediaAsset,
   resolveVersionId,
 }

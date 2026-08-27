@@ -1,10 +1,15 @@
-import type { PgPool } from "@liam-public/node-postgres"
+import { createHash } from "node:crypto"
+import { mkdir, writeFile } from "node:fs/promises"
+import { resolve, sep } from "node:path"
+import { withTransaction, type PgPool } from "@liam-public/node-postgres"
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
+  UnsupportedMediaTypeException,
 } from "@nestjs/common"
 import { testDocumentSchema, type Clock, type TestDocument } from "@pp/common"
 import {
@@ -12,9 +17,13 @@ import {
   exportTestDocument,
   importTestDocument,
   publishDraftVersion,
+  recordMediaAsset,
   resolveVersionId,
+  type MediaAssetRow,
+  type MediaKind,
 } from "@pp/db/admin"
 import { CLOCK, JOB_POOL } from "../database/tokens.js"
+import { loadServerConfig } from "../config.js"
 
 export interface ImportResult {
   testId: string
@@ -27,6 +36,111 @@ export interface PublishResult {
   versionId: string
   version: number
   publishedAt: Date
+}
+
+export interface UploadMediaResult {
+  id: string
+  kind: MediaKind
+  filename: string
+  mimeType: string
+  byteSize: number
+  checksum: string
+}
+
+/**
+ * Multer's in-memory storage engine (no `dest`/`storage` option -- see
+ * `MulterModule.registerAsync` in admin.module.ts) hands the controller
+ * exactly this shape. Declared locally rather than reaching for the
+ * `Express.Multer.File` global namespace: `@types/multer` is not installed,
+ * since nothing else in this repo touches file upload.
+ */
+export interface MulterFile {
+  originalname: string
+  mimetype: string
+  buffer: Buffer
+}
+
+/**
+ * One rule set per accepted `media_kind` value, in one object literal so
+ * the enum's members are stated exactly once here rather than restated
+ * across a kind check, a MIME-prefix check and an extension table: the
+ * keys double as the "is this a legal kind" set, and each entry supplies
+ * both the accepted MIME prefix and the on-disk extension.
+ *
+ * The extension is the kind name itself, not sniffed from the upload's
+ * MIME subtype -- a `.audio`/`.image` file on disk never claims a format
+ * more specific than what this route actually validated. Nothing
+ * downstream needs a real extension either: `/media` (plan 3) pins its
+ * served Content-Type from `kind`, never from the filename or the
+ * upload's declared MIME type.
+ */
+const KIND_RULES: Record<MediaKind, { mimePrefix: string; extension: string }> =
+  {
+    audio: { mimePrefix: "audio/", extension: "audio" },
+    image: { mimePrefix: "image/", extension: "image" },
+  }
+
+function isMediaKind(value: unknown): value is MediaKind {
+  return typeof value === "string" && value in KIND_RULES
+}
+
+const UNIQUE_VIOLATION_SQLSTATE = "23505"
+const MEDIA_FILENAME_CONSTRAINT = "media_asset_filename_key"
+
+/**
+ * `filename` is `UNIQUE` in the schema. Overwriting on a duplicate would
+ * mutate content a published version already cites, so the write must
+ * fail instead -- see media.repository.ts.
+ */
+function isDuplicateFilename(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) {
+    return false
+  }
+
+  const { code, constraint } = error as {
+    code?: unknown
+    constraint?: unknown
+  }
+
+  return (
+    code === UNIQUE_VIOLATION_SQLSTATE &&
+    constraint === MEDIA_FILENAME_CONSTRAINT
+  )
+}
+
+function toUploadResult(row: MediaAssetRow): UploadMediaResult {
+  return {
+    id: row.id,
+    kind: row.kind,
+    filename: row.filename,
+    mimeType: row.mimeType,
+    byteSize: row.byteSize,
+    checksum: row.checksum,
+  }
+}
+
+/**
+ * The stored path is derived only from the server-generated `id` plus a
+ * whitelisted extension -- never from the client-supplied `filename` --
+ * so a traversing name (`../../etc/passwd`, an absolute path, a name with
+ * a NUL byte) never reaches the filesystem; `filename` is stored as
+ * metadata only (media.repository.ts). Resolving and prefix-checking the
+ * final path is insurance against a future change to that derivation, not
+ * the primary defense.
+ */
+async function writeMediaFile(
+  mediaRootResolved: string,
+  storedName: string,
+  buffer: Buffer,
+): Promise<void> {
+  const target = resolve(mediaRootResolved, storedName)
+
+  if (!target.startsWith(mediaRootResolved + sep)) {
+    throw new Error(`resolved media path escaped mediaRoot: ${target}`)
+  }
+
+  await mkdir(mediaRootResolved, { recursive: true })
+  await writeFile(target, buffer)
 }
 
 /**
@@ -114,6 +228,69 @@ export class AdminService {
     // this route is guarded by the admin role claim, not by the field's
     // absence (spec §4). AdminGuard already ran before this call.
     return exportTestDocument(this.pool, versionId)
+  }
+
+  /**
+   * `JOB_POOL`, not `REQUEST_POOL`: a checksum over the whole upload plus a
+   * filesystem write are not the sub-5s request-path work `REQUEST_POOL`'s
+   * statement timeout assumes.
+   *
+   * Ordering, coordinated by one transaction (see media.repository.ts):
+   * INSERT the row first -- a duplicate `filename` surfaces as the 409
+   * here, before any bytes are written -- then stream the file, then let
+   * the transaction commit. A failure writing the file rolls the INSERT
+   * back too, so there is never a row with no file. A failure committing
+   * after a successful write leaves only an orphaned file: invisible,
+   * harmless, cleanable later. Row-first would risk the opposite -- a
+   * dangling row, which is a broken reference in every export.
+   */
+  async uploadMedia(
+    kindInput: unknown,
+    file: MulterFile | undefined,
+  ): Promise<UploadMediaResult> {
+    if (!isMediaKind(kindInput) || !file) {
+      throw new UnsupportedMediaTypeException("unsupported_kind")
+    }
+
+    const kind = kindInput
+    const rules = KIND_RULES[kind]
+
+    if (!file.mimetype.startsWith(rules.mimePrefix)) {
+      throw new UnsupportedMediaTypeException("mime_kind_mismatch")
+    }
+
+    // Computed server-side. A client-supplied checksum is trusted by
+    // nobody -- it is the one thing this route exists to make trustworthy.
+    const checksum = createHash("sha256").update(file.buffer).digest("hex")
+    const mediaRootResolved = resolve(loadServerConfig().mediaRoot)
+
+    try {
+      const row = await withTransaction(this.pool, async (tx) => {
+        const inserted = await recordMediaAsset(tx, {
+          kind,
+          filename: file.originalname,
+          mimeType: file.mimetype,
+          byteSize: file.buffer.length,
+          checksum,
+        })
+
+        await writeMediaFile(
+          mediaRootResolved,
+          `${inserted.id}.${rules.extension}`,
+          file.buffer,
+        )
+
+        return inserted
+      })
+
+      return toUploadResult(row)
+    } catch (error) {
+      if (isDuplicateFilename(error)) {
+        throw new ConflictException("duplicate_filename")
+      }
+
+      throw error
+    }
   }
 
   private async runPublish(

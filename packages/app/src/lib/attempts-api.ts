@@ -1,5 +1,6 @@
 import { apiFetch } from "./api-client.js"
 import type {
+  AttemptHistoryPage,
   AttemptResult,
   PlayGrant,
   ReviewPayload,
@@ -8,6 +9,23 @@ import type {
   SubmitRequest,
   SubmitResult,
 } from "./api-types.js"
+
+const HISTORY_PAGE_SIZE = 20
+
+export function listAttemptHistory(
+  cursor: string | null = null,
+): Promise<AttemptHistoryPage> {
+  const query = new URLSearchParams({
+    status: "finished",
+    limit: String(HISTORY_PAGE_SIZE),
+  })
+
+  if (cursor !== null) {
+    query.set("cursor", cursor)
+  }
+
+  return apiFetch<AttemptHistoryPage>(`/attempts?${query.toString()}`)
+}
 
 export function getAttemptResult(attemptId: string): Promise<AttemptResult> {
   return apiFetch<AttemptResult>(`/attempts/${attemptId}/result`)

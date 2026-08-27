@@ -207,6 +207,24 @@ export interface AttemptResult {
   }
 }
 
+export interface AttemptHistoryRow {
+  id: string
+  test: {
+    title: string
+  }
+  submittedAt: string
+  status: "submitted" | "expired"
+  pointsEarned: number
+  pointsPossible: number
+  percentage: number
+  sections: AttemptSectionScore[]
+}
+
+export interface AttemptHistoryPage {
+  attempts: AttemptHistoryRow[]
+  nextCursor: string | null
+}
+
 export interface ReviewChoice {
   id: string
   label: string

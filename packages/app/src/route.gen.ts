@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './pages/__root'
+import { Route as HistoryRouteImport } from './pages/history'
 import { Route as AttemptsAttemptIdRunRouteImport } from './pages/attempts.$attemptId.run'
 import { Route as AttemptsAttemptIdReviewRouteImport } from './pages/attempts.$attemptId.review'
 import { Route as AttemptsAttemptIdResultRouteImport } from './pages/attempts.$attemptId.result'
 import { Route as AttemptsAttemptIdHandInRouteImport } from './pages/attempts.$attemptId.hand-in'
 import { Route as AttemptsAttemptIdSectionsSectionIdRulesRouteImport } from './pages/attempts.$attemptId.sections.$sectionId.rules'
 
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AttemptsAttemptIdRunRoute = AttemptsAttemptIdRunRouteImport.update({
   id: '/attempts/$attemptId/run',
   path: '/attempts/$attemptId/run',
@@ -43,6 +49,7 @@ const AttemptsAttemptIdSectionsSectionIdRulesRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/history': typeof HistoryRoute
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
   '/attempts/$attemptId/review': typeof AttemptsAttemptIdReviewRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/attempts/$attemptId/sections/$sectionId/rules': typeof AttemptsAttemptIdSectionsSectionIdRulesRoute
 }
 export interface FileRoutesByTo {
+  '/history': typeof HistoryRoute
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
   '/attempts/$attemptId/review': typeof AttemptsAttemptIdReviewRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/history': typeof HistoryRoute
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
   '/attempts/$attemptId/review': typeof AttemptsAttemptIdReviewRoute
@@ -67,6 +76,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/history'
     | '/attempts/$attemptId/hand-in'
     | '/attempts/$attemptId/result'
     | '/attempts/$attemptId/review'
@@ -74,6 +84,7 @@ export interface FileRouteTypes {
     | '/attempts/$attemptId/sections/$sectionId/rules'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/history'
     | '/attempts/$attemptId/hand-in'
     | '/attempts/$attemptId/result'
     | '/attempts/$attemptId/review'
@@ -81,6 +92,7 @@ export interface FileRouteTypes {
     | '/attempts/$attemptId/sections/$sectionId/rules'
   id:
     | '__root__'
+    | '/history'
     | '/attempts/$attemptId/hand-in'
     | '/attempts/$attemptId/result'
     | '/attempts/$attemptId/review'
@@ -89,6 +101,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  HistoryRoute: typeof HistoryRoute
   AttemptsAttemptIdHandInRoute: typeof AttemptsAttemptIdHandInRoute
   AttemptsAttemptIdResultRoute: typeof AttemptsAttemptIdResultRoute
   AttemptsAttemptIdReviewRoute: typeof AttemptsAttemptIdReviewRoute
@@ -98,6 +111,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/attempts/$attemptId/run': {
       id: '/attempts/$attemptId/run'
       path: '/attempts/$attemptId/run'
@@ -137,6 +157,7 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRouteChildren: RootRouteChildren = {
+  HistoryRoute: HistoryRoute,
   AttemptsAttemptIdHandInRoute: AttemptsAttemptIdHandInRoute,
   AttemptsAttemptIdResultRoute: AttemptsAttemptIdResultRoute,
   AttemptsAttemptIdReviewRoute: AttemptsAttemptIdReviewRoute,

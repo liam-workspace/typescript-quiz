@@ -25,9 +25,13 @@ function rejectionReasonFor(
   }
 
   if (code === "23503") {
-    return constraint === "response_choice_choice_fk"
-      ? "invalid"
-      : "unknown_question"
+    if (constraint === "response_question_fk") {
+      return "unknown_question"
+    }
+
+    if (constraint === "response_choice_choice_fk") {
+      return "invalid"
+    }
   }
 
   if (

@@ -26,6 +26,10 @@ const UuidStringSchema = z
     "invalid_uuid",
   )
 
+export const ResponseSnapshotQuestionIdentitySchema = z.object({
+  questionId: UuidStringSchema,
+})
+
 export const ResponseSnapshotItemSchema = z.strictObject({
   questionId: UuidStringSchema,
   seq: z.number().int().nonnegative(),

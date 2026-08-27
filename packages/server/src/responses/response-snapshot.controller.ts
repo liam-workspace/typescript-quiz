@@ -18,7 +18,11 @@ import { REQUEST_POOL } from "../database/tokens.js"
 import type { CapturedRequest } from "../http/raw-body-json.middleware.js"
 import { CapturableBadRequestException } from "../validation/zod-body-validation.pipe.js"
 import { captureItemRejection } from "./capture.js"
-import { ResponseSnapshotDto, ResponseSnapshotItemSchema } from "./dto.js"
+import {
+  ResponseSnapshotDto,
+  ResponseSnapshotItemSchema,
+  ResponseSnapshotQuestionIdentitySchema,
+} from "./dto.js"
 import { ResponseHttpExceptionFilter } from "./response-http-exception.filter.js"
 import { ResponseWriteService } from "./response-write.service.js"
 import {
@@ -68,12 +72,14 @@ export class ResponseSnapshotController {
       raw: item,
       parsed: ResponseSnapshotItemSchema.safeParse(item),
     }))
-    const validItems = parsedItems.flatMap(({ parsed }) =>
-      parsed.success ? [parsed.data] : [],
-    )
+    const questionIdentities = body.responses.flatMap((item) => {
+      const identity = ResponseSnapshotQuestionIdentitySchema.safeParse(item)
+
+      return identity.success ? [identity.data] : []
+    })
     const sectionInfo = await loadQuestionSectionInfo(this.pool, {
       testVersionId: attempt.testVersionId,
-      questionIds: validItems.map((item) => item.questionId),
+      questionIds: questionIdentities.map((item) => item.questionId),
     })
     const sectionIds = new Set(
       [...sectionInfo.values()].map((info) => info.sectionId),
@@ -86,7 +92,7 @@ export class ResponseSnapshotController {
       )
     }
 
-    const firstResolvedItem = validItems.find((item) =>
+    const firstResolvedItem = questionIdentities.find((item) =>
       sectionInfo.has(item.questionId),
     )
     let sharedRules: SectionRules | undefined = undefined

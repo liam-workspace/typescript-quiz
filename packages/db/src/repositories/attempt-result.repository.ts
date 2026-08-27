@@ -309,7 +309,16 @@ export async function loadAttemptResult(
  */
 export async function loadReview(
   pool: PgPool,
-  input: { attemptId: string; now: Date; mediaBaseUrl: string },
+  input: {
+    attemptId: string
+    now: Date
+    // A builder rather than a base URL: /media refuses any CAPPED filename
+    // without a valid signature, and review's whole promise is that "media is
+    // freely replayable, the attempt is over". Signing needs the secret and
+    // the clock, which are server concerns -- so the caller supplies the
+    // mapping and this repository stays ignorant of both.
+    mediaUrlFor: (filename: string) => string
+  },
 ): Promise<ReviewOutcome> {
   const { rows: attemptRows } = await pool.query<ReviewAttemptDbRow>(
     `SELECT test_version_id, status, expires_at
@@ -361,11 +370,7 @@ export async function loadReview(
   const accumulators: ReviewAccumulator[] = []
 
   for (const row of rows) {
-    const accumulator = findOrCreateReview(
-      accumulators,
-      row,
-      input.mediaBaseUrl,
-    )
+    const accumulator = findOrCreateReview(accumulators, row, input.mediaUrlFor)
     const choiceId = asChoiceId(row.c_id)
 
     accumulator.item.choices.push({
@@ -394,7 +399,7 @@ export async function loadReview(
 function findOrCreateReview(
   accumulators: ReviewAccumulator[],
   row: ReviewDbRow,
-  mediaBaseUrl: string,
+  mediaUrlFor: (filename: string) => string,
 ): ReviewAccumulator {
   const questionId = asQuestionId(row.q_id)
   const existing = accumulators.find(
@@ -416,7 +421,7 @@ function findOrCreateReview(
       sectionId,
       prompt: row.q_prompt,
       ...(row.st_id
-        ? { stimulus: buildReviewStimulus(row, row.st_id, mediaBaseUrl) }
+        ? { stimulus: buildReviewStimulus(row, row.st_id, mediaUrlFor) }
         : {}),
       choices: [],
     },
@@ -440,10 +445,10 @@ function findOrCreateReview(
 function buildReviewStimulus(
   row: ReviewDbRow,
   stimulusId: string,
-  mediaBaseUrl: string,
+  mediaUrlFor: (filename: string) => string,
 ): ReviewStimulus {
   const id = asStimulusId(stimulusId)
-  const mediaUrl = row.st_filename ? `${mediaBaseUrl}/${row.st_filename}` : null
+  const mediaUrl = row.st_filename ? mediaUrlFor(row.st_filename) : null
 
   if (row.st_type === "audio" || row.st_type === "image") {
     if (!mediaUrl) {

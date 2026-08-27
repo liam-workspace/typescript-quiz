@@ -9,6 +9,8 @@ import {
 import { loadReview, type ReviewItem, type ReviewOutcome } from "@pp/db/scoring"
 import { CLOCK, REQUEST_POOL } from "../database/tokens.js"
 import { resolveOwnedAttempt } from "./ownership.js"
+import { signMediaUrl } from "../media/media-signing.js"
+import { loadServerConfig } from "../config.js"
 import { ProblemException } from "./problem.exception.js"
 
 function notYourAttemptError(): ProblemException {
@@ -37,6 +39,16 @@ export type ReadyReviewItems = Extract<
   ReviewOutcome,
   { kind: "ready" }
 >["items"]
+
+/**
+ * Review media is signed with a generous TTL rather than left bare.
+ * `/media/:filename` refuses any CAPPED filename without a valid signature,
+ * and it cannot check who is asking -- an `<audio src>` sends no bearer. So
+ * "the attempt is over, the cap no longer applies" has to be expressed by
+ * handing the client a URL that already carries authority, not by relaxing
+ * the serving route for everyone.
+ */
+const REVIEW_URL_TTL_MS = 6 * 60 * 60 * 1000
 
 @Injectable()
 export class ResultsService {
@@ -127,7 +139,12 @@ export class ResultsService {
       // Runner and play-grant payloads already establish `/media` as the
       // public URL mount. loadServerConfig().mediaRoot is a filesystem path
       // and must never be serialized as though it were this URL base.
-      mediaBaseUrl: "/media",
+      mediaUrlFor: (filename) =>
+        signMediaUrl(
+          filename,
+          new Date(this.clock.now().getTime() + REVIEW_URL_TTL_MS),
+          loadServerConfig().mediaSigningSecret,
+        ),
     })
 
     if (outcome.kind === "not_found") {
@@ -148,7 +165,12 @@ export class ResultsService {
       const finalized = await loadReview(this.pool, {
         attemptId,
         now: this.clock.now(),
-        mediaBaseUrl: "/media",
+        mediaUrlFor: (filename) =>
+          signMediaUrl(
+            filename,
+            new Date(this.clock.now().getTime() + REVIEW_URL_TTL_MS),
+            loadServerConfig().mediaSigningSecret,
+          ),
       })
 
       if (finalized.kind !== "ready") {

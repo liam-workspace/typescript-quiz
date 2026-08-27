@@ -80,7 +80,7 @@ function readyReview(
   return loadReview(pool, {
     attemptId,
     now: NOW,
-    mediaBaseUrl: "/media",
+    mediaUrlFor: (filename: string) => `/media/${filename}?signed=stub`,
   })
 }
 
@@ -195,7 +195,7 @@ describe("loadReview", () => {
     })
   }, 120_000)
 
-  it("carries an unsigned, uncapped mediaUrl with no play-count field anywhere", async () => {
+  it("carries a replayable mediaUrl with no play-count field anywhere", async () => {
     await withDatabase(async (pool) => {
       const fixture = await seedPublishedTest(pool)
       const attemptId = await finishAttempt(pool, fixture)
@@ -209,11 +209,19 @@ describe("loadReview", () => {
       expect(result.items[0]?.stimulus).toEqual({
         id: fixture.cappedStimulusId,
         type: "audio",
-        mediaUrl: "/media/l07.mp3",
+        // Built by the caller's mediaUrlFor, which the service uses to SIGN.
+        // "The cap no longer applies" cannot mean "send a bare URL":
+        // /media refuses a capped filename without a valid signature and
+        // cannot tell review from mid-test, because an <audio src> sends no
+        // bearer. A bare URL here is one the client can never fetch.
+        mediaUrl: "/media/l07.mp3?signed=stub",
         replayable: true,
       })
+      // The play CAP is gone from the payload -- no counts, no pause/seek
+      // rules. That is what "replayable" means on this route; it is a
+      // different claim from whether the URL carries authority.
       expect(JSON.stringify(result)).not.toMatch(
-        /playsUsed|playsRemaining|maxPlays|allowPause|allowSeek|sig=/,
+        /playsUsed|playsRemaining|maxPlays|allowPause|allowSeek/,
       )
     })
   }, 120_000)

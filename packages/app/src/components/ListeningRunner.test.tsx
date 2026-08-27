@@ -42,6 +42,7 @@ const pips = [
 
 const baseProps = {
   question,
+  onHandIn: vi.fn(),
   stimulus: cappedAudio,
   selectedChoiceId: null,
   locked: false,
@@ -118,6 +119,17 @@ describe("ListeningRunner", () => {
     expect(
       screen.queryByRole("button", { name: "Previous" }),
     ).not.toBeInTheDocument()
+  })
+
+  it("calls onHandIn when Hand in is tapped", async () => {
+    const onHandIn = vi.fn()
+    const user = userEvent.setup()
+
+    render(<ListeningRunner {...baseProps} onHandIn={onHandIn} />)
+
+    await user.click(screen.getByRole("button", { name: "Hand in" }))
+
+    expect(onHandIn).toHaveBeenCalledTimes(1)
   })
 
   it("calls onNext when Next is clicked, and hides Next when hasNext is false", async () => {

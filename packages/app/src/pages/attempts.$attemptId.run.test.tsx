@@ -521,10 +521,12 @@ describe("RunScreen", () => {
       ).toBeInTheDocument()
     })
 
-    it("shows a disabled Hand in button", () => {
-      renderRunScreen(readingEnvelope)
+    it("navigates to the hand-in dialog when Hand in is tapped", async () => {
+      const { navigate } = renderRunScreen(readingEnvelope)
 
-      expect(screen.getByRole("button", { name: "Hand in" })).toBeDisabled()
+      await userEvent.click(screen.getByRole("button", { name: "Hand in" }))
+
+      expect(navigate).toHaveBeenCalledWith(expect.stringContaining("/hand-in"))
     })
 
     // Mirrors the claimPlay 410 coverage above: reading has no claimPlay

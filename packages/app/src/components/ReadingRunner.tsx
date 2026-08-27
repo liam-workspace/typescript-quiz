@@ -46,6 +46,10 @@ export interface ReadingRunnerProps {
   readonly hasNext: boolean
   readonly onNext: () => void
   readonly expired: ReadingExpiredState | null
+  // Supplied by the page, because navigation is state and `components/` is
+  // stateless by policy. Present since plan 5 gave the hand-in dialog a
+  // route; before that the button was deliberately inert.
+  readonly onHandIn: () => void
 }
 
 // Purely presentational -- same discipline as ListeningRunner (components/
@@ -57,10 +61,10 @@ export interface ReadingRunnerProps {
 // section are navigation (a `free` section gets an enabled Previous button,
 // unlike listening's forward_only) and answer-change (`locked` flows from
 // the same allowAnswerChange formula rather than a second hardcoded rule).
-// The Hand in button is a PHASE 5 boundary: it exists visually per the
-// prototype but calls nothing yet, so it stays `disabled` with a `title`
-// explaining why -- an honest "not yet" rather than a silent no-op that
-// looks like it worked.
+// The Hand in button now navigates: plan 5 built the confirm dialog at
+// /attempts/$attemptId/hand-in, so the honest "not yet" that used to sit
+// here has been redeemed. It stays a callback rather than a link because
+// `components/` is stateless and the page owns routing.
 export function ReadingRunner({
   question,
   stimulus,
@@ -77,6 +81,7 @@ export function ReadingRunner({
   hasNext,
   onNext,
   expired,
+  onHandIn,
 }: ReadingRunnerProps) {
   const { t } = useTranslation("runner")
 
@@ -144,9 +149,7 @@ export function ReadingRunner({
           <Button onClick={onPrevious}>{t("runner.previous")}</Button>
         ) : null}
         {hasNext ? <Button onClick={onNext}>{t("runner.next")}</Button> : null}
-        <Button disabled title={t("runner.handIn.unavailable")}>
-          {t("runner.handIn")}
-        </Button>
+        <Button onClick={onHandIn}>{t("runner.handIn")}</Button>
       </div>
     </div>
   )

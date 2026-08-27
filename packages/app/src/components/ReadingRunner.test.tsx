@@ -48,6 +48,7 @@ const pips = [
 
 const baseProps = {
   question,
+  onHandIn: vi.fn(),
   stimulus: passage,
   passageOrdinal: 1,
   passageFirstOrdinal: 5,
@@ -175,13 +176,17 @@ describe("ReadingRunner", () => {
     expect(onSelectChoice).toHaveBeenCalledExactlyOnceWith("c-2")
   })
 
-  it("shows a disabled Hand in button with a tooltip noting submit is not yet available", () => {
-    render(<ReadingRunner {...baseProps} />)
+  it("calls onHandIn when Hand in is tapped", async () => {
+    const onHandIn = vi.fn()
 
-    const handIn = screen.getByRole("button", { name: "Hand in" })
+    render(<ReadingRunner {...baseProps} onHandIn={onHandIn} />)
 
-    expect(handIn).toBeDisabled()
-    expect(handIn).toHaveAttribute("title", "Submitting isn't available yet.")
+    // Until plan 5 this button was deliberately disabled with a "not yet"
+    // title -- an honest placeholder rather than a silent no-op. The dialog
+    // now exists at /attempts/$attemptId/hand-in, so it navigates.
+    await userEvent.click(screen.getByRole("button", { name: "Hand in" }))
+
+    expect(onHandIn).toHaveBeenCalledTimes(1)
   })
 
   it("renders 'Passage N · questions X–Y' from the group's question ordinals", () => {

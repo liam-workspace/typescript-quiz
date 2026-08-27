@@ -46,6 +46,10 @@ export interface ListeningRunnerProps {
   readonly hasNext: boolean
   readonly onNext: () => void
   readonly expired: ListeningExpiredState | null
+  // Supplied by the page -- navigation is state, and `components/` is
+  // stateless by policy. A child must be able to hand in from either
+  // section, not only the last one.
+  readonly onHandIn: () => void
 }
 
 // Purely presentational -- see ListeningRunner.test.tsx's doc comment for
@@ -64,6 +68,7 @@ export function ListeningRunner({
   pips,
   hasNext,
   onNext,
+  onHandIn,
   expired,
 }: ListeningRunnerProps) {
   const { t } = useTranslation("runner")
@@ -133,6 +138,7 @@ export function ListeningRunner({
           listening section, which spec section 1.4 requires to run
           forward_only. */}
       {hasNext ? <Button onClick={onNext}>{t("runner.next")}</Button> : null}
+      <Button onClick={onHandIn}>{t("runner.handIn")}</Button>
     </div>
   )
 }

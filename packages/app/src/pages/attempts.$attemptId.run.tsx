@@ -280,6 +280,13 @@ export function RunScreen({ attemptId, envelope, navigate }: RunScreenProps) {
         hasNext={Boolean(nextEntry)}
         onNext={handleNext}
         expired={expired}
+        onHandIn={() => {
+          // Plan 5 gave hand-in a route; before that ReadingRunner's button
+          // was deliberately inert with a "not yet" title. Navigation lives
+          // here rather than in the component because `components/` is
+          // stateless by policy.
+          navigate(`/attempts/${attemptId}/hand-in`)
+        }}
       />
     )
   }
@@ -306,6 +313,13 @@ export function RunScreen({ attemptId, envelope, navigate }: RunScreenProps) {
         hasNext={Boolean(nextEntry)}
         onNext={handleNext}
         expired={expired}
+        onHandIn={() => {
+          // Plan 5 gave hand-in a route; before that ReadingRunner's button
+          // was deliberately inert with a "not yet" title. Navigation lives
+          // here rather than in the component because `components/` is
+          // stateless by policy.
+          navigate(`/attempts/${attemptId}/hand-in`)
+        }}
       />
     )
   }

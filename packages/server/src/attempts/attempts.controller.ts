@@ -15,6 +15,7 @@ import { CurrentStudent } from "../auth/current-student.decorator.js"
 import { JwksGuard } from "../auth/jwks.guard.js"
 import {
   AttemptsService,
+  type PlayGrant,
   type RunnerEnvelopeResult,
   type SectionEntryResult,
 } from "./attempts.service.js"
@@ -222,6 +223,22 @@ export class AttemptsController {
     )
 
     return toSectionEntryView(result, this.attempts.now())
+  }
+
+  /**
+   * Claims one play and, only then, issues a short-lived signed URL --
+   * the ONLY way a client obtains audio for a capped stimulus. `200`, not
+   * Nest's POST default of `201`: this recognises a claim against existing
+   * state (the play counter), not the creation of a new resource.
+   */
+  @Post(":id/stimuli/:stimulusId/play")
+  @HttpCode(200)
+  play(
+    @CurrentStudent() claims: JwtClaims,
+    @Param("id") id: string,
+    @Param("stimulusId") stimulusId: string,
+  ): Promise<PlayGrant> {
+    return this.attempts.claimPlay(subjectOf(claims), id, stimulusId)
   }
 }
 

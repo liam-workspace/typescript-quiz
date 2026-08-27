@@ -5,6 +5,7 @@ import { AuthModule } from "./auth/auth.module.js"
 import { CatalogModule } from "./catalog/catalog.module.js"
 import { DatabaseModule } from "./database/database.module.js"
 import { HealthModule } from "./health/health.module.js"
+import { MediaModule } from "./media/media.module.js"
 import { SessionModule } from "./session/session.module.js"
 
 @Module({
@@ -15,6 +16,7 @@ import { SessionModule } from "./session/session.module.js"
     CatalogModule,
     DatabaseModule,
     HealthModule,
+    MediaModule,
     SessionModule,
   ],
 })

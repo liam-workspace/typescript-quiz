@@ -10,6 +10,7 @@ import {
 } from "@nestjs/common"
 import type { Clock } from "@pp/common"
 import {
+  claimPlay as claimPlayRow,
   enterSection as enterSectionRow,
   findStudentBySubject,
   loadRunnerEnvelope,
@@ -24,7 +25,9 @@ import {
   type SectionEntryRow,
   type StartResult,
 } from "@pp/db"
+import { loadServerConfig } from "../config.js"
 import { CLOCK, REQUEST_POOL } from "../database/tokens.js"
+import { signMediaUrl } from "../media/media-signing.js"
 
 export interface RunnerEnvelopeResult {
   attempt: AttemptRow
@@ -38,6 +41,17 @@ export interface SectionEntryResult {
   entry: SectionEntryRow
   section: SectionBriefRow
 }
+
+export interface PlayGrant {
+  stimulusId: string
+  playsUsed: number
+  playsRemaining: number | null
+  mediaUrl: string
+  urlExpiresAt: Date
+}
+
+/** How long a signed media URL stays valid after `POST /play` issues it. */
+const PLAY_URL_TTL_MS = 5 * 60 * 1000
 
 /**
  * `NotYourAttempt` (contract: "the attempt belongs to another student").
@@ -91,6 +105,18 @@ function sectionStillOpenError(): HttpException {
     {
       type: "section_still_open",
       title: "A previous section is still open.",
+      status: HttpStatus.CONFLICT,
+    },
+    HttpStatus.CONFLICT,
+  )
+}
+
+/** `409`, contract: "No plays remaining." */
+function noPlaysRemainingError(): HttpException {
+  return new HttpException(
+    {
+      type: "no_plays_remaining",
+      title: "No plays remaining.",
       status: HttpStatus.CONFLICT,
     },
     HttpStatus.CONFLICT,
@@ -274,5 +300,66 @@ export class AttemptsService {
     }
 
     return { entry: outcome.entry, section }
+  }
+
+  /**
+   * Claims one play against a (possibly) capped stimulus and, only on
+   * success, issues a short-lived signed URL -- the ONLY way to obtain
+   * audio for a capped stimulus (spec: a URL in the runner payload would
+   * let a student fetch the file directly and replay it forever).
+   * `loadRunningOwnedAttempt` is the same load-bearing 403/410 check every
+   * other attempt-scoped route runs first.
+   */
+  async claimPlay(
+    subjectClaim: string,
+    attemptId: string,
+    stimulusId: string,
+  ): Promise<PlayGrant> {
+    const student = await findStudentBySubject(this.pool, subjectClaim)
+
+    if (!student) {
+      throw notYourAttemptError()
+    }
+
+    const now = this.clock.now()
+    const result = await loadRunningOwnedAttempt(this.pool, {
+      attemptId,
+      studentId: student.id,
+      now,
+    })
+
+    if (!result.attempt) {
+      if (result.finalized) {
+        throw attemptExpiredError(result.finalized)
+      }
+
+      throw notYourAttemptError()
+    }
+
+    const claimed = await claimPlayRow(this.pool, {
+      attemptId: result.attempt.id,
+      stimulusId,
+      testVersionId: result.attempt.testVersionId,
+      now,
+    })
+
+    if (!claimed.ok) {
+      throw noPlaysRemainingError()
+    }
+
+    const urlExpiresAt = new Date(now.getTime() + PLAY_URL_TTL_MS)
+    const mediaUrl = signMediaUrl(
+      claimed.claim.filename,
+      urlExpiresAt,
+      loadServerConfig().mediaSigningSecret,
+    )
+
+    return {
+      stimulusId,
+      playsUsed: claimed.claim.playsUsed,
+      playsRemaining: claimed.claim.playsRemaining,
+      mediaUrl,
+      urlExpiresAt,
+    }
   }
 }

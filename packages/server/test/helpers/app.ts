@@ -38,6 +38,9 @@ export async function createTestApp(
   // `isEmailAllowed` rejects everything when the allowlist is empty, which is
   // the right production default but would 403 every test.
   process.env.ALLOWED_EMAILS = options.allowedEmails ?? "*@example.com"
+  // `required(env, "MEDIA_SIGNING_SECRET")` has no default -- every test from
+  // here on fails to boot without this set before AppModule compiles.
+  process.env.MEDIA_SIGNING_SECRET = "test-media-signing-secret"
 
   await migrateToLatest(process.env.DATABASE_URL)
 

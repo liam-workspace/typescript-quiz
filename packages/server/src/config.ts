@@ -12,6 +12,7 @@ export interface ServerConfig {
   mediaRoot: string
   mediaMaxBytes: number
   allowedEmails: string[]
+  mediaSigningSecret: string
 }
 
 function required(env: Environment, key: string): string {
@@ -34,5 +35,9 @@ export function loadServerConfig(
     mediaRoot: env.MEDIA_ROOT ?? "/media",
     mediaMaxBytes: parseIntegerEnv(env, "MEDIA_MAX_BYTES", 20 * 1024 * 1024),
     allowedEmails: [...parseCsvEnv(env, "ALLOWED_EMAILS")],
+    // No default: a default signing secret is the secret every deployment
+    // would actually ship with, which makes signed URLs forgeable by anyone
+    // who has read the source.
+    mediaSigningSecret: required(env, "MEDIA_SIGNING_SECRET"),
   }
 }

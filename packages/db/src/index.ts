@@ -24,6 +24,11 @@ import {
   type TestCardRow,
 } from "./repositories/catalog.repository.js"
 import {
+  claimPlay,
+  isFilenameCapped,
+  type PlayClaimResult,
+} from "./repositories/media-play.repository.js"
+import {
   loadRunnerEnvelope,
   type RunnerEnvelopeRow,
 } from "./repositories/runner.repository.js"
@@ -52,6 +57,8 @@ export type { AttemptRow, FinalizedAttemptRow, SectionEntryRow, StartResult }
 
 export type { RunnerEnvelopeRow }
 
+export type { PlayClaimResult }
+
 export {
   loadDbConfig,
   createJobPool,
@@ -70,4 +77,6 @@ export {
   startOrResumeAttempt,
   enterSection,
   TestNotFoundError,
+  claimPlay,
+  isFilenameCapped,
 }

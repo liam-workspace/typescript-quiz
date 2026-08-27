@@ -13,6 +13,19 @@ export type WriteOutcome =
       reason: "answer_change_not_allowed" | "invalid" | "unknown_question"
     }
 
+export interface ResponseWriteInput {
+  attemptId: string
+  questionId: string
+  testVersionId: string
+  clientInstanceId: string
+  seq: number
+  selectedChoiceIds: string[]
+  answeredAt: Date | null
+  timeSpentMs: number | null
+  allowAnswerChange: boolean
+  now: Date
+}
+
 function rejectionReasonFor(
   error: unknown,
 ): "invalid" | "unknown_question" | null {
@@ -58,23 +71,31 @@ function rejectionReasonFor(
  * not looked up here -- this repository is ordering/durability mechanics
  * only, not section business rules.
  */
-export async function writeResponse(
+export function writeResponse(
   pool: PgPool,
-  input: {
-    attemptId: string
-    questionId: string
-    testVersionId: string
-    clientInstanceId: string
-    seq: number
-    selectedChoiceIds: string[]
-    answeredAt: Date | null
-    timeSpentMs: number | null
-    allowAnswerChange: boolean
-    now: Date
-  },
+  input: ResponseWriteInput,
 ): Promise<WriteOutcome> {
+  return withTransaction(pool, (tx) => applyResponse(tx, input))
+}
+
+/**
+ * The transaction-scoped form of writeResponse. Submit uses this inside the
+ * same transaction that locks and finalizes the attempt, so a final queued
+ * answer cannot commit separately from the score that includes it.
+ *
+ * A savepoint isolates invalid foreign keys/values to this one item. Without
+ * it PostgreSQL would leave the submit transaction aborted after a rejected
+ * item, preventing its failed_write capture and every later item from being
+ * committed.
+ */
+export async function applyResponse(
+  tx: PgQueryable,
+  input: ResponseWriteInput,
+): Promise<WriteOutcome> {
+  await tx.query("SAVEPOINT apply_response_item")
+
   try {
-    return await withTransaction(pool, async (tx) => {
+    const outcome = await (async (): Promise<WriteOutcome> => {
       // Ensure the response row exists so response_client_cursor's FK can
       // reference it. A no-op if a prior write (from any instance) already
       // created it -- the row is never deleted, even on a clear. If
@@ -162,8 +183,13 @@ export async function writeResponse(
       )
 
       return { kind: "applied" }
-    })
+    })()
+    await tx.query("RELEASE SAVEPOINT apply_response_item")
+
+    return outcome
   } catch (error) {
+    await tx.query("ROLLBACK TO SAVEPOINT apply_response_item")
+    await tx.query("RELEASE SAVEPOINT apply_response_item")
     const reason = rejectionReasonFor(error)
 
     if (reason) {

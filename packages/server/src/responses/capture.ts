@@ -1,4 +1,4 @@
-import type { PgPool } from "@liam-public/node-postgres"
+import type { PgQueryable } from "@liam-public/node-postgres"
 import { HttpStatus } from "@nestjs/common"
 import { insertFailedWrite } from "@pp/db"
 import { ProblemException } from "../attempts/problem.exception.js"
@@ -33,7 +33,7 @@ function rejectionTitle(reason: string): string {
 }
 
 async function captureResponseRejection(
-  pool: PgPool,
+  pool: PgQueryable,
   req: ResponseRequest,
   input: CaptureInput,
 ): Promise<string> {
@@ -64,7 +64,7 @@ async function captureResponseRejection(
 }
 
 export async function captureRejection(
-  pool: PgPool,
+  pool: PgQueryable,
   req: ResponseRequest,
   input: Omit<CaptureInput, "itemOnly">,
 ): Promise<ProblemException> {
@@ -80,7 +80,7 @@ export async function captureRejection(
 }
 
 export function captureItemRejection(
-  pool: PgPool,
+  pool: PgQueryable,
   req: ResponseRequest,
   input: Omit<CaptureInput, "itemOnly">,
 ): Promise<string> {

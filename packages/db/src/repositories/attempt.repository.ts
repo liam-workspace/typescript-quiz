@@ -426,6 +426,120 @@ export function finalizeAttempt(
   return withTransaction(pool, (tx) => finalizeAttemptTx(tx, input))
 }
 
+export type SubmitOutcome<T> =
+  | { kind: "not_found" }
+  | { kind: "already_expired"; finalized: AttemptScoreRow }
+  | { kind: "nothing_answered" }
+  | {
+      kind: "submitted"
+      alreadySubmitted: boolean
+      finalized: AttemptScoreRow
+      finalFlush: T[]
+    }
+
+interface AttemptSubmitStateDbRow extends AttemptDbRow {
+  submitted_at: Date | null
+}
+
+/**
+ * Locks, applies the caller's final response remainder, then grades in one
+ * transaction. The callback keeps response-specific acknowledgement and
+ * failed-write capture concerns outside this repository while ensuring they
+ * use this exact transaction.
+ */
+export function submitAttempt<T>(
+  pool: PgPool,
+  input: {
+    attemptId: string
+    now: Date
+    applyRemainder: (tx: PgQueryable, attempt: AttemptRow) => Promise<T[]>
+  },
+): Promise<SubmitOutcome<T>> {
+  return withTransaction(pool, async (tx) => {
+    const { rows } = await tx.query<AttemptSubmitStateDbRow>(
+      `SELECT ${ATTEMPT_COLUMNS}, submitted_at
+         FROM attempt
+        WHERE id = $1
+        FOR UPDATE`,
+      [input.attemptId],
+    )
+
+    if (rows.length === 0) {
+      return { kind: "not_found" }
+    }
+
+    const [state] = rows
+    const attempt = toAttempt(state)
+
+    if (attempt.status !== "in_progress") {
+      const submittedAt = state.submitted_at ?? attempt.expiresAt ?? input.now
+      const finalized = await finalizeAttemptTx(tx, {
+        attemptId: attempt.id,
+        status: attempt.status,
+        submittedAt,
+      })
+
+      if (!finalized) {
+        throw new Error(`attempt ${attempt.id} vanished while locked`)
+      }
+
+      if (attempt.status === "expired") {
+        return { kind: "already_expired", finalized }
+      }
+
+      return {
+        kind: "submitted",
+        alreadySubmitted: true,
+        finalized,
+        finalFlush: [],
+      }
+    }
+
+    if (isPastDeadline(attempt.expiresAt, input.now)) {
+      const finalized = await finalizeAttemptTx(tx, {
+        attemptId: attempt.id,
+        status: "expired",
+        submittedAt: attempt.expiresAt ?? input.now,
+      })
+
+      if (!finalized) {
+        throw new Error(`attempt ${attempt.id} vanished while locked`)
+      }
+
+      return { kind: "already_expired", finalized }
+    }
+
+    const finalFlush = await input.applyRemainder(tx, attempt)
+    const { rows: answeredRows } = await tx.query<{ answered: boolean }>(
+      `SELECT EXISTS(
+         SELECT 1 FROM response_choice WHERE attempt_id = $1
+       ) AS answered`,
+      [attempt.id],
+    )
+
+    if (!answeredRows[0]?.answered) {
+      return { kind: "nothing_answered" }
+    }
+
+    const finalized = await finalizeAttemptTx(tx, {
+      attemptId: attempt.id,
+      status: "submitted",
+      submittedAt: input.now,
+    })
+
+    if (!finalized) {
+      throw new Error(`attempt ${attempt.id} vanished while locked`)
+    }
+
+    return {
+      kind: "submitted",
+      alreadySubmitted: false,
+      finalized,
+      finalFlush,
+    }
+  })
+}
+
 /**
  * The load-bearing check every attempt-scoped route runs first. Returns
  * the live row when the attempt is still running; finalizes and returns

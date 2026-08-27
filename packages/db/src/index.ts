@@ -8,12 +8,14 @@ import {
   loadRunningOwnedAttempt,
   setPosition,
   startOrResumeAttempt,
+  submitAttempt,
   TestNotFoundError,
   type AttemptRow,
   type AttemptScoreRow,
   type FinalizedAttemptRow,
   type SectionEntryRow,
   type StartResult,
+  type SubmitOutcome,
 } from "./repositories/attempt.repository.js"
 import { SectionExpiredError } from "./repositories/section-expired.error.js"
 import {
@@ -37,8 +39,10 @@ import {
   type PlayClaimResult,
 } from "./repositories/media-play.repository.js"
 import {
+  applyResponse,
   loadResponse,
   writeResponse,
+  type ResponseWriteInput,
   type WriteOutcome,
 } from "./repositories/response.repository.js"
 import {
@@ -76,6 +80,7 @@ export type {
   FinalizedAttemptRow,
   SectionEntryRow,
   StartResult,
+  SubmitOutcome,
 }
 
 export type { RunnerEnvelopeRow }
@@ -84,7 +89,7 @@ export type { PlayClaimResult }
 
 export type { FailedWriteRow }
 
-export type { WriteOutcome }
+export type { ResponseWriteInput, WriteOutcome }
 
 export type { QuestionSectionInfo }
 
@@ -107,6 +112,7 @@ export {
   SectionExpiredError,
   setPosition,
   startOrResumeAttempt,
+  submitAttempt,
   enterSection,
   TestNotFoundError,
   claimPlay,
@@ -114,5 +120,6 @@ export {
   insertFailedWrite,
   loadResponse,
   writeResponse,
+  applyResponse,
   loadQuestionSectionInfo,
 }

@@ -9,6 +9,7 @@ import {
   Post,
   Put,
   Res,
+  Req,
   UseFilters,
   UseGuards,
 } from "@nestjs/common"
@@ -17,12 +18,15 @@ import { CurrentStudent } from "../auth/current-student.decorator.js"
 import { JwksGuard } from "../auth/jwks.guard.js"
 import { ProblemException } from "./problem.exception.js"
 import { ProblemExceptionFilter } from "./problem.filter.js"
+import type { CapturedRequest } from "../http/raw-body-json.middleware.js"
 import {
   AttemptsService,
   type PlayGrant,
   type RunnerEnvelopeResult,
   type SectionEntryResult,
+  type SubmitResultView,
 } from "./attempts.service.js"
+import { SubmitRequestDto } from "./submit-request.schema.js"
 
 /**
  * Structural rather than express's Response: @types/express is not a
@@ -211,6 +215,23 @@ export class AttemptsController {
     const result = await this.attempts.getRunnerEnvelope(subjectOf(claims), id)
 
     return toRunnerEnvelopeView(result, this.attempts.now())
+  }
+
+  /** Final queue flush first, one-time grading second; 201 creates finality. */
+  @Post(":id/submit")
+  async submit(
+    @CurrentStudent() claims: JwtClaims,
+    @Param("id") id: string,
+    @Body() body: SubmitRequestDto,
+    @Req() req: CapturedRequest,
+    @Res({ passthrough: true }) res: StatusSettable,
+  ): Promise<SubmitResultView> {
+    const result = await this.attempts.submit(subjectOf(claims), id, body, req)
+
+    // 201 finalizes, 200 recognizes an already-finalized submitted row.
+    res.status(result.alreadySubmitted ? 200 : 201)
+
+    return result.view
   }
 
   /**

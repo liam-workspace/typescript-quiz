@@ -5,14 +5,17 @@ import {
   claimPlay as claimPlayRow,
   enterSection as enterSectionRow,
   findStudentBySubject,
+  applyResponse,
   loadRunnerEnvelope,
   loadRunningOwnedAttempt,
   loadSectionBrief,
   SectionExpiredError,
   setPosition as setPositionRow,
   startOrResumeAttempt,
+  submitAttempt as submitAttemptRow,
   TestNotFoundError,
   type AttemptRow,
+  type AttemptScoreRow,
   type FinalizedAttemptRow,
   type RunnerEnvelopeRow,
   type SectionBriefRow,
@@ -22,7 +25,14 @@ import {
 import { loadServerConfig } from "../config.js"
 import { CLOCK, REQUEST_POOL } from "../database/tokens.js"
 import { signMediaUrl } from "../media/media-signing.js"
+import type { CapturedRequest } from "../http/raw-body-json.middleware.js"
+import {
+  applyResponseItems,
+  type ItemResult,
+} from "../responses/apply-response.js"
+import { resolveOwnedAttempt } from "./ownership.js"
 import { ProblemException } from "./problem.exception.js"
+import type { SubmitRequest } from "./submit-request.schema.js"
 
 export interface RunnerEnvelopeResult {
   attempt: AttemptRow
@@ -43,6 +53,19 @@ export interface PlayGrant {
   playsRemaining: number | null
   mediaUrl: string
   urlExpiresAt: Date
+}
+
+export interface SubmitResultView {
+  attemptId: string
+  status: "submitted"
+  submittedAt: string
+  resultUrl: string
+  finalFlush: ItemResult[]
+}
+
+export interface SubmittedAttemptResult {
+  alreadySubmitted: boolean
+  view: SubmitResultView
 }
 
 /** How long a signed media URL stays valid after `POST /play` issues it. */
@@ -122,6 +145,32 @@ function noPlaysRemainingError(): ProblemException {
     type: "no_plays_remaining",
     title: "No plays remaining.",
     status: HttpStatus.CONFLICT,
+  })
+}
+
+function nothingAnsweredError(): ProblemException {
+  return new ProblemException({
+    type: "nothing_answered",
+    title: "Nothing answered.",
+    status: HttpStatus.CONFLICT,
+    retryable: false,
+  })
+}
+
+function submittedAttemptExpiredError(
+  finalized: Pick<AttemptScoreRow, "attemptId" | "submittedAt">,
+): ProblemException {
+  return new ProblemException({
+    type: "attempt_expired",
+    title: "The attempt was past its deadline and has been finalized.",
+    status: HttpStatus.GONE,
+    retryable: false,
+    attempt: {
+      id: finalized.attemptId,
+      status: "expired",
+      submittedAt: finalized.submittedAt.toISOString(),
+      resultUrl: `/api/attempts/${finalized.attemptId}/result`,
+    },
   })
 }
 
@@ -427,6 +476,66 @@ export class AttemptsService {
       playsRemaining: claimed.claim.playsRemaining,
       mediaUrl,
       urlExpiresAt,
+    }
+  }
+
+  /** Applies the queue remainder and finalizes under submitAttempt's one lock. */
+  async submit(
+    subjectClaim: string,
+    attemptId: string,
+    body: SubmitRequest,
+    req: CapturedRequest,
+  ): Promise<SubmittedAttemptResult> {
+    const owned = await resolveOwnedAttempt(this.pool, {
+      attemptId,
+      subjectClaim,
+    })
+
+    // The operation declares only NotYourAttempt for ownership failures, so
+    // an unknown id and somebody else's id deliberately have one wire shape.
+    if (owned.kind !== "ok") {
+      throw notYourAttemptError()
+    }
+
+    const now = this.clock.now()
+    const outcome = await submitAttemptRow(this.pool, {
+      attemptId,
+      now,
+      applyRemainder: async (tx, attempt) => {
+        const { results } = await applyResponseItems(tx, {
+          attempt,
+          clientInstanceId: body.clientInstanceId,
+          responses: body.responses ?? [],
+          now,
+          req,
+          write: (input) => applyResponse(tx, input),
+        })
+
+        return results
+      },
+    })
+
+    if (outcome.kind === "not_found") {
+      throw notYourAttemptError()
+    }
+
+    if (outcome.kind === "nothing_answered") {
+      throw nothingAnsweredError()
+    }
+
+    if (outcome.kind === "already_expired") {
+      throw submittedAttemptExpiredError(outcome.finalized)
+    }
+
+    return {
+      alreadySubmitted: outcome.alreadySubmitted,
+      view: {
+        attemptId,
+        status: "submitted",
+        submittedAt: outcome.finalized.submittedAt.toISOString(),
+        resultUrl: `/api/attempts/${attemptId}/result`,
+        finalFlush: outcome.finalFlush,
+      },
     }
   }
 }

@@ -1,4 +1,4 @@
-import type { PgPool } from "@liam-public/node-postgres"
+import type { PgQueryable } from "@liam-public/node-postgres"
 import { HttpStatus } from "@nestjs/common"
 import { canSetPosition, isPastDeadline } from "@pp/common"
 import type { AttemptRow } from "@pp/db"
@@ -20,7 +20,7 @@ interface SectionRulesDbRow {
 }
 
 export async function resolveSectionRules(
-  pool: PgPool,
+  pool: PgQueryable,
   input: { attempt: AttemptRow; questionId: string },
 ): Promise<SectionRules> {
   const { attempt, questionId } = input

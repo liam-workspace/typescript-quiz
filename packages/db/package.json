@@ -11,6 +11,10 @@
     "./scoring": {
       "types": "./dist/scoring.d.ts",
       "default": "./dist/scoring.js"
+    },
+    "./admin": {
+      "types": "./dist/admin.d.ts",
+      "default": "./dist/admin.js"
     }
   },
   "files": [

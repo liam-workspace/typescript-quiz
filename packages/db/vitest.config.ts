@@ -5,6 +5,7 @@ export default defineConfig({
     alias: {
       "@pp/db/scoring": new URL("../db/src/scoring.ts", import.meta.url)
         .pathname,
+      "@pp/db/admin": new URL("../db/src/admin.ts", import.meta.url).pathname,
       "@pp/common/scoring": new URL("../common/src/scoring.ts", import.meta.url)
         .pathname,
       "@pp/common": new URL("../common/src/index.ts", import.meta.url).pathname,

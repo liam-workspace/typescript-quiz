@@ -1750,6 +1750,29 @@ Plan 1 accepted a broken `Dockerfile` and `pnpm build` as a recorded ruling, bec
 
 Multi-stage: install with `--frozen-lockfile`, `pnpm build` (now `common` → `db` → `server`), then a runtime stage carrying `dist/` for all three plus `packages/db/migrations` and production `node_modules`. Copy `packages/{common,db,server}/package.json` — the current file copies `web` and `socket` and omits `db`, which is why it fails today.
 
+**Three things about the current file, checked rather than assumed:**
+
+- **Pin the builder to `node:24-alpine`, not `node:26-alpine`.** Both tags
+  exist, so this is not a build break — it is a skew: every test in this
+  repository has only ever run on Node 24 (`v24.15.0` locally), and there is no
+  `engines` field anywhere to pin it. Building and shipping on a major version
+  the suite has never executed against is a risk taken for nothing.
+- **The runner stage installs nginx and supervisor and serves the OLD Razzia
+  app** — it copies `packages/web/dist` and `packages/socket/dist/index.cjs`,
+  which are the upstream application this repository was forked from. All of
+  that goes. The runtime is one Node process running `packages/server/dist`;
+  there is no reverse proxy and nothing to supervise.
+- **Delete `docker/nginx.conf` and `docker/supervisord.conf` with it.** They
+  exist only for that supervisor runtime. Plan 6's deploy task serves the built
+  SPA from the API process itself, so nginx is not coming back — leaving the
+  files would strand two config files nobody can explain.
+
+`GET /health` is deliberately NOT under the `/api` prefix (`main.ts` calls
+`setGlobalPrefix("api", { exclude: ["health"] })`), so Step 3's
+`curl .../health` is correct as written. Do not "fix" it to `/api/health`; that
+path 404s by design, because the container healthcheck should not depend on the
+published contract's shape.
+
 `@liam-workspace/*` resolves from GitHub Packages, so the build needs `NODE_AUTH_TOKEN`. Use a BuildKit secret mount (`--mount=type=secret`), never an `ARG` — an `ARG` token is recoverable from the image history.
 
 - [ ] **Step 2: compose**
@@ -1769,11 +1792,7 @@ docker compose down -v
 
 A Dockerfile that has not been built is a Dockerfile that does not work. Paste the `/health` response into your report.
 
-- [ ] **Step 4: Gates and commit**
-
-```bash
-git commit -m "build: ship the server image and give compose a runnable api service"
-```
+- [ ] **Step 4: Gates.** Do not run `git add -A` and do not commit from a step.
 
 ---
 

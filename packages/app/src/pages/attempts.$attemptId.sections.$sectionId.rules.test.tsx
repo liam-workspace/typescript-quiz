@@ -4,13 +4,23 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
 import { enterSection } from "../lib/attempts-api.js"
-import { SectionRulesScreen } from "./attempts.$attemptId.sections.$sectionId.rules.js"
+import {
+  SectionRulesScreen,
+  searchSchema,
+} from "./attempts.$attemptId.sections.$sectionId.rules.js"
 
 vi.mock("../lib/attempts-api.js", () => ({
   enterSection: vi.fn(),
 }))
 
 const mockEnterSection = vi.mocked(enterSection)
+
+// Built by concatenation, not as a string literal -- oxlint's `no-script-url`
+// rule flags a literal `"javascript:..."` token even inside a test that
+// asserts it gets rejected, and the point of these tests is to keep
+// asserting rejection.
+// oxlint-disable-next-line no-script-url -- the hostile scheme IS the fixture
+const javascriptUrl = "javascript:alert(1)"
 
 const baseProps = {
   attemptId: "attempt-1",
@@ -222,5 +232,92 @@ describe("SectionRulesScreen", () => {
       "/api/attempts/attempt-1/result",
     )
     expect(navigate).not.toHaveBeenCalled()
+  })
+
+  // Security: `resultUrl` reaches this screen from the URL query string (the
+  // `finalizedPriorAttempt` search param, parsed by the route) and from the
+  // server's own `410 attempt_expired` response body. Either source can
+  // carry a `javascript:`/`data:`/`//host` value, and React does not
+  // sanitise `href` -- it escapes attribute VALUES, and a `javascript:` URL
+  // is a syntactically valid one. On a shared, authenticated iPad, a
+  // hostile href is a bearer-token theft vector, not a curiosity. Both
+  // paths are constrained at the point `resultUrl` is first parsed --
+  // `sameOriginPath` in the search schema, and the `.catch` handler for the
+  // attempt-expired response -- not at the `<a>` that later renders it.
+  describe("resultUrl is constrained where it is parsed, not where it is rendered", () => {
+    it("rejects a javascript: resultUrl at the search-param parse boundary", () => {
+      const result = searchSchema.safeParse({
+        title: "Listening — Part 1",
+        instructions: [],
+        finalizedPriorAttempt: {
+          id: "attempt-0",
+          status: "expired",
+          submittedAt: "2026-08-27T08:00:00.000Z",
+          resultUrl: javascriptUrl,
+        },
+      })
+
+      expect(result.success).toBe(false)
+    })
+
+    it("rejects a protocol-relative resultUrl at the search-param parse boundary", () => {
+      const result = searchSchema.safeParse({
+        title: "Listening — Part 1",
+        instructions: [],
+        finalizedPriorAttempt: {
+          id: "attempt-0",
+          status: "expired",
+          submittedAt: "2026-08-27T08:00:00.000Z",
+          resultUrl: "//evil.example/steal",
+        },
+      })
+
+      expect(result.success).toBe(false)
+    })
+
+    it("accepts the same-origin path the server actually issues", () => {
+      const result = searchSchema.safeParse({
+        title: "Listening — Part 1",
+        instructions: [],
+        finalizedPriorAttempt: {
+          id: "attempt-0",
+          status: "expired",
+          submittedAt: "2026-08-27T08:00:00.000Z",
+          resultUrl: "/api/attempts/attempt-0/result",
+        },
+      })
+
+      expect(result.success).toBe(true)
+    })
+
+    it("does not render a result link when the 410 attempt_expired response carries a javascript: resultUrl", async () => {
+      mockEnterSection.mockRejectedValue(
+        new ApiError({
+          type: "attempt_expired",
+          title: "The attempt was past its deadline and has been finalized.",
+          status: 410,
+          attempt: {
+            id: "attempt-1",
+            status: "expired",
+            submittedAt: "2026-08-27T09:25:00.000Z",
+            resultUrl: javascriptUrl,
+          },
+        }),
+      )
+      const user = userEvent.setup()
+
+      render(<SectionRulesScreen {...baseProps} navigate={vi.fn()} />)
+
+      await user.click(screen.getByTestId("ready-button"))
+
+      expect(
+        await screen.findByText(
+          "Your test time ran out. Your answers have been submitted.",
+        ),
+      ).toBeInTheDocument()
+      expect(
+        screen.queryByRole("link", { name: "View result" }),
+      ).not.toBeInTheDocument()
+    })
   })
 })

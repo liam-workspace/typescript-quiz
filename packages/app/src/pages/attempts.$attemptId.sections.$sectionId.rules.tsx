@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next"
 import { z } from "zod"
 import { ApiError } from "../lib/api-client.js"
 import { enterSection } from "../lib/attempts-api.js"
+import { sameOriginPath } from "../lib/same-origin-path.js"
 import type { FinalizedAttempt } from "../lib/api-types.js"
 
 // The section-rules screen ("secintro" in the prototype) is the last thing a
@@ -32,11 +33,14 @@ const finalizedPriorAttemptSearchSchema = z
     id: z.string(),
     status: z.literal("expired"),
     submittedAt: z.string(),
-    resultUrl: z.string(),
+    // Straight out of the URL bar -- the attacker-controlled half of the two
+    // sources this module's docstring names. Guarded here so the render site
+    // below cannot be the thing that has to remember.
+    resultUrl: sameOriginPath,
   })
   .nullable()
 
-const searchSchema = z.object({
+export const searchSchema = z.object({
   title: z.string().default(""),
   instructions: z.array(z.string()).default([]),
   finalizedPriorAttempt: finalizedPriorAttemptSearchSchema.default(null),
@@ -49,7 +53,7 @@ type EnterOutcome =
   | { readonly status: "entering" }
   | { readonly status: "refused"; readonly problem: ApiError["problem"] }
   | { readonly status: "sectionExpired" }
-  | { readonly status: "attemptExpired"; readonly attempt: FinalizedAttempt }
+  | { readonly status: "attemptExpired"; readonly resultUrl: string | null }
 
 export interface SectionRulesScreenProps {
   readonly attemptId: string
@@ -84,9 +88,13 @@ export function SectionRulesScreen({
         }
 
         if (error.problem.type === "attempt_expired" && error.problem.attempt) {
+          const resultUrl = sameOriginPath.safeParse(
+            error.problem.attempt.resultUrl,
+          )
+
           setOutcome({
             status: "attemptExpired",
-            attempt: error.problem.attempt,
+            resultUrl: resultUrl.success ? resultUrl.data : null,
           })
 
           return
@@ -117,8 +125,8 @@ export function SectionRulesScreen({
               ? t("sectionRules.expired.attemptMessage")
               : t("sectionRules.expired.sectionMessage")}
           </p>
-          {outcome.status === "attemptExpired" ? (
-            <a href={outcome.attempt.resultUrl}>
+          {outcome.status === "attemptExpired" && outcome.resultUrl ? (
+            <a href={outcome.resultUrl}>
               {t("sectionRules.expired.viewResult")}
             </a>
           ) : null}

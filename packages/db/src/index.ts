@@ -26,6 +26,10 @@ import {
   type TestCardRow,
 } from "./repositories/catalog.repository.js"
 import {
+  insertFailedWrite,
+  type FailedWriteRow,
+} from "./repositories/failed-write.repository.js"
+import {
   claimPlay,
   isFilenameCapped,
   type PlayClaimResult,
@@ -61,6 +65,8 @@ export type { RunnerEnvelopeRow }
 
 export type { PlayClaimResult }
 
+export type { FailedWriteRow }
+
 export {
   loadDbConfig,
   createJobPool,
@@ -83,4 +89,5 @@ export {
   TestNotFoundError,
   claimPlay,
   isFilenameCapped,
+  insertFailedWrite,
 }

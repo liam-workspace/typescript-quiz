@@ -1633,7 +1633,22 @@ git commit -m "feat(server): admin import, publication validation and export"
 
 - [ ] **Step 1: Rules**
 
-Multipart upload to `config.mediaRoot`, capped at `config.mediaMaxBytes` (`413` past it). `filename` is `UNIQUE` in the schema, so a re-upload of the same name is `409`, not a silent overwrite — overwriting would mutate content a published version cites, defeating immutability from outside the trigger's reach.
+Multipart upload to `config.mediaRoot`, capped at `config.mediaMaxBytes` (`413` past it).
+
+**Status codes, checked against the contract rather than paraphrased.**
+`POST /admin/media` declares exactly `201, 401, 403, 413, 415`.
+
+- **`415` is required and was missing from this task.** "Unsupported media
+  type" — a `kind` outside the `media_kind` enum (`'audio'`, `'image'`), or a
+  MIME type that does not match the declared kind. Implement and test it.
+- **`409` is NOT declared on this operation**, though this task previously
+  specified it for a duplicate filename. `filename` is `UNIQUE` in the schema,
+  so a duplicate must still fail rather than silently overwrite — overwriting
+  would mutate content a published version cites, defeating immutability from
+  outside the trigger's reach. Keep returning `409`: a constraint that exists
+  has to surface as something, and Conflict is its meaning. **Record it in
+  your report as a contract gap** — the operation needs a `409` added to
+  `openapi.yaml`, which is a doc change outside this task's scope.
 
 Compute a SHA-256 checksum server-side; never trust a client-supplied one. Accepted kinds come from the `media_kind` enum — reuse it rather than restating the values, so the enum-parity guard keeps covering them.
 
@@ -1673,7 +1688,7 @@ every export.
 with `Number(...)` at the repository boundary and assert `typeof` in the test,
 as with `attemptCount` in Tasks 7-8.
 
-- [ ] **Step 2: Tests** — accepts an mp3 and returns its id; rejects an oversized file with `413`; rejects a duplicate filename with `409`; rejects a non-admin with `403`; **admits an admin** (the positive case, without which a guard that refused everyone would pass all of the above); and **refuses a traversing filename**, asserting no file appears outside `mediaRoot`.
+- [ ] **Step 2: Tests** — accepts an mp3 and returns its id; rejects an oversized file with `413`; rejects a duplicate filename with `409`; rejects a kind outside the `media_kind` enum with `415`; rejects a non-admin with `403`; **admits an admin** (the positive case, without which a guard that refused everyone would pass all of the above); and **refuses a traversing filename**, asserting no file appears outside `mediaRoot`.
 
 - [ ] **Step 3–4:** implement, run, gates. Do not run `git add -A` and do not commit from a step.
 

@@ -1714,17 +1714,26 @@ Content is placeholder-quality English appropriate to ages 8–11; it does not n
 
 `pnpm seed` imports the document via `importTestDocument`, publishes it via `publishDraftVersion`, and prints the resulting `testId`/`versionId`. Idempotent: re-running finds the existing slug and reports it rather than dying on `test_version_one_draft`. That partial index is exactly what made a re-import unrecoverable before the trigger fix — do not reintroduce the trap.
 
-Media: the audio stimuli cite filenames that need `media_asset` rows. Either ship 20 tiny silent mp3s under `scripts/fixtures/media/` and upload them, or make the listening stimuli uncapped passages for the seed. **Decide and say which in your report** — a seed whose publish fails `stimulus_media_must_exist` is worse than one with no audio.
+Media: the audio stimuli cite filenames that need `media_asset` rows. **This
+is now decided, so do not re-litigate it:** ship ONE tiny silent mp3 at
+`scripts/fixtures/media/silence.mp3`, insert a single `media_asset` row for it,
+and have all twenty listening stimuli cite that same `media_asset_id`.
+
+Nothing requires a distinct asset per stimulus, and `media_asset.filename` is
+`UNIQUE`, so twenty copies of the same silence would need twenty contrived
+names for no gain. One row satisfies `stimulus_media_must_exist`, gives plan 3
+a real audio element to render and a real duration to play against, and keeps
+the fixture directory to a single binary.
+
+Insert the row **directly in the seed script**, not through `POST /admin/media`
+— the seed is a script, not an HTTP client, and routing it through the upload
+endpoint would make seeding depend on a running server and an admin token.
 
 - [ ] **Step 3: The proof**
 
 An e2e test that runs the seed against a clean container, then drives `GET /tests` → `GET /tests/{slug}` → `POST /attempts` and asserts a real attempt comes back for the seeded test. That is the first end-to-end exercise of this plan's whole surface.
 
-- [ ] **Step 4: Gates and commit**
-
-```bash
-git commit -m "feat: seed a real 40-question practice test"
-```
+- [ ] **Step 4: Gates.** Do not run `git add -A` and do not commit from a step.
 
 ---
 

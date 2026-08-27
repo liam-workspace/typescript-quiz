@@ -1,0 +1,21 @@
+{
+  "sectionRules.readyButton": "Sono pronto",
+  "sectionRules.beforeYouBegin": "Prima di iniziare",
+  "sectionRules.attemptLabel": "Tentativo {{number}}",
+  "listening.rule.playsOnce": "Ogni registrazione viene riprodotta una sola volta.",
+  "listening.rule.noPauseRewind": "Non puoi mettere in pausa né riavvolgere.",
+  "listening.rule.noReturn": "Non puoi tornare a una domanda già superata.",
+  "listening.rule.headphones": "Indossa ora le cuffie.",
+  "listening.playButton": "Riproduci registrazione",
+  "listening.playsLeft_one": "{{count}} ascolto rimasto",
+  "listening.playsLeft_other": "{{count}} ascolti rimasti",
+  "listening.answerLocked": "Risposta bloccata — questa sezione non consente modifiche.",
+  "runner.questionCount": "Domanda {{current}} di {{total}}",
+  "runner.previous": "Indietro",
+  "runner.next": "Avanti",
+  "runner.handIn": "Consegna",
+  "runner.savedIndicator": "Salvato",
+  "runner.sectionChip.listening": "Ascolto",
+  "runner.sectionChip.reading": "Lettura",
+  "reading.passageQuestions": "Brano {{passageNumber}} · domande {{first}}–{{last}}"
+}

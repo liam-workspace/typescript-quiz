@@ -1,0 +1,21 @@
+{
+  "sectionRules.readyButton": "Je suis prêt",
+  "sectionRules.beforeYouBegin": "Avant de commencer",
+  "sectionRules.attemptLabel": "Tentative {{number}}",
+  "listening.rule.playsOnce": "Chaque enregistrement n'est diffusé qu'une seule fois.",
+  "listening.rule.noPauseRewind": "Tu ne peux pas mettre en pause ni revenir en arrière.",
+  "listening.rule.noReturn": "Tu ne peux pas revenir à une question déjà passée.",
+  "listening.rule.headphones": "Mets ton casque maintenant.",
+  "listening.playButton": "Lire l'enregistrement",
+  "listening.playsLeft_one": "{{count}} écoute restante",
+  "listening.playsLeft_other": "{{count}} écoutes restantes",
+  "listening.answerLocked": "Réponse verrouillée — cette section n'autorise aucune modification.",
+  "runner.questionCount": "Question {{current}} sur {{total}}",
+  "runner.previous": "Précédent",
+  "runner.next": "Suivant",
+  "runner.handIn": "Rendre",
+  "runner.savedIndicator": "Enregistré",
+  "runner.sectionChip.listening": "Compréhension orale",
+  "runner.sectionChip.reading": "Compréhension écrite",
+  "reading.passageQuestions": "Texte {{passageNumber}} · questions {{first}}–{{last}}"
+}

@@ -1,0 +1,20 @@
+{
+  "sectionRules.readyButton": "準備ができました",
+  "sectionRules.beforeYouBegin": "開始する前に",
+  "sectionRules.attemptLabel": "{{number}}回目の受験",
+  "listening.rule.playsOnce": "各録音は一度だけ再生されます。",
+  "listening.rule.noPauseRewind": "一時停止や巻き戻しはできません。",
+  "listening.rule.noReturn": "一度進んだ問題には戻れません。",
+  "listening.rule.headphones": "今すぐヘッドホンを装着してください。",
+  "listening.playButton": "録音を再生",
+  "listening.playsLeft": "残り{{count}}回再生できます",
+  "listening.answerLocked": "解答はロックされています — このセクションでは変更できません。",
+  "runner.questionCount": "問題 {{current}} / {{total}}",
+  "runner.previous": "前へ",
+  "runner.next": "次へ",
+  "runner.handIn": "提出する",
+  "runner.savedIndicator": "保存済み",
+  "runner.sectionChip.listening": "リスニング",
+  "runner.sectionChip.reading": "リーディング",
+  "reading.passageQuestions": "パッセージ{{passageNumber}} · 問題{{first}}–{{last}}"
+}

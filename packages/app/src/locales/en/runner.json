@@ -1,0 +1,21 @@
+{
+  "sectionRules.readyButton": "I'm ready",
+  "sectionRules.beforeYouBegin": "Before you begin",
+  "sectionRules.attemptLabel": "Attempt {{number}}",
+  "listening.rule.playsOnce": "Each recording plays once.",
+  "listening.rule.noPauseRewind": "You cannot pause or rewind.",
+  "listening.rule.noReturn": "You cannot return to a question you have passed.",
+  "listening.rule.headphones": "Put your headphones on now.",
+  "listening.playButton": "Play recording",
+  "listening.playsLeft_one": "{{count}} play left",
+  "listening.playsLeft_other": "{{count}} plays left",
+  "listening.answerLocked": "Answer locked — this section does not allow changes.",
+  "runner.questionCount": "Question {{current}} of {{total}}",
+  "runner.previous": "Previous",
+  "runner.next": "Next",
+  "runner.handIn": "Hand in",
+  "runner.savedIndicator": "Saved",
+  "runner.sectionChip.listening": "Listening",
+  "runner.sectionChip.reading": "Reading",
+  "reading.passageQuestions": "Passage {{passageNumber}} · questions {{first}}–{{last}}"
+}

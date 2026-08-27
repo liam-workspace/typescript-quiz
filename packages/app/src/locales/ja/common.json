@@ -1,0 +1,13 @@
+{
+  "cancel": "キャンセル",
+  "confirm": "確認",
+  "language": {
+    "de": "Deutsch - ドイツ語",
+    "en": "English - 英語",
+    "es": "Español - スペイン語",
+    "fr": "Français - フランス語",
+    "it": "Italiano - イタリア語",
+    "ja": "日本語 - 日本語"
+  },
+  "loading": "読み込み中..."
+}

@@ -1,0 +1,21 @@
+{
+  "sectionRules.readyButton": "Ich bin bereit",
+  "sectionRules.beforeYouBegin": "Bevor du beginnst",
+  "sectionRules.attemptLabel": "Versuch {{number}}",
+  "listening.rule.playsOnce": "Jede Aufnahme wird nur einmal abgespielt.",
+  "listening.rule.noPauseRewind": "Du kannst nicht pausieren oder zurückspulen.",
+  "listening.rule.noReturn": "Du kannst nicht zu einer bereits beantworteten Frage zurückkehren.",
+  "listening.rule.headphones": "Setze jetzt deine Kopfhörer auf.",
+  "listening.playButton": "Aufnahme abspielen",
+  "listening.playsLeft_one": "Noch {{count}} Wiedergabe übrig",
+  "listening.playsLeft_other": "Noch {{count}} Wiedergaben übrig",
+  "listening.answerLocked": "Antwort gesperrt — in diesem Abschnitt sind keine Änderungen möglich.",
+  "runner.questionCount": "Frage {{current}} von {{total}}",
+  "runner.previous": "Zurück",
+  "runner.next": "Weiter",
+  "runner.handIn": "Abgeben",
+  "runner.savedIndicator": "Gespeichert",
+  "runner.sectionChip.listening": "Hören",
+  "runner.sectionChip.reading": "Lesen",
+  "reading.passageQuestions": "Text {{passageNumber}} · Fragen {{first}}–{{last}}"
+}

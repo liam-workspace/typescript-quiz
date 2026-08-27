@@ -48,7 +48,7 @@ export function AppMenu({
   const [selectedLanguage] = (i18n.resolvedLanguage ?? i18n.language).split("-")
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet modal={false} open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="left"
         aria-describedby={undefined}

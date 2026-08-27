@@ -63,7 +63,7 @@ export function QuestionNavigator({
   const groups = buildNavigatorGroups(source)
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet modal={false} open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex flex-col gap-3">
         <DialogTitle>
           {source.mode === "review"

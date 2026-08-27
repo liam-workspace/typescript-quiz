@@ -3,9 +3,14 @@ import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
-import { claimPlay, setPosition } from "../lib/attempts-api.js"
+import {
+  claimPlay,
+  getRunnerEnvelope,
+  setPosition,
+} from "../lib/attempts-api.js"
 import type { CappedStimulusWire, RunnerEnvelope } from "../lib/api-types.js"
-import { RunScreen } from "./attempts.$attemptId.run.js"
+import { getCurrentStudent } from "../lib/session-api.js"
+import { loadRunScreenData, RunScreen } from "./attempts.$attemptId.run.js"
 
 vi.mock("../lib/attempts-api.js", () => ({
   claimPlay: vi.fn(),
@@ -13,8 +18,22 @@ vi.mock("../lib/attempts-api.js", () => ({
   getRunnerEnvelope: vi.fn(),
 }))
 
+vi.mock("../lib/session-api.js", () => ({
+  getCurrentStudent: vi.fn(),
+}))
+
 const mockClaimPlay = vi.mocked(claimPlay)
+const mockGetCurrentStudent = vi.mocked(getCurrentStudent)
+const mockGetRunnerEnvelope = vi.mocked(getRunnerEnvelope)
 const mockSetPosition = vi.mocked(setPosition)
+
+/**
+ * Hoisted rather than inlined into `waitFor`: this assertion lives two
+ * describes deep, and an inline arrow there is a fourth nested callback.
+ */
+const positionWasWritten = (): void => {
+  expect(mockSetPosition).toHaveBeenCalledOnce()
+}
 
 const cappedAudio: CappedStimulusWire = {
   id: "stim-1",
@@ -188,10 +207,127 @@ describe("RunScreen", () => {
     vi.clearAllMocks()
   })
 
+  describe("route data", () => {
+    it("loads the attempt and current student together", async () => {
+      const student = {
+        id: "student-1",
+        displayName: "Tom Nguyen",
+        email: "tom@example.com",
+        level: "primary-step-1" as const,
+        isAdmin: false,
+      }
+      mockGetRunnerEnvelope.mockResolvedValue(listeningEnvelope)
+      mockGetCurrentStudent.mockResolvedValue(student)
+
+      await expect(loadRunScreenData("attempt-1")).resolves.toEqual({
+        envelope: listeningEnvelope,
+        student,
+      })
+    })
+
+    it("keeps the runner load successful when the optional identity fetch fails", async () => {
+      mockGetRunnerEnvelope.mockResolvedValue(listeningEnvelope)
+      mockGetCurrentStudent.mockRejectedValue(
+        new ApiError({
+          type: "not_found",
+          title: "No profile for this sub — call POST /session first",
+          status: 404,
+        }),
+      )
+
+      await expect(loadRunScreenData("attempt-1")).resolves.toEqual({
+        envelope: listeningEnvelope,
+        student: undefined,
+      })
+    })
+  })
+
   it("renders ListeningRunner when the current section's type is listening", () => {
     renderRunScreen()
 
     expect(screen.getByTestId("listening-runner")).toBeInTheDocument()
+  })
+
+  describe("runner panels", () => {
+    it("opens the menu when its trigger is clicked", async () => {
+      renderRunScreen()
+
+      await userEvent.click(screen.getByRole("button", { name: "Open menu" }))
+
+      expect(screen.getByRole("dialog", { name: "Menu" })).toBeInTheDocument()
+    })
+
+    it("closes the menu and opens the navigator when its trigger is clicked while the menu is open", async () => {
+      renderRunScreen()
+
+      await userEvent.click(screen.getByRole("button", { name: "Open menu" }))
+      await userEvent.click(
+        screen.getByRole("button", {
+          name: "Open the question navigator",
+        }),
+      )
+
+      expect(screen.getAllByRole("dialog")).toHaveLength(1)
+      expect(
+        screen.getByRole("dialog", { name: "Questions" }),
+      ).toBeInTheDocument()
+    })
+
+    it("closes whichever panel is open on Escape", async () => {
+      renderRunScreen()
+
+      await userEvent.click(screen.getByRole("button", { name: "Open menu" }))
+      await userEvent.keyboard("{Escape}")
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    })
+
+    it("uses 44px touch targets for both runner-chrome triggers", () => {
+      renderRunScreen()
+
+      expect(
+        screen.getByRole("button", { name: "Open menu" }).className,
+      ).toContain("size-11")
+      expect(
+        screen.getByRole("button", {
+          name: "Open the question navigator",
+        }).className,
+      ).toContain("size-11")
+    })
+
+    it("never writes position when a disabled forward-only cell is clicked", async () => {
+      renderRunScreen()
+
+      await userEvent.click(
+        screen.getByRole("button", {
+          name: "Open the question navigator",
+        }),
+      )
+      await userEvent.click(screen.getByRole("button", { name: "Question 4" }))
+
+      expect(mockSetPosition).not.toHaveBeenCalled()
+    })
+
+    it("writes position and closes the navigator when an enabled cell is clicked", async () => {
+      mockSetPosition.mockResolvedValue(undefined)
+      renderRunScreen(readingEnvelope)
+
+      await userEvent.click(
+        screen.getByRole("button", {
+          name: "Open the question navigator",
+        }),
+      )
+      await userEvent.click(screen.getByRole("button", { name: "Question 7" }))
+
+      await waitFor(positionWasWritten)
+
+      expect(mockSetPosition).toHaveBeenCalledExactlyOnceWith(
+        "attempt-1",
+        "section-reading",
+        "q-r3",
+      )
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    })
   })
 
   it("redirects to the section-rules route when currentSectionId is null", () => {

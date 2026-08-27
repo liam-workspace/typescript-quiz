@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { useState } from "react"
+import { useState, type JSX } from "react"
+import { useTranslation } from "react-i18next"
+import { AppMenu, type MenuStudent } from "../components/AppMenu.js"
 import { ListeningRunner } from "../components/ListeningRunner.js"
+import { QuestionNavigator } from "../components/QuestionNavigator.js"
 import { ReadingRunner } from "../components/ReadingRunner.js"
 import { ApiError } from "../lib/api-client.js"
 import {
@@ -9,6 +12,8 @@ import {
   setPosition,
 } from "../lib/attempts-api.js"
 import { sameOriginPath } from "../lib/same-origin-path.js"
+import { getCurrentStudent } from "../lib/session-api.js"
+import type { NavigatorSource } from "../lib/navigator-state.js"
 import type {
   RunnerEnvelope,
   RunnerQuestion,
@@ -63,10 +68,19 @@ interface ExpiredState {
 export interface RunScreenProps {
   readonly attemptId: string
   readonly envelope: RunnerEnvelope
+  readonly student?: MenuStudent
   readonly navigate: (path: string) => void
 }
 
-export function RunScreen({ attemptId, envelope, navigate }: RunScreenProps) {
+type RunnerPanel = "menu" | "navigator" | null
+
+export function RunScreen({
+  attemptId,
+  envelope,
+  student,
+  navigate,
+}: RunScreenProps) {
+  const { t } = useTranslation("runner")
   const section = envelope.currentSectionId
     ? envelope.sections.find(
         (candidate) => candidate.id === envelope.currentSectionId,
@@ -100,6 +114,7 @@ export function RunScreen({ attemptId, envelope, navigate }: RunScreenProps) {
     Record<string, number>
   >({})
   const [expired, setExpired] = useState<ExpiredState | null>(null)
+  const [panel, setPanel] = useState<RunnerPanel>(null)
 
   // "attempt exists but nothing entered yet" -- no section has ever been
   // entered, so every section is still `pending`. The first one in
@@ -264,8 +279,80 @@ export function RunScreen({ attemptId, envelope, navigate }: RunScreenProps) {
     current: entry.question.id === question.id,
   }))
 
+  const navigatorSource: NavigatorSource = {
+    mode: "runner",
+    currentQuestionId: question.id,
+    sections: envelope.sections.map((candidate) => ({
+      id: candidate.id,
+      type: candidate.type,
+      navigation: candidate.navigation,
+      status: candidate.status,
+      questions: candidate.groups.flatMap((group) =>
+        group.questions.map(({ id, ordinal }) => ({ id, ordinal })),
+      ),
+    })),
+    answeredQuestionIds: new Set(responses.keys()),
+  }
+
+  const handleNavigatorNavigate = (
+    targetSectionId: string,
+    targetQuestionId: string,
+  ): void => {
+    const targetSection = envelope.sections.find(
+      (candidate) => candidate.id === targetSectionId,
+    )
+    const targetEntry = targetSection
+      ? flattenSection(targetSection).find(
+          (entry) => entry.question.id === targetQuestionId,
+        )
+      : undefined
+
+    // This repeats the server-backed disabled rule at the write boundary.
+    // A presentational regression must not turn a disabled cell into a PUT
+    // the server refuses.
+    if (
+      !targetSection ||
+      !targetEntry ||
+      targetSection.status !== "open" ||
+      targetSection.navigation !== "free"
+    ) {
+      return
+    }
+
+    setPosition(attemptId, targetSection.id, targetEntry.question.id)
+      .then(() => {
+        setCurrentQuestionId(targetEntry.question.id)
+        setPlayState({ status: "idle" })
+      })
+      .catch((error: unknown) => {
+        if (!(error instanceof ApiError)) {
+          throw error
+        }
+
+        if (error.problem.type === "section_expired") {
+          setExpired({ kind: "section", resultUrl: null })
+
+          return
+        }
+
+        if (error.problem.type === "attempt_expired" && error.problem.attempt) {
+          const parsed = sameOriginPath.safeParse(
+            error.problem.attempt.resultUrl,
+          )
+
+          setExpired({
+            kind: "attempt",
+            resultUrl: parsed.success ? parsed.data : null,
+          })
+        }
+      })
+    setPanel(null)
+  }
+
+  let runner: JSX.Element | null = null
+
   if (section.type === "listening") {
-    return (
+    runner = (
       <ListeningRunner
         question={question}
         stimulus={displayStimulus}
@@ -289,10 +376,8 @@ export function RunScreen({ attemptId, envelope, navigate }: RunScreenProps) {
         }}
       />
     )
-  }
-
-  if (section.type === "reading") {
-    return (
+  } else if (section.type === "reading") {
+    runner = (
       <ReadingRunner
         question={question}
         stimulus={displayStimulus}
@@ -322,23 +407,130 @@ export function RunScreen({ attemptId, envelope, navigate }: RunScreenProps) {
         }}
       />
     )
+  } else {
+    // No runner is built yet for the remaining section types (vocabulary,
+    // grammar) -- out of scope for this plan.
+    return null
   }
 
-  // No runner is built yet for the remaining section types (vocabulary,
-  // grammar) -- out of scope for this plan.
-  return null
+  return (
+    <div className="min-h-screen bg-stone-50 text-stone-900">
+      <header className="relative z-[60] flex items-center justify-between border-b border-stone-200 bg-white px-3 py-2">
+        <button
+          type="button"
+          aria-label={t("menu.openLabel")}
+          aria-expanded={panel === "menu"}
+          className="size-11 touch-manipulation rounded-md text-xl font-bold hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+          onClick={() => {
+            setPanel((current) => (current === "menu" ? null : "menu"))
+          }}
+        >
+          <span aria-hidden="true">☰</span>
+        </button>
+        <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">
+          {t(`runner.sectionChip.${section.type}`)}
+        </span>
+      </header>
+
+      <div>{runner}</div>
+
+      <nav className="relative z-[60] flex justify-end border-t border-stone-200 bg-white px-3 py-2">
+        <button
+          type="button"
+          aria-label={t("navigator.openLabel")}
+          aria-expanded={panel === "navigator"}
+          className="size-11 touch-manipulation rounded-md text-xl font-bold hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+          onClick={() => {
+            setPanel((current) =>
+              current === "navigator" ? null : "navigator",
+            )
+          }}
+        >
+          <span aria-hidden="true">▦</span>
+        </button>
+      </nav>
+
+      <AppMenu
+        open={panel === "menu"}
+        onOpenChange={(next) => {
+          // Radix requests closing for Escape, overlay and close-button
+          // interactions. Opening is exclusively driven by our triggers.
+          // Only close if this is still the active panel: a delayed dismiss
+          // from the menu must not clobber a direct switch to the navigator.
+          if (!next) {
+            setPanel((current) => (current === "menu" ? null : current))
+          }
+        }}
+        inTest
+        // The attempt's clock does not start with the attempt: openapi.yaml
+        // is explicit that `startedAt` and `expiresAt` "stay null until the
+        // first section entry". Hardcoding this told a child "the clock
+        // keeps running while you are away" before they had started
+        // anything -- false, and exactly the sort of thing that would stop
+        // a child leaving a test they had not begun.
+        clockStarted={envelope.expiresAt !== null}
+        student={student}
+        onGoLibrary={() => {
+          navigate("/")
+        }}
+        onGoHistory={() => {
+          navigate("/history")
+        }}
+        onLeaveTest={() => {
+          navigate("/")
+        }}
+        onSignOut={() => {
+          navigate("/")
+        }}
+      />
+      <QuestionNavigator
+        open={panel === "navigator"}
+        onOpenChange={(next) => {
+          // See AppMenu's matching guards: Sheet never owns the open action,
+          // and a stale close must not dismiss the newly selected panel.
+          if (!next) {
+            setPanel((current) => (current === "navigator" ? null : current))
+          }
+        }}
+        source={navigatorSource}
+        answeredCount={responses.size}
+        totalCount={envelope.questionCount}
+        onNavigate={handleNavigatorNavigate}
+      />
+    </div>
+  )
+}
+
+/**
+ * The envelope is required; the identity is not.
+ *
+ * `GET /me` 404s when no profile exists for this `sub` yet -- the contract
+ * says "call `POST /session` first", which is the ordinary state of a fresh
+ * install rather than an error. So a failed identity fetch must leave the
+ * child able to sit the test with an unnamed menu, never block the runner
+ * from loading. Exported so that promise is testable directly, instead of
+ * being reachable only through the router.
+ */
+export async function loadRunScreenData(attemptId: string): Promise<{
+  envelope: RunnerEnvelope
+  student: MenuStudent | undefined
+}> {
+  const [envelope, student] = await Promise.all([
+    getRunnerEnvelope(attemptId),
+    getCurrentStudent().catch(() => undefined),
+  ])
+
+  return { envelope, student }
 }
 
 export const Route = createFileRoute("/attempts/$attemptId/run")({
-  loader: async ({ params }) => ({
-    envelope: await getRunnerEnvelope(params.attemptId),
-  }),
+  loader: ({ params }) => loadRunScreenData(params.attemptId),
   component: RouteComponent,
 })
 
 function RouteComponent() {
   const { attemptId } = Route.useParams()
-  const { envelope } = Route.useLoaderData()
+  const { envelope, student } = Route.useLoaderData()
 
   // Same stand-in as sections.$sectionId.rules.tsx: no typed route exists
   // yet for the section-rules destination from here without inventing its
@@ -348,6 +540,11 @@ function RouteComponent() {
   }
 
   return (
-    <RunScreen attemptId={attemptId} envelope={envelope} navigate={navigate} />
+    <RunScreen
+      attemptId={attemptId}
+      envelope={envelope}
+      student={student}
+      navigate={navigate}
+    />
   )
 }

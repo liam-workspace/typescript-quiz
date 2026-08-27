@@ -273,3 +273,15 @@ export interface ReviewPayload {
   attemptId: string
   items: ReviewItem[]
 }
+
+/**
+ * Openapi.yaml `Student` -- the response of `GET /me`. `isAdmin` gates the
+ * admin area, which is a separate spec; no student screen renders it.
+ */
+export interface Student {
+  id: string
+  displayName: string
+  email: string
+  level: "primary-step-1" | "primary-step-2" | null
+  isAdmin: boolean
+}

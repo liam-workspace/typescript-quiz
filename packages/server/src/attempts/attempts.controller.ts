@@ -3,18 +3,20 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   Post,
   Res,
   UnauthorizedException,
   UseGuards,
 } from "@nestjs/common"
-import type { RunnerEnvelopeRow, StartResult } from "@pp/db"
+import type { RunnerEnvelopeRow, SectionBriefRow, StartResult } from "@pp/db"
 import { CurrentStudent } from "../auth/current-student.decorator.js"
 import { JwksGuard } from "../auth/jwks.guard.js"
 import {
   AttemptsService,
   type RunnerEnvelopeResult,
+  type SectionEntryResult,
 } from "./attempts.service.js"
 
 /**
@@ -108,6 +110,57 @@ function toRunnerEnvelopeView(
   }
 }
 
+/**
+ * The contract's `SectionEntry` is FLAT: `sectionId` plus the entry's own
+ * clock fields plus the section's rules content, all as one object -- not
+ * `{ entry, section }` the way the service's `SectionEntryResult` splits
+ * them for its own two data sources.
+ */
+interface SectionEntryView {
+  sectionId: string
+  title: string
+  type: SectionBriefRow["type"]
+  questionCount: number
+  enteredAt: Date
+  expiresAt: Date
+  serverTime: Date
+  attemptStartedAt?: Date
+  attemptExpiresAt?: Date
+  navigation: SectionBriefRow["navigation"]
+  allowAnswerChange: boolean
+  playback: SectionBriefRow["playback"]
+  instructions: string[]
+}
+
+function toSectionEntryView(
+  result: SectionEntryResult,
+  serverTime: Date,
+): SectionEntryView {
+  const { entry, section } = result
+
+  return {
+    sectionId: entry.sectionId,
+    title: section.title,
+    type: section.type,
+    questionCount: section.questionCount,
+    enteredAt: entry.enteredAt,
+    expiresAt: entry.expiresAt,
+    serverTime,
+    // Present only on the FIRST entry (contract description on
+    // `attemptStartedAt`) -- `enterSection` only sets both together.
+    ...(entry.attemptStartedAt && entry.attemptExpiresAt
+      ? {
+          attemptStartedAt: entry.attemptStartedAt,
+          attemptExpiresAt: entry.attemptExpiresAt,
+        }
+      : {}),
+    navigation: section.navigation,
+    allowAnswerChange: section.allowAnswerChange,
+    playback: section.playback,
+    instructions: section.instructions,
+  }
+}
+
 @Controller("attempts")
 @UseGuards(JwksGuard)
 export class AttemptsController {
@@ -147,6 +200,28 @@ export class AttemptsController {
     const result = await this.attempts.getRunnerEnvelope(subjectOf(claims), id)
 
     return toRunnerEnvelopeView(result, this.attempts.now())
+  }
+
+  /**
+   * "I'm ready" -- fired on tap, NOT on screen load (spec: reading the
+   * section rules is untimed). The FIRST entry also starts the whole-test
+   * clock. `200`, not Nest's POST default of `201`: this recognises an
+   * already-open section on a refresh as often as it creates one.
+   */
+  @Post(":id/sections/:sectionId/enter")
+  @HttpCode(200)
+  async enter(
+    @CurrentStudent() claims: JwtClaims,
+    @Param("id") id: string,
+    @Param("sectionId") sectionId: string,
+  ): Promise<SectionEntryView> {
+    const result = await this.attempts.enterSection(
+      subjectOf(claims),
+      id,
+      sectionId,
+    )
+
+    return toSectionEntryView(result, this.attempts.now())
   }
 }
 

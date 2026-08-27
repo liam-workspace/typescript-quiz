@@ -442,3 +442,79 @@ export async function loadTestBrief(
 
   return toTestBrief(row)
 }
+
+export type SectionBriefRow = TestBriefRow["sections"][number]
+
+interface SectionBriefDbRow {
+  id: string
+  type: string
+  title: string
+  ordinal: number
+  duration_seconds: number
+  navigation: string
+  allow_answer_change: boolean
+  default_max_plays: number | null
+  default_allow_pause: boolean | null
+  default_allow_seek: boolean | null
+  question_count: string
+  instructions: string[]
+}
+
+const SECTION_BRIEF_QUERY = `
+  SELECT ts.id, ts.type, ts.title, ts.ordinal, ts.duration_seconds,
+         ts.navigation, ts.allow_answer_change,
+         ts.default_max_plays, ts.default_allow_pause, ts.default_allow_seek,
+         COALESCE(qc.question_count, 0) AS question_count,
+         COALESCE(ins.instructions, '[]'::jsonb) AS instructions
+    FROM test_section ts
+    LEFT JOIN LATERAL (
+      SELECT count(q.id) AS question_count
+        FROM question_group qg
+        JOIN question q ON q.question_group_id = qg.id
+       WHERE qg.test_section_id = ts.id
+    ) qc ON true
+    LEFT JOIN LATERAL (
+      SELECT jsonb_agg(si.text ORDER BY si.ordinal) AS instructions
+        FROM section_instruction si
+       WHERE si.test_section_id = ts.id
+    ) ins ON true
+   WHERE ts.id = $1
+`
+
+/**
+ * The single-section counterpart of `loadTestBrief`'s section rows -- reuses
+ * `toBriefSection` so `POST /attempts/{id}/sections/{sectionId}/enter`
+ * (Task 3) pulls title/type/questionCount/navigation/allowAnswerChange/
+ * playback/instructions from the exact same mapping the brief screen uses,
+ * rather than re-deriving that shape from a second, drifting query.
+ */
+export async function loadSectionBrief(
+  db: PgQueryable,
+  sectionId: string,
+): Promise<SectionBriefRow | null> {
+  const { rows } = await db.query<SectionBriefDbRow>(SECTION_BRIEF_QUERY, [
+    sectionId,
+  ])
+
+  if (rows.length === 0) {
+    return null
+  }
+
+  const [row] = rows
+
+  return toBriefSection({
+    id: row.id,
+    type: row.type,
+    title: row.title,
+    ordinal: row.ordinal,
+    // `count(...)` is a bigint -- node-postgres returns it as a string.
+    questionCount: Number(row.question_count),
+    durationSeconds: row.duration_seconds,
+    navigation: row.navigation,
+    allowAnswerChange: row.allow_answer_change,
+    maxPlays: row.default_max_plays,
+    allowPause: row.default_allow_pause,
+    allowSeek: row.default_allow_seek,
+    instructions: row.instructions,
+  })
+}

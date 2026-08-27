@@ -219,6 +219,207 @@ export async function loadRunningOwnedAttempt(
   return { attempt: null, finalized }
 }
 
+export interface SectionEntryRow {
+  sectionId: string
+  enteredAt: Date
+  expiresAt: Date
+  /** Present only on the FIRST section entry of this attempt -- see enterSection. */
+  attemptStartedAt: Date | null
+  attemptExpiresAt: Date | null
+}
+
+interface OpenAttemptSectionDbRow {
+  test_section_id: string
+  entered_at: Date
+  expires_at: Date
+}
+
+interface EnterSectionContextDbRow {
+  started_at: Date | null
+  section_duration_seconds: number
+  test_version_id: string
+  version_duration_seconds: number
+}
+
+/**
+ * "I'm ready" for one section (spec: this is where the clock starts --
+ * reading the brief and the section rules is untimed). Wrapped in a single
+ * transaction because `attempt_clock_paired` (started_at IS NULL) =
+ * (expires_at IS NULL) rejects setting one half without the other, and the
+ * first-entry branch below writes both attempt.started_at and
+ * attempt.expires_at together.
+ *
+ * Rule, in order:
+ *   1. An OPEN attempt_section already exists for this exact section --
+ *      idempotent success, the ORIGINAL entered_at/expires_at come back
+ *      unchanged (a refresh must not extend or reset the deadline).
+ *   2. A DIFFERENT attempt_section is open -- refused; closing a section is
+ *      a side effect of the answer-submission path, not of entering another.
+ *   3. Otherwise this is a genuine new entry: insert attempt_section, and if
+ *      this is the attempt's first-ever section entry, also start the
+ *      whole-test clock and seed current_section_id/current_question_id --
+ *      done on every entry (not only the first) so a reload lands correctly
+ *      mid-section.
+ */
+export function enterSection(
+  db: PgQueryable,
+  input: { attemptId: string; sectionId: string; now: Date },
+): Promise<
+  | { ok: true; entry: SectionEntryRow }
+  | { ok: false; reason: "section_still_open" }
+> {
+  return withTransaction(db as pg.Pool, (tx) =>
+    enterSectionInTransaction(tx, input),
+  )
+}
+
+async function enterSectionInTransaction(
+  tx: PgQueryable,
+  input: { attemptId: string; sectionId: string; now: Date },
+): Promise<
+  | { ok: true; entry: SectionEntryRow }
+  | { ok: false; reason: "section_still_open" }
+> {
+  const { rows: openRows } = await tx.query<OpenAttemptSectionDbRow>(
+    `SELECT test_section_id, entered_at, expires_at
+       FROM attempt_section
+      WHERE attempt_id = $1 AND completed_at IS NULL
+      FOR UPDATE`,
+    [input.attemptId],
+  )
+
+  const sameSection = openRows.find(
+    (row) => row.test_section_id === input.sectionId,
+  )
+
+  if (sameSection) {
+    return {
+      ok: true,
+      entry: {
+        sectionId: input.sectionId,
+        enteredAt: sameSection.entered_at,
+        expiresAt: sameSection.expires_at,
+        // Not the first entry -- an open row for THIS section already
+        // existing means the attempt's clock was already started earlier.
+        attemptStartedAt: null,
+        attemptExpiresAt: null,
+      },
+    }
+  }
+
+  if (openRows.length > 0) {
+    return { ok: false, reason: "section_still_open" }
+  }
+
+  const { rows: contextRows } = await tx.query<EnterSectionContextDbRow>(
+    `SELECT a.started_at,
+            ts.duration_seconds AS section_duration_seconds,
+            ts.test_version_id,
+            tv.duration_seconds AS version_duration_seconds
+       FROM attempt a
+       JOIN test_section ts ON ts.id = $2
+       JOIN test_version tv ON tv.id = ts.test_version_id
+      WHERE a.id = $1
+      FOR UPDATE OF a`,
+    [input.attemptId, input.sectionId],
+  )
+
+  if (contextRows.length === 0) {
+    throw new Error(
+      `section ${input.sectionId} does not belong to the test version of attempt ${input.attemptId}`,
+    )
+  }
+
+  const [context] = contextRows
+  const sectionExpiresAt = new Date(
+    input.now.getTime() + context.section_duration_seconds * 1000,
+  )
+
+  const { rows: insertedRows } = await tx.query<{
+    entered_at: Date
+    expires_at: Date
+  }>(
+    `INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id, entered_at, expires_at)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING entered_at, expires_at`,
+    [
+      input.attemptId,
+      input.sectionId,
+      context.test_version_id,
+      input.now,
+      sectionExpiresAt,
+    ],
+  )
+  const [inserted] = insertedRows
+
+  const { rows: questionRows } = await tx.query<{ id: string }>(
+    `SELECT q.id
+       FROM question q
+       JOIN question_group qg ON q.question_group_id = qg.id
+      WHERE qg.test_section_id = $1
+      ORDER BY q.ordinal ASC
+      LIMIT 1`,
+    [input.sectionId],
+  )
+  const firstQuestionId = questionRows[0]?.id ?? null
+
+  const isFirstSectionEntry = context.started_at === null
+
+  if (!isFirstSectionEntry) {
+    await tx.query(
+      `UPDATE attempt
+          SET current_section_id = $2, current_question_id = $3
+        WHERE id = $1`,
+      [input.attemptId, input.sectionId, firstQuestionId],
+    )
+
+    return {
+      ok: true,
+      entry: {
+        sectionId: input.sectionId,
+        enteredAt: inserted.entered_at,
+        expiresAt: inserted.expires_at,
+        attemptStartedAt: null,
+        attemptExpiresAt: null,
+      },
+    }
+  }
+
+  const attemptExpiresAt = new Date(
+    input.now.getTime() + context.version_duration_seconds * 1000,
+  )
+
+  const { rows: attemptRows } = await tx.query<{
+    started_at: Date
+    expires_at: Date
+  }>(
+    `UPDATE attempt
+        SET started_at = $2, expires_at = $3,
+            current_section_id = $4, current_question_id = $5
+      WHERE id = $1
+      RETURNING started_at, expires_at`,
+    [
+      input.attemptId,
+      input.now,
+      attemptExpiresAt,
+      input.sectionId,
+      firstQuestionId,
+    ],
+  )
+  const [updatedAttempt] = attemptRows
+
+  return {
+    ok: true,
+    entry: {
+      sectionId: input.sectionId,
+      enteredAt: inserted.entered_at,
+      expiresAt: inserted.expires_at,
+      attemptStartedAt: updatedAttempt.started_at,
+      attemptExpiresAt: updatedAttempt.expires_at,
+    },
+  }
+}
+
 /** Thrown when a slug has no published version -- the caller maps this to 404. */
 export class TestNotFoundError extends Error {}
 

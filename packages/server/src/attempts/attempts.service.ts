@@ -10,14 +10,18 @@ import {
 } from "@nestjs/common"
 import type { Clock } from "@pp/common"
 import {
+  enterSection as enterSectionRow,
   findStudentBySubject,
   loadRunnerEnvelope,
   loadRunningOwnedAttempt,
+  loadSectionBrief,
   startOrResumeAttempt,
   TestNotFoundError,
   type AttemptRow,
   type FinalizedAttemptRow,
   type RunnerEnvelopeRow,
+  type SectionBriefRow,
+  type SectionEntryRow,
   type StartResult,
 } from "@pp/db"
 import { CLOCK, REQUEST_POOL } from "../database/tokens.js"
@@ -28,6 +32,11 @@ export interface RunnerEnvelopeResult {
     RunnerEnvelopeRow,
     "id" | "status" | "expiresAt" | "currentSectionId" | "currentQuestionId"
   >
+}
+
+export interface SectionEntryResult {
+  entry: SectionEntryRow
+  section: SectionBriefRow
 }
 
 /**
@@ -68,6 +77,23 @@ function attemptExpiredError(finalized: FinalizedAttemptRow): HttpException {
       },
     },
     HttpStatus.GONE,
+  )
+}
+
+/**
+ * `409`, contract: "A previous section is still open." Section closing is a
+ * side effect of the phase-4/5 answer-submission path, not of entering
+ * another section, so this is refused rather than closed on the caller's
+ * behalf.
+ */
+function sectionStillOpenError(): HttpException {
+  return new HttpException(
+    {
+      type: "section_still_open",
+      title: "A previous section is still open.",
+      status: HttpStatus.CONFLICT,
+    },
+    HttpStatus.CONFLICT,
   )
 }
 
@@ -193,5 +219,60 @@ export class AttemptsService {
     })
 
     return { attempt: result.attempt, envelope }
+  }
+
+  /**
+   * "I'm ready" for one section (spec: this is where the clock starts).
+   * `loadRunningOwnedAttempt` is the same load-bearing check
+   * `getRunnerEnvelope` runs first, so a stale attempt is finalized into a
+   * 410 here too rather than having its clock started by mistake.
+   */
+  async enterSection(
+    subjectClaim: string,
+    attemptId: string,
+    sectionId: string,
+  ): Promise<SectionEntryResult> {
+    const student = await findStudentBySubject(this.pool, subjectClaim)
+
+    if (!student) {
+      throw notYourAttemptError()
+    }
+
+    const now = this.clock.now()
+    const result = await loadRunningOwnedAttempt(this.pool, {
+      attemptId,
+      studentId: student.id,
+      now,
+    })
+
+    if (!result.attempt) {
+      if (result.finalized) {
+        throw attemptExpiredError(result.finalized)
+      }
+
+      throw notYourAttemptError()
+    }
+
+    const outcome = await enterSectionRow(this.pool, {
+      attemptId: result.attempt.id,
+      sectionId,
+      now,
+    })
+
+    if (!outcome.ok) {
+      throw sectionStillOpenError()
+    }
+
+    const section = await loadSectionBrief(this.pool, sectionId)
+
+    if (!section) {
+      // `enterSectionRow`'s INSERT already satisfied the composite FK tying
+      // sectionId to this attempt's test_version -- a missing brief row
+      // here would mean that FK and this read disagree about which
+      // sections a version has, which should be unreachable.
+      throw new Error(`section ${sectionId} has no brief row after entry`)
+    }
+
+    return { entry: outcome.entry, section }
   }
 }

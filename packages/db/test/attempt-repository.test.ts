@@ -3,6 +3,7 @@ import { createFixedClock } from "@pp/common"
 import type pg from "pg"
 import { describe, expect, it } from "vitest"
 import {
+  enterSection,
   finalizeExpiredAttempt,
   loadOwnedAttempt,
   loadRunningOwnedAttempt,
@@ -39,6 +40,28 @@ async function insertAttempt(
     `INSERT INTO attempt (id, student_id, test_version_id, status, started_at, expires_at)
      VALUES ($1, $2, $3, 'in_progress', ${startedAt}, ${expiresAt})`,
     [input.id, input.studentId ?? f.studentId, f.versionId],
+  )
+}
+
+/**
+ * Marks an open attempt_section complete via direct SQL, standing in for
+ * the phase-4/5 write path this task does not implement. Only needed so
+ * enterSection's tests can get past section 1 to section 2 --
+ * `attempt_section_counts_reconcile` requires the full graded breakdown the
+ * moment completed_at is non-null, hence the arbitrary-but-valid numbers.
+ */
+async function closeSection(
+  pool: pg.Pool,
+  attemptId: string,
+  sectionId: string,
+): Promise<void> {
+  await pool.query(
+    `UPDATE attempt_section
+        SET completed_at = now(), points_earned = 0, points_possible = 1,
+            answered_count = 0, unanswered_count = 1,
+            correct_count = 0, incorrect_count = 0
+      WHERE attempt_id = $1 AND test_section_id = $2`,
+    [attemptId, sectionId],
   )
 }
 
@@ -555,6 +578,227 @@ describe("attempt repository", () => {
           now: new Date(),
         }),
       ).rejects.toThrow(TestNotFoundError)
+    })
+  }, 120_000)
+
+  // -- enterSection --
+
+  it("starts the attempt's clock on first entry, deriving expiresAt from the test's total duration", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const attemptId = randomUUID()
+      await insertAttempt(pool, f, {
+        id: attemptId,
+        startedAt: "NULL",
+        expiresAt: null,
+      })
+
+      const now = new Date()
+      const result = await enterSection(pool, {
+        attemptId,
+        sectionId: f.listeningSectionId,
+        now,
+      })
+
+      if (!result.ok) {
+        throw new Error("expected enterSection to succeed")
+      }
+
+      expect(result.entry.sectionId).toBe(f.listeningSectionId)
+      expect(result.entry.enteredAt.toISOString()).toBe(now.toISOString())
+      // Listening section's own duration is 1500s.
+      expect(result.entry.expiresAt.toISOString()).toBe(
+        new Date(now.getTime() + 1500 * 1000).toISOString(),
+      )
+      expect(result.entry.attemptStartedAt?.toISOString()).toBe(
+        now.toISOString(),
+      )
+      // The test_version's total duration is 3000s.
+      expect(result.entry.attemptExpiresAt?.toISOString()).toBe(
+        new Date(now.getTime() + 3000 * 1000).toISOString(),
+      )
+
+      const row = await readAttemptRow(pool, attemptId)
+      expect(row.status).toBe("in_progress")
+    })
+  }, 120_000)
+
+  it("does not touch attempt.startedAt on a second section's entry", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const attemptId = randomUUID()
+      await insertAttempt(pool, f, {
+        id: attemptId,
+        startedAt: "NULL",
+        expiresAt: null,
+      })
+
+      const firstNow = new Date()
+      const first = await enterSection(pool, {
+        attemptId,
+        sectionId: f.listeningSectionId,
+        now: firstNow,
+      })
+
+      if (!first.ok) {
+        throw new Error("expected the first enterSection to succeed")
+      }
+
+      // Section 1 must be closed before section 2 can be entered --
+      // enterSection refuses a second OPEN section by design (Decision 2).
+      // Closing it is normally a side effect of the phase-4/5 write path;
+      // simulated directly here since that path does not exist yet.
+      await closeSection(pool, attemptId, f.listeningSectionId)
+
+      const secondNow = new Date(firstNow.getTime() + 60 * 1000)
+      const second = await enterSection(pool, {
+        attemptId,
+        sectionId: f.readingSectionId,
+        now: secondNow,
+      })
+
+      if (!second.ok) {
+        throw new Error("expected the second enterSection to succeed")
+      }
+
+      // Present only on the FIRST entry -- this is the second.
+      expect(second.entry.attemptStartedAt).toBeNull()
+      expect(second.entry.attemptExpiresAt).toBeNull()
+
+      const { rows } = await pool.query<{ started_at: Date }>(
+        `SELECT started_at FROM attempt WHERE id = $1`,
+        [attemptId],
+      )
+      expect(rows[0].started_at.toISOString()).toBe(firstNow.toISOString())
+    })
+  }, 120_000)
+
+  it("is idempotent -- re-entering the same open section returns the SAME expiresAt, not a new one", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const attemptId = randomUUID()
+      await insertAttempt(pool, f, {
+        id: attemptId,
+        startedAt: "NULL",
+        expiresAt: null,
+      })
+
+      const firstNow = new Date()
+      const first = await enterSection(pool, {
+        attemptId,
+        sectionId: f.listeningSectionId,
+        now: firstNow,
+      })
+
+      if (!first.ok) {
+        throw new Error("expected the first enterSection to succeed")
+      }
+
+      // A refresh, much later -- if this extended the deadline, expiresAt
+      // below would drift forward instead of staying pinned.
+      const laterNow = new Date(firstNow.getTime() + 10 * 60 * 1000)
+      const second = await enterSection(pool, {
+        attemptId,
+        sectionId: f.listeningSectionId,
+        now: laterNow,
+      })
+
+      if (!second.ok) {
+        throw new Error("expected the idempotent re-entry to succeed")
+      }
+
+      expect(second.entry.enteredAt.toISOString()).toBe(
+        first.entry.enteredAt.toISOString(),
+      )
+      expect(second.entry.expiresAt.toISOString()).toBe(
+        first.entry.expiresAt.toISOString(),
+      )
+
+      const { rows } = await pool.query<{ count: string }>(
+        `SELECT count(*) AS count FROM attempt_section WHERE attempt_id = $1`,
+        [attemptId],
+      )
+      expect(Number(rows[0].count)).toBe(1)
+    })
+  }, 120_000)
+
+  it("refuses with section_still_open when a DIFFERENT attempt_section is open", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const attemptId = randomUUID()
+      await insertAttempt(pool, f, {
+        id: attemptId,
+        startedAt: "now()",
+        expiresAt: "now() + interval '50 minutes'",
+      })
+
+      // Seeded directly via SQL, per Decision 2 -- the app cannot reach a
+      // second section through its own UI until phase 4 lands.
+      await pool.query(
+        `INSERT INTO attempt_section (attempt_id, test_section_id, test_version_id, expires_at)
+         VALUES ($1, $2, $3, now() + interval '25 minutes')`,
+        [attemptId, f.listeningSectionId, f.versionId],
+      )
+
+      const result = await enterSection(pool, {
+        attemptId,
+        sectionId: f.readingSectionId,
+        now: new Date(),
+      })
+
+      expect(result).toEqual({ ok: false, reason: "section_still_open" })
+
+      const { rows } = await pool.query<{ count: string }>(
+        `SELECT count(*) AS count FROM attempt_section WHERE attempt_id = $1 AND test_section_id = $2`,
+        [attemptId, f.readingSectionId],
+      )
+      expect(Number(rows[0].count)).toBe(0)
+    })
+  }, 120_000)
+
+  it("sets current_section_id and current_question_id to the section's first question", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const attemptId = randomUUID()
+      await insertAttempt(pool, f, {
+        id: attemptId,
+        startedAt: "NULL",
+        expiresAt: null,
+      })
+
+      await enterSection(pool, {
+        attemptId,
+        sectionId: f.listeningSectionId,
+        now: new Date(),
+      })
+
+      const { rows: afterFirst } = await pool.query<{
+        current_section_id: string
+        current_question_id: string
+      }>(
+        `SELECT current_section_id, current_question_id FROM attempt WHERE id = $1`,
+        [attemptId],
+      )
+      expect(afterFirst[0].current_section_id).toBe(f.listeningSectionId)
+      expect(afterFirst[0].current_question_id).toBe(f.questionIds[0])
+
+      await closeSection(pool, attemptId, f.listeningSectionId)
+
+      await enterSection(pool, {
+        attemptId,
+        sectionId: f.readingSectionId,
+        now: new Date(),
+      })
+
+      const { rows: afterSecond } = await pool.query<{
+        current_section_id: string
+        current_question_id: string
+      }>(
+        `SELECT current_section_id, current_question_id FROM attempt WHERE id = $1`,
+        [attemptId],
+      )
+      expect(afterSecond[0].current_section_id).toBe(f.readingSectionId)
+      expect(afterSecond[0].current_question_id).toBe(f.questionIds[1])
     })
   }, 120_000)
 })

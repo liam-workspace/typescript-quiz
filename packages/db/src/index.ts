@@ -1,6 +1,7 @@
 import { type DbConfig, loadDbConfig } from "./config.js"
 import { createJobPool, createRequestPool } from "./pool.js"
 import {
+  enterSection,
   finalizeExpiredAttempt,
   loadOwnedAttempt,
   loadRunningOwnedAttempt,
@@ -8,13 +9,16 @@ import {
   TestNotFoundError,
   type AttemptRow,
   type FinalizedAttemptRow,
+  type SectionEntryRow,
   type StartResult,
 } from "./repositories/attempt.repository.js"
 import {
   InvalidCursorError,
   listPublishedTests,
+  loadSectionBrief,
   loadTestBrief,
   type ListPublishedTestsResult,
+  type SectionBriefRow,
   type StudentSummary,
   type TestBriefRow,
   type TestCardRow,
@@ -38,12 +42,13 @@ export type { StudentRow }
 
 export type {
   ListPublishedTestsResult,
+  SectionBriefRow,
   StudentSummary,
   TestBriefRow,
   TestCardRow,
 }
 
-export type { AttemptRow, FinalizedAttemptRow, StartResult }
+export type { AttemptRow, FinalizedAttemptRow, SectionEntryRow, StartResult }
 
 export type { RunnerEnvelopeRow }
 
@@ -57,10 +62,12 @@ export {
   findStudentBySubject,
   listPublishedTests,
   loadTestBrief,
+  loadSectionBrief,
   InvalidCursorError,
   loadOwnedAttempt,
   finalizeExpiredAttempt,
   loadRunningOwnedAttempt,
   startOrResumeAttempt,
+  enterSection,
   TestNotFoundError,
 }

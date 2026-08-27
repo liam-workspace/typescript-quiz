@@ -1,0 +1,76 @@
+import { useTranslation } from "react-i18next"
+import type { StimulusWire } from "../lib/api-types.js"
+
+export interface QuestionMediaProps {
+  stimulus: StimulusWire
+  onClaimPlay: () => Promise<void>
+  playing: boolean
+}
+
+// Adapted from packages/web/src/components/QuestionMedia.tsx. The audio
+// branch is rewritten from the ground up: no `controls`, no `autoPlay`, no
+// seek bar. Native <audio controls> would let a student pause, rewind and
+// replay -- exactly the behaviours spec §1.4 ("audio plays once, no pause or
+// seek, forward-only navigation") forbids. Playback is driven entirely by
+// the play button; there is no scrubber, and this component never sets or
+// holds a mediaUrl for a capped stimulus -- `onClaimPlay` (owned by the
+// caller) claims the play via `POST /play` and only then plays the granted,
+// signed, short-lived URL.
+//
+// `components/` is stateless by policy (frontend-lint's layering rule: state
+// moves up to the page), so a claim that comes back refused -- a 403/409/410,
+// all ordinary runner outcomes here rather than bugs -- is the caller's state
+// to hold, not this component's. `handlePlay` still swallows a rejection
+// rather than leaving it unhandled, so a tap can never surface as an
+// unhandled promise rejection regardless of how the caller's `onClaimPlay`
+// behaves.
+export function QuestionMedia({
+  stimulus,
+  onClaimPlay,
+  playing,
+}: QuestionMediaProps) {
+  const { t } = useTranslation("runner")
+
+  if (stimulus.type === "passage") {
+    return <div className="passage">{stimulus.bodyText}</div>
+  }
+
+  if (stimulus.type === "image" && stimulus.maxPlays === null) {
+    if (!stimulus.mediaUrl) {
+      return null
+    }
+
+    return (
+      <img
+        src={stimulus.mediaUrl}
+        alt=""
+        className="max-h-60 w-auto rounded-md"
+      />
+    )
+  }
+
+  if (stimulus.type === "audio") {
+    const handlePlay = (): void => {
+      onClaimPlay().catch(() => {
+        // Handled by the caller -- see the component doc comment above.
+      })
+    }
+
+    return (
+      <div className="audio-box">
+        <button
+          onClick={handlePlay}
+          disabled={
+            playing ||
+            (stimulus.maxPlays !== null &&
+              stimulus.playsUsed >= stimulus.maxPlays)
+          }
+        >
+          {t("listening.playButton")}
+        </button>
+      </div>
+    )
+  }
+
+  return null
+}

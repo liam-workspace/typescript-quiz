@@ -49,7 +49,11 @@ export interface RunnerQuestion {
   choices: RunnerChoice[]
 }
 
-export interface CappedStimulus {
+// A stimulus with a play limit. Carries NO `mediaUrl` -- a cap is meaningless
+// if the bytes are reachable without claiming a play, so the URL is issued
+// only by `POST /play`, signed and short-lived (openapi.yaml:1318-1333,
+// `additionalProperties: false`, no `mediaUrl` in its properties at all).
+export interface CappedStimulusWire {
   id: string
   type: StimulusType
   title?: string
@@ -60,7 +64,12 @@ export interface CappedStimulus {
   allowSeek: boolean
 }
 
-export interface OpenStimulus {
+// A stimulus with no play limit -- an image, a passage, or audio a student
+// may replay freely. Only these may carry a `mediaUrl` in the runner payload
+// (openapi.yaml:1335-1351; `mediaUrl`/`allowPause`/`allowSeek` are all
+// optional there, not required, since a passage-typed OpenStimulus has
+// neither).
+export interface OpenStimulusWire {
   id: string
   type: StimulusType
   title?: string
@@ -71,9 +80,15 @@ export interface OpenStimulus {
   allowSeek?: boolean
 }
 
+// Capped or uncapped. The distinction decides whether `mediaUrl` may appear
+// at all -- keeping this a discriminated union (rather than one merged type
+// with `mediaUrl?: string`) is what stops a component from accidentally
+// rendering a `mediaUrl` for a capped stimulus. See api-types.test.ts.
+export type StimulusWire = CappedStimulusWire | OpenStimulusWire
+
 export interface QuestionGroup {
   id: string
-  stimulus?: CappedStimulus | OpenStimulus
+  stimulus?: StimulusWire
   questions: RunnerQuestion[]
 }
 

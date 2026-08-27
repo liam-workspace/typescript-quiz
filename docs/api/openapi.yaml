@@ -115,6 +115,7 @@ paths:
               application/json:
                 { schema: { $ref: "#/components/schemas/SessionResult" } },
             }
+        "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403":
           description: Email not permitted by the allowlist.
@@ -283,6 +284,7 @@ paths:
               application/json:
                 { schema: { $ref: "#/components/schemas/AttemptStart" } },
             }
+        "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409":
           description: The test is not published.
@@ -426,10 +428,15 @@ paths:
                   schema: { $ref: "#/components/schemas/SingleResponseResult" },
                 },
             }
+        "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/NotYourAttempt" }
         "409":
-          description: "`answer_change_not_allowed` or `navigation_locked`. Never retry these."
+          description: |
+            `answer_change_not_allowed`, `navigation_locked`, `unknown_question`, or `invalid`.
+            Never retry any of them: each describes the request, not a transient server state, so
+            the identical body will be refused identically. Every one is captured to
+            `failed_write` before the error is returned.
           content:
             {
               application/problem+json:
@@ -513,6 +520,7 @@ paths:
                 questionId: { type: string }
       responses:
         "204": { description: Position recorded. }
+        "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/NotYourAttempt" }
         "409":
@@ -564,6 +572,7 @@ paths:
               application/json:
                 { schema: { $ref: "#/components/schemas/SubmitResult" } },
             }
+        "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/NotYourAttempt" }
         "409":
@@ -833,6 +842,7 @@ paths:
               application/json:
                 { schema: { $ref: "#/components/schemas/MediaAsset" } },
             }
+        "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/AdminOnly" }
         "413":
@@ -894,6 +904,17 @@ components:
       schema: { type: string }
 
   responses:
+    InvalidBody:
+      description: |
+        The request body did not match this operation's schema. Emitted by the global validation
+        pipe BEFORE any handler runs, so it applies to every operation that takes a body — a
+        `type` of `invalid_body`, with the specific failures in `detail`. Never retry the same
+        body: it describes the request, not a transient server state.
+      content:
+        {
+          application/problem+json:
+            { schema: { $ref: "#/components/schemas/Problem" } },
+        }
     Unauthorized:
       description: Missing, invalid or expired token.
       content:
@@ -1710,8 +1731,11 @@ components:
     ReviewMediaStimulus:
       type: object
       description: |
-        Audio or image, as the student saw it. `mediaUrl` is REQUIRED here and unsigned: the
-        attempt is finished, so the play cap no longer applies and there is nothing left to guard.
+        Audio or image, as the student saw it. `mediaUrl` is REQUIRED here and SIGNED, with a
+        short-lived expiry. "The cap no longer applies" does not mean "send a bare URL": `/media`
+        refuses a capped filename without a valid signature and cannot tell review from mid-test,
+        because an `<audio src>` sends no bearer token. A bare URL here is one the client could
+        never fetch.
       required: [id, type, mediaUrl, replayable]
       additionalProperties: false
       properties:

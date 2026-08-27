@@ -1,16 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { useState, type JSX } from "react"
+import { useEffect, useRef, useState, type JSX } from "react"
 import { useTranslation } from "react-i18next"
 import { AppMenu, type MenuStudent } from "../components/AppMenu.js"
 import { ListeningRunner } from "../components/ListeningRunner.js"
 import { QuestionNavigator } from "../components/QuestionNavigator.js"
 import { ReadingRunner } from "../components/ReadingRunner.js"
+import { AnswerQueue } from "../lib/answerQueue.js"
 import { ApiError } from "../lib/api-client.js"
 import {
   claimPlay,
   getRunnerEnvelope,
   setPosition,
 } from "../lib/attempts-api.js"
+import { FlushController, type Scheduler } from "../lib/flushController.js"
+import { apiFlushHttp } from "../lib/flushHttp.js"
+import { registerPagehideFlush } from "../lib/lifecycleFlush.js"
 import { sameOriginPath } from "../lib/same-origin-path.js"
 import { getCurrentStudent } from "../lib/session-api.js"
 import type { NavigatorSource } from "../lib/navigator-state.js"
@@ -28,9 +32,18 @@ import type {
 // components/ is stateless by policy, frontend-lint's `stateless` rule
 // rejects useState/useEffect/etc. as AST nodes anywhere under components/ --
 // so this page is where all of it actually lives: the current question, the
-// in-flight (unsent -- PHASE 4 boundary) answer selections, the claimed
-// audio URL, and the expired-audio state that Tasks 8 and 9 each correctly
-// declined (see ListeningRunner's ListeningExpiredState doc comment).
+// durably-queued (`AnswerQueue`, IndexedDB-backed) answer selections and
+// their flush to the server, the claimed audio URL, and the expired-audio
+// state that Tasks 8 and 9 each correctly declined (see ListeningRunner's
+// ListeningExpiredState doc comment).
+
+// A real setTimeout-backed scheduler for FlushController's retry backoff --
+// the same shape FlushController's own tests inject a fake for, but here
+// there is no fake clock to serve, so this actually waits.
+const scheduler: Scheduler = (delayMs) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, delayMs)
+  })
 
 interface FlatEntry {
   readonly question: RunnerQuestion
@@ -68,6 +81,7 @@ interface ExpiredState {
 export interface RunScreenProps {
   readonly attemptId: string
   readonly envelope: RunnerEnvelope
+  readonly queue: AnswerQueue
   readonly student?: MenuStudent
   readonly navigate: (path: string) => void
 }
@@ -77,6 +91,7 @@ type RunnerPanel = "menu" | "navigator" | null
 export function RunScreen({
   attemptId,
   envelope,
+  queue,
   student,
   navigate,
 }: RunScreenProps) {
@@ -116,6 +131,50 @@ export function RunScreen({
   const [expired, setExpired] = useState<ExpiredState | null>(null)
   const [panel, setPanel] = useState<RunnerPanel>(null)
 
+  // Constructed once per mount, tied to this attempt's `queue` prop (opened
+  // once by the route loader, not re-opened on every render) -- the lazy
+  // initializer runs exactly once, on the first render, never again.
+  const [controller] = useState(
+    () => new FlushController(queue, apiFlushHttp, scheduler),
+  )
+
+  // A "latest value" ref rather than a dependency the pagehide effect below
+  // re-subscribes on: `registerPagehideFlush` calls `getOpenSection()` live,
+  // at the moment `pagehide` actually fires, so this only needs to be kept
+  // current, never to trigger a re-registration when the question (and
+  // hence, on a section boundary, `section`) changes.
+  const openSectionRef = useRef<{
+    attemptId: string
+    sectionId: string
+  } | null>(null)
+
+  // Refs are read outside render (event handlers, effects); writing one
+  // must live there too, never inline in the render body, so this update
+  // runs as its own no-dependency-array effect -- after every render,
+  // exactly the "keep it current" semantics the comment above promises.
+  useEffect(() => {
+    openSectionRef.current = section
+      ? { attemptId, sectionId: section.id }
+      : null
+  })
+
+  // Spec §5 rule 6, "Flush at end of life": a backgrounded/closed tab must
+  // not lose whatever the queue is still holding for the open section. The
+  // queue itself is closed here too -- on unmount, not per render -- since
+  // this component owns the one open() call the loader made for it.
+  useEffect(() => {
+    const unregisterPagehideFlush = registerPagehideFlush(
+      queue,
+      () => openSectionRef.current,
+      (id) => `/attempts/${id}/responses`,
+    )
+
+    return () => {
+      unregisterPagehideFlush()
+      void queue.close()
+    }
+  }, [queue])
+
   // "attempt exists but nothing entered yet" -- no section has ever been
   // entered, so every section is still `pending`. The first one in
   // ordinal order (the order the server returns them in) is the only
@@ -147,12 +206,34 @@ export function RunScreen({
   const locked =
     !section.allowAnswerChange && (existingResponse?.length ?? 0) > 0
 
+  // Durable before sent (spec §5 rule 1): `queue.recordAnswer` writes to
+  // IndexedDB -- surviving a tab close from this point on -- alongside the
+  // optimistic `setResponses` update, before any network attempt is even
+  // attempted. The flush that follows is fire-and-forget on purpose:
+  // FlushController already owns retry/backoff internally, and awaiting it
+  // here would make every tap wait on the network the queue exists to
+  // route around.
   const handleSelectChoice = (choiceId: string): void => {
     setResponses((prev) => new Map(prev).set(question.id, [choiceId]))
-    // PHASE 4: a save-response call (`PUT /attempts/{id}/responses/{questionId}`)
-    // belongs here. Deliberately absent -- a selection is held in local
-    // state only until that phase lands; see the test asserting no network
-    // call fires on select.
+
+    void queue
+      .recordAnswer(
+        {
+          attemptId,
+          sectionId: section.id,
+          questionId: question.id,
+          selectedChoiceIds: [choiceId],
+          timeSpentMs: null,
+        },
+        new Date(),
+      )
+      .then(() =>
+        controller.flushSection(
+          attemptId,
+          section.id,
+          `/attempts/${attemptId}/responses`,
+        ),
+      )
   }
 
   const handleClaimPlay = async (): Promise<void> => {
@@ -524,13 +605,23 @@ export async function loadRunScreenData(attemptId: string): Promise<{
 }
 
 export const Route = createFileRoute("/attempts/$attemptId/run")({
-  loader: ({ params }) => loadRunScreenData(params.attemptId),
+  // The queue is opened once per route entry, alongside the envelope fetch,
+  // matching the hand-in screen's own loader (`attempts.$attemptId.hand-in.tsx`)
+  // -- not inside the component, so a re-render never reopens it.
+  loader: async ({ params }) => {
+    const [{ envelope, student }, queue] = await Promise.all([
+      loadRunScreenData(params.attemptId),
+      AnswerQueue.open(),
+    ])
+
+    return { envelope, student, queue }
+  },
   component: RouteComponent,
 })
 
 function RouteComponent() {
   const { attemptId } = Route.useParams()
-  const { envelope, student } = Route.useLoaderData()
+  const { envelope, student, queue } = Route.useLoaderData()
 
   // Same stand-in as sections.$sectionId.rules.tsx: no typed route exists
   // yet for the section-rules destination from here without inventing its
@@ -543,6 +634,7 @@ function RouteComponent() {
     <RunScreen
       attemptId={attemptId}
       envelope={envelope}
+      queue={queue}
       student={student}
       navigate={navigate}
     />

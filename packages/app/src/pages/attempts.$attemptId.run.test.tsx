@@ -1,8 +1,10 @@
+import "fake-indexeddb/auto"
 import { cleanup, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
+import { AnswerQueue } from "../lib/answerQueue.js"
 import {
   claimPlay,
   getRunnerEnvelope,
@@ -11,6 +13,8 @@ import {
 import type { CappedStimulusWire, RunnerEnvelope } from "../lib/api-types.js"
 import { getCurrentStudent } from "../lib/session-api.js"
 import { loadRunScreenData, RunScreen } from "./attempts.$attemptId.run.js"
+
+const DB_NAME = "pp-answer-queue-run-test"
 
 vi.mock("../lib/attempts-api.js", () => ({
   claimPlay: vi.fn(),
@@ -26,6 +30,14 @@ const mockClaimPlay = vi.mocked(claimPlay)
 const mockGetCurrentStudent = vi.mocked(getCurrentStudent)
 const mockGetRunnerEnvelope = vi.mocked(getRunnerEnvelope)
 const mockSetPosition = vi.mocked(setPosition)
+
+/**
+ * Hoisted rather than inlined into `waitFor`: this assertion lives two
+ * describes deep, and an inline arrow there is a fourth nested callback.
+ */
+const fetchWasCalled = (): void => {
+  expect(fetch).toHaveBeenCalled()
+}
 
 /**
  * Hoisted rather than inlined into `waitFor`: this assertion lives two
@@ -190,21 +202,65 @@ const readingEnvelope: RunnerEnvelope = {
   responses: [],
 }
 
+// Opened fresh in `beforeEach` below (real `AnswerQueue`, IndexedDB-backed
+// via `fake-indexeddb/auto` -- matching the pattern already established by
+// `attempts.$attemptId.hand-in.test.tsx`), so every test starts from an
+// empty queue and can inspect exactly what `handleSelectChoice` durably
+// recorded. `undefined` between tests, never read except through
+// `getQueue()`, which is what keeps this honestly typed without a
+// non-null assertion (banned by this repo's oxlint config).
+let queue: AnswerQueue | undefined = undefined
+
+function getQueue(): AnswerQueue {
+  if (!queue) {
+    throw new Error("AnswerQueue not opened -- beforeEach did not run yet")
+  }
+
+  return queue
+}
+
 function renderRunScreen(
   envelope: RunnerEnvelope = listeningEnvelope,
   navigate = vi.fn(),
 ) {
   const utils = render(
-    <RunScreen attemptId="attempt-1" envelope={envelope} navigate={navigate} />,
+    <RunScreen
+      attemptId="attempt-1"
+      envelope={envelope}
+      queue={getQueue()}
+      navigate={navigate}
+    />,
   )
 
   return { ...utils, navigate }
 }
 
 describe("RunScreen", () => {
-  afterEach(() => {
+  // A default fetch stub for every test in this describe, not just the ones
+  // that assert on it: selecting a choice now durably records the answer
+  // AND fires a flush (see `handleSelectChoice`), so any test that clicks a
+  // choice needs a fetch response to resolve against, not the real global
+  // fetch. Individual tests below overwrite this stub when they need to
+  // inspect what was sent.
+  beforeEach(async () => {
+    indexedDB.deleteDatabase(DB_NAME)
+    queue = await AnswerQueue.open(DB_NAME)
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(JSON.stringify({ results: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    )
+  })
+
+  afterEach(async () => {
     cleanup()
     vi.clearAllMocks()
+    vi.unstubAllGlobals()
+    await getQueue().close()
   })
 
   describe("route data", () => {
@@ -396,9 +452,14 @@ describe("RunScreen", () => {
     )
   })
 
-  it("holds a new choice selection in local state only -- no network call fires on select", async () => {
-    const fetchMock = vi.fn()
-    vi.stubGlobal("fetch", fetchMock)
+  // Replaces the old "holds a new choice selection in local state only --
+  // no network call fires on select" test, which encoded the defect this
+  // fix closes: a selection that lived in React state ONLY, discarded on
+  // reload, was exactly why a child sitting a timed test could be graded
+  // "0 answered" on a test they had actually completed. These two tests
+  // prove the opposite -- a selection survives a tab close from the moment
+  // it is tapped (durably queued in IndexedDB) and reaches the server.
+  it("durably records a new choice selection in the local answer queue immediately on select", async () => {
     const user = userEvent.setup()
 
     renderRunScreen()
@@ -409,10 +470,52 @@ describe("RunScreen", () => {
       "aria-checked",
       "true",
     )
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(mockSetPosition).not.toHaveBeenCalled()
 
-    vi.unstubAllGlobals()
+    const [firstQueued] = await waitFor(async () => {
+      const items = await getQueue().snapshotForSection(
+        "attempt-1",
+        "section-listening",
+      )
+
+      expect(items).toHaveLength(1)
+
+      return items
+    })
+
+    expect(firstQueued).toMatchObject({
+      attemptId: "attempt-1",
+      sectionId: "section-listening",
+      questionId: "q-1",
+      selectedChoiceIds: ["c-2"],
+    })
+  })
+
+  it("flushes a newly recorded answer to the server as a PATCH /attempts/{id}/responses snapshot", async () => {
+    const user = userEvent.setup()
+
+    renderRunScreen()
+
+    await user.click(screen.getByRole("radio", { name: "A cat" }))
+
+    await waitFor(fetchWasCalled)
+
+    const [call] = vi.mocked(fetch).mock.calls
+    const [url, init] = call
+
+    expect(url).toBe("/api/attempts/attempt-1/responses")
+    expect(init?.method).toBe("PATCH")
+
+    const body: unknown = JSON.parse(
+      (init?.body as string | undefined) ?? "null",
+    )
+    expect(body).toMatchObject({
+      responses: [
+        expect.objectContaining({
+          questionId: "q-1",
+          selectedChoiceIds: ["c-2"],
+        }),
+      ],
+    })
   })
 
   it("locks the choice list once a response already exists for this question and allowAnswerChange is false", () => {
@@ -640,6 +743,12 @@ describe("RunScreen", () => {
         "aria-checked",
         "true",
       )
+
+      // Selecting fires a durable-record-then-flush chain (see
+      // `handleSelectChoice`) that this test does not otherwise assert on --
+      // waited out here so it settles before `afterEach` closes the queue,
+      // rather than racing an in-flight IndexedDB write against the close.
+      await waitFor(fetchWasCalled)
     })
 
     it("renders 'Passage N · questions X–Y' from the current group's own ordinals", async () => {

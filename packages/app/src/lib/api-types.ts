@@ -269,6 +269,7 @@ export interface ReviewItem {
   questionId: string
   ordinal: number
   sectionId: string
+  sectionType: SectionType
   prompt: string
   outcome: "correct" | "incorrect" | "unanswered"
   stimulus?: ReviewStimulus

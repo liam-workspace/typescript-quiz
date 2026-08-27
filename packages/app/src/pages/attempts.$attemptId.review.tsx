@@ -209,9 +209,10 @@ export function ReviewScreen({ review }: ReviewScreenProps) {
 
   const current = review.items[currentIndex]
 
-  const sectionIds = [...new Set(review.items.map((item) => item.sectionId))]
-  const sectionKey =
-    sectionIds.indexOf(current.sectionId) === 0 ? "listening" : "reading"
+  // The server says which kind of section this is. It used to be guessed
+  // from the section's POSITION in the item list -- right only for a
+  // two-section test in the expected order, and the enum has four values.
+  const sectionKey = current.sectionType
   const outcome = t(`review.outcome.${current.outcome}`)
   const atFirst = currentIndex === 0
   const atLast = currentIndex === review.items.length - 1

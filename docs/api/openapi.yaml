@@ -1760,11 +1760,19 @@ components:
 
     ReviewItem:
       type: object
-      required: [questionId, ordinal, sectionId, prompt, outcome, choices]
+      required:
+        [questionId, ordinal, sectionId, sectionType, prompt, outcome, choices]
       properties:
         questionId: { type: string }
         ordinal: { type: integer }
         sectionId: { type: string }
+        sectionType:
+          allOf:
+            - $ref: "#/components/schemas/SectionType"
+          description: |
+            Carried rather than inferred. Without it a client can only guess a section's kind
+            from the ORDER items arrive in, which holds for a two-section test in the expected
+            sequence and nothing else — and this enum has four values.
         prompt: { type: string }
         outcome: { type: string, enum: [correct, incorrect, unanswered] }
         stimulus:

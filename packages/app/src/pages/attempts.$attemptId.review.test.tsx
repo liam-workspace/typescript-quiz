@@ -18,6 +18,7 @@ const reviewPayload: ReviewPayload = {
       questionId: "question-7",
       ordinal: 7,
       sectionId: "section-listening",
+      sectionType: "listening",
       prompt: "What does the boy want to do?",
       outcome: "correct",
       stimulus: {
@@ -52,6 +53,7 @@ const reviewPayload: ReviewPayload = {
       questionId: "question-12",
       ordinal: 12,
       sectionId: "section-reading",
+      sectionType: "reading",
       prompt: "Where are the children going?",
       outcome: "unanswered",
       stimulus: {
@@ -86,6 +88,7 @@ const reviewPayload: ReviewPayload = {
       questionId: "question-27",
       ordinal: 27,
       sectionId: "section-reading",
+      sectionType: "reading",
       prompt: "Why did Mia take an umbrella?",
       outcome: "incorrect",
       choices: [
@@ -124,6 +127,7 @@ function mixedReview(mediaKind: "audio" | "image"): ReviewPayload {
         questionId: "question-9",
         ordinal: 9,
         sectionId: "section-listening",
+        sectionType: "listening",
         prompt: "What is happening?",
         outcome: "correct",
         stimulus: {
@@ -158,6 +162,32 @@ describe("attempt review page", () => {
   afterEach(() => {
     cleanup()
     vi.unstubAllGlobals()
+  })
+
+  // The screen used to derive this chip from a section's POSITION in the
+  // item list -- first section seen means listening, anything else means
+  // reading. That holds for a two-section test in the expected order and
+  // nothing else, and the section-type enum has four values. Here the
+  // FIRST item is a reading question, so a position guess says "Listening"
+  // and the carried value says "Reading".
+  it("labels the section from the type the server sends, not from item order", () => {
+    render(
+      <ReviewScreen
+        review={{
+          attemptId: "attempt-1",
+          items: [
+            {
+              ...reviewPayload.items[1],
+              sectionId: "section-reading",
+              sectionType: "reading",
+            },
+          ],
+        }}
+      />,
+    )
+
+    expect(screen.getByText("Reading")).toBeInTheDocument()
+    expect(screen.queryByText("Listening")).not.toBeInTheDocument()
   })
 
   it("shows a selected correct choice as the student's correct answer", () => {

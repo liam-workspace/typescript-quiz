@@ -264,6 +264,11 @@ export interface ReviewItem {
   questionId: string
   ordinal: number
   sectionId: string
+  // Carried, not inferred. The review screen used to guess "listening vs
+  // reading" from a section's POSITION in the item list, which is only ever
+  // right for a two-section test in the expected order -- and the section
+  // type enum has four values.
+  sectionType: "listening" | "reading" | "vocabulary" | "grammar"
   prompt: string
   outcome: "correct" | "incorrect" | "unanswered"
   stimulus?: ReviewStimulus
@@ -289,6 +294,7 @@ interface ReviewDbRow {
   q_type: string
   q_points: number
   section_id: string
+  section_type: string
   c_id: string
   c_label: string
   c_is_correct: boolean
@@ -511,7 +517,7 @@ export async function loadReview(
   const { rows } = await pool.query<ReviewDbRow>(
     `SELECT q.id q_id, q.ordinal q_ordinal, q.prompt q_prompt,
             q.type::text q_type, q.points q_points,
-            ts.id section_id,
+            ts.id section_id, ts.type::text section_type,
             c.id c_id, c.label c_label, c.is_correct c_is_correct,
             (rc.choice_id IS NOT NULL) c_selected,
             st.id st_id, st.type::text st_type, st.title st_title,
@@ -584,6 +590,7 @@ function findOrCreateReview(
       // from silently reaching the wire if this query changes later.
       ordinal: row.q_ordinal,
       sectionId,
+      sectionType: row.section_type as ReviewItem["sectionType"],
       prompt: row.q_prompt,
       ...(row.st_id
         ? { stimulus: buildReviewStimulus(row, row.st_id, mediaUrlFor) }

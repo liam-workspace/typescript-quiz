@@ -1,4 +1,5 @@
 import { getDevBearerToken } from "./dev-auth.js"
+import type { FinalizedAttempt } from "./api-types.js"
 
 export class ApiError extends Error {
   public readonly problem: {
@@ -6,6 +7,10 @@ export class ApiError extends Error {
     title: string
     status: number
     detail?: string
+    // Present only on `410 attempt_expired` (openapi.yaml `AttemptExpiredProblem`) --
+    // the request finalized the attempt itself, so the caller can render the
+    // time-up screen without a follow-up read.
+    attempt?: FinalizedAttempt
   }
 
   public constructor(problem: ApiError["problem"]) {

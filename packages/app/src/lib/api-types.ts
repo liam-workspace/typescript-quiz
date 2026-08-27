@@ -12,6 +12,17 @@ export interface PlaybackRules {
   allowSeek: boolean
 }
 
+// The attempt a request finalized by lazy expiry -- either the one it touched (a
+// `410 attempt_expired` on `enterSection`) or a stale one cleared out of the way by a
+// new `POST /attempts` (`finalizedPriorAttempt` on `AttemptStart`, openapi.yaml
+// `FinalizedAttempt`). `status` is always `expired`: both uses are expiry-driven.
+export interface FinalizedAttempt {
+  id: string
+  status: "expired"
+  submittedAt: string
+  resultUrl: string
+}
+
 export interface SectionEntry {
   sectionId: string
   title: string

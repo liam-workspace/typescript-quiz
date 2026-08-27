@@ -675,8 +675,17 @@ This is the prerequisite every other task in this plan calls. Read Decision 2 be
   it("rejects a signature for a DIFFERENT filename", …)
   it("rejects once now is past the embedded expiry", …)
   it("rejects a tampered signature of the same length", …)
+  it("rejects an extended exp carrying the original signature", …)
   it("rejects a missing exp or sig query param", …)
   ```
+
+  The `exp` case is the one an attacker actually runs: take a valid signed
+  URL, change `?exp=` to a far-future timestamp, keep the `sig` untouched, and
+  replay it forever. It passes only because the HMAC covers the expiry as well
+  as the filename — `signMediaUrl` takes both, so the binding is there by
+  construction, but nothing above proves it. The other cases all tamper with
+  the SIGNATURE; this is the one that tampers with the payload the signature
+  exists to protect, which is a different failure and needs its own test.
 
   Run: `pnpm --filter @pp/server test media-signing` → FAIL. Implement with `node:crypto` `createHmac("sha256", …)` + `timingSafeEqual` (constant-time compare — a `===` here would make the signature guessable byte-by-byte via timing, defeating the whole point of signing). Run again → PASS.
 

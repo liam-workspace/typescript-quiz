@@ -196,8 +196,9 @@ function findOrCreateQuestion(
 }
 
 /**
- * The SCORING projection — the answer key. Reachable only from the scoring
- * service; no student-facing route may import it.
+ * The SCORING projection — the answer key. Reachable only through the fenced
+ * scoring entry point; the finished-attempt review route is the sole
+ * student-facing consumer allowed to cross that boundary.
  */
 export async function loadForScoring(
   db: PgQueryable,

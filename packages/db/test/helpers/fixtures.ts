@@ -84,8 +84,8 @@ export async function seedPublishedTest(pool: pg.Pool): Promise<Fixture> {
     [cappedStimulusId, versionId, mediaAssetId],
   )
   await pool.query(
-    `INSERT INTO stimulus (id, test_version_id, type, body_text)
-     VALUES ($1,$2,'passage','A short reading passage about a rainy day.')`,
+    `INSERT INTO stimulus (id, test_version_id, type, title, body_text)
+     VALUES ($1,$2,'passage','Rainy Day','A short reading passage about a rainy day.')`,
     [uncappedStimulusId, versionId],
   )
 

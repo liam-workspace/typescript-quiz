@@ -6,6 +6,7 @@ import {
   loadAttemptResult,
   type AttemptResultOutcome,
 } from "@pp/db"
+import { loadReview, type ReviewItem, type ReviewOutcome } from "@pp/db/scoring"
 import { CLOCK, REQUEST_POOL } from "../database/tokens.js"
 import { resolveOwnedAttempt } from "./ownership.js"
 import { ProblemException } from "./problem.exception.js"
@@ -31,6 +32,11 @@ export type ReadyAttemptResult = Extract<
   AttemptResultOutcome,
   { kind: "ready" }
 >["result"]
+
+export type ReadyReviewItems = Extract<
+  ReviewOutcome,
+  { kind: "ready" }
+>["items"]
 
 @Injectable()
 export class ResultsService {
@@ -100,5 +106,58 @@ export class ResultsService {
     }
 
     return outcome.result
+  }
+
+  async getReview(
+    subjectClaim: string,
+    attemptId: string,
+  ): Promise<ReviewItem[]> {
+    const owned = await resolveOwnedAttempt(this.pool, {
+      attemptId,
+      subjectClaim,
+    })
+
+    if (owned.kind !== "ok") {
+      throw notYourAttemptError()
+    }
+
+    const outcome = await loadReview(this.pool, {
+      attemptId,
+      now: this.clock.now(),
+      // Runner and play-grant payloads already establish `/media` as the
+      // public URL mount. loadServerConfig().mediaRoot is a filesystem path
+      // and must never be serialized as though it were this URL base.
+      mediaBaseUrl: "/media",
+    })
+
+    if (outcome.kind === "not_found") {
+      throw notYourAttemptError()
+    }
+
+    if (outcome.kind === "still_running") {
+      throw stillRunningError()
+    }
+
+    if (outcome.kind === "expired_unfinalized") {
+      await finalizeAttempt(this.pool, {
+        attemptId,
+        status: "expired",
+        submittedAt: outcome.expiresAt,
+      })
+
+      const finalized = await loadReview(this.pool, {
+        attemptId,
+        now: this.clock.now(),
+        mediaBaseUrl: "/media",
+      })
+
+      if (finalized.kind !== "ready") {
+        throw stillRunningError()
+      }
+
+      return finalized.items
+    }
+
+    return outcome.items
   }
 }

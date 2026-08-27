@@ -2,13 +2,17 @@ import {
   asChoiceId,
   asQuestionId,
   asSectionId,
+  asStimulusId,
   gradeAttempt,
+  isQuestionCorrect,
+  type ChoiceId,
   type GradableResponse,
   type GradableSection,
   type GradeResult,
 } from "@pp/common"
+import type { ScoringQuestion } from "@pp/common/scoring"
 import type { PgPool, PgQueryable } from "@liam-public/node-postgres"
-import { loadForScoring } from "../scoring.js"
+import { loadForScoring } from "./test-version.repository.js"
 
 export type AttemptResultOutcome =
   | { kind: "not_found" }
@@ -60,6 +64,83 @@ interface SectionDbRow {
 interface ResponseDbRow {
   question_id: string
   choice_ids: string[]
+}
+
+export interface ReviewChoice {
+  id: string
+  label: string
+  isCorrect: boolean
+  selected: boolean
+}
+
+export type ReviewStimulus =
+  | {
+      id: string
+      type: "audio" | "image"
+      title?: string
+      mediaUrl: string
+      replayable: true
+    }
+  | {
+      id: string
+      type: "passage"
+      title: string
+      bodyText: string
+      replayable: true
+    }
+  | {
+      id: string
+      type: "mixed"
+      title?: string
+      bodyText: string
+      mediaUrl: string
+      replayable: true
+    }
+
+export interface ReviewItem {
+  questionId: string
+  ordinal: number
+  sectionId: string
+  prompt: string
+  outcome: "correct" | "incorrect" | "unanswered"
+  stimulus?: ReviewStimulus
+  choices: ReviewChoice[]
+}
+
+export type ReviewOutcome =
+  | { kind: "not_found" }
+  | { kind: "still_running" }
+  | { kind: "expired_unfinalized"; expiresAt: Date }
+  | { kind: "ready"; items: ReviewItem[] }
+
+interface ReviewAttemptDbRow {
+  test_version_id: string
+  status: "in_progress" | "submitted" | "expired"
+  expires_at: Date | null
+}
+
+interface ReviewDbRow {
+  q_id: string
+  q_ordinal: number
+  q_prompt: string
+  q_type: string
+  q_points: number
+  section_id: string
+  c_id: string
+  c_label: string
+  c_is_correct: boolean
+  c_selected: boolean
+  st_id: string | null
+  st_type: string | null
+  st_title: string | null
+  st_body: string | null
+  st_filename: string | null
+}
+
+interface ReviewAccumulator {
+  item: Omit<ReviewItem, "outcome">
+  scoringQuestion: ScoringQuestion
+  selectedChoiceIds: ChoiceId[]
 }
 
 /**
@@ -213,5 +294,217 @@ export async function loadAttemptResult(
       },
       isPersonalBest: row.is_personal_best,
     },
+  }
+}
+
+/**
+ * The deliberate student-facing answer-key projection. This repository is
+ * exported only through `@pp/db/scoring`; the review route may consume it
+ * after the attempt is terminal, while the default `@pp/db` surface remains
+ * incapable of supplying `choice.isCorrect` to runner/result handlers.
+ *
+ * This function is read-only. As with loadAttemptResult, an expired clock is
+ * reported distinctly so the server can delegate the only grading write to
+ * the idempotent finalizeAttempt path and then read again.
+ */
+export async function loadReview(
+  pool: PgPool,
+  input: { attemptId: string; now: Date; mediaBaseUrl: string },
+): Promise<ReviewOutcome> {
+  const { rows: attemptRows } = await pool.query<ReviewAttemptDbRow>(
+    `SELECT test_version_id, status, expires_at
+       FROM attempt
+      WHERE id = $1`,
+    [input.attemptId],
+  )
+
+  if (attemptRows.length === 0) {
+    return { kind: "not_found" }
+  }
+
+  const [attempt] = attemptRows
+
+  if (attempt.status === "in_progress") {
+    if (attempt.expires_at !== null && attempt.expires_at <= input.now) {
+      return {
+        kind: "expired_unfinalized",
+        expiresAt: attempt.expires_at,
+      }
+    }
+
+    return { kind: "still_running" }
+  }
+
+  const { rows } = await pool.query<ReviewDbRow>(
+    `SELECT q.id q_id, q.ordinal q_ordinal, q.prompt q_prompt,
+            q.type::text q_type, q.points q_points,
+            ts.id section_id,
+            c.id c_id, c.label c_label, c.is_correct c_is_correct,
+            (rc.choice_id IS NOT NULL) c_selected,
+            st.id st_id, st.type::text st_type, st.title st_title,
+            st.body_text st_body, ma.filename st_filename
+       FROM question q
+       JOIN question_group g ON g.id = q.question_group_id
+       JOIN test_section ts  ON ts.id = g.test_section_id
+  LEFT JOIN stimulus st      ON st.id = g.stimulus_id
+  LEFT JOIN media_asset ma   ON ma.id = st.media_asset_id
+       JOIN choice c         ON c.question_id = q.id
+  LEFT JOIN response_choice rc
+         ON rc.attempt_id = $2
+        AND rc.question_id = q.id
+        AND rc.choice_id = c.id
+      WHERE q.test_version_id = $1
+      ORDER BY q.ordinal, c.ordinal`,
+    [attempt.test_version_id, input.attemptId],
+  )
+
+  const accumulators: ReviewAccumulator[] = []
+
+  for (const row of rows) {
+    const accumulator = findOrCreateReview(
+      accumulators,
+      row,
+      input.mediaBaseUrl,
+    )
+    const choiceId = asChoiceId(row.c_id)
+
+    accumulator.item.choices.push({
+      id: choiceId,
+      label: row.c_label,
+      isCorrect: row.c_is_correct,
+      selected: row.c_selected,
+    })
+    accumulator.scoringQuestion.choices.push({
+      id: choiceId,
+      label: row.c_label,
+      isCorrect: row.c_is_correct,
+    })
+
+    if (row.c_selected) {
+      accumulator.selectedChoiceIds.push(choiceId)
+    }
+  }
+
+  return {
+    kind: "ready",
+    items: accumulators.map(toReviewItem),
+  }
+}
+
+function findOrCreateReview(
+  accumulators: ReviewAccumulator[],
+  row: ReviewDbRow,
+  mediaBaseUrl: string,
+): ReviewAccumulator {
+  const questionId = asQuestionId(row.q_id)
+  const existing = accumulators.find(
+    (accumulator) => accumulator.item.questionId === questionId,
+  )
+
+  if (existing) {
+    return existing
+  }
+
+  const sectionId = asSectionId(row.section_id)
+  const accumulator: ReviewAccumulator = {
+    item: {
+      questionId,
+      // Unlike numeric/bigint, PostgreSQL integer is parsed as a number.
+      // Keeping that driver-boundary type explicit prevents a string ordinal
+      // from silently reaching the wire if this query changes later.
+      ordinal: row.q_ordinal,
+      sectionId,
+      prompt: row.q_prompt,
+      ...(row.st_id
+        ? { stimulus: buildReviewStimulus(row, row.st_id, mediaBaseUrl) }
+        : {}),
+      choices: [],
+    },
+    scoringQuestion: {
+      id: questionId,
+      sectionId,
+      ordinal: row.q_ordinal,
+      type: row.q_type as ScoringQuestion["type"],
+      prompt: row.q_prompt,
+      points: row.q_points,
+      choices: [],
+    },
+    selectedChoiceIds: [],
+  }
+
+  accumulators.push(accumulator)
+
+  return accumulator
+}
+
+function buildReviewStimulus(
+  row: ReviewDbRow,
+  stimulusId: string,
+  mediaBaseUrl: string,
+): ReviewStimulus {
+  const id = asStimulusId(stimulusId)
+  const mediaUrl = row.st_filename ? `${mediaBaseUrl}/${row.st_filename}` : null
+
+  if (row.st_type === "audio" || row.st_type === "image") {
+    if (!mediaUrl) {
+      throw new Error(`review stimulus ${stimulusId} is missing media`)
+    }
+
+    return {
+      id,
+      type: row.st_type,
+      ...(row.st_title ? { title: row.st_title } : {}),
+      mediaUrl,
+      replayable: true,
+    }
+  }
+
+  if (row.st_type === "passage") {
+    if (row.st_title === null || row.st_body === null) {
+      throw new Error(`review passage ${stimulusId} is missing text`)
+    }
+
+    return {
+      id,
+      type: "passage",
+      title: row.st_title,
+      bodyText: row.st_body,
+      replayable: true,
+    }
+  }
+
+  if (row.st_type === "mixed") {
+    if (row.st_body === null || !mediaUrl) {
+      throw new Error(`review mixed stimulus ${stimulusId} is incomplete`)
+    }
+
+    return {
+      id,
+      type: "mixed",
+      ...(row.st_title ? { title: row.st_title } : {}),
+      bodyText: row.st_body,
+      mediaUrl,
+      replayable: true,
+    }
+  }
+
+  throw new Error(`review stimulus ${stimulusId} has unknown type`)
+}
+
+function toReviewItem(accumulator: ReviewAccumulator): ReviewItem {
+  let outcome: ReviewItem["outcome"] = "unanswered"
+
+  if (accumulator.selectedChoiceIds.length > 0) {
+    outcome = isQuestionCorrect(
+      accumulator.scoringQuestion,
+      accumulator.selectedChoiceIds,
+    )
+      ? "correct"
+      : "incorrect"
+  }
+
+  return {
+    ...accumulator.item,
+    outcome,
   }
 }

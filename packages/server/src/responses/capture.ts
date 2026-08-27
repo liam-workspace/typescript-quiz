@@ -1,6 +1,7 @@
 import type { PgPool } from "@liam-public/node-postgres"
-import { HttpException, HttpStatus } from "@nestjs/common"
+import { HttpStatus } from "@nestjs/common"
 import { insertFailedWrite } from "@pp/db"
+import { ProblemException } from "../attempts/problem.exception.js"
 import type { CapturedRequest } from "../http/raw-body-json.middleware.js"
 
 interface ResponseRequest extends CapturedRequest {
@@ -66,19 +67,16 @@ export async function captureRejection(
   pool: PgPool,
   req: ResponseRequest,
   input: Omit<CaptureInput, "itemOnly">,
-): Promise<HttpException> {
+): Promise<ProblemException> {
   const capturedAs = await captureResponseRejection(pool, req, input)
 
-  return new HttpException(
-    {
-      type: input.reason,
-      title: rejectionTitle(input.reason),
-      status: HttpStatus.CONFLICT,
-      retryable: false,
-      capturedAs,
-    },
-    HttpStatus.CONFLICT,
-  )
+  return new ProblemException({
+    type: input.reason,
+    title: rejectionTitle(input.reason),
+    status: HttpStatus.CONFLICT,
+    retryable: false,
+    capturedAs,
+  })
 }
 
 export function captureItemRejection(

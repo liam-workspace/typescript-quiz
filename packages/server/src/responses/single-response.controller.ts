@@ -4,21 +4,22 @@ import { writeResponse } from "@pp/db"
 import {
   Body,
   Controller,
+  HttpStatus,
   Inject,
   Param,
   Put,
   Req,
-  UnauthorizedException,
   UseFilters,
   UseGuards,
 } from "@nestjs/common"
+import { ProblemException } from "../attempts/problem.exception.js"
+import { ProblemExceptionFilter } from "../attempts/problem.filter.js"
 import { CurrentStudent } from "../auth/current-student.decorator.js"
 import { JwksGuard } from "../auth/jwks.guard.js"
 import { REQUEST_POOL } from "../database/tokens.js"
 import type { CapturedRequest } from "../http/raw-body-json.middleware.js"
 import { captureRejection } from "./capture.js"
 import { SingleResponseWriteDto } from "./dto.js"
-import { ResponseHttpExceptionFilter } from "./response-http-exception.filter.js"
 import { ResponseWriteService } from "./response-write.service.js"
 import { mapWriteConflict, resolveSectionRules } from "./section-rules.js"
 
@@ -34,7 +35,7 @@ interface SingleResponseResult {
 
 @Controller("attempts/:id/responses")
 @UseGuards(JwksGuard)
-@UseFilters(ResponseHttpExceptionFilter)
+@UseFilters(ProblemExceptionFilter)
 export class SingleResponseController {
   constructor(
     private readonly responseWrites: ResponseWriteService,
@@ -103,7 +104,11 @@ export class SingleResponseController {
 
 function subjectOf(claims: JwtClaims): string {
   if (!claims.sub) {
-    throw new UnauthorizedException("invalid_token")
+    throw new ProblemException({
+      type: "invalid_token",
+      title: "Missing, invalid or expired token.",
+      status: HttpStatus.UNAUTHORIZED,
+    })
   }
 
   return claims.sub

@@ -1,6 +1,7 @@
 import type { PgPool } from "@liam-public/node-postgres"
-import { HttpException, HttpStatus } from "@nestjs/common"
+import { HttpStatus } from "@nestjs/common"
 import type { AttemptRow } from "@pp/db"
+import { ProblemException } from "../attempts/problem.exception.js"
 
 export interface SectionRules {
   allowAnswerChange: boolean
@@ -74,14 +75,11 @@ export async function resolveSectionRules(
 
 export function mapWriteConflict(rules: SectionRules, now: Date): void {
   if (rules.sectionExpiresAt && rules.sectionExpiresAt <= now) {
-    throw new HttpException(
-      {
-        type: "section_expired",
-        title: "The section's clock ran out.",
-        status: HttpStatus.GONE,
-        retryable: false,
-      },
-      HttpStatus.GONE,
-    )
+    throw new ProblemException({
+      type: "section_expired",
+      title: "The section's clock ran out.",
+      status: HttpStatus.GONE,
+      retryable: false,
+    })
   }
 }

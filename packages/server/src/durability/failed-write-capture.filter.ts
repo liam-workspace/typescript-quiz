@@ -36,11 +36,12 @@ interface CapturableRequest extends CapturedRequest {
  * Structural rather than express's Response: @types/express is not a
  * dependency of this package (see raw-body-json.middleware.ts's
  * `CapturedRequest` and session.controller.ts's `StatusSettable` for the
- * same rule applied elsewhere). `status` and `json` are all this filter
- * needs.
+ * same rule applied elsewhere). `status`, `type` and `json` are all this
+ * filter needs.
  */
 interface JsonResponse {
   status(code: number): this
+  type(contentType: string): this
   json(body: unknown): void
 }
 
@@ -129,14 +130,17 @@ export class FailedWriteCaptureFilter implements ExceptionFilter {
 
     const status = isOversized ? 413 : 400
 
-    res.status(status).json({
-      type: isOversized ? "payload_too_large" : reason,
-      title: isOversized
-        ? "Payload too large"
-        : "The request body could not be applied",
-      status,
-      retryable: false,
-      capturedAs: captured.id,
-    })
+    res
+      .status(status)
+      .type("application/problem+json")
+      .json({
+        type: isOversized ? "payload_too_large" : reason,
+        title: isOversized
+          ? "Payload too large"
+          : "The request body could not be applied",
+        status,
+        retryable: false,
+        capturedAs: captured.id,
+      })
   }
 }

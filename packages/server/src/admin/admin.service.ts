@@ -2,15 +2,7 @@ import { createHash } from "node:crypto"
 import { mkdir, writeFile } from "node:fs/promises"
 import { resolve, sep } from "node:path"
 import { withTransaction, type PgPool } from "@liam-public/node-postgres"
-import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
-  UnprocessableEntityException,
-  UnsupportedMediaTypeException,
-} from "@nestjs/common"
+import { HttpStatus, Inject, Injectable } from "@nestjs/common"
 import { testDocumentSchema, type Clock, type TestDocument } from "@pp/common"
 import {
   DraftNotFoundError,
@@ -22,6 +14,7 @@ import {
   type MediaAssetRow,
   type MediaKind,
 } from "@pp/db/admin"
+import { ProblemException } from "../attempts/problem.exception.js"
 import { CLOCK, JOB_POOL } from "../database/tokens.js"
 import { loadServerConfig } from "../config.js"
 
@@ -200,8 +193,10 @@ export class AdminService {
     const parsed = testDocumentSchema.safeParse(body)
 
     if (!parsed.success) {
-      throw new BadRequestException({
-        message: "invalid_document",
+      throw new ProblemException({
+        type: "invalid_document",
+        title: "The document failed validation.",
+        status: HttpStatus.BAD_REQUEST,
         issues: parsed.error.issues,
       })
     }
@@ -213,7 +208,10 @@ export class AdminService {
     const result = await this.runPublish(testId)
 
     if (!result.ok) {
-      throw new UnprocessableEntityException({
+      throw new ProblemException({
+        type: "validation_failed",
+        title: "Content validation failed; the version stays a draft.",
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
         // Repository `code` -> wire `rule`: the repository's PublishViolation
         // is an internal shape (see publish.repository.ts); the contract's
         // violation objects are flat and name the field `rule`.
@@ -242,7 +240,11 @@ export class AdminService {
     const versionId = await resolveVersionId(this.pool, { testId, version })
 
     if (!versionId) {
-      throw new NotFoundException("test_not_found")
+      throw new ProblemException({
+        type: "test_not_found",
+        title: "No such resource, or it is not published.",
+        status: HttpStatus.NOT_FOUND,
+      })
     }
 
     // `exportTestDocument` includes isCorrect on every choice, deliberately:
@@ -270,14 +272,22 @@ export class AdminService {
     file: MulterFile | undefined,
   ): Promise<UploadMediaResult> {
     if (!isMediaKind(kindInput) || !file) {
-      throw new UnsupportedMediaTypeException("unsupported_kind")
+      throw new ProblemException({
+        type: "unsupported_kind",
+        title: "Unsupported media type.",
+        status: HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+      })
     }
 
     const kind = kindInput
     const rules = EXTENSION_BY_MIME[file.mimetype.toLowerCase()]
 
     if (!rules || rules.kind !== kind) {
-      throw new UnsupportedMediaTypeException("mime_kind_mismatch")
+      throw new ProblemException({
+        type: "mime_kind_mismatch",
+        title: "Unsupported media type.",
+        status: HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+      })
     }
 
     // Computed server-side. A client-supplied checksum is trusted by
@@ -317,7 +327,11 @@ export class AdminService {
       return toUploadResult(row)
     } catch (error) {
       if (isDuplicateFilename(error)) {
-        throw new ConflictException("duplicate_filename")
+        throw new ProblemException({
+          type: "duplicate_filename",
+          title: "A media file with these exact bytes already exists.",
+          status: HttpStatus.CONFLICT,
+        })
       }
 
       throw error
@@ -334,7 +348,11 @@ export class AdminService {
       })
     } catch (error) {
       if (error instanceof DraftNotFoundError) {
-        throw new NotFoundException("draft_not_found")
+        throw new ProblemException({
+          type: "draft_not_found",
+          title: "No such resource, or it is not published.",
+          status: HttpStatus.NOT_FOUND,
+        })
       }
 
       throw error

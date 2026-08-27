@@ -4,16 +4,19 @@ import {
   Controller,
   Get,
   HttpCode,
+  HttpStatus,
   Param,
   Post,
   Put,
   Res,
-  UnauthorizedException,
+  UseFilters,
   UseGuards,
 } from "@nestjs/common"
 import type { RunnerEnvelopeRow, SectionBriefRow, StartResult } from "@pp/db"
 import { CurrentStudent } from "../auth/current-student.decorator.js"
 import { JwksGuard } from "../auth/jwks.guard.js"
+import { ProblemException } from "./problem.exception.js"
+import { ProblemExceptionFilter } from "./problem.filter.js"
 import {
   AttemptsService,
   type PlayGrant,
@@ -170,6 +173,7 @@ function toSectionEntryView(
 
 @Controller("attempts")
 @UseGuards(JwksGuard)
+@UseFilters(ProblemExceptionFilter)
 export class AttemptsController {
   constructor(private readonly attempts: AttemptsService) {}
 
@@ -271,7 +275,11 @@ export class AttemptsController {
 /** JwksGuard rejects a null sub, so this is a belt-and-braces narrowing. */
 function subjectOf(claims: JwtClaims): string {
   if (!claims.sub) {
-    throw new UnauthorizedException("invalid_token")
+    throw new ProblemException({
+      type: "invalid_token",
+      title: "Missing, invalid or expired token.",
+      status: HttpStatus.UNAUTHORIZED,
+    })
   }
 
   return claims.sub

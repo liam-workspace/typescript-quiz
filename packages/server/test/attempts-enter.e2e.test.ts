@@ -329,10 +329,18 @@ describe("POST /attempts/:id/sections/:sectionId/enter", () => {
       .set("Authorization", `Bearer ${token}`)
       .expect(409)
 
+    // Repo-wide claim, not just plan 5's own routes: this is a plan-3 route
+    // (attempts.service.ts's sectionStillOpenError, pre-dating
+    // ProblemException) now converted to speak the same contract shape as
+    // everything else.
+    expect(res.headers["content-type"]).toMatch(/^application\/problem\+json/)
+
     const problem = res.body as { type: string; title: string; status: number }
 
     expect(problem.type).toBe("section_still_open")
     expect(problem.status).toBe(409)
+    expect(problem).not.toHaveProperty("error")
+    expect(problem).not.toHaveProperty("statusCode")
 
     // Bracketed the other way: closing section 1 first lets section 2 in.
     await closeSection(

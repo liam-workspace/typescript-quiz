@@ -2,14 +2,16 @@ import type { JwtClaims } from "@liam-workspace/node-auth-server"
 import {
   Controller,
   Get,
-  NotFoundException,
+  HttpStatus,
   Post,
   Res,
-  UnauthorizedException,
+  UseFilters,
   UseGuards,
 } from "@nestjs/common"
 import { CurrentStudent } from "../auth/current-student.decorator.js"
 import { JwksGuard } from "../auth/jwks.guard.js"
+import { ProblemException } from "../attempts/problem.exception.js"
+import { ProblemExceptionFilter } from "../attempts/problem.filter.js"
 import {
   SessionService,
   toStudentView,
@@ -26,6 +28,7 @@ interface StatusSettable {
 
 @Controller()
 @UseGuards(JwksGuard)
+@UseFilters(ProblemExceptionFilter)
 export class SessionController {
   constructor(private readonly sessions: SessionService) {}
 
@@ -54,7 +57,11 @@ export class SessionController {
     const student = await this.sessions.find(subjectOf(claims))
 
     if (!student) {
-      throw new NotFoundException("student_not_provisioned")
+      throw new ProblemException({
+        type: "student_not_provisioned",
+        title: "No student profile exists for this token.",
+        status: HttpStatus.NOT_FOUND,
+      })
     }
 
     return toStudentView(student, claims.isAdmin)
@@ -64,7 +71,11 @@ export class SessionController {
 /** JwksGuard rejects a null sub, so this is a belt-and-braces narrowing. */
 function subjectOf(claims: JwtClaims): string {
   if (!claims.sub) {
-    throw new UnauthorizedException("invalid_token")
+    throw new ProblemException({
+      type: "invalid_token",
+      title: "Missing, invalid or expired token.",
+      status: HttpStatus.UNAUTHORIZED,
+    })
   }
 
   return claims.sub

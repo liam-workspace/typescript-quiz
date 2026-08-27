@@ -114,17 +114,28 @@ describe("POST /admin/media", () => {
     expect(files).toContain(body.filename)
   })
 
-  it("rejects an oversized file with 413", async () => {
+  it("rejects an oversized file with 413 as a Problem, not multer's default shape", async () => {
     const a = ready()
     const token = await adminToken("oversized")
     const big = Buffer.alloc(2000, "a")
 
-    await request(a.http.getHttpServer() as App)
+    const res = await request(a.http.getHttpServer() as App)
       .post("/api/admin/media")
       .set("Authorization", `Bearer ${token}`)
       .field("kind", "audio")
       .attach("file", big, "big.mp3")
       .expect(413)
+
+    // Multer's FileInterceptor throws its OWN PayloadTooLargeException
+    // before AdminService.uploadMedia ever runs (see
+    // MulterPayloadTooLargeFilter's own note) -- this is the framework-
+    // native exception that filter exists to convert.
+    expect(res.headers["content-type"]).toMatch(/^application\/problem\+json/)
+    expect(res.body).toStrictEqual({
+      type: "file_too_large",
+      title: "File too large.",
+      status: 413,
+    })
   })
 
   it("rejects a re-upload of identical content with 409", async () => {

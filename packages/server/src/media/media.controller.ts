@@ -3,16 +3,18 @@ import { extname, resolve, sep } from "node:path"
 import type { PgPool } from "@liam-public/node-postgres"
 import {
   Controller,
-  ForbiddenException,
   Get,
+  HttpStatus,
   Inject,
-  NotFoundException,
   Param,
   Query,
   StreamableFile,
+  UseFilters,
 } from "@nestjs/common"
 import type { Clock } from "@pp/common"
 import { isFilenameCapped } from "@pp/db"
+import { ProblemException } from "../attempts/problem.exception.js"
+import { ProblemExceptionFilter } from "../attempts/problem.filter.js"
 import { loadServerConfig } from "../config.js"
 import { CLOCK, REQUEST_POOL } from "../database/tokens.js"
 import { verifyMediaSignature } from "./media-signing.js"
@@ -42,6 +44,7 @@ const MIME_TYPES: Record<string, string> = {
  * already knows its name, the same way a public asset URL always is.
  */
 @Controller("media")
+@UseFilters(ProblemExceptionFilter)
 export class MediaController {
   constructor(
     @Inject(REQUEST_POOL) private readonly pool: PgPool,
@@ -66,7 +69,11 @@ export class MediaController {
     // prefix match for a sibling directory that merely starts with the same
     // characters.
     if (!target.startsWith(mediaRootResolved + sep)) {
-      throw new NotFoundException("not_found")
+      throw new ProblemException({
+        type: "not_found",
+        title: "No such media file.",
+        status: HttpStatus.NOT_FOUND,
+      })
     }
 
     const capped = await isFilenameCapped(this.pool, filename)
@@ -81,12 +88,20 @@ export class MediaController {
       )
 
       if (!verified) {
-        throw new ForbiddenException("invalid_or_expired_signature")
+        throw new ProblemException({
+          type: "invalid_or_expired_signature",
+          title: "The signature is invalid or expired.",
+          status: HttpStatus.FORBIDDEN,
+        })
       }
     }
 
     if (!existsSync(target)) {
-      throw new NotFoundException("not_found")
+      throw new ProblemException({
+        type: "not_found",
+        title: "No such media file.",
+        status: HttpStatus.NOT_FOUND,
+      })
     }
 
     return new StreamableFile(createReadStream(target), {

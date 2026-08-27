@@ -6,7 +6,8 @@ import {
   type AttemptRow,
   type FinalizedAttemptRow,
 } from "@pp/db"
-import { HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common"
+import { HttpStatus, Inject, Injectable } from "@nestjs/common"
+import { ProblemException } from "../attempts/problem.exception.js"
 import { CLOCK, REQUEST_POOL } from "../database/tokens.js"
 
 export interface AttemptOwnership {
@@ -14,33 +15,27 @@ export interface AttemptOwnership {
   now: Date
 }
 
-function notYourAttemptError(): HttpException {
-  return new HttpException(
-    {
-      type: "not_your_attempt",
-      title: "The attempt belongs to another student.",
-      status: HttpStatus.FORBIDDEN,
-    },
-    HttpStatus.FORBIDDEN,
-  )
+function notYourAttemptError(): ProblemException {
+  return new ProblemException({
+    type: "not_your_attempt",
+    title: "The attempt belongs to another student.",
+    status: HttpStatus.FORBIDDEN,
+  })
 }
 
-function attemptExpiredError(finalized: FinalizedAttemptRow): HttpException {
-  return new HttpException(
-    {
-      type: "attempt_expired",
-      title: "The attempt was past its deadline and has been finalized.",
-      status: HttpStatus.GONE,
-      retryable: false,
-      attempt: {
-        id: finalized.id,
-        status: finalized.status,
-        submittedAt: finalized.submittedAt.toISOString(),
-        resultUrl: `/api/attempts/${finalized.id}/result`,
-      },
+function attemptExpiredError(finalized: FinalizedAttemptRow): ProblemException {
+  return new ProblemException({
+    type: "attempt_expired",
+    title: "The attempt was past its deadline and has been finalized.",
+    status: HttpStatus.GONE,
+    retryable: false,
+    attempt: {
+      id: finalized.id,
+      status: finalized.status,
+      submittedAt: finalized.submittedAt.toISOString(),
+      resultUrl: `/api/attempts/${finalized.id}/result`,
     },
-    HttpStatus.GONE,
-  )
+  })
 }
 
 @Injectable()

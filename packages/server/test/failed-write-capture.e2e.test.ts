@@ -96,6 +96,11 @@ describe("FailedWriteCaptureFilter + ZodBodyValidationPipe", () => {
     })
 
     expect(res.status).toBe(400)
+    // PayloadCaptured's contract content-type -- verified against the
+    // registration order note above, not merely assumed.
+    expect(res.headers.get("content-type")).toMatch(
+      /^application\/problem\+json/,
+    )
     const problem = (await res.json()) as {
       capturedAs: string
       retryable: boolean
@@ -129,6 +134,9 @@ describe("FailedWriteCaptureFilter + ZodBodyValidationPipe", () => {
     })
 
     expect(res.status).toBe(413)
+    expect(res.headers.get("content-type")).toMatch(
+      /^application\/problem\+json/,
+    )
     const problem = (await res.json()) as { capturedAs: string }
 
     if (!pool) {

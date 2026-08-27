@@ -7,6 +7,7 @@ import {
   Post,
   Query,
   UploadedFile,
+  UseFilters,
   UseGuards,
   UseInterceptors,
 } from "@nestjs/common"
@@ -14,6 +15,7 @@ import { FileInterceptor } from "@nestjs/platform-express"
 import type { TestDocument } from "@pp/common"
 import { AdminGuard } from "../auth/admin.guard.js"
 import { JwksGuard } from "../auth/jwks.guard.js"
+import { ProblemExceptionFilter } from "../attempts/problem.filter.js"
 import {
   AdminService,
   type ImportResult,
@@ -21,9 +23,11 @@ import {
   type PublishResult,
   type UploadMediaResult,
 } from "./admin.service.js"
+import { MulterPayloadTooLargeFilter } from "./multer-payload-too-large.filter.js"
 
 @Controller("admin/tests")
 @UseGuards(JwksGuard, AdminGuard)
+@UseFilters(ProblemExceptionFilter)
 export class AdminController {
   constructor(private readonly admin: AdminService) {}
 
@@ -55,6 +59,7 @@ export class AdminController {
  */
 @Controller("admin/media")
 @UseGuards(JwksGuard, AdminGuard)
+@UseFilters(ProblemExceptionFilter, MulterPayloadTooLargeFilter)
 export class AdminMediaController {
   constructor(private readonly admin: AdminService) {}
 

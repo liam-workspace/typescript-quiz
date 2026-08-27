@@ -1,10 +1,5 @@
 import type { PgPool } from "@liam-public/node-postgres"
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common"
+import { HttpStatus, Inject, Injectable } from "@nestjs/common"
 import {
   findStudentBySubject,
   InvalidCursorError,
@@ -13,6 +8,7 @@ import {
   type ListPublishedTestsResult,
   type TestBriefRow,
 } from "@pp/db"
+import { ProblemException } from "../attempts/problem.exception.js"
 import { REQUEST_POOL } from "../database/tokens.js"
 
 const MIN_LIMIT = 1
@@ -32,7 +28,11 @@ function parseLimit(raw: string | undefined): number {
   const value = Number(raw)
 
   if (!Number.isInteger(value) || value < MIN_LIMIT || value > MAX_LIMIT) {
-    throw new BadRequestException("bad_limit")
+    throw new ProblemException({
+      type: "bad_limit",
+      title: "The limit query parameter is invalid.",
+      status: HttpStatus.BAD_REQUEST,
+    })
   }
 
   return value
@@ -51,7 +51,11 @@ export class CatalogService {
     const student = await findStudentBySubject(this.pool, subjectClaim)
 
     if (!student) {
-      throw new NotFoundException("student_not_provisioned")
+      throw new ProblemException({
+        type: "student_not_provisioned",
+        title: "No student profile exists for this token.",
+        status: HttpStatus.NOT_FOUND,
+      })
     }
 
     try {
@@ -62,7 +66,11 @@ export class CatalogService {
       })
     } catch (error) {
       if (error instanceof InvalidCursorError) {
-        throw new BadRequestException("bad_cursor")
+        throw new ProblemException({
+          type: "bad_cursor",
+          title: "The cursor could not be decoded.",
+          status: HttpStatus.BAD_REQUEST,
+        })
       }
 
       throw error
@@ -73,7 +81,11 @@ export class CatalogService {
     const student = await findStudentBySubject(this.pool, subjectClaim)
 
     if (!student) {
-      throw new NotFoundException("student_not_provisioned")
+      throw new ProblemException({
+        type: "student_not_provisioned",
+        title: "No student profile exists for this token.",
+        status: HttpStatus.NOT_FOUND,
+      })
     }
 
     const brief = await loadTestBrief(this.pool, {
@@ -82,7 +94,11 @@ export class CatalogService {
     })
 
     if (!brief) {
-      throw new NotFoundException("test_not_found")
+      throw new ProblemException({
+        type: "test_not_found",
+        title: "No such resource, or it is not published.",
+        status: HttpStatus.NOT_FOUND,
+      })
     }
 
     return brief

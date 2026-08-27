@@ -3,12 +3,13 @@ import {
   type JwtClaims,
 } from "@liam-workspace/node-auth-server"
 import type { PgPool } from "@liam-public/node-postgres"
-import { ForbiddenException, Inject, Injectable } from "@nestjs/common"
+import { HttpStatus, Inject, Injectable } from "@nestjs/common"
 import {
   findStudentBySubject,
   upsertStudentBySubject,
   type StudentRow,
 } from "@pp/db"
+import { ProblemException } from "../attempts/problem.exception.js"
 import { loadServerConfig } from "../config.js"
 import { REQUEST_POOL } from "../database/tokens.js"
 
@@ -63,7 +64,11 @@ export class SessionService {
     const { email } = claims
 
     if (!email || !isEmailAllowed(email, loadServerConfig().allowedEmails)) {
-      throw new ForbiddenException("email_not_allowed")
+      throw new ProblemException({
+        type: "email_not_allowed",
+        title: "This email is not permitted to sign in.",
+        status: HttpStatus.FORBIDDEN,
+      })
     }
 
     return email

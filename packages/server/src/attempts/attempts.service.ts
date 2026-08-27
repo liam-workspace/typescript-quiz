@@ -1,13 +1,5 @@
 import type { PgPool } from "@liam-public/node-postgres"
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  ConflictException,
-  HttpException,
-  HttpStatus,
-  NotFoundException,
-} from "@nestjs/common"
+import { Inject, Injectable, HttpStatus } from "@nestjs/common"
 import type { Clock } from "@pp/common"
 import {
   claimPlay as claimPlayRow,
@@ -30,6 +22,7 @@ import {
 import { loadServerConfig } from "../config.js"
 import { CLOCK, REQUEST_POOL } from "../database/tokens.js"
 import { signMediaUrl } from "../media/media-signing.js"
+import { ProblemException } from "./problem.exception.js"
 
 export interface RunnerEnvelopeResult {
   attempt: AttemptRow
@@ -61,15 +54,12 @@ const PLAY_URL_TTL_MS = 5 * 60 * 1000
  * attempt and one owned by nobody the token can prove it is are the same
  * answer to the caller, and the contract declares no 404 for this route.
  */
-function notYourAttemptError(): HttpException {
-  return new HttpException(
-    {
-      type: "not_your_attempt",
-      title: "The attempt belongs to another student.",
-      status: HttpStatus.FORBIDDEN,
-    },
-    HttpStatus.FORBIDDEN,
-  )
+function notYourAttemptError(): ProblemException {
+  return new ProblemException({
+    type: "not_your_attempt",
+    title: "The attempt belongs to another student.",
+    status: HttpStatus.FORBIDDEN,
+  })
 }
 
 /**
@@ -78,22 +68,19 @@ function notYourAttemptError(): HttpException {
  * finalized attempt so the client can render the time-up screen without a
  * follow-up read, mirroring `finalizedPriorAttempt` in `toAttemptStartView`.
  */
-function attemptExpiredError(finalized: FinalizedAttemptRow): HttpException {
-  return new HttpException(
-    {
-      type: "attempt_expired",
-      title: "The attempt was past its deadline and has been finalized.",
-      status: HttpStatus.GONE,
-      retryable: false,
-      attempt: {
-        id: finalized.id,
-        status: finalized.status,
-        submittedAt: finalized.submittedAt.toISOString(),
-        resultUrl: `/api/attempts/${finalized.id}/result`,
-      },
+function attemptExpiredError(finalized: FinalizedAttemptRow): ProblemException {
+  return new ProblemException({
+    type: "attempt_expired",
+    title: "The attempt was past its deadline and has been finalized.",
+    status: HttpStatus.GONE,
+    retryable: false,
+    attempt: {
+      id: finalized.id,
+      status: finalized.status,
+      submittedAt: finalized.submittedAt.toISOString(),
+      resultUrl: `/api/attempts/${finalized.id}/result`,
     },
-    HttpStatus.GONE,
-  )
+  })
 }
 
 /**
@@ -102,52 +89,40 @@ function attemptExpiredError(finalized: FinalizedAttemptRow): HttpException {
  * another section, so this is refused rather than closed on the caller's
  * behalf.
  */
-function sectionStillOpenError(): HttpException {
-  return new HttpException(
-    {
-      type: "section_still_open",
-      title: "A previous section is still open.",
-      status: HttpStatus.CONFLICT,
-    },
-    HttpStatus.CONFLICT,
-  )
+function sectionStillOpenError(): ProblemException {
+  return new ProblemException({
+    type: "section_still_open",
+    title: "A previous section is still open.",
+    status: HttpStatus.CONFLICT,
+  })
 }
 
 /** `409`, contract: "this section runs forward only." */
-function navigationLockedError(): HttpException {
-  return new HttpException(
-    {
-      type: "navigation_locked",
-      title: "This section runs forward only.",
-      status: HttpStatus.CONFLICT,
-    },
-    HttpStatus.CONFLICT,
-  )
+function navigationLockedError(): ProblemException {
+  return new ProblemException({
+    type: "navigation_locked",
+    title: "This section runs forward only.",
+    status: HttpStatus.CONFLICT,
+  })
 }
 
 /** `410`, contract: the section clock elapsed while the attempt remains live. */
-function sectionExpiredError(): HttpException {
-  return new HttpException(
-    {
-      type: "section_expired",
-      title: "The section's clock ran out.",
-      status: HttpStatus.GONE,
-      retryable: false,
-    },
-    HttpStatus.GONE,
-  )
+function sectionExpiredError(): ProblemException {
+  return new ProblemException({
+    type: "section_expired",
+    title: "The section's clock ran out.",
+    status: HttpStatus.GONE,
+    retryable: false,
+  })
 }
 
 /** `409`, contract: "No plays remaining." */
-function noPlaysRemainingError(): HttpException {
-  return new HttpException(
-    {
-      type: "no_plays_remaining",
-      title: "No plays remaining.",
-      status: HttpStatus.CONFLICT,
-    },
-    HttpStatus.CONFLICT,
-  )
+function noPlaysRemainingError(): ProblemException {
+  return new ProblemException({
+    type: "no_plays_remaining",
+    title: "No plays remaining.",
+    status: HttpStatus.CONFLICT,
+  })
 }
 
 const UNIQUE_VIOLATION_SQLSTATE = "23505"
@@ -189,13 +164,21 @@ export class AttemptsService {
     slug: string | undefined,
   ): Promise<StartResult> {
     if (!slug || slug.trim().length === 0) {
-      throw new BadRequestException("bad_slug")
+      throw new ProblemException({
+        type: "bad_slug",
+        title: "The slug is missing or blank.",
+        status: HttpStatus.BAD_REQUEST,
+      })
     }
 
     const student = await findStudentBySubject(this.pool, subjectClaim)
 
     if (!student) {
-      throw new NotFoundException("student_not_provisioned")
+      throw new ProblemException({
+        type: "student_not_provisioned",
+        title: "No student profile exists for this token.",
+        status: HttpStatus.NOT_FOUND,
+      })
     }
 
     const now = this.clock.now()
@@ -215,7 +198,11 @@ export class AttemptsService {
         // start -- and collapsing them also stops the response from
         // distinguishing "no such test" from "not published yet", which
         // would leak the existence of unpublished content.
-        throw new ConflictException("test_not_published")
+        throw new ProblemException({
+          type: "test_not_published",
+          title: "The test is not published.",
+          status: HttpStatus.CONFLICT,
+        })
       }
 
       if (isActiveAttemptRace(error)) {

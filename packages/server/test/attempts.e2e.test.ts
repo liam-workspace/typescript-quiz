@@ -254,7 +254,7 @@ describe("POST /attempts", () => {
     // expired` because both of its uses are expiry-driven.
     expect(parsed.finalizedPriorAttempt?.status).toBe("expired")
     expect(parsed.finalizedPriorAttempt?.resultUrl).toBe(
-      `/api/attempts/${staleId}/result`,
+      `/attempts/${staleId}/result`,
     )
     expect(parsed.id).not.toBe(staleId)
     expect(parsed.attemptNumber).toBe(2)

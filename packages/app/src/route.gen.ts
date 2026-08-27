@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './pages/__root'
 import { Route as AttemptsAttemptIdRunRouteImport } from './pages/attempts.$attemptId.run'
+import { Route as AttemptsAttemptIdResultRouteImport } from './pages/attempts.$attemptId.result'
 import { Route as AttemptsAttemptIdHandInRouteImport } from './pages/attempts.$attemptId.hand-in'
 import { Route as AttemptsAttemptIdSectionsSectionIdRulesRouteImport } from './pages/attempts.$attemptId.sections.$sectionId.rules'
 
 const AttemptsAttemptIdRunRoute = AttemptsAttemptIdRunRouteImport.update({
   id: '/attempts/$attemptId/run',
   path: '/attempts/$attemptId/run',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AttemptsAttemptIdResultRoute = AttemptsAttemptIdResultRouteImport.update({
+  id: '/attempts/$attemptId/result',
+  path: '/attempts/$attemptId/result',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AttemptsAttemptIdHandInRoute = AttemptsAttemptIdHandInRouteImport.update({
@@ -32,17 +38,20 @@ const AttemptsAttemptIdSectionsSectionIdRulesRoute =
 
 export interface FileRoutesByFullPath {
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
+  '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
   '/attempts/$attemptId/run': typeof AttemptsAttemptIdRunRoute
   '/attempts/$attemptId/sections/$sectionId/rules': typeof AttemptsAttemptIdSectionsSectionIdRulesRoute
 }
 export interface FileRoutesByTo {
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
+  '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
   '/attempts/$attemptId/run': typeof AttemptsAttemptIdRunRoute
   '/attempts/$attemptId/sections/$sectionId/rules': typeof AttemptsAttemptIdSectionsSectionIdRulesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
+  '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
   '/attempts/$attemptId/run': typeof AttemptsAttemptIdRunRoute
   '/attempts/$attemptId/sections/$sectionId/rules': typeof AttemptsAttemptIdSectionsSectionIdRulesRoute
 }
@@ -50,22 +59,26 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/attempts/$attemptId/hand-in'
+    | '/attempts/$attemptId/result'
     | '/attempts/$attemptId/run'
     | '/attempts/$attemptId/sections/$sectionId/rules'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/attempts/$attemptId/hand-in'
+    | '/attempts/$attemptId/result'
     | '/attempts/$attemptId/run'
     | '/attempts/$attemptId/sections/$sectionId/rules'
   id:
     | '__root__'
     | '/attempts/$attemptId/hand-in'
+    | '/attempts/$attemptId/result'
     | '/attempts/$attemptId/run'
     | '/attempts/$attemptId/sections/$sectionId/rules'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AttemptsAttemptIdHandInRoute: typeof AttemptsAttemptIdHandInRoute
+  AttemptsAttemptIdResultRoute: typeof AttemptsAttemptIdResultRoute
   AttemptsAttemptIdRunRoute: typeof AttemptsAttemptIdRunRoute
   AttemptsAttemptIdSectionsSectionIdRulesRoute: typeof AttemptsAttemptIdSectionsSectionIdRulesRoute
 }
@@ -77,6 +90,13 @@ declare module '@tanstack/react-router' {
       path: '/attempts/$attemptId/run'
       fullPath: '/attempts/$attemptId/run'
       preLoaderRoute: typeof AttemptsAttemptIdRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/attempts/$attemptId/result': {
+      id: '/attempts/$attemptId/result'
+      path: '/attempts/$attemptId/result'
+      fullPath: '/attempts/$attemptId/result'
+      preLoaderRoute: typeof AttemptsAttemptIdResultRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/attempts/$attemptId/hand-in': {
@@ -98,6 +118,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   AttemptsAttemptIdHandInRoute: AttemptsAttemptIdHandInRoute,
+  AttemptsAttemptIdResultRoute: AttemptsAttemptIdResultRoute,
   AttemptsAttemptIdRunRoute: AttemptsAttemptIdRunRoute,
   AttemptsAttemptIdSectionsSectionIdRulesRoute:
     AttemptsAttemptIdSectionsSectionIdRulesRoute,

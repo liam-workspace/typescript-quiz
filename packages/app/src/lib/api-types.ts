@@ -177,3 +177,32 @@ export interface SubmitResult {
   resultUrl: string
   finalFlush: SubmitFinalFlushItem[]
 }
+
+export interface AttemptSectionScore {
+  title: string
+  type: SectionType
+  pointsEarned: number
+  pointsPossible: number
+}
+
+export interface AttemptResult {
+  attemptId: string
+  test: {
+    title: string
+    version: number
+  }
+  status: "submitted" | "expired"
+  submittedAt: string
+  elapsedSeconds: number
+  score: {
+    pointsEarned: number
+    pointsPossible: number
+    percentage: number
+    answered: number
+    unanswered: number
+    correct: number
+    incorrect: number
+    isPersonalBest: boolean
+    sections: AttemptSectionScore[]
+  }
+}

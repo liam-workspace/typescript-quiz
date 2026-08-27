@@ -339,9 +339,7 @@ describe("GET /attempts/:id", () => {
       expect(problem.attempt.id).toBe(attemptId)
       expect(problem.attempt.status).toBe("expired")
       expect(problem.attempt.submittedAt).toBe(expiresAt.toISOString())
-      expect(problem.attempt.resultUrl).toBe(
-        `/api/attempts/${attemptId}/result`,
-      )
+      expect(problem.attempt.resultUrl).toBe(`/attempts/${attemptId}/result`)
 
       const { rows } = await pool.query<{ status: string }>(
         `SELECT status FROM attempt WHERE id = $1`,

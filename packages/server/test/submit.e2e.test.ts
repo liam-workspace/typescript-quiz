@@ -124,7 +124,7 @@ describe("POST /api/attempts/:id/submit", () => {
       attemptId: fixture.attemptId,
       status: "submitted",
       submittedAt: NOW.toISOString(),
-      resultUrl: `/api/attempts/${fixture.attemptId}/result`,
+      resultUrl: `/attempts/${fixture.attemptId}/result`,
       finalFlush: [
         { questionId: fixture.appliedQuestionId, status: "applied" },
       ],
@@ -241,7 +241,7 @@ describe("POST /api/attempts/:id/submit", () => {
         id: fixture.attemptId,
         status: "expired",
         submittedAt: expiresAtForWire,
-        resultUrl: `/api/attempts/${fixture.attemptId}/result`,
+        resultUrl: `/attempts/${fixture.attemptId}/result`,
       },
     })
     const { rows } = await context.pool.query<{

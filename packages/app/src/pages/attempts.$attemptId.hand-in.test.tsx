@@ -96,7 +96,7 @@ describe("HandInScreen", () => {
             attemptId: "attempt-1",
             status: "submitted",
             submittedAt: "2026-08-27T09:05:00.000Z",
-            resultUrl: "/api/attempts/attempt-1/result",
+            resultUrl: "/attempts/attempt-1/result",
             finalFlush: [{ questionId: "q-9", status: "applied" }],
           }),
           {
@@ -164,7 +164,7 @@ describe("HandInScreen", () => {
 
       await vi.waitFor(() => {
         expect(navigate).toHaveBeenCalledExactlyOnceWith(
-          "/api/attempts/attempt-1/result",
+          "/attempts/attempt-1/result",
         )
       })
 
@@ -187,7 +187,7 @@ describe("HandInScreen", () => {
             attemptId: "attempt-1",
             status: "submitted",
             submittedAt: "2026-08-27T09:05:00.000Z",
-            resultUrl: "/api/attempts/attempt-1/result",
+            resultUrl: "/attempts/attempt-1/result",
             finalFlush: [],
           }),
           {
@@ -219,7 +219,7 @@ describe("HandInScreen", () => {
 
       await vi.waitFor(() => {
         expect(navigate).toHaveBeenCalledExactlyOnceWith(
-          "/api/attempts/attempt-1/result",
+          "/attempts/attempt-1/result",
         )
       })
 
@@ -243,7 +243,7 @@ describe("HandInScreen", () => {
               id: "attempt-1",
               status: "expired",
               submittedAt: "2026-08-27T09:30:00.000Z",
-              resultUrl: "/api/attempts/attempt-1/result",
+              resultUrl: "/attempts/attempt-1/result",
             },
           }),
           {
@@ -280,7 +280,7 @@ describe("HandInScreen", () => {
       ).toBeInTheDocument()
       expect(screen.getByRole("link", { name: "View result" })).toHaveAttribute(
         "href",
-        "/api/attempts/attempt-1/result",
+        "/attempts/attempt-1/result",
       )
       expect(screen.queryByRole("alert")).not.toBeInTheDocument()
       expect(navigate).not.toHaveBeenCalled()

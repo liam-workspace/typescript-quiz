@@ -339,7 +339,7 @@ describe("PUT /attempts/:id/responses/:questionId", () => {
         id: expired.attemptId,
         status: "expired",
         submittedAt: "2026-08-27T09:00:00.000Z",
-        resultUrl: `/api/attempts/${expired.attemptId}/result`,
+        resultUrl: `/attempts/${expired.attemptId}/result`,
       },
     })
 

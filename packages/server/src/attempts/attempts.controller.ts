@@ -92,7 +92,7 @@ function toAttemptStartView(
           // are expiry-driven, so there is nothing else it can be.
           status: "expired",
           submittedAt: prior.submittedAt,
-          resultUrl: `/api/attempts/${prior.id}/result`,
+          resultUrl: `/attempts/${prior.id}/result`,
         }
       : null,
   }

@@ -37,5 +37,16 @@
   "handIn.keepWorking": "Weiterarbeiten",
   "handIn.pendingSync": "Deine letzten Antworten werden noch gespeichert …",
   "handIn.error.nothingAnswered.title": "Noch nichts beantwortet",
-  "handIn.error.nothingAnswered.message": "Beantworte mindestens eine Frage, bevor du abgibst."
+  "handIn.error.nothingAnswered.message": "Beantworte mindestens eine Frage, bevor du abgibst.",
+  "result.scoreLabel": "Ergebnis",
+  "result.percentage": "{{percentage}} %",
+  "result.fraction": "{{earned}} / {{possible}}",
+  "result.headline": "Gut gemacht!",
+  "result.personalBest": "Dein bisher bestes Ergebnis.",
+  "result.summary": "{{correct}} richtig · {{incorrect}} falsch · {{unanswered}} nicht beantwortet · {{answered}} beantwortet",
+  "result.practiceNotice": "{{title}}, Version {{version}}. Dies ist ein Übungsergebnis und kein offizielles skaliertes TOEFL-Primary-Ergebnis.",
+  "result.backToLibrary": "Zurück zur Übersicht",
+  "result.reviewAnswers": "Antworten ansehen →",
+  "result.forbidden": "Du kannst dieses Ergebnis nicht ansehen.",
+  "result.error": "Das Ergebnis konnte nicht geladen werden. Versuche es erneut."
 }

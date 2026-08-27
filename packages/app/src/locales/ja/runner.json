@@ -34,5 +34,16 @@
   "handIn.keepWorking": "続ける",
   "handIn.pendingSync": "最新の解答を保存しています…",
   "handIn.error.nothingAnswered.title": "まだ何も解答していません",
-  "handIn.error.nothingAnswered.message": "提出する前に少なくとも1問は解答してください。"
+  "handIn.error.nothingAnswered.message": "提出する前に少なくとも1問は解答してください。",
+  "result.scoreLabel": "スコア",
+  "result.percentage": "{{percentage}}%",
+  "result.fraction": "{{earned}} / {{possible}}",
+  "result.headline": "よくできました！",
+  "result.personalBest": "これまでの最高スコアです。",
+  "result.summary": "正解 {{correct}}問 · 不正解 {{incorrect}}問 · 未回答 {{unanswered}}問 · 回答済み {{answered}}問",
+  "result.practiceNotice": "{{title}}、バージョン{{version}}。これは練習用のスコアであり、TOEFL Primaryの公式換算スコアではありません。",
+  "result.backToLibrary": "ライブラリに戻る",
+  "result.reviewAnswers": "解答を確認 →",
+  "result.forbidden": "この結果は表示できません。",
+  "result.error": "結果を読み込めませんでした。もう一度お試しください。"
 }

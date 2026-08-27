@@ -183,7 +183,7 @@ describe("ListeningRunner", () => {
         {...baseProps}
         expired={{
           kind: "attempt",
-          resultUrl: "/api/attempts/attempt-1/result",
+          resultUrl: "/attempts/attempt-1/result",
         }}
       />,
     )
@@ -193,7 +193,7 @@ describe("ListeningRunner", () => {
     )
     expect(screen.getByRole("link", { name: "View result" })).toHaveAttribute(
       "href",
-      "/api/attempts/attempt-1/result",
+      "/attempts/attempt-1/result",
     )
   })
 })

@@ -104,14 +104,14 @@ describe("SectionRulesScreen", () => {
           id: "attempt-0",
           status: "expired",
           submittedAt: "2026-08-27T08:00:00.000Z",
-          resultUrl: "/api/attempts/attempt-0/result",
+          resultUrl: "/attempts/attempt-0/result",
         }}
         navigate={vi.fn()}
       />,
     )
 
     const link = screen.getByRole("link", { name: "See it" })
-    expect(link).toHaveAttribute("href", "/api/attempts/attempt-0/result")
+    expect(link).toHaveAttribute("href", "/attempts/attempt-0/result")
   })
 
   it("does not show the finalizedPriorAttempt notice when attempt-start carried none", () => {
@@ -211,7 +211,7 @@ describe("SectionRulesScreen", () => {
           id: "attempt-1",
           status: "expired",
           submittedAt: "2026-08-27T09:25:00.000Z",
-          resultUrl: "/api/attempts/attempt-1/result",
+          resultUrl: "/attempts/attempt-1/result",
         },
       }),
     )
@@ -229,7 +229,7 @@ describe("SectionRulesScreen", () => {
     ).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "View result" })).toHaveAttribute(
       "href",
-      "/api/attempts/attempt-1/result",
+      "/attempts/attempt-1/result",
     )
     expect(navigate).not.toHaveBeenCalled()
   })
@@ -283,7 +283,7 @@ describe("SectionRulesScreen", () => {
           id: "attempt-0",
           status: "expired",
           submittedAt: "2026-08-27T08:00:00.000Z",
-          resultUrl: "/api/attempts/attempt-0/result",
+          resultUrl: "/attempts/attempt-0/result",
         },
       })
 

@@ -33,7 +33,7 @@ function attemptExpiredError(finalized: FinalizedAttemptRow): ProblemException {
       id: finalized.id,
       status: finalized.status,
       submittedAt: finalized.submittedAt.toISOString(),
-      resultUrl: `/api/attempts/${finalized.id}/result`,
+      resultUrl: `/attempts/${finalized.id}/result`,
     },
   })
 }

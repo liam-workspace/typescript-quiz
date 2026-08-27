@@ -123,7 +123,7 @@ function attemptExpiredError(finalized: FinalizedAttemptRow): ProblemException {
       id: finalized.id,
       status: finalized.status,
       submittedAt: finalized.submittedAt.toISOString(),
-      resultUrl: `/api/attempts/${finalized.id}/result`,
+      resultUrl: `/attempts/${finalized.id}/result`,
     },
   })
 }
@@ -191,7 +191,7 @@ function submittedAttemptExpiredError(
       id: finalized.attemptId,
       status: "expired",
       submittedAt: finalized.submittedAt.toISOString(),
-      resultUrl: `/api/attempts/${finalized.attemptId}/result`,
+      resultUrl: `/attempts/${finalized.attemptId}/result`,
     },
   })
 }
@@ -591,7 +591,7 @@ export class AttemptsService {
         attemptId,
         status: "submitted",
         submittedAt: outcome.finalized.submittedAt.toISOString(),
-        resultUrl: `/api/attempts/${attemptId}/result`,
+        resultUrl: `/attempts/${attemptId}/result`,
         finalFlush: outcome.finalFlush,
       },
     }

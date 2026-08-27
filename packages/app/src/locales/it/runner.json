@@ -37,5 +37,16 @@
   "handIn.keepWorking": "Continua",
   "handIn.pendingSync": "Salvataggio delle ultime risposte in corso…",
   "handIn.error.nothingAnswered.title": "Non hai ancora risposto a nulla",
-  "handIn.error.nothingAnswered.message": "Rispondi ad almeno una domanda prima di consegnare."
+  "handIn.error.nothingAnswered.message": "Rispondi ad almeno una domanda prima di consegnare.",
+  "result.scoreLabel": "Punteggio",
+  "result.percentage": "{{percentage}}%",
+  "result.fraction": "{{earned}} / {{possible}}",
+  "result.headline": "Ottimo lavoro!",
+  "result.personalBest": "Il tuo miglior punteggio finora.",
+  "result.summary": "{{correct}} corrette · {{incorrect}} errate · {{unanswered}} senza risposta · {{answered}} risposte",
+  "result.practiceNotice": "{{title}}, versione {{version}}. Questo è un punteggio di esercitazione, non un punteggio ufficiale in scala TOEFL Primary.",
+  "result.backToLibrary": "Torna alla raccolta",
+  "result.reviewAnswers": "Rivedi le risposte →",
+  "result.forbidden": "Non puoi vedere questo risultato.",
+  "result.error": "Impossibile caricare il risultato. Riprova."
 }

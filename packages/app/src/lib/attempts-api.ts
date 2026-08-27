@@ -1,11 +1,16 @@
 import { apiFetch } from "./api-client.js"
 import type {
+  AttemptResult,
   PlayGrant,
   RunnerEnvelope,
   SectionEntry,
   SubmitRequest,
   SubmitResult,
 } from "./api-types.js"
+
+export function getAttemptResult(attemptId: string): Promise<AttemptResult> {
+  return apiFetch<AttemptResult>(`/attempts/${attemptId}/result`)
+}
 
 export function getRunnerEnvelope(attemptId: string): Promise<RunnerEnvelope> {
   return apiFetch<RunnerEnvelope>(`/attempts/${attemptId}`)

@@ -37,5 +37,16 @@
   "handIn.keepWorking": "Keep working",
   "handIn.pendingSync": "Waiting for your last answers to save…",
   "handIn.error.nothingAnswered.title": "Nothing answered yet",
-  "handIn.error.nothingAnswered.message": "Answer at least one question before handing in."
+  "handIn.error.nothingAnswered.message": "Answer at least one question before handing in.",
+  "result.scoreLabel": "Score",
+  "result.percentage": "{{percentage}}%",
+  "result.fraction": "{{earned}} / {{possible}}",
+  "result.headline": "Well done!",
+  "result.personalBest": "Your best score so far.",
+  "result.summary": "{{correct}} correct · {{incorrect}} wrong · {{unanswered}} left blank · {{answered}} answered",
+  "result.practiceNotice": "{{title}}, version {{version}}. This is a practice score, not an official TOEFL Primary scaled score.",
+  "result.backToLibrary": "Back to library",
+  "result.reviewAnswers": "Review answers →",
+  "result.forbidden": "You can't view this result.",
+  "result.error": "The result could not be loaded. Please try again."
 }

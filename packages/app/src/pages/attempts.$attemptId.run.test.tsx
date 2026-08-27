@@ -369,7 +369,7 @@ describe("RunScreen", () => {
             id: "attempt-1",
             status: "expired",
             submittedAt: "2026-08-27T09:25:00.000Z",
-            resultUrl: "/api/attempts/attempt-1/result",
+            resultUrl: "/attempts/attempt-1/result",
           },
         }),
       )
@@ -384,7 +384,7 @@ describe("RunScreen", () => {
       )
       expect(screen.getByRole("link", { name: "View result" })).toHaveAttribute(
         "href",
-        "/api/attempts/attempt-1/result",
+        "/attempts/attempt-1/result",
       )
     })
 

@@ -37,5 +37,16 @@
   "handIn.keepWorking": "Continuer",
   "handIn.pendingSync": "Enregistrement de tes dernières réponses…",
   "handIn.error.nothingAnswered.title": "Rien n'a encore été répondu",
-  "handIn.error.nothingAnswered.message": "Réponds à au moins une question avant de rendre ton test."
+  "handIn.error.nothingAnswered.message": "Réponds à au moins une question avant de rendre ton test.",
+  "result.scoreLabel": "Score",
+  "result.percentage": "{{percentage}} %",
+  "result.fraction": "{{earned}} / {{possible}}",
+  "result.headline": "Bravo !",
+  "result.personalBest": "Ton meilleur score jusqu’à présent.",
+  "result.summary": "{{correct}} correctes · {{incorrect}} incorrectes · {{unanswered}} sans réponse · {{answered}} répondues",
+  "result.practiceNotice": "{{title}}, version {{version}}. Il s’agit d’un score d’entraînement, et non d’un score officiel étalonné du TOEFL Primary.",
+  "result.backToLibrary": "Retour à la bibliothèque",
+  "result.reviewAnswers": "Voir les réponses →",
+  "result.forbidden": "Tu ne peux pas voir ce résultat.",
+  "result.error": "Le résultat n’a pas pu être chargé. Réessaie."
 }

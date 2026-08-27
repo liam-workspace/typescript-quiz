@@ -3,6 +3,7 @@ import { ApiError } from "./api-client.js"
 import {
   claimPlay,
   enterSection,
+  getAttemptResult,
   getRunnerEnvelope,
   setPosition,
 } from "./attempts-api.js"
@@ -27,6 +28,27 @@ describe("attempts-api", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/attempts/attempt-1")
     expect(fetchMock.mock.calls[0]?.[1]?.method).toBeUndefined()
     expect(result).toEqual(envelope)
+  })
+
+  it("getAttemptResult calls GET /api/attempts/:id/result and returns the parsed body", async () => {
+    const attemptResult = {
+      attemptId: "attempt-1",
+      status: "submitted",
+      score: { percentage: 90 },
+    }
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify(attemptResult), {
+        headers: { "content-type": "application/json" },
+        status: 200,
+      }),
+    )
+    vi.stubGlobal("fetch", fetchMock)
+
+    const result = await getAttemptResult("attempt-1")
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/attempts/attempt-1/result")
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBeUndefined()
+    expect(result).toEqual(attemptResult)
   })
 
   it("enterSection calls POST /api/attempts/:id/sections/:sectionId/enter", async () => {

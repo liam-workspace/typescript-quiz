@@ -31,7 +31,7 @@ class ProblemProbeController {
         id: "attempt-1",
         status: "expired",
         submittedAt: "2026-08-27T10:00:00.000Z",
-        resultUrl: "/api/attempts/attempt-1/result",
+        resultUrl: "/attempts/attempt-1/result",
       },
     })
   }
@@ -127,7 +127,7 @@ describe("ProblemExceptionFilter", () => {
       id: "attempt-1",
       status: "expired",
       submittedAt: "2026-08-27T10:00:00.000Z",
-      resultUrl: "/api/attempts/attempt-1/result",
+      resultUrl: "/attempts/attempt-1/result",
     })
   })
 

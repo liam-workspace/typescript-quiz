@@ -9,8 +9,14 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './pages/__root'
+import { Route as AttemptsAttemptIdRunRouteImport } from './pages/attempts.$attemptId.run'
 import { Route as AttemptsAttemptIdSectionsSectionIdRulesRouteImport } from './pages/attempts.$attemptId.sections.$sectionId.rules'
 
+const AttemptsAttemptIdRunRoute = AttemptsAttemptIdRunRouteImport.update({
+  id: '/attempts/$attemptId/run',
+  path: '/attempts/$attemptId/run',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AttemptsAttemptIdSectionsSectionIdRulesRoute =
   AttemptsAttemptIdSectionsSectionIdRulesRouteImport.update({
     id: '/attempts/$attemptId/sections/$sectionId/rules',
@@ -19,29 +25,47 @@ const AttemptsAttemptIdSectionsSectionIdRulesRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/attempts/$attemptId/run': typeof AttemptsAttemptIdRunRoute
   '/attempts/$attemptId/sections/$sectionId/rules': typeof AttemptsAttemptIdSectionsSectionIdRulesRoute
 }
 export interface FileRoutesByTo {
+  '/attempts/$attemptId/run': typeof AttemptsAttemptIdRunRoute
   '/attempts/$attemptId/sections/$sectionId/rules': typeof AttemptsAttemptIdSectionsSectionIdRulesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/attempts/$attemptId/run': typeof AttemptsAttemptIdRunRoute
   '/attempts/$attemptId/sections/$sectionId/rules': typeof AttemptsAttemptIdSectionsSectionIdRulesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/attempts/$attemptId/sections/$sectionId/rules'
+  fullPaths:
+    | '/attempts/$attemptId/run'
+    | '/attempts/$attemptId/sections/$sectionId/rules'
   fileRoutesByTo: FileRoutesByTo
-  to: '/attempts/$attemptId/sections/$sectionId/rules'
-  id: '__root__' | '/attempts/$attemptId/sections/$sectionId/rules'
+  to:
+    | '/attempts/$attemptId/run'
+    | '/attempts/$attemptId/sections/$sectionId/rules'
+  id:
+    | '__root__'
+    | '/attempts/$attemptId/run'
+    | '/attempts/$attemptId/sections/$sectionId/rules'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  AttemptsAttemptIdRunRoute: typeof AttemptsAttemptIdRunRoute
   AttemptsAttemptIdSectionsSectionIdRulesRoute: typeof AttemptsAttemptIdSectionsSectionIdRulesRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/attempts/$attemptId/run': {
+      id: '/attempts/$attemptId/run'
+      path: '/attempts/$attemptId/run'
+      fullPath: '/attempts/$attemptId/run'
+      preLoaderRoute: typeof AttemptsAttemptIdRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/attempts/$attemptId/sections/$sectionId/rules': {
       id: '/attempts/$attemptId/sections/$sectionId/rules'
       path: '/attempts/$attemptId/sections/$sectionId/rules'
@@ -53,6 +77,7 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRouteChildren: RootRouteChildren = {
+  AttemptsAttemptIdRunRoute: AttemptsAttemptIdRunRoute,
   AttemptsAttemptIdSectionsSectionIdRulesRoute:
     AttemptsAttemptIdSectionsSectionIdRulesRoute,
 }

@@ -1,0 +1,138 @@
+import { Button } from "@liam-public/browser-react-ui"
+import { useTranslation } from "react-i18next"
+import type { RunnerQuestion, StimulusWire } from "../lib/api-types.js"
+import { ChoiceList } from "./ChoiceList.js"
+import { QuestionMedia } from "./QuestionMedia.js"
+
+export interface QuestionPip {
+  readonly questionId: string
+  readonly ordinal: number
+  readonly current: boolean
+}
+
+// A claimPlay 410 that outlived a section (or the whole attempt). Both are
+// the SAME `SectionOrAttemptExpired` condition openapi.yaml already defines
+// for every other runner call -- there is no distinct "media expired"
+// problem type -- so this reuses the exact section/attempt-expired wording
+// the rules screen already carries in every locale, rather than inventing a
+// parallel message.
+export interface ListeningExpiredState {
+  readonly kind: "section" | "attempt"
+  readonly resultUrl: string | null
+}
+
+export interface ListeningRunnerProps {
+  readonly question: RunnerQuestion
+  readonly stimulus: StimulusWire | undefined
+  readonly selectedChoiceId: string | null
+  // See ChoiceListProps.locked -- computed by the page from
+  // envelope.responses and the section's allowAnswerChange.
+  readonly locked: boolean
+  readonly onSelectChoice: (choiceId: string) => void
+  readonly onClaimPlay: () => Promise<void>
+  // Set only once a claimed play has resolved -- QuestionMedia never holds
+  // or reconstructs this itself (see its own doc comment); the page sets it
+  // from the PlayGrant it gets back from `claimPlay`.
+  readonly audioSrc: string | null
+  readonly onAudioEnded: () => void
+  readonly questionCount: number
+  // One entry per question in the CURRENT section, in section order --
+  // "the section's own question ordinals," not 1..questionCount. Read-only:
+  // rendered as plain <span>s, no click handler, because a forward_only
+  // section (openapi.yaml `PUT /attempts/{id}/position`, `409
+  // navigation_locked` on a backward move) does not let a tap on an earlier
+  // pip jump back to it.
+  readonly pips: readonly QuestionPip[]
+  readonly hasNext: boolean
+  readonly onNext: () => void
+  readonly expired: ListeningExpiredState | null
+}
+
+// Purely presentational -- see ListeningRunner.test.tsx's doc comment for
+// why. All state (current question, in-flight responses, the claimed audio
+// URL, the expired-audio state) lives in pages/attempts.$attemptId.run.tsx.
+export function ListeningRunner({
+  question,
+  stimulus,
+  selectedChoiceId,
+  locked,
+  onSelectChoice,
+  onClaimPlay,
+  audioSrc,
+  onAudioEnded,
+  questionCount,
+  pips,
+  hasNext,
+  onNext,
+  expired,
+}: ListeningRunnerProps) {
+  const { t } = useTranslation("runner")
+
+  if (expired) {
+    return (
+      <div data-testid="listening-runner">
+        <p role="alert">
+          {expired.kind === "attempt"
+            ? t("sectionRules.expired.attemptMessage")
+            : t("sectionRules.expired.sectionMessage")}
+        </p>
+        {expired.kind === "attempt" && expired.resultUrl ? (
+          <a href={expired.resultUrl}>{t("sectionRules.expired.viewResult")}</a>
+        ) : null}
+      </div>
+    )
+  }
+
+  return (
+    <div data-testid="listening-runner">
+      <p>
+        {t("runner.questionCount", {
+          current: question.ordinal,
+          total: questionCount,
+        })}
+      </p>
+      <div>
+        {pips.map((pip) => (
+          <span
+            key={pip.questionId}
+            data-testid="question-pip"
+            aria-current={pip.current ? "step" : undefined}
+          >
+            {pip.ordinal}
+          </span>
+        ))}
+      </div>
+
+      {stimulus ? (
+        <>
+          <QuestionMedia
+            stimulus={stimulus}
+            onClaimPlay={onClaimPlay}
+            playing={audioSrc !== null}
+          />
+          {stimulus.type === "audio" && audioSrc ? (
+            <audio
+              data-testid="audio-player"
+              src={audioSrc}
+              autoPlay
+              onEnded={onAudioEnded}
+            />
+          ) : null}
+        </>
+      ) : null}
+
+      <p>{question.prompt}</p>
+      <ChoiceList
+        choices={question.choices}
+        selectedId={selectedChoiceId}
+        onSelect={onSelectChoice}
+        locked={locked}
+      />
+
+      {/* No Previous button: this component is only ever rendered for a
+          listening section, which spec section 1.4 requires to run
+          forward_only. */}
+      {hasNext ? <Button onClick={onNext}>{t("runner.next")}</Button> : null}
+    </div>
+  )
+}

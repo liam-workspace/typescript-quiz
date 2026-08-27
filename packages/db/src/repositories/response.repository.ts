@@ -9,16 +9,36 @@ export type WriteOutcome =
   | { kind: "ignored_stale" }
   | {
       kind: "rejected"
-      reason: "answer_change_not_allowed" | "unknown_question"
+      reason: "answer_change_not_allowed" | "invalid" | "unknown_question"
     }
 
-function isForeignKeyViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "23503"
-  )
+function rejectionReasonFor(
+  error: unknown,
+): "invalid" | "unknown_question" | null {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return null
+  }
+
+  const { code, constraint } = error as {
+    code?: string
+    constraint?: string
+  }
+
+  if (code === "23503") {
+    return constraint === "response_choice_choice_fk"
+      ? "invalid"
+      : "unknown_question"
+  }
+
+  if (
+    (code === "23505" && constraint === "response_choice_pkey") ||
+    code === "22P02" ||
+    code === "22003"
+  ) {
+    return "invalid"
+  }
+
+  return null
 }
 
 function sameSelection(a: string[], b: string[]): boolean {
@@ -145,8 +165,10 @@ export async function writeResponse(
       return { kind: "applied" }
     })
   } catch (error) {
-    if (isForeignKeyViolation(error)) {
-      return { kind: "rejected", reason: "unknown_question" }
+    const reason = rejectionReasonFor(error)
+
+    if (reason) {
+      return { kind: "rejected", reason }
     }
 
     throw error

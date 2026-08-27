@@ -16,12 +16,11 @@ import { CurrentStudent } from "../auth/current-student.decorator.js"
 import { JwksGuard } from "../auth/jwks.guard.js"
 import { REQUEST_POOL } from "../database/tokens.js"
 import type { CapturedRequest } from "../http/raw-body-json.middleware.js"
+import { captureRejection } from "./capture.js"
 import { SingleResponseWriteDto } from "./dto.js"
 import { ResponseHttpExceptionFilter } from "./response-http-exception.filter.js"
-import {
-  ResponseWriteService,
-  sectionExpiredError,
-} from "./response-write.service.js"
+import { ResponseWriteService } from "./response-write.service.js"
+import { mapWriteConflict, resolveSectionRules } from "./section-rules.js"
 
 interface SingleResponseResult {
   questionId: string
@@ -54,21 +53,16 @@ export class SingleResponseController {
       subjectOf(claims),
       attemptId,
     )
-    const rules = await this.responseWrites.resolveSectionRules(
-      attempt,
-      questionId,
-    )
-
-    if (rules.sectionExpiresAt && rules.sectionExpiresAt <= now) {
-      throw sectionExpiredError()
-    }
+    const rules = await resolveSectionRules(this.pool, { attempt, questionId })
+    mapWriteConflict(rules, now)
 
     if (rules.navigationLocked) {
-      throw await this.responseWrites.captureRejection(req, {
+      throw await captureRejection(this.pool, req, {
         attemptId,
         body,
         now,
         reason: "navigation_locked",
+        clientInstanceId: body.clientInstanceId,
       })
     }
 
@@ -86,11 +80,12 @@ export class SingleResponseController {
     })
 
     if (outcome.kind === "rejected") {
-      throw await this.responseWrites.captureRejection(req, {
+      throw await captureRejection(this.pool, req, {
         attemptId,
         body,
         now,
         reason: outcome.reason,
+        clientInstanceId: body.clientInstanceId,
       })
     }
 

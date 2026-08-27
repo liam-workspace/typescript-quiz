@@ -6,128 +6,18 @@ import type { App } from "supertest/types.js"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { REQUEST_POOL } from "../src/database/tokens.js"
 import { createTestApp, type TestApp } from "./helpers/app.js"
-
-interface Fixture {
-  attemptId: string
-  versionId: string
-  sectionId: string
-  appliedQuestionId: string
-  staleQuestionId: string
-  choiceIds: [string, string, string, string]
-}
-
-interface SeedOptions {
-  navigation?: "free" | "forward_only"
-  allowAnswerChange?: boolean
-  sectionType?: "listening" | "reading"
-}
+import {
+  provisionStudent,
+  seedWriteFixture,
+  type WriteFixture,
+} from "./helpers/write-fixture.js"
 
 const NOW = new Date("2026-08-27T10:00:00.000Z")
-
-async function provisionStudent(
-  app: TestApp,
-  subjectClaim: string,
-): Promise<{ studentId: string; token: string }> {
-  const token = await app.mint({
-    sub: subjectClaim,
-    email: "single-response@example.com",
-  })
-
-  const session = await request(app.http.getHttpServer() as App)
-    .post("/api/session")
-    .set("Authorization", `Bearer ${token}`)
-    .expect(201)
-
-  return {
-    studentId: (session.body as { id: string }).id,
-    token,
-  }
-}
-
-async function seedAttempt(
-  pool: PgPool,
-  studentId: string,
-  options: SeedOptions = {},
-): Promise<Fixture> {
-  const testId = randomUUID()
-  const versionId = randomUUID()
-  const sectionId = randomUUID()
-  const groupId = randomUUID()
-  const appliedQuestionId = randomUUID()
-  const staleQuestionId = randomUUID()
-  const choiceIds: Fixture["choiceIds"] = [
-    randomUUID(),
-    randomUUID(),
-    randomUUID(),
-    randomUUID(),
-  ]
-  const attemptId = randomUUID()
-
-  await pool.query(`INSERT INTO test (id, slug) VALUES ($1, $2)`, [
-    testId,
-    `single-response-${testId}`,
-  ])
-  await pool.query(
-    `INSERT INTO test_version
-       (id, test_id, version, title, duration_seconds)
-     VALUES ($1, $2, 1, 'Single response test', 3000)`,
-    [versionId, testId],
-  )
-  await pool.query(
-    `INSERT INTO test_section
-       (id, test_version_id, ordinal, title, type, duration_seconds,
-        navigation, allow_answer_change)
-     VALUES ($1, $2, 1, 'Section', $3, 1500, $4, $5)`,
-    [
-      sectionId,
-      versionId,
-      options.sectionType ?? "reading",
-      options.navigation ?? "free",
-      options.allowAnswerChange ?? true,
-    ],
-  )
-  await pool.query(
-    `INSERT INTO question_group
-       (id, test_version_id, test_section_id, ordinal)
-     VALUES ($1, $2, $3, 1)`,
-    [groupId, versionId, sectionId],
-  )
-  await pool.query(
-    `INSERT INTO question
-       (id, test_version_id, question_group_id, question_key, ordinal,
-        prompt, type, points)
-     VALUES ($1, $3, $4, 'applied', 1, 'Applied?', 'single_choice', 1),
-            ($2, $3, $4, 'stale', 2, 'Stale?', 'single_choice', 1)`,
-    [appliedQuestionId, staleQuestionId, versionId, groupId],
-  )
-  await pool.query(
-    `INSERT INTO choice (id, question_id, ordinal, label, is_correct)
-     VALUES ($1, $5, 1, 'A', true),
-            ($2, $5, 2, 'B', false),
-            ($3, $6, 1, 'C', true),
-            ($4, $6, 2, 'D', false)`,
-    [...choiceIds, appliedQuestionId, staleQuestionId],
-  )
-  await pool.query(
-    `INSERT INTO attempt (id, student_id, test_version_id, status)
-     VALUES ($1, $2, $3, 'in_progress')`,
-    [attemptId, studentId, versionId],
-  )
-
-  return {
-    attemptId,
-    versionId,
-    sectionId,
-    appliedQuestionId,
-    staleQuestionId,
-    choiceIds,
-  }
-}
 
 describe("PUT /attempts/:id/responses/:questionId", () => {
   let app: TestApp | undefined = undefined
   let pool: PgPool | undefined = undefined
-  let fixture: Fixture | undefined = undefined
+  let fixture: WriteFixture | undefined = undefined
   let token = ""
 
   beforeAll(async () => {
@@ -138,14 +28,14 @@ describe("PUT /attempts/:id/responses/:questionId", () => {
       `single-response-${randomUUID()}`,
     )
     token = provisionedToken
-    fixture = await seedAttempt(pool, studentId)
+    fixture = await seedWriteFixture(pool, studentId)
   })
 
   afterAll(async () => {
     await app?.close()
   })
 
-  function ready(): { app: TestApp; pool: PgPool; fixture: Fixture } {
+  function ready(): { app: TestApp; pool: PgPool; fixture: WriteFixture } {
     if (!app || !pool || !fixture) {
       throw new Error("Single-response fixture was not initialized")
     }
@@ -235,7 +125,7 @@ describe("PUT /attempts/:id/responses/:questionId", () => {
       context.app,
       `single-response-locked-${randomUUID()}`,
     )
-    const locked = await seedAttempt(context.pool, provisioned.studentId, {
+    const locked = await seedWriteFixture(context.pool, provisioned.studentId, {
       navigation: "forward_only",
       allowAnswerChange: false,
       sectionType: "listening",
@@ -313,7 +203,7 @@ describe("PUT /attempts/:id/responses/:questionId", () => {
       context.app,
       `single-response-navigation-${randomUUID()}`,
     )
-    const locked = await seedAttempt(context.pool, provisioned.studentId, {
+    const locked = await seedWriteFixture(context.pool, provisioned.studentId, {
       navigation: "forward_only",
       allowAnswerChange: true,
     })
@@ -359,7 +249,7 @@ describe("PUT /attempts/:id/responses/:questionId", () => {
       context.app,
       `single-response-section-expired-${randomUUID()}`,
     )
-    const expired = await seedAttempt(context.pool, provisioned.studentId)
+    const expired = await seedWriteFixture(context.pool, provisioned.studentId)
     await context.pool.query(
       `UPDATE attempt
           SET started_at = $2, expires_at = $3,
@@ -418,7 +308,7 @@ describe("PUT /attempts/:id/responses/:questionId", () => {
       context.app,
       `single-response-attempt-expired-${randomUUID()}`,
     )
-    const expired = await seedAttempt(context.pool, provisioned.studentId)
+    const expired = await seedWriteFixture(context.pool, provisioned.studentId)
     await context.pool.query(
       `UPDATE attempt SET started_at = $2, expires_at = $3 WHERE id = $1`,
       [

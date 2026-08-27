@@ -40,6 +40,10 @@ import {
   type WriteOutcome,
 } from "./repositories/response.repository.js"
 import {
+  loadQuestionSectionInfo,
+  type QuestionSectionInfo,
+} from "./repositories/section-lookup.repository.js"
+import {
   loadRunnerEnvelope,
   type RunnerEnvelopeRow,
 } from "./repositories/runner.repository.js"
@@ -74,6 +78,8 @@ export type { FailedWriteRow }
 
 export type { WriteOutcome }
 
+export type { QuestionSectionInfo }
+
 export {
   loadDbConfig,
   createJobPool,
@@ -99,4 +105,5 @@ export {
   insertFailedWrite,
   loadResponse,
   writeResponse,
+  loadQuestionSectionInfo,
 }

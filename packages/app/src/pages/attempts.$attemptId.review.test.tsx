@@ -1,0 +1,355 @@
+import { cleanup, render, screen, within } from "@testing-library/react"
+import { isRedirect } from "@tanstack/react-router"
+import userEvent from "@testing-library/user-event"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import "../i18n.js"
+import { ApiError } from "../lib/api-client.js"
+import type { ReviewPayload } from "../lib/api-types.js"
+import {
+  ReviewRouteError,
+  ReviewScreen,
+  loadReview,
+} from "./attempts.$attemptId.review.js"
+
+const reviewPayload: ReviewPayload = {
+  attemptId: "attempt-1",
+  items: [
+    {
+      questionId: "question-7",
+      ordinal: 7,
+      sectionId: "section-listening",
+      prompt: "What does the boy want to do?",
+      outcome: "correct",
+      stimulus: {
+        id: "stimulus-7",
+        type: "audio",
+        title: "A conversation",
+        mediaUrl: "/media/audio/l07.mp3?exp=1787932800&sig=signed-review-url",
+        replayable: true,
+      },
+      choices: [
+        {
+          id: "choice-7-a",
+          label: "Visit his friend",
+          isCorrect: false,
+          selected: false,
+        },
+        {
+          id: "choice-7-b",
+          label: "Read a book",
+          isCorrect: true,
+          selected: true,
+        },
+        {
+          id: "choice-7-c",
+          label: "Play football",
+          isCorrect: false,
+          selected: false,
+        },
+      ],
+    },
+    {
+      questionId: "question-12",
+      ordinal: 12,
+      sectionId: "section-reading",
+      prompt: "Where are the children going?",
+      outcome: "unanswered",
+      stimulus: {
+        id: "stimulus-12",
+        type: "passage",
+        title: "A day out",
+        bodyText: "The children packed their books and walked into town.",
+        replayable: true,
+      },
+      choices: [
+        {
+          id: "choice-12-a",
+          label: "To the park",
+          isCorrect: false,
+          selected: false,
+        },
+        {
+          id: "choice-12-b",
+          label: "To the library",
+          isCorrect: true,
+          selected: false,
+        },
+        {
+          id: "choice-12-c",
+          label: "To the shop",
+          isCorrect: false,
+          selected: false,
+        },
+      ],
+    },
+    {
+      questionId: "question-27",
+      ordinal: 27,
+      sectionId: "section-reading",
+      prompt: "Why did Mia take an umbrella?",
+      outcome: "incorrect",
+      choices: [
+        {
+          id: "choice-27-a",
+          label: "It was sunny",
+          isCorrect: false,
+          selected: true,
+        },
+        {
+          id: "choice-27-b",
+          label: "It might rain",
+          isCorrect: true,
+          selected: false,
+        },
+      ],
+    },
+  ],
+}
+
+function response(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type":
+        status >= 400 ? "application/problem+json" : "application/json",
+    },
+  })
+}
+
+function mixedReview(mediaKind: "audio" | "image"): ReviewPayload {
+  return {
+    attemptId: "attempt-1",
+    items: [
+      {
+        questionId: "question-9",
+        ordinal: 9,
+        sectionId: "section-listening",
+        prompt: "What is happening?",
+        outcome: "correct",
+        stimulus: {
+          id: "stimulus-9",
+          type: "mixed",
+          title: "At the park",
+          bodyText: "Look and listen.",
+          mediaUrl: "/media/mixed/m01.bin?exp=1787932800&sig=signed-review-url",
+          mediaKind,
+          replayable: true,
+        },
+        choices: [
+          {
+            id: "choice-9-a",
+            label: "A game",
+            isCorrect: true,
+            selected: true,
+          },
+          {
+            id: "choice-9-b",
+            label: "A meal",
+            isCorrect: false,
+            selected: false,
+          },
+        ],
+      },
+    ],
+  }
+}
+
+describe("attempt review page", () => {
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it("shows a selected correct choice as the student's correct answer", () => {
+    render(<ReviewScreen review={reviewPayload} />)
+
+    expect(
+      screen.getByText("What does the boy want to do?"),
+    ).toBeInTheDocument()
+    expect(screen.getByText("Correct")).toBeInTheDocument()
+    expect(screen.getByText("Your answer · correct")).toBeInTheDocument()
+    expect(
+      screen.queryByText("Your answer · incorrect"),
+    ).not.toBeInTheDocument()
+  })
+
+  it("shows a selected incorrect choice separately from the correct answer", async () => {
+    const user = userEvent.setup()
+    render(<ReviewScreen review={reviewPayload} />)
+
+    await user.click(screen.getByRole("button", { name: "Question 27: Wrong" }))
+
+    expect(
+      screen.getByText("Why did Mia take an umbrella?"),
+    ).toBeInTheDocument()
+    expect(screen.getByText("Your answer · incorrect")).toBeInTheDocument()
+    expect(screen.getByText("Correct answer")).toBeInTheDocument()
+    expect(screen.queryByText("Your answer · correct")).not.toBeInTheDocument()
+  })
+
+  it("shows every choice as unselected and a left-blank notice for an unanswered question", async () => {
+    const user = userEvent.setup()
+    render(<ReviewScreen review={reviewPayload} />)
+
+    await user.click(
+      screen.getByRole("button", { name: "Question 12: Left blank" }),
+    )
+
+    const choices = screen.getByRole("list", { name: "Answer choices" })
+    expect(within(choices).getAllByRole("listitem")).toHaveLength(3)
+    expect(within(choices).queryByText(/Your answer/)).not.toBeInTheDocument()
+    expect(screen.getByText("Question 12 was left blank.")).toBeInTheDocument()
+    expect(screen.getByText("Correct answer")).toBeInTheDocument()
+  })
+
+  it("renders the signed replay URL for media and no replay control for a passage-only stimulus", async () => {
+    const user = userEvent.setup()
+    render(<ReviewScreen review={reviewPayload} />)
+
+    expect(screen.getByLabelText("Replay audio")).toHaveAttribute(
+      "src",
+      "/media/audio/l07.mp3?exp=1787932800&sig=signed-review-url",
+    )
+
+    await user.click(
+      screen.getByRole("button", { name: "Question 12: Left blank" }),
+    )
+
+    expect(screen.queryByLabelText("Replay audio")).not.toBeInTheDocument()
+    expect(screen.getByText("A day out")).toBeInTheDocument()
+    expect(
+      screen.getByText("The children packed their books and walked into town."),
+    ).toBeInTheDocument()
+  })
+
+  // `mixed` means text PLUS media and never says which media -- only
+  // `mediaKind` does. Branching on `type` alone rendered EVERY mixed
+  // stimulus as an audio player, so a mixed passage-and-picture question
+  // showed a child a dead audio control and no image. Both directions,
+  // because either one alone passes against a hardwired branch.
+  it("renders an audio control for a mixed stimulus whose mediaKind is audio", () => {
+    render(<ReviewScreen review={mixedReview("audio")} />)
+
+    expect(screen.getByLabelText("Replay audio")).toHaveAttribute(
+      "src",
+      "/media/mixed/m01.bin?exp=1787932800&sig=signed-review-url",
+    )
+    expect(screen.queryByRole("img")).not.toBeInTheDocument()
+    expect(screen.getByText("Look and listen.")).toBeInTheDocument()
+  })
+
+  it("renders an image for a mixed stimulus whose mediaKind is image", () => {
+    render(<ReviewScreen review={mixedReview("image")} />)
+
+    expect(screen.getByRole("img")).toHaveAttribute(
+      "src",
+      "/media/mixed/m01.bin?exp=1787932800&sig=signed-review-url",
+    )
+    expect(screen.queryByLabelText("Replay audio")).not.toBeInTheDocument()
+    expect(screen.getByText("Look and listen.")).toBeInTheDocument()
+  })
+
+  it("moves through the loaded payload without a network refetch and respects both navigation bounds", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(response(reviewPayload))
+    vi.stubGlobal("fetch", fetchMock)
+    const user = userEvent.setup()
+
+    const review = await loadReview("attempt-1")
+    render(<ReviewScreen review={review} />)
+
+    const previous = screen.getByRole("button", { name: "Previous" })
+    const next = screen.getByRole("button", { name: "Next" })
+    expect(previous).toBeDisabled()
+    expect(next).toBeEnabled()
+
+    await user.click(next)
+
+    expect(
+      screen.getByText("Where are the children going?"),
+    ).toBeInTheDocument()
+    expect(previous).toBeEnabled()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/attempts/attempt-1/review")
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBeUndefined()
+
+    await user.click(screen.getByRole("button", { name: "Question 27: Wrong" }))
+
+    expect(next).toBeDisabled()
+    await user.click(previous)
+    expect(
+      screen.getByText("Where are the children going?"),
+    ).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("labels the first section Listening and the next distinct section Reading", async () => {
+    const user = userEvent.setup()
+    render(<ReviewScreen review={reviewPayload} />)
+
+    expect(screen.getByText("Listening")).toBeInTheDocument()
+    expect(screen.queryByText("Reading")).not.toBeInTheDocument()
+
+    await user.click(
+      screen.getByRole("button", { name: "Question 12: Left blank" }),
+    )
+
+    expect(screen.getByText("Reading")).toBeInTheDocument()
+    expect(screen.queryByText("Listening")).not.toBeInTheDocument()
+  })
+
+  it("redirects to the runner when the attempt is still running (409)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        response(
+          {
+            type: "still_running",
+            title: "Attempt still running",
+            status: 409,
+          },
+          409,
+        ),
+      ),
+    )
+
+    const thrown: unknown = await loadReview("attempt-1").catch(
+      (error: unknown) => error,
+    )
+
+    expect(isRedirect(thrown)).toBe(true)
+
+    if (!isRedirect(thrown)) {
+      throw new Error("Expected a TanStack Router redirect")
+    }
+
+    expect(thrown.options.href).toBe("/attempts/attempt-1/run")
+  })
+
+  it("renders the forbidden state for a 403 without inventing a 404 branch", () => {
+    render(
+      <ReviewRouteError
+        error={
+          new ApiError({
+            type: "not_your_attempt",
+            title: "The attempt belongs to another student.",
+            status: 403,
+          })
+        }
+      />,
+    )
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "You can't review this attempt.",
+    )
+  })
+
+  it("renders the generic error state, not the forbidden one, for a non-403", () => {
+    render(<ReviewRouteError error={new Error("network down")} />)
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The review could not be loaded. Please try again.",
+    )
+  })
+})

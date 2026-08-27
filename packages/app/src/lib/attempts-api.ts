@@ -2,6 +2,7 @@ import { apiFetch } from "./api-client.js"
 import type {
   AttemptResult,
   PlayGrant,
+  ReviewPayload,
   RunnerEnvelope,
   SectionEntry,
   SubmitRequest,
@@ -10,6 +11,10 @@ import type {
 
 export function getAttemptResult(attemptId: string): Promise<AttemptResult> {
   return apiFetch<AttemptResult>(`/attempts/${attemptId}/result`)
+}
+
+export function getAttemptReview(attemptId: string): Promise<ReviewPayload> {
+  return apiFetch<ReviewPayload>(`/attempts/${attemptId}/review`)
 }
 
 export function getRunnerEnvelope(attemptId: string): Promise<RunnerEnvelope> {

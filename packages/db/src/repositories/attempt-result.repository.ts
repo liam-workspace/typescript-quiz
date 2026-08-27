@@ -254,6 +254,9 @@ export type ReviewStimulus =
       title?: string
       bodyText: string
       mediaUrl: string
+      // "mixed" says text-plus-media, never WHICH media. Without this the
+      // client has to guess an audio player or a picture from the filename.
+      mediaKind: "audio" | "image"
       replayable: true
     }
 
@@ -295,6 +298,7 @@ interface ReviewDbRow {
   st_title: string | null
   st_body: string | null
   st_filename: string | null
+  st_media_kind: string | null
 }
 
 interface ReviewAccumulator {
@@ -511,7 +515,8 @@ export async function loadReview(
             c.id c_id, c.label c_label, c.is_correct c_is_correct,
             (rc.choice_id IS NOT NULL) c_selected,
             st.id st_id, st.type::text st_type, st.title st_title,
-            st.body_text st_body, ma.filename st_filename
+            st.body_text st_body, ma.filename st_filename,
+            ma.kind::text st_media_kind
        FROM question q
        JOIN question_group g ON g.id = q.question_group_id
        JOIN test_section ts  ON ts.id = g.test_section_id
@@ -639,7 +644,15 @@ function buildReviewStimulus(
   }
 
   if (row.st_type === "mixed") {
-    if (row.st_body === null || !mediaUrl) {
+    // `mixed` names only "text plus media", so unlike the audio/image branch
+    // above its own type says nothing about WHICH. media_asset.kind has always
+    // known; projecting it here is what lets review render an audio player or
+    // a picture instead of guessing from the filename.
+    if (
+      row.st_body === null ||
+      !mediaUrl ||
+      (row.st_media_kind !== "audio" && row.st_media_kind !== "image")
+    ) {
       throw new Error(`review mixed stimulus ${stimulusId} is incomplete`)
     }
 
@@ -649,6 +662,7 @@ function buildReviewStimulus(
       ...(row.st_title ? { title: row.st_title } : {}),
       bodyText: row.st_body,
       mediaUrl,
+      mediaKind: row.st_media_kind,
       replayable: true,
     }
   }

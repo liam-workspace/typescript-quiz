@@ -4,7 +4,11 @@ import { finalizeAttempt } from "../src/repositories/attempt.repository.js"
 import { loadReview } from "@pp/db/scoring"
 import { describe, expect, it } from "vitest"
 import { withDatabase } from "./helpers/database.js"
-import { seedPublishedTest, type Fixture } from "./helpers/fixtures.js"
+import {
+  seedMixedStimulusTest,
+  seedPublishedTest,
+  type Fixture,
+} from "./helpers/fixtures.js"
 
 const NOW = new Date("2026-08-27T10:00:00.000Z")
 
@@ -223,6 +227,53 @@ describe("loadReview", () => {
       expect(JSON.stringify(result)).not.toMatch(
         /playsUsed|playsRemaining|maxPlays|allowPause|allowSeek/,
       )
+    })
+  }, 120_000)
+
+  // `mixed` is text AND media, and its own `type` never says WHICH media --
+  // only media_asset.kind does, and until now that column was joined but
+  // never projected. A client cannot guess, so it rendered every mixed
+  // stimulus as an audio player: a picture question showed a child a dead
+  // audio control and no image. No fixture had a mixed stimulus, so nothing
+  // failed. This is the case that keeps `ma.kind` in the SELECT list.
+  it("carries mediaKind on a mixed stimulus, so the client need not guess", async () => {
+    await withDatabase(async (pool) => {
+      const fixture = await seedMixedStimulusTest(pool)
+      const attemptId = randomUUID()
+
+      await pool.query(
+        `INSERT INTO attempt
+           (id, student_id, test_version_id, status, started_at, expires_at)
+         VALUES ($1, $2, $3, 'in_progress', $4, $5)`,
+        [
+          attemptId,
+          fixture.studentId,
+          fixture.versionId,
+          new Date("2026-08-27T09:30:00.000Z"),
+          new Date("2026-08-27T10:30:00.000Z"),
+        ],
+      )
+      await finalizeAttempt(pool, {
+        attemptId,
+        status: "submitted",
+        submittedAt: NOW,
+      })
+
+      const result = await readyReview(pool, attemptId)
+
+      if (result.kind !== "ready") {
+        throw new Error(`expected ready, received ${result.kind}`)
+      }
+
+      expect(result.items[0]?.stimulus).toEqual({
+        id: "70000000-0000-0000-0000-000000000003",
+        type: "mixed",
+        title: "At the park",
+        bodyText: "Look and listen.",
+        mediaUrl: "/media/m01.png?signed=stub",
+        mediaKind: "image",
+        replayable: true,
+      })
     })
   }, 120_000)
 })

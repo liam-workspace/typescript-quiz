@@ -138,3 +138,94 @@ export async function seedPublishedTest(pool: pg.Pool): Promise<Fixture> {
     uncappedStimulusId,
   }
 }
+
+export interface MixedFixture {
+  studentId: string
+  versionId: string
+  questionId: string
+  choiceId: string
+}
+
+/**
+ * A second, self-contained published test whose only question hangs off a
+ * `mixed` stimulus — text AND media together.
+ *
+ * Separate from `seedPublishedTest` rather than folded into it because
+ * several suites assert exact question counts against that fixture, and
+ * because content must be written BEFORE publication (the immutability
+ * trigger refuses inserts once `published_at` is set), so a mixed stimulus
+ * cannot be appended to an already-published version.
+ *
+ * `media_asset.kind` is deliberately `image` here: `mixed` names only
+ * "text plus media" and never says which, so an image-backed mixed stimulus
+ * is exactly the case a projection that assumes audio gets wrong.
+ */
+export async function seedMixedStimulusTest(
+  pool: pg.Pool,
+): Promise<MixedFixture> {
+  const studentId = "11111111-1111-1111-1111-111111111112"
+  const testId = "22222222-2222-2222-2222-222222222223"
+  const versionId = "a0000000-0000-0000-0000-000000000002"
+  const sectionId = "b0000000-0000-0000-0000-000000000003"
+  const groupId = "c0000000-0000-0000-0000-000000000003"
+  const questionId = "d0000000-0000-0000-0000-000000000003"
+  const choiceId = "e0000000-0000-0000-0000-000000000005"
+  const mediaAssetId = "90000000-0000-0000-0000-000000000002"
+  const stimulusId = "70000000-0000-0000-0000-000000000003"
+
+  await pool.query(
+    `INSERT INTO student (id, subject_claim, email, display_name)
+     VALUES ($1,'sub-mixed','mixed@example.test','Mixed')`,
+    [studentId],
+  )
+  await pool.query(`INSERT INTO test (id, slug) VALUES ($1,'mixed-test')`, [
+    testId,
+  ])
+  await pool.query(
+    `INSERT INTO test_version (id, test_id, version, title, duration_seconds)
+     VALUES ($1,$2,1,'Mixed stimulus practice',600)`,
+    [versionId, testId],
+  )
+  await pool.query(
+    `INSERT INTO test_section (id, test_version_id, ordinal, title, type, duration_seconds,
+                               navigation, allow_answer_change)
+     VALUES ($1,$2,1,'Listening — Mixed','listening',600,'free',true)`,
+    [sectionId, versionId],
+  )
+  await pool.query(
+    `INSERT INTO media_asset (id, kind, filename, mime_type, byte_size, checksum)
+     VALUES ($1,'image','m01.png','image/png',2048,'cafebabe')`,
+    [mediaAssetId],
+  )
+  await pool.query(
+    `INSERT INTO stimulus (id, test_version_id, type, title, body_text, media_asset_id)
+     VALUES ($1,$2,'mixed','At the park','Look and listen.',$3)`,
+    [stimulusId, versionId, mediaAssetId],
+  )
+  await pool.query(
+    `INSERT INTO question_group (id, test_version_id, test_section_id, stimulus_id, ordinal)
+     VALUES ($1,$2,$3,$4,1)`,
+    [groupId, versionId, sectionId, stimulusId],
+  )
+  await pool.query(
+    `INSERT INTO question (id, test_version_id, question_group_id, question_key,
+                           ordinal, prompt, type, points)
+     VALUES ($1,$2,$3,'qm1',1,'What is happening?','single_choice',1)`,
+    [questionId, versionId, groupId],
+  )
+  await pool.query(
+    `INSERT INTO choice (id, question_id, ordinal, label, is_correct)
+     VALUES ($1,$2,1,'A game',true)`,
+    [choiceId, questionId],
+  )
+  await pool.query(
+    `UPDATE test_version SET published_at = now() WHERE id = $1`,
+    [versionId],
+  )
+  await pool.query(`UPDATE test SET current_version_id = $1 WHERE id = $2`, [
+    versionId,
+    testId,
+  ])
+
+  return { studentId, versionId, questionId, choiceId }
+}

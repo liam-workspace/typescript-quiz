@@ -206,3 +206,52 @@ export interface AttemptResult {
     sections: AttemptSectionScore[]
   }
 }
+
+export interface ReviewChoice {
+  id: string
+  label: string
+  isCorrect: boolean
+  selected: boolean
+}
+
+export type ReviewStimulus =
+  | {
+      id: string
+      type: "audio" | "image"
+      title?: string
+      mediaUrl: string
+      replayable: true
+    }
+  | {
+      id: string
+      type: "passage"
+      title: string
+      bodyText: string
+      replayable: true
+    }
+  | {
+      id: string
+      type: "mixed"
+      title?: string
+      bodyText: string
+      mediaUrl: string
+      // "mixed" says text-plus-media, never WHICH media. Without this the
+      // client has to guess an audio player or a picture from the filename.
+      mediaKind: "audio" | "image"
+      replayable: true
+    }
+
+export interface ReviewItem {
+  questionId: string
+  ordinal: number
+  sectionId: string
+  prompt: string
+  outcome: "correct" | "incorrect" | "unanswered"
+  stimulus?: ReviewStimulus
+  choices: ReviewChoice[]
+}
+
+export interface ReviewPayload {
+  attemptId: string
+  items: ReviewItem[]
+}

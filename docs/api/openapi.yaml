@@ -1724,7 +1724,7 @@ components:
     ReviewMixedStimulus:
       type: object
       description: Text AND media together, so review must reproduce both halves.
-      required: [id, type, bodyText, mediaUrl, replayable]
+      required: [id, type, bodyText, mediaUrl, mediaKind, replayable]
       additionalProperties: false
       properties:
         id: { type: string }
@@ -1732,6 +1732,16 @@ components:
         title: { type: string }
         bodyText: { type: string }
         mediaUrl: { type: string }
+        mediaKind:
+          type: string
+          enum: [audio, image]
+          description: |
+            Whether `mediaUrl` is an audio file or an image. Unlike
+            `ReviewMediaStimulus`, whose `type` already says which, `mixed`
+            names only "text plus media" — so without this the client cannot
+            tell an audio player from a picture and has to guess from the
+            filename. `media_asset.kind` has carried this all along; it just
+            was not projected into review.
         replayable: { type: boolean, const: true }
 
     ReviewPassageStimulus:

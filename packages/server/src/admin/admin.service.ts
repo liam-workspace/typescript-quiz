@@ -74,14 +74,35 @@ export interface MulterFile {
  * served Content-Type from `kind`, never from the filename or the
  * upload's declared MIME type.
  */
-const KIND_RULES: Record<MediaKind, { mimePrefix: string; extension: string }> =
-  {
-    audio: { mimePrefix: "audio/", extension: "audio" },
-    image: { mimePrefix: "image/", extension: "image" },
-  }
+/**
+ * The inverse of `media.controller.ts`'s MIME_TYPES, and it has to stay that
+ * way: the serving route picks a Content-Type from the stored file's
+ * EXTENSION, so an extension it does not know is served as
+ * application/octet-stream and an `<audio>` element silently refuses to play
+ * it. Storing a placeholder extension (`.audio`, `.image`) produced exactly
+ * that -- a file that uploaded fine, served 200, and would not play.
+ *
+ * Whitelisting here also sharpens the 415: a `mimePrefix` check alone accepts
+ * `audio/flac`, which then stores as something unplayable rather than being
+ * refused up front.
+ */
+const EXTENSION_BY_MIME: Record<
+  string,
+  { kind: MediaKind; extension: string } | undefined
+> = {
+  "audio/mpeg": { kind: "audio", extension: "mp3" },
+  "audio/wav": { kind: "audio", extension: "wav" },
+  "image/png": { kind: "image", extension: "png" },
+  "image/jpeg": { kind: "image", extension: "jpg" },
+  "image/webp": { kind: "image", extension: "webp" },
+}
+
+const MEDIA_KINDS: readonly MediaKind[] = ["audio", "image"]
 
 function isMediaKind(value: unknown): value is MediaKind {
-  return typeof value === "string" && value in KIND_RULES
+  // Checked against the enum's own members rather than a lookup table's keys,
+  // so the accepted set cannot drift when that table changes shape.
+  return typeof value === "string" && MEDIA_KINDS.includes(value as MediaKind)
 }
 
 const UNIQUE_VIOLATION_SQLSTATE = "23505"
@@ -253,9 +274,9 @@ export class AdminService {
     }
 
     const kind = kindInput
-    const rules = KIND_RULES[kind]
+    const rules = EXTENSION_BY_MIME[file.mimetype.toLowerCase()]
 
-    if (!file.mimetype.startsWith(rules.mimePrefix)) {
+    if (!rules || rules.kind !== kind) {
       throw new UnsupportedMediaTypeException("mime_kind_mismatch")
     }
 
@@ -263,22 +284,32 @@ export class AdminService {
     // nobody -- it is the one thing this route exists to make trustworthy.
     const checksum = createHash("sha256").update(file.buffer).digest("hex")
     const mediaRootResolved = resolve(loadServerConfig().mediaRoot)
+    const storedName = `${checksum}.${rules.extension}`
 
     try {
       const row = await withTransaction(this.pool, async (tx) => {
         const inserted = await recordMediaAsset(tx, {
           kind,
-          filename: file.originalname,
+          // Content-addressed, and the SAME name the file gets on disk.
+          // `media_asset.filename` is the locator: the runner emits
+          // `/media/<filename>`, claimPlay looks a stimulus up by it, and
+          // `/media/:filename` resolves it under mediaRoot. Storing the
+          // client's `originalname` here while writing the bytes somewhere
+          // else broke that invariant -- every signed URL pointed at a file
+          // that was never written under that name.
+          //
+          // The checksum rather than the row id because the id is not known
+          // until this INSERT returns, and because it makes the UNIQUE
+          // constraint mean something real: identical bytes collide, so the
+          // 409 now reports a duplicate UPLOAD rather than a coincidence of
+          // author-chosen names.
+          filename: storedName,
           mimeType: file.mimetype,
           byteSize: file.buffer.length,
           checksum,
         })
 
-        await writeMediaFile(
-          mediaRootResolved,
-          `${inserted.id}.${rules.extension}`,
-          file.buffer,
-        )
+        await writeMediaFile(mediaRootResolved, storedName, file.buffer)
 
         return inserted
       })

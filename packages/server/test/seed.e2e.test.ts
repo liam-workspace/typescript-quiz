@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import type { PgPool } from "@liam-public/node-postgres"
 import request from "supertest"
 import type { App } from "supertest/types.js"
@@ -61,11 +64,19 @@ const EMAIL = "tom@example.com"
 describe("seed-test", () => {
   let app: TestApp | undefined = undefined
 
+  let mediaRoot = ""
+
   beforeAll(async () => {
+    // The seed writes silence.mp3 into MEDIA_ROOT now, because a media_asset
+    // row without the bytes beside it is a stimulus whose audio 404s.
+    mediaRoot = await mkdtemp(join(tmpdir(), "pp-seed-media-"))
+    process.env.MEDIA_ROOT = mediaRoot
     app = await createTestApp()
   })
 
   afterAll(async () => {
+    await rm(mediaRoot, { recursive: true, force: true })
+    delete process.env.MEDIA_ROOT
     await app?.close()
   })
 

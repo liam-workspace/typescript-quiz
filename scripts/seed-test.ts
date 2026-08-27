@@ -20,7 +20,7 @@
  * index and dies unrecoverably.
  */
 import { createHash } from "node:crypto"
-import { readFile } from "node:fs/promises"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { waitForDatabase } from "@liam-public/node-postgres"
@@ -79,6 +79,16 @@ async function ensureMediaAsset(pool: pg.Pool): Promise<void> {
 
   const bytes = await readFile(MEDIA_PATH)
   const checksum = createHash("sha256").update(bytes).digest("hex")
+
+  // The row alone is not enough. `media_asset.filename` is the LOCATOR: the
+  // runner emits `/media/<filename>` and the serving route resolves it under
+  // MEDIA_ROOT, so a row without the bytes beside it is a stimulus whose
+  // audio 404s -- the listening screen would render a player that cannot
+  // play. Seeding the row and not the file left exactly that gap.
+  const mediaRoot = resolve(process.env.MEDIA_ROOT ?? "/media")
+
+  await mkdir(mediaRoot, { recursive: true })
+  await writeFile(resolve(mediaRoot, MEDIA_FILENAME), bytes)
 
   await pool.query(
     `INSERT INTO media_asset (kind, filename, mime_type, byte_size, checksum)

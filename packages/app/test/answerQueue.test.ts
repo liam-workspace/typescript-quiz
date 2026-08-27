@@ -172,6 +172,40 @@ describe("AnswerQueue", () => {
     await queue.close()
   })
 
+  it("snapshotForAttempt carries every section's queued answers for the attempt, while snapshotForSection still returns only its own section", async () => {
+    const queue = await AnswerQueue.open("pp-answer-queue-test")
+    await queue.recordAnswer(
+      {
+        attemptId: "a1",
+        sectionId: "s1",
+        questionId: "q1",
+        selectedChoiceIds: ["c1"],
+        timeSpentMs: null,
+      },
+      NOW,
+    )
+    await queue.recordAnswer(
+      {
+        attemptId: "a1",
+        sectionId: "s2",
+        questionId: "q2",
+        selectedChoiceIds: ["c2"],
+        timeSpentMs: null,
+      },
+      NOW,
+    )
+
+    const forAttempt = await queue.snapshotForAttempt("a1")
+    expect(forAttempt.map((item) => item.questionId).sort()).toEqual([
+      "q1",
+      "q2",
+    ])
+
+    const forSection = await queue.snapshotForSection("a1", "s1")
+    expect(forSection.map((item) => item.questionId)).toEqual(["q1"])
+    await queue.close()
+  })
+
   it("clearing on envelope success rather than per-item ack is exactly the bug rule 1 prevents: an acked item is gone but an unacked sibling in the same flush survives", async () => {
     const queue = await AnswerQueue.open("pp-answer-queue-test")
     const acked = await queue.recordAnswer(

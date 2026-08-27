@@ -1,4 +1,5 @@
 import type { AttemptId, ChoiceId, QuestionId } from "./ids.js"
+import type { SectionType } from "./test.js"
 
 export type AttemptStatus = "in_progress" | "submitted" | "expired"
 
@@ -49,7 +50,7 @@ export type ItemResult =
 
 export interface SectionScore {
   title: string
-  type: string
+  type: SectionType
   pointsEarned: number
   pointsPossible: number
 }

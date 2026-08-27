@@ -1,5 +1,6 @@
 import type { ChoiceId, QuestionId } from "./domain/ids.js"
 import type { RunnerChoice, RunnerQuestion } from "./domain/test.js"
+import { isQuestionCorrect } from "./grading.js"
 
 /** Used only by the scoring service. Never serialized to a student. */
 export interface ScoringChoice extends RunnerChoice {
@@ -32,6 +33,12 @@ export interface AttemptScoreSummary {
  * set exactly — single_choice's "exactly one correct" and multi_choice's
  * "all of them, none extra" are the same rule once expressed as set
  * equality, so there is one comparison, not two branches by type.
+ *
+ * That comparison lives in `isQuestionCorrect` (./grading.js) — the ONLY
+ * place it is implemented. `gradeAttempt` (grading.ts, plan 5 Task 2) needs
+ * the identical rule for its section-broken-down score, and a second inline
+ * copy here would let the two silently drift apart on exactly the case that
+ * matters most: what a partial multi_choice selection scores.
  */
 export function scoreAttempt(
   questions: ScoringQuestion[],
@@ -53,15 +60,8 @@ export function scoreAttempt(
     }
 
     answeredCount += 1
-    const correctIds = new Set(
-      question.choices.filter((c) => c.isCorrect).map((c) => c.id),
-    )
-    const selectedIds = new Set(answer.selectedChoiceIds)
-    const isCorrect =
-      correctIds.size === selectedIds.size &&
-      [...correctIds].every((id) => selectedIds.has(id))
 
-    if (isCorrect) {
+    if (isQuestionCorrect(question, answer.selectedChoiceIds)) {
       correctCount += 1
       pointsEarned += question.points
     } else {

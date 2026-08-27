@@ -25,5 +25,15 @@
   "runner.savedIndicator": "保存済み",
   "runner.sectionChip.listening": "リスニング",
   "runner.sectionChip.reading": "リーディング",
-  "reading.passageQuestions": "パッセージ{{passageNumber}} · 問題{{first}}–{{last}}"
+  "reading.passageQuestions": "パッセージ{{passageNumber}} · 問題{{first}}–{{last}}",
+  "handIn.title": "テストを提出しますか?",
+  "handIn.subtitle": "提出すると解答を変更できなくなります。",
+  "handIn.answered": "解答済み",
+  "handIn.notAnswered": "未解答",
+  "handIn.notice.blankQuestions": "問題{{list}}がまだ空欄です。",
+  "handIn.notice.timeLeft": "戻る場合、残り時間は{{minutes}}分です。",
+  "handIn.keepWorking": "続ける",
+  "handIn.pendingSync": "最新の解答を保存しています…",
+  "handIn.error.nothingAnswered.title": "まだ何も解答していません",
+  "handIn.error.nothingAnswered.message": "提出する前に少なくとも1問は解答してください。"
 }

@@ -26,5 +26,17 @@
   "runner.savedIndicator": "Salvato",
   "runner.sectionChip.listening": "Ascolto",
   "runner.sectionChip.reading": "Lettura",
-  "reading.passageQuestions": "Brano {{passageNumber}} · domande {{first}}–{{last}}"
+  "reading.passageQuestions": "Brano {{passageNumber}} · domande {{first}}–{{last}}",
+  "handIn.title": "Consegnare il test?",
+  "handIn.subtitle": "Una volta consegnato non potrai più modificare le risposte.",
+  "handIn.answered": "Risposte date",
+  "handIn.notAnswered": "Senza risposta",
+  "handIn.notice.blankQuestions_one": "La domanda {{list}} è ancora senza risposta.",
+  "handIn.notice.blankQuestions_other": "Le domande {{list}} sono ancora senza risposta.",
+  "handIn.notice.timeLeft_one": "Ti resta {{minutes}} minuto se vuoi tornare indietro.",
+  "handIn.notice.timeLeft_other": "Ti restano {{minutes}} minuti se vuoi tornare indietro.",
+  "handIn.keepWorking": "Continua",
+  "handIn.pendingSync": "Salvataggio delle ultime risposte in corso…",
+  "handIn.error.nothingAnswered.title": "Non hai ancora risposto a nulla",
+  "handIn.error.nothingAnswered.message": "Rispondi ad almeno una domanda prima di consegnare."
 }

@@ -135,3 +135,45 @@ export interface RunnerEnvelope {
   sections: RunnerSection[]
   responses: RecordedResponse[]
 }
+
+// Mirrors openapi.yaml `ResponseSnapshotItem` -- the shape `AnswerQueue`'s
+// records take once serialized for the wire, whether carried by a section
+// flush's PATCH body or, here, by `SubmitRequest.responses`.
+export interface ResponseSnapshotItem {
+  questionId: string
+  seq: number
+  selectedChoiceIds: string[]
+  answeredAt: string
+  timeSpentMs?: number
+}
+
+// Openapi.yaml `SubmitRequest` (`POST /attempts/{id}/submit`). `responses`
+// is optional there ("may be empty or absent") -- `buildSubmitRemainder`
+// (lib/lifecycleFlush.ts) always supplies the array (possibly empty), which
+// is structurally assignable here since a required array satisfies an
+// optional one.
+export interface SubmitRequest {
+  clientInstanceId: string
+  responses?: ResponseSnapshotItem[]
+}
+
+// Openapi.yaml `ItemResult` narrowed to the fields the client actually acts
+// on (questionId, status) -- mirrors `ItemAckResult` in lib/flushController.ts,
+// which reconciles the same shape for a section flush's `results`. Submit's
+// `finalFlush` reconciles the queue the same way: "applied"/"ignored_stale"
+// ack the item, "rejected" marks it a terminal rejection.
+export interface SubmitFinalFlushItem {
+  questionId: string
+  status: "applied" | "ignored_stale" | "rejected"
+}
+
+// Openapi.yaml `SubmitResult`. Returned on both `200` (already submitted --
+// the same row, not a regrade) and `201` (graded and finalized): the client
+// treats both as success, since `apiFetch` only throws for a non-2xx status.
+export interface SubmitResult {
+  attemptId: string
+  status: "submitted"
+  submittedAt: string
+  resultUrl: string
+  finalFlush: SubmitFinalFlushItem[]
+}

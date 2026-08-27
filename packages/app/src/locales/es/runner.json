@@ -26,5 +26,17 @@
   "runner.savedIndicator": "Guardado",
   "runner.sectionChip.listening": "Comprensión auditiva",
   "runner.sectionChip.reading": "Lectura",
-  "reading.passageQuestions": "Lectura {{passageNumber}} · preguntas {{first}}–{{last}}"
+  "reading.passageQuestions": "Lectura {{passageNumber}} · preguntas {{first}}–{{last}}",
+  "handIn.title": "¿Entregar tu examen?",
+  "handIn.subtitle": "Una vez que entregues, no podrás cambiar tus respuestas.",
+  "handIn.answered": "Respondidas",
+  "handIn.notAnswered": "Sin responder",
+  "handIn.notice.blankQuestions_one": "La pregunta {{list}} sigue en blanco.",
+  "handIn.notice.blankQuestions_other": "Las preguntas {{list}} siguen en blanco.",
+  "handIn.notice.timeLeft_one": "Te queda {{minutes}} minuto si quieres volver.",
+  "handIn.notice.timeLeft_other": "Te quedan {{minutes}} minutos si quieres volver.",
+  "handIn.keepWorking": "Seguir trabajando",
+  "handIn.pendingSync": "Guardando tus últimas respuestas…",
+  "handIn.error.nothingAnswered.title": "Todavía no respondiste nada",
+  "handIn.error.nothingAnswered.message": "Responde al menos una pregunta antes de entregar."
 }

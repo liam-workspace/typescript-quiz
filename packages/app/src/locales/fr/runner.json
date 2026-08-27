@@ -26,5 +26,17 @@
   "runner.savedIndicator": "Enregistré",
   "runner.sectionChip.listening": "Compréhension orale",
   "runner.sectionChip.reading": "Compréhension écrite",
-  "reading.passageQuestions": "Texte {{passageNumber}} · questions {{first}}–{{last}}"
+  "reading.passageQuestions": "Texte {{passageNumber}} · questions {{first}}–{{last}}",
+  "handIn.title": "Rendre ton test ?",
+  "handIn.subtitle": "Une fois rendu, tu ne peux plus modifier tes réponses.",
+  "handIn.answered": "Répondu",
+  "handIn.notAnswered": "Sans réponse",
+  "handIn.notice.blankQuestions_one": "La question {{list}} est encore vide.",
+  "handIn.notice.blankQuestions_other": "Les questions {{list}} sont encore vides.",
+  "handIn.notice.timeLeft_one": "Il te reste {{minutes}} minute si tu veux y retourner.",
+  "handIn.notice.timeLeft_other": "Il te reste {{minutes}} minutes si tu veux y retourner.",
+  "handIn.keepWorking": "Continuer",
+  "handIn.pendingSync": "Enregistrement de tes dernières réponses…",
+  "handIn.error.nothingAnswered.title": "Rien n'a encore été répondu",
+  "handIn.error.nothingAnswered.message": "Réponds à au moins une question avant de rendre ton test."
 }

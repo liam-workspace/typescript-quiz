@@ -26,5 +26,17 @@
   "runner.savedIndicator": "Saved",
   "runner.sectionChip.listening": "Listening",
   "runner.sectionChip.reading": "Reading",
-  "reading.passageQuestions": "Passage {{passageNumber}} · questions {{first}}–{{last}}"
+  "reading.passageQuestions": "Passage {{passageNumber}} · questions {{first}}–{{last}}",
+  "handIn.title": "Hand in your test?",
+  "handIn.subtitle": "Once you hand in you cannot change your answers.",
+  "handIn.answered": "Answered",
+  "handIn.notAnswered": "Not answered",
+  "handIn.notice.blankQuestions_one": "Question {{list}} is still blank.",
+  "handIn.notice.blankQuestions_other": "Questions {{list}} are still blank.",
+  "handIn.notice.timeLeft_one": "You have {{minutes}} minute left if you want to go back.",
+  "handIn.notice.timeLeft_other": "You have {{minutes}} minutes left if you want to go back.",
+  "handIn.keepWorking": "Keep working",
+  "handIn.pendingSync": "Waiting for your last answers to save…",
+  "handIn.error.nothingAnswered.title": "Nothing answered yet",
+  "handIn.error.nothingAnswered.message": "Answer at least one question before handing in."
 }

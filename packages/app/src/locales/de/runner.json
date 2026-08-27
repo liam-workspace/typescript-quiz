@@ -26,5 +26,17 @@
   "runner.savedIndicator": "Gespeichert",
   "runner.sectionChip.listening": "Hören",
   "runner.sectionChip.reading": "Lesen",
-  "reading.passageQuestions": "Text {{passageNumber}} · Fragen {{first}}–{{last}}"
+  "reading.passageQuestions": "Text {{passageNumber}} · Fragen {{first}}–{{last}}",
+  "handIn.title": "Test abgeben?",
+  "handIn.subtitle": "Nach dem Abgeben kannst du deine Antworten nicht mehr ändern.",
+  "handIn.answered": "Beantwortet",
+  "handIn.notAnswered": "Nicht beantwortet",
+  "handIn.notice.blankQuestions_one": "Frage {{list}} ist noch leer.",
+  "handIn.notice.blankQuestions_other": "Fragen {{list}} sind noch leer.",
+  "handIn.notice.timeLeft_one": "Du hast noch {{minutes}} Minute Zeit, falls du zurückgehen möchtest.",
+  "handIn.notice.timeLeft_other": "Du hast noch {{minutes}} Minuten Zeit, falls du zurückgehen möchtest.",
+  "handIn.keepWorking": "Weiterarbeiten",
+  "handIn.pendingSync": "Deine letzten Antworten werden noch gespeichert …",
+  "handIn.error.nothingAnswered.title": "Noch nichts beantwortet",
+  "handIn.error.nothingAnswered.message": "Beantworte mindestens eine Frage, bevor du abgibst."
 }

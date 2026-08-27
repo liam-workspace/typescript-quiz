@@ -1,11 +1,19 @@
 import {
   asChoiceId,
   asQuestionId,
+  asSectionId,
   canSetPosition,
+  gradeAttempt,
   isPastDeadline,
+  type GradableResponse,
+  type GradableSection,
+  type SectionScore,
 } from "@pp/common"
-import { scoreAttempt, type RecordedAnswer } from "@pp/common/scoring"
-import { withTransaction, type PgQueryable } from "@liam-public/node-postgres"
+import {
+  withTransaction,
+  type PgPool,
+  type PgQueryable,
+} from "@liam-public/node-postgres"
 import type pg from "pg"
 import { loadForScoring } from "../scoring.js"
 import { SectionExpiredError } from "./section-expired.error.js"
@@ -83,16 +91,15 @@ interface AttemptStatusRow {
   expires_at: Date | null
 }
 
-interface AnswerRow {
-  question_id: string
-  choice_ids: string[]
-}
-
 /**
  * Idempotent: if `attempt.status` is already terminal, returns the
- * existing row without re-grading (re-running scoreAttempt on the same
- * frozen content and responses would be safe but wasteful, and a second
- * write past a CHECK-satisfied row is pure risk for no benefit).
+ * existing row without re-grading. The actual grading + write lives in
+ * exactly one place -- finalizeAttemptTx below -- so an expired attempt and
+ * a submitted one can never disagree about what score the SAME responses
+ * over the SAME frozen content produce. The one genuine difference between
+ * the two is what submittedAt gets pinned to (the deadline, never `now`),
+ * which is why it is resolved here and handed in rather than being decided
+ * by finalizeAttemptTx itself.
  */
 export async function finalizeExpiredAttempt(
   db: PgQueryable,
@@ -137,8 +144,105 @@ export async function finalizeExpiredAttempt(
     }
   }
 
-  const questions = await loadForScoring(db, attempt.test_version_id)
-  const { rows: answerRows } = await db.query<AnswerRow>(
+  if (!attempt.expires_at) {
+    // The clock-paired constraint plus the caller contract
+    // (loadRunningOwnedAttempt only reaches here once isPastDeadline has
+    // already required a non-null expiresAt) make this unreachable in
+    // practice; guarded so the pin below never silently degrades to
+    // `undefined`.
+    throw new Error(
+      `attempt ${input.attemptId} is in_progress with no deadline to expire at`,
+    )
+  }
+
+  const graded = await finalizeAttemptTx(db, {
+    attemptId: input.attemptId,
+    status: "expired",
+    // An expired attempt is finalized AT its deadline, never at the moment
+    // the late request happened to arrive -- attempt_expired_pins_deadline
+    // enforces exactly this at the database.
+    submittedAt: attempt.expires_at,
+  })
+
+  if (!graded) {
+    // Vanished between our SELECT above and finalizeAttemptTx's own --
+    // attempt rows are never deleted (test_version_id is ON DELETE
+    // RESTRICT), so this is practically unreachable; kept so the return
+    // type stays honest without a non-null assertion.
+    throw new Error(`attempt ${input.attemptId} does not exist`)
+  }
+
+  return {
+    id: input.attemptId,
+    status: "expired",
+    submittedAt: graded.submittedAt,
+  }
+}
+
+export interface AttemptScoreRow {
+  attemptId: string
+  testVersionId: string
+  status: "submitted" | "expired"
+  submittedAt: Date
+  pointsEarned: number
+  pointsPossible: number
+  percentage: number
+  answered: number
+  unanswered: number
+  correct: number
+  incorrect: number
+  sections: SectionScore[]
+}
+
+interface AttemptFinalizeStateRow {
+  status: "in_progress" | "submitted" | "expired"
+  test_version_id: string
+  submitted_at: Date | null
+  points_earned: number | null
+  points_possible: number | null
+  percentage: string | null
+  answered_count: number | null
+  unanswered_count: number | null
+  correct_count: number | null
+  incorrect_count: number | null
+  question_count: number | null
+}
+
+interface TestSectionGradeRow {
+  id: string
+  title: string
+  type: string
+}
+
+async function loadGradableSections(
+  tx: PgQueryable,
+  testVersionId: string,
+): Promise<GradableSection[]> {
+  const { rows } = await tx.query<TestSectionGradeRow>(
+    `SELECT id, title, type::text AS type
+       FROM test_section
+      WHERE test_version_id = $1
+      ORDER BY ordinal`,
+    [testVersionId],
+  )
+
+  return rows.map((r) => ({
+    id: asSectionId(r.id),
+    title: r.title,
+    type: r.type as GradableSection["type"],
+  }))
+}
+
+interface ResponseGradeRow {
+  question_id: string
+  choice_ids: string[]
+}
+
+async function loadResponsesForGrading(
+  tx: PgQueryable,
+  attemptId: string,
+): Promise<GradableResponse[]> {
+  const { rows } = await tx.query<ResponseGradeRow>(
     `SELECT r.question_id,
             COALESCE(array_agg(rc.choice_id) FILTER (WHERE rc.choice_id IS NOT NULL), '{}') AS choice_ids
        FROM response r
@@ -146,50 +250,180 @@ export async function finalizeExpiredAttempt(
          ON rc.attempt_id = r.attempt_id AND rc.question_id = r.question_id
       WHERE r.attempt_id = $1
       GROUP BY r.question_id`,
-    [input.attemptId],
+    [attemptId],
   )
-  const answers: RecordedAnswer[] = answerRows.map((r) => ({
+
+  return rows.map((r) => ({
     questionId: asQuestionId(r.question_id),
     selectedChoiceIds: r.choice_ids.map(asChoiceId),
   }))
-  const score = scoreAttempt(questions, answers)
+}
 
-  const { rows } = await db.query<{ submitted_at: Date }>(
+/**
+ * The ONE place an attempt is graded and its nine score columns are
+ * written. Not exported from the package (see index.ts) -- reachable only
+ * by this module's own finalizeAttempt/finalizeExpiredAttempt, and by
+ * attempt-finalize.test.ts via a relative import. Task 6's submit handler
+ * is the intended external caller once it exists: it applies the final
+ * responses and finalizes in the SAME transaction, which is exactly why
+ * this takes an already-open `tx` instead of opening its own.
+ *
+ * Locks the row FOR UPDATE first: called through finalizeAttempt (a real
+ * transaction), that lock alone serializes concurrent finalizers, so the
+ * second caller simply observes the row as already terminal. Called with a
+ * bare pool (as finalizeExpiredAttempt sometimes is), FOR UPDATE does not
+ * persist across separate round trips -- so the terminal write below is
+ * ALSO guarded by `WHERE status = 'in_progress'` and re-reads on conflict,
+ * the same belt-and-suspenders pattern claimPlay uses. Either way, exactly
+ * one write ever lands.
+ */
+export async function finalizeAttemptTx(
+  tx: PgQueryable,
+  input: {
+    attemptId: string
+    status: "submitted" | "expired"
+    submittedAt: Date
+  },
+): Promise<AttemptScoreRow | null> {
+  const { rows } = await tx.query<AttemptFinalizeStateRow>(
+    `SELECT status, test_version_id, submitted_at,
+            points_earned, points_possible, percentage,
+            answered_count, unanswered_count, correct_count, incorrect_count,
+            question_count
+       FROM attempt
+      WHERE id = $1
+      FOR UPDATE`,
+    [input.attemptId],
+  )
+
+  if (rows.length === 0) {
+    return null
+  }
+
+  const [attempt] = rows
+
+  // `sections` is never cached on `attempt` -- only the flat totals are
+  // (see the schema comment on attempt.points_earned). Every reader of a
+  // score's per-section breakdown, fresh or already-finalized, recomputes
+  // it here from frozen content. That recompute never feeds back into a
+  // write and content is immutable once published, so it reproduces
+  // exactly the numbers whichever call originally froze the flat totals
+  // below -- it is not the re-grade the idempotence contract forbids.
+  const sections = await loadGradableSections(tx, attempt.test_version_id)
+  const questions = await loadForScoring(tx, attempt.test_version_id)
+  const responses = await loadResponsesForGrading(tx, input.attemptId)
+  const graded = gradeAttempt({ sections, questions, responses })
+
+  if (attempt.status !== "in_progress") {
+    // Already terminal -- NOT a re-grade. The flat totals are read back
+    // exactly as a prior call froze them; input.status/input.submittedAt
+    // are ignored on purpose (attempt-finalize.test.ts proves this with a
+    // second call that passes DIFFERENT values and asserts nothing moved).
+    if (
+      attempt.submitted_at === null ||
+      attempt.points_earned === null ||
+      attempt.points_possible === null ||
+      attempt.percentage === null ||
+      attempt.answered_count === null ||
+      attempt.unanswered_count === null ||
+      attempt.correct_count === null ||
+      attempt.incorrect_count === null
+    ) {
+      // `attempt_finished_is_graded` guarantees every one of these is
+      // non-null once status leaves 'in_progress' -- unreachable in
+      // practice, guarded so the return below stays honest without a
+      // non-null assertion.
+      throw new Error(
+        `attempt ${input.attemptId} is terminal but missing a graded column`,
+      )
+    }
+
+    return {
+      attemptId: input.attemptId,
+      testVersionId: attempt.test_version_id,
+      status: attempt.status,
+      submittedAt: attempt.submitted_at,
+      pointsEarned: attempt.points_earned,
+      pointsPossible: attempt.points_possible,
+      percentage: Number(attempt.percentage),
+      answered: attempt.answered_count,
+      unanswered: attempt.unanswered_count,
+      correct: attempt.correct_count,
+      incorrect: attempt.incorrect_count,
+      sections: graded.sections,
+    }
+  }
+
+  // For 'expired', submitted_at is pinned to the expires_at COLUMN, not the
+  // $3 parameter -- a JS Date only holds millisecond precision, while
+  // expires_at (often derived from `now()`) can carry microseconds, so
+  // round-tripping it through JS and back would fail
+  // attempt_expired_pins_deadline's exact-equality check by a few
+  // microseconds. Reading straight from the column sidesteps that.
+  const { rows: written } = await tx.query<{ submitted_at: Date }>(
     `UPDATE attempt
-        SET status = 'expired', submitted_at = expires_at,
-            points_earned = $2, points_possible = $3, percentage = $4,
-            answered_count = $5, unanswered_count = $6,
-            correct_count = $7, incorrect_count = $8, question_count = $9
+        SET status = $2,
+            submitted_at = CASE WHEN $2::attempt_status = 'expired' THEN expires_at ELSE $3 END,
+            points_earned = $4, points_possible = $5, percentage = $6,
+            answered_count = $7, unanswered_count = $8,
+            correct_count = $9, incorrect_count = $10, question_count = $11
       WHERE id = $1 AND status = 'in_progress'
       RETURNING submitted_at`,
     [
       input.attemptId,
-      score.pointsEarned,
-      score.pointsPossible,
-      score.percentage,
-      score.answeredCount,
-      score.unansweredCount,
-      score.correctCount,
-      score.incorrectCount,
-      score.questionCount,
+      input.status,
+      input.submittedAt,
+      graded.pointsEarned,
+      graded.pointsPossible,
+      graded.percentage,
+      graded.answered,
+      graded.unanswered,
+      graded.correct,
+      graded.incorrect,
+      questions.length,
     ],
   )
 
-  if (rows.length === 0) {
-    // Another request finalized this attempt between our SELECT and this
-    // UPDATE. The status predicate above is what makes that a no-op rather
-    // than a second grade; re-read to report what actually landed, so two
-    // racing callers agree on submitted_at.
-    return finalizeExpiredAttempt(db, input)
+  if (written.length === 0) {
+    // Lost a race between our SELECT and this UPDATE -- another caller
+    // finalized first. Re-read and return THEIR row, not ours, so two
+    // racing callers agree on the result.
+    return finalizeAttemptTx(tx, input)
   }
 
-  const [row] = rows
+  const [row] = written
 
   return {
-    id: input.attemptId,
-    status: "expired",
+    attemptId: input.attemptId,
+    testVersionId: attempt.test_version_id,
+    status: input.status,
     submittedAt: row.submitted_at,
+    pointsEarned: graded.pointsEarned,
+    pointsPossible: graded.pointsPossible,
+    percentage: graded.percentage,
+    answered: graded.answered,
+    unanswered: graded.unanswered,
+    correct: graded.correct,
+    incorrect: graded.incorrect,
+    sections: graded.sections,
   }
+}
+
+/**
+ * The pool-opening entry point for grading + finalizing an attempt outside
+ * any existing transaction -- what Tasks 7-8's lazy finalize call. Never
+ * re-grades: see finalizeAttemptTx, the single place this and
+ * finalizeExpiredAttempt both delegate the actual work to.
+ */
+export function finalizeAttempt(
+  pool: PgPool,
+  input: {
+    attemptId: string
+    status: "submitted" | "expired"
+    submittedAt: Date
+  },
+): Promise<AttemptScoreRow | null> {
+  return withTransaction(pool, (tx) => finalizeAttemptTx(tx, input))
 }
 
 /**

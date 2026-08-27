@@ -2,6 +2,7 @@ import { type DbConfig, loadDbConfig } from "./config.js"
 import { createJobPool, createRequestPool } from "./pool.js"
 import {
   enterSection,
+  finalizeAttempt,
   finalizeExpiredAttempt,
   loadOwnedAttempt,
   loadRunningOwnedAttempt,
@@ -9,6 +10,7 @@ import {
   startOrResumeAttempt,
   TestNotFoundError,
   type AttemptRow,
+  type AttemptScoreRow,
   type FinalizedAttemptRow,
   type SectionEntryRow,
   type StartResult,
@@ -68,7 +70,13 @@ export type {
   TestCardRow,
 }
 
-export type { AttemptRow, FinalizedAttemptRow, SectionEntryRow, StartResult }
+export type {
+  AttemptRow,
+  AttemptScoreRow,
+  FinalizedAttemptRow,
+  SectionEntryRow,
+  StartResult,
+}
 
 export type { RunnerEnvelopeRow }
 
@@ -93,6 +101,7 @@ export {
   loadSectionBrief,
   InvalidCursorError,
   loadOwnedAttempt,
+  finalizeAttempt,
   finalizeExpiredAttempt,
   loadRunningOwnedAttempt,
   SectionExpiredError,

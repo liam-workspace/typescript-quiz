@@ -1,4 +1,13 @@
 {
+  "menu.title": "Menu",
+  "menu.library": "Test library",
+  "menu.history": "Attempt history",
+  "menu.leaveTest": "Leave test",
+  "menu.leaveTestNoteBeforeStart": "Nothing has started yet. The clock begins when you tap I'm ready.",
+  "menu.leaveTestNoteRunning": "The clock keeps running while you are away.",
+  "menu.language": "Language",
+  "menu.signOut": "Sign out",
+  "menu.openLabel": "Open menu",
   "navigator.title": "Questions",
   "navigator.reviewTitle": "Jump to a question",
   "navigator.progressSubtitle": "{{answered}} of {{total}} answered",

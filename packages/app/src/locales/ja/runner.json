@@ -1,4 +1,13 @@
 {
+  "menu.title": "メニュー",
+  "menu.library": "テストライブラリ",
+  "menu.history": "受験履歴",
+  "menu.leaveTest": "テストを離れる",
+  "menu.leaveTestNoteBeforeStart": "まだ何も始まっていません。「準備ができました」をタップすると時間の計測が始まります。",
+  "menu.leaveTestNoteRunning": "この画面を離れている間も時間は進み続けます。",
+  "menu.language": "言語",
+  "menu.signOut": "サインアウト",
+  "menu.openLabel": "メニューを開く",
   "navigator.title": "問題",
   "navigator.reviewTitle": "問題に移動",
   "navigator.progressSubtitle": "{{total}}問中{{answered}}問に解答済み",

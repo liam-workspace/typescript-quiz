@@ -1,4 +1,13 @@
 {
+  "menu.title": "Menu",
+  "menu.library": "Raccolta di test",
+  "menu.history": "Cronologia dei tentativi",
+  "menu.leaveTest": "Esci dal test",
+  "menu.leaveTestNoteBeforeStart": "Non è ancora iniziato nulla. Il tempo parte quando tocchi «Sono pronto».",
+  "menu.leaveTestNoteRunning": "Il tempo continua a scorrere mentre sei fuori.",
+  "menu.language": "Lingua",
+  "menu.signOut": "Esci",
+  "menu.openLabel": "Apri il menu",
   "navigator.title": "Domande",
   "navigator.reviewTitle": "Vai a una domanda",
   "navigator.progressSubtitle": "{{answered}} di {{total}} con risposta",

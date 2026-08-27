@@ -1,4 +1,13 @@
 {
+  "menu.title": "Menú",
+  "menu.library": "Biblioteca de pruebas",
+  "menu.history": "Historial de intentos",
+  "menu.leaveTest": "Salir de la prueba",
+  "menu.leaveTestNoteBeforeStart": "Todavía no ha empezado nada. El reloj empieza cuando tocas «Estoy listo».",
+  "menu.leaveTestNoteRunning": "El reloj sigue avanzando mientras estás fuera.",
+  "menu.language": "Idioma",
+  "menu.signOut": "Cerrar sesión",
+  "menu.openLabel": "Abrir el menú",
   "navigator.title": "Preguntas",
   "navigator.reviewTitle": "Ir a una pregunta",
   "navigator.progressSubtitle": "{{answered}} de {{total}} respondidas",

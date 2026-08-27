@@ -1,4 +1,13 @@
 {
+  "menu.title": "Menu",
+  "menu.library": "Bibliothèque de tests",
+  "menu.history": "Historique des tentatives",
+  "menu.leaveTest": "Quitter le test",
+  "menu.leaveTestNoteBeforeStart": "Rien n’a encore commencé. Le chronomètre démarre quand tu touches « Je suis prêt ».",
+  "menu.leaveTestNoteRunning": "Le chronomètre continue pendant ton absence.",
+  "menu.language": "Langue",
+  "menu.signOut": "Se déconnecter",
+  "menu.openLabel": "Ouvrir le menu",
   "navigator.title": "Questions",
   "navigator.reviewTitle": "Aller à une question",
   "navigator.progressSubtitle": "{{answered}} réponses sur {{total}}",

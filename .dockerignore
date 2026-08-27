@@ -18,7 +18,3 @@ compose.yml
 .prettierignore
 .prettierrc.json
 oxlint.config.ts
-
-# the old Razzia app this repo was forked from — never built into the image
-packages/web
-packages/socket

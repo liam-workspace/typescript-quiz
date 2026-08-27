@@ -6,11 +6,6 @@ export default defineConfig({
     builtin: true,
     node: true,
   },
-  // Packages/socket and packages/web are the old Razzia app: they're
-  // excluded from pnpm-workspace.yaml (still import the now-renamed
-  // @razzia/common) so they have no installed node_modules, which makes
-  // type-aware oxlint fail on them. They stay on disk for reference and
-  // are deleted in a later plan; ignored here in the meantime.
   // Type-aware oxlint descends into node_modules/ and dist/ unless told not
   // to (verified: removing every ignorePattern does not restore a default
   // skip). Linting emitted JS is pointless -- diagnostics land on generated
@@ -19,12 +14,7 @@ export default defineConfig({
   // it, making the gate nondeterministic. Ignoring both holds the whole-repo
   // run at 0.09GB. tsc checks the same program in 1s using 0.19GB, so this
   // is a linter pathology, not a defect in the code being linted.
-  ignorePatterns: [
-    "packages/socket/**",
-    "packages/web/**",
-    "**/dist/**",
-    "**/node_modules/**",
-  ],
+  ignorePatterns: ["**/dist/**", "**/node_modules/**"],
   jsPlugins: ["@stylistic/eslint-plugin"],
   options: {
     typeAware: true,
@@ -35,13 +25,6 @@ export default defineConfig({
     {
       files: ["packages/app/**/*.{ts,tsx}"],
       plugins: ["react"],
-    },
-    {
-      files: ["packages/web/**/*.{ts,tsx}"],
-      plugins: ["react"],
-      rules: {
-        "react/jsx-key": "off",
-      },
     },
     {
       // NestJS is decorator- and class-driven, so several of the repo's

@@ -6,6 +6,5 @@ This folder covers the basic setup (config, quizzes, branding) as well as more a
 - [Quiz](quiz.md): creating and structuring quizzes via `config/quizz/*.json`.
 - [Branding](branding.md): optional custom theming via `config/branding/`.
 - [Reverse Proxy](reverse-proxy.md): running Razzia behind Traefik, Nginx, Caddy, or another reverse proxy.
-- [WebSocket Protocol](websocket-protocol.md): the player-facing event protocol, for building custom clients (e.g. a physical buzzer).
 
 Back to the [main README](../README.md).

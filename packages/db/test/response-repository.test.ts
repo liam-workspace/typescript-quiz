@@ -258,6 +258,27 @@ describe("response repository -- reorder guard", () => {
     })
   }, 120_000)
 
+  it("does not misclassify an unknown attempt as an unknown question", async () => {
+    await withDatabase(async (pool) => {
+      const fixture = await seedPublishedTest(pool)
+
+      await expect(
+        writeResponse(pool, {
+          attemptId: randomUUID(),
+          questionId: fixture.questionIds[0],
+          testVersionId: fixture.versionId,
+          clientInstanceId: "device-a",
+          seq: 1,
+          selectedChoiceIds: [],
+          answeredAt: NOW,
+          timeSpentMs: null,
+          allowAnswerChange: true,
+          now: NOW,
+        }),
+      ).rejects.toMatchObject({ constraint: "response_attempt_fk" })
+    })
+  }, 120_000)
+
   it("an empty selectedChoiceIds clears the answer rather than being rejected as malformed", async () => {
     await withDatabase(async (pool) => {
       const fixture = await seedPublishedTest(pool)

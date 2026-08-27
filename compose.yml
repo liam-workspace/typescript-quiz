@@ -10,11 +10,17 @@ services:
       dockerfile: Dockerfile
       secrets:
         - node_auth_token
+    # Bound to all interfaces ON PURPOSE, unlike postgres below: the child's
+    # iPad reaches this over the home wifi, so loopback would make the app
+    # unusable for the one device it exists to serve. What protects it is not
+    # the bind address but JWKS verification on every route plus the
+    # ALLOWED_EMAILS allowlist -- an unauthenticated request gets 401 and an
+    # unlisted account gets 403 before any handler runs.
     ports:
       - "3000:3000"
     environment:
       PORT: 3000
-      DATABASE_URL: postgresql://pp:${POSTGRES_PASSWORD:-pp}@postgres:5432/pp
+      DATABASE_URL: postgresql://pp:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/pp
       JWKS_URL: ${JWKS_URL:-https://auth.icovn.me/.well-known/jwks.json}
       # Comma-separated allowlist checked at sign-in; leaving it unset
       # rejects every sign-in, so set it in the environment or a .env file.
@@ -35,7 +41,11 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: pp
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pp}
+      # No default. A weak fallback like `pp` is the password this actually
+      # ships with, because nobody overrides a value that already works -- and
+      # this database holds a child's answers and scores. Compose fails fast
+      # with the message below instead.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       POSTGRES_DB: pp
     ports:
       - "127.0.0.1:5433:5432"

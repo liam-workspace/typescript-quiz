@@ -61,6 +61,18 @@ COPY --from=builder /app/packages/db/dist ./packages/db/dist
 COPY --from=builder /app/packages/db/migrations ./packages/db/migrations
 COPY --from=builder /app/packages/server/dist ./packages/server/dist
 
+# /media is a named volume at runtime. Docker seeds an empty named volume from
+# the image's directory, ownership included, so creating it as `node` here is
+# what makes it writable after the drop below -- otherwise the volume arrives
+# owned by root and every upload fails.
+RUN mkdir -p /media && chown -R node:node /media /app
+
+# Drop root. The `node` images ship an unprivileged `node` user (uid 1000);
+# nothing in this runtime needs more than that -- it binds 3000, reads its own
+# dist/ and writes /media. A container that never needed root should not spend
+# its life as root.
+USER node
+
 EXPOSE 3000
 
 # GET /health is deliberately outside the /api prefix (main.ts excludes it

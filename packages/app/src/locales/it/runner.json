@@ -22,6 +22,7 @@
   "runner.previous": "Indietro",
   "runner.next": "Avanti",
   "runner.handIn": "Consegna",
+  "runner.handIn.unavailable": "L'invio non è ancora disponibile.",
   "runner.savedIndicator": "Salvato",
   "runner.sectionChip.listening": "Ascolto",
   "runner.sectionChip.reading": "Lettura",

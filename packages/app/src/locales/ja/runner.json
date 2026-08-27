@@ -21,6 +21,7 @@
   "runner.previous": "前へ",
   "runner.next": "次へ",
   "runner.handIn": "提出する",
+  "runner.handIn.unavailable": "まだ提出はできません。",
   "runner.savedIndicator": "保存済み",
   "runner.sectionChip.listening": "リスニング",
   "runner.sectionChip.reading": "リーディング",

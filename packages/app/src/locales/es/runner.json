@@ -22,6 +22,7 @@
   "runner.previous": "Anterior",
   "runner.next": "Siguiente",
   "runner.handIn": "Entregar",
+  "runner.handIn.unavailable": "Enviar todavía no está disponible.",
   "runner.savedIndicator": "Guardado",
   "runner.sectionChip.listening": "Comprensión auditiva",
   "runner.sectionChip.reading": "Lectura",

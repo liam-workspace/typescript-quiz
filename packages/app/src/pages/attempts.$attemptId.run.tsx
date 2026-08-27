@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
 import { ListeningRunner } from "../components/ListeningRunner.js"
+import { ReadingRunner } from "../components/ReadingRunner.js"
 import { ApiError } from "../lib/api-client.js"
 import {
   claimPlay,
@@ -29,11 +30,24 @@ import type {
 interface FlatEntry {
   readonly question: RunnerQuestion
   readonly stimulus: StimulusWire | undefined
+  // The 0-based index of `question`'s group within `section.groups`, and
+  // that group's full question list -- ReadingRunner's "Passage N ·
+  // questions X-Y" needs both (N = groupIndex + 1, X/Y = the group's first
+  // and last question ordinals). Unused by the listening branch; carried
+  // here rather than recomputed by a second group lookup in the reading
+  // branch below.
+  readonly groupIndex: number
+  readonly groupQuestions: readonly RunnerQuestion[]
 }
 
 function flattenSection(section: RunnerSection): FlatEntry[] {
-  return section.groups.flatMap((group) =>
-    group.questions.map((question) => ({ question, stimulus: group.stimulus })),
+  return section.groups.flatMap((group, groupIndex) =>
+    group.questions.map((question) => ({
+      question,
+      stimulus: group.stimulus,
+      groupIndex,
+      groupQuestions: group.questions,
+    })),
   )
 }
 
@@ -173,29 +187,67 @@ export function RunScreen({ attemptId, envelope, navigate }: RunScreenProps) {
   }
 
   const nextEntry = entries.at(currentIndex + 1)
+  const previousEntry = entries.at(currentIndex - 1)
 
-  const handleNext = (): void => {
-    if (!nextEntry) {
-      return
-    }
-
-    setPosition(attemptId, section.id, nextEntry.question.id)
+  // Shared by Next (both sections) and Previous (reading's `free` section
+  // only -- listening's forward_only never renders a Previous button, see
+  // ListeningRunner). `PUT /position` itself does not distinguish direction:
+  // openapi.yaml's `navigation_locked` 409 only ever fires for a BACKWARD
+  // move in a forward_only section (attempt.repository.ts), which this app
+  // never attempts since it hides Previous there entirely. What CAN fire
+  // regardless of direction or navigation mode is the same
+  // SectionOrAttemptExpired 410 every other runner call uses -- surfaced
+  // here exactly like handleClaimPlay does, so a student paging through a
+  // reading passage after the section's clock has run out sees the same
+  // actionable message rather than a click that silently does nothing.
+  const moveToQuestion = (entry: FlatEntry): void => {
+    setPosition(attemptId, section.id, entry.question.id)
       .then(() => {
-        setCurrentQuestionId(nextEntry.question.id)
+        setCurrentQuestionId(entry.question.id)
         setPlayState({ status: "idle" })
       })
       .catch((error: unknown) => {
         if (!(error instanceof ApiError)) {
           throw error
         }
-        // Debounced/fire-and-forget per openapi.yaml -- losing one costs a
-        // wrong landing spot after reload, nothing more. A forward move in
-        // a forward_only section is accepted by the server (only a
-        // BACKWARD move gets 409 navigation_locked), so this branch is not
-        // expected to fire for the Next button; it exists so a genuine
-        // 410 section/attempt expiry does not surface as an unhandled
-        // rejection.
+
+        if (error.problem.type === "section_expired") {
+          setExpired({ kind: "section", resultUrl: null })
+
+          return
+        }
+
+        if (error.problem.type === "attempt_expired" && error.problem.attempt) {
+          const parsed = sameOriginPath.safeParse(
+            error.problem.attempt.resultUrl,
+          )
+
+          setExpired({
+            kind: "attempt",
+            resultUrl: parsed.success ? parsed.data : null,
+          })
+
+          // Debounced/fire-and-forget for anything else (e.g. a stale
+          // request racing a reload) per openapi.yaml -- losing one costs
+          // a wrong landing spot after reload, nothing more.
+        }
       })
+  }
+
+  const handleNext = (): void => {
+    if (!nextEntry) {
+      return
+    }
+
+    moveToQuestion(nextEntry)
+  }
+
+  const handlePrevious = (): void => {
+    if (!previousEntry) {
+      return
+    }
+
+    moveToQuestion(previousEntry)
   }
 
   const displayStimulus: StimulusWire | undefined =
@@ -232,7 +284,34 @@ export function RunScreen({ attemptId, envelope, navigate }: RunScreenProps) {
     )
   }
 
-  // ReadingRunner (Task 11) is not built yet.
+  if (section.type === "reading") {
+    return (
+      <ReadingRunner
+        question={question}
+        stimulus={displayStimulus}
+        passageOrdinal={currentEntry.groupIndex + 1}
+        passageFirstOrdinal={
+          currentEntry.groupQuestions.at(0)?.ordinal ?? question.ordinal
+        }
+        passageLastOrdinal={
+          currentEntry.groupQuestions.at(-1)?.ordinal ?? question.ordinal
+        }
+        selectedChoiceId={selectedChoiceId}
+        locked={locked}
+        onSelectChoice={handleSelectChoice}
+        questionCount={envelope.questionCount}
+        pips={pips}
+        hasPrevious={Boolean(previousEntry)}
+        onPrevious={handlePrevious}
+        hasNext={Boolean(nextEntry)}
+        onNext={handleNext}
+        expired={expired}
+      />
+    )
+  }
+
+  // No runner is built yet for the remaining section types (vocabulary,
+  // grammar) -- out of scope for this plan.
   return null
 }
 

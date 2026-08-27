@@ -66,3 +66,15 @@ export interface RunnerSection {
   allowAnswerChange: boolean
   groups: RunnerGroup[]
 }
+
+/**
+ * The per-attempt progress plan 1's RunnerSection deliberately omits (see
+ * above). Plan 3 joins attempt_section and merges this in, turning content
+ * plus progress into the one section shape the runner envelope's contract
+ * (`RunnerSection` in openapi.yaml) actually requires.
+ */
+export interface RunnerSectionState {
+  status: "pending" | "open" | "closed"
+  completedAt: string | null
+  expiresAt: string | null
+}

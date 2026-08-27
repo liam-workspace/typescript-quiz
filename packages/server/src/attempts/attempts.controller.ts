@@ -2,15 +2,20 @@ import type { JwtClaims } from "@liam-workspace/node-auth-server"
 import {
   Body,
   Controller,
+  Get,
+  Param,
   Post,
   Res,
   UnauthorizedException,
   UseGuards,
 } from "@nestjs/common"
-import type { StartResult } from "@pp/db"
+import type { RunnerEnvelopeRow, StartResult } from "@pp/db"
 import { CurrentStudent } from "../auth/current-student.decorator.js"
 import { JwksGuard } from "../auth/jwks.guard.js"
-import { AttemptsService } from "./attempts.service.js"
+import {
+  AttemptsService,
+  type RunnerEnvelopeResult,
+} from "./attempts.service.js"
 
 /**
  * Structural rather than express's Response: @types/express is not a
@@ -71,6 +76,38 @@ function toAttemptStartView(
   }
 }
 
+/**
+ * The contract's `RunnerEnvelope` merged over `RunnerEnvelopeRow`: `id`,
+ * `status`, `expiresAt`, `currentSectionId` and `currentQuestionId` come
+ * straight off the `AttemptRow` the service already loaded, plus
+ * `serverTime`, which is not stored anywhere -- it is read off the clock at
+ * response time, same as `AttemptStartView`'s.
+ */
+interface RunnerEnvelopeView extends Omit<
+  RunnerEnvelopeRow,
+  "id" | "status" | "expiresAt"
+> {
+  id: string
+  status: "in_progress"
+  expiresAt: Date | null
+  serverTime: Date
+}
+
+function toRunnerEnvelopeView(
+  result: RunnerEnvelopeResult,
+  serverTime: Date,
+): RunnerEnvelopeView {
+  return {
+    ...result.envelope,
+    id: result.attempt.id,
+    status: "in_progress",
+    expiresAt: result.attempt.expiresAt,
+    currentSectionId: result.attempt.currentSectionId,
+    currentQuestionId: result.attempt.currentQuestionId,
+    serverTime,
+  }
+}
+
 @Controller("attempts")
 @UseGuards(JwksGuard)
 export class AttemptsController {
@@ -95,6 +132,21 @@ export class AttemptsController {
     res.status(result.resumed ? 200 : 201)
 
     return toAttemptStartView(result, this.attempts.now())
+  }
+
+  /**
+   * The canonical runner envelope (spec: "ONE shape, read by the listening,
+   * reading, hand-in and recovery screens alike"). `isCorrect` is absent by
+   * construction -- `getRunnerEnvelope` never reaches `@pp/db/scoring`.
+   */
+  @Get(":id")
+  async get(
+    @CurrentStudent() claims: JwtClaims,
+    @Param("id") id: string,
+  ): Promise<RunnerEnvelopeView> {
+    const result = await this.attempts.getRunnerEnvelope(subjectOf(claims), id)
+
+    return toRunnerEnvelopeView(result, this.attempts.now())
   }
 }
 

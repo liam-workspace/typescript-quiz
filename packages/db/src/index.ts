@@ -19,6 +19,10 @@ import {
   type TestBriefRow,
   type TestCardRow,
 } from "./repositories/catalog.repository.js"
+import {
+  loadRunnerEnvelope,
+  type RunnerEnvelopeRow,
+} from "./repositories/runner.repository.js"
 import { loadForRunner } from "./repositories/test-version.repository.js"
 import {
   findStudentBySubject,
@@ -41,11 +45,14 @@ export type {
 
 export type { AttemptRow, FinalizedAttemptRow, StartResult }
 
+export type { RunnerEnvelopeRow }
+
 export {
   loadDbConfig,
   createJobPool,
   createRequestPool,
   loadForRunner,
+  loadRunnerEnvelope,
   upsertStudentBySubject,
   findStudentBySubject,
   listPublishedTests,

@@ -4,16 +4,72 @@ import {
   Inject,
   Injectable,
   ConflictException,
+  HttpException,
+  HttpStatus,
   NotFoundException,
 } from "@nestjs/common"
 import type { Clock } from "@pp/common"
 import {
   findStudentBySubject,
+  loadRunnerEnvelope,
+  loadRunningOwnedAttempt,
   startOrResumeAttempt,
   TestNotFoundError,
+  type AttemptRow,
+  type FinalizedAttemptRow,
+  type RunnerEnvelopeRow,
   type StartResult,
 } from "@pp/db"
 import { CLOCK, REQUEST_POOL } from "../database/tokens.js"
+
+export interface RunnerEnvelopeResult {
+  attempt: AttemptRow
+  envelope: Omit<
+    RunnerEnvelopeRow,
+    "id" | "status" | "expiresAt" | "currentSectionId" | "currentQuestionId"
+  >
+}
+
+/**
+ * `NotYourAttempt` (contract: "the attempt belongs to another student").
+ * Also thrown for a caller who never provisioned a student row: an unowned
+ * attempt and one owned by nobody the token can prove it is are the same
+ * answer to the caller, and the contract declares no 404 for this route.
+ */
+function notYourAttemptError(): HttpException {
+  return new HttpException(
+    {
+      type: "not_your_attempt",
+      title: "The attempt belongs to another student.",
+      status: HttpStatus.FORBIDDEN,
+    },
+    HttpStatus.FORBIDDEN,
+  )
+}
+
+/**
+ * `AttemptExpired`: the attempt was past its deadline and has just been
+ * finalized by `loadRunningOwnedAttempt`'s lazy-expiry check. Carries the
+ * finalized attempt so the client can render the time-up screen without a
+ * follow-up read, mirroring `finalizedPriorAttempt` in `toAttemptStartView`.
+ */
+function attemptExpiredError(finalized: FinalizedAttemptRow): HttpException {
+  return new HttpException(
+    {
+      type: "attempt_expired",
+      title: "The attempt was past its deadline and has been finalized.",
+      status: HttpStatus.GONE,
+      retryable: false,
+      attempt: {
+        id: finalized.id,
+        status: finalized.status,
+        submittedAt: finalized.submittedAt.toISOString(),
+        resultUrl: `/api/attempts/${finalized.id}/result`,
+      },
+    },
+    HttpStatus.GONE,
+  )
+}
 
 const UNIQUE_VIOLATION_SQLSTATE = "23505"
 const ACTIVE_ATTEMPT_CONSTRAINT = "attempt_one_active"
@@ -97,5 +153,45 @@ export class AttemptsService {
 
       throw error
     }
+  }
+
+  /**
+   * The runner projection (spec: "ONE shape, read by the listening,
+   * reading, hand-in and recovery screens alike"). loadRunningOwnedAttempt
+   * is the load-bearing check: it is what turns a stale in-progress attempt
+   * into a 410 by finalizing it on this very request, rather than handing
+   * back content for an attempt that is secretly already over.
+   */
+  async getRunnerEnvelope(
+    subjectClaim: string,
+    attemptId: string,
+  ): Promise<RunnerEnvelopeResult> {
+    const student = await findStudentBySubject(this.pool, subjectClaim)
+
+    if (!student) {
+      throw notYourAttemptError()
+    }
+
+    const now = this.clock.now()
+    const result = await loadRunningOwnedAttempt(this.pool, {
+      attemptId,
+      studentId: student.id,
+      now,
+    })
+
+    if (!result.attempt) {
+      if (result.finalized) {
+        throw attemptExpiredError(result.finalized)
+      }
+
+      throw notYourAttemptError()
+    }
+
+    const envelope = await loadRunnerEnvelope(this.pool, {
+      attemptId: result.attempt.id,
+      testVersionId: result.attempt.testVersionId,
+    })
+
+    return { attempt: result.attempt, envelope }
   }
 }

@@ -12,6 +12,22 @@ export interface ResponseWrite {
   timeSpentMs?: number
 }
 
+/**
+ * `RecordedResponse` on the wire (openapi.yaml): what the runner envelope
+ * reports back for a question already answered. Mirrors `ResponseWrite`'s
+ * ordering fields but is a server-read shape, not a client write -- there is
+ * no `timeSpentMs` here because the envelope never reports it back.
+ */
+export interface RecordedResponseWire {
+  questionId: QuestionId
+  selectedChoiceIds: ChoiceId[]
+  clientInstanceId: string
+  /** What the resume merge compares. */
+  seq: number
+  /** Display text. Never consulted for ordering or expiry. */
+  answeredAt?: string
+}
+
 export type WriteStatus = "applied" | "ignored_stale" | "rejected"
 
 export type RejectReason =

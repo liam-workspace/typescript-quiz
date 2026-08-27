@@ -17,6 +17,10 @@ import {
   type StartResult,
   type SubmitOutcome,
 } from "./repositories/attempt.repository.js"
+import {
+  loadAttemptResult,
+  type AttemptResultOutcome,
+} from "./repositories/attempt-result.repository.js"
 import { SectionExpiredError } from "./repositories/section-expired.error.js"
 import {
   InvalidCursorError,
@@ -83,6 +87,8 @@ export type {
   SubmitOutcome,
 }
 
+export type { AttemptResultOutcome }
+
 export type { RunnerEnvelopeRow }
 
 export type { PlayClaimResult }
@@ -106,6 +112,7 @@ export {
   loadSectionBrief,
   InvalidCursorError,
   loadOwnedAttempt,
+  loadAttemptResult,
   finalizeAttempt,
   finalizeExpiredAttempt,
   loadRunningOwnedAttempt,

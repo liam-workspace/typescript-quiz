@@ -9,6 +9,7 @@ packages:
   - "packages/common"
   - "packages/db"
   - "packages/server"
+  - "packages/app"
 
 allowBuilds:
   cpu-features: true
@@ -19,4 +20,8 @@ allowBuilds:
   ssh2: true
 
 minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - "@tanstack/router-core"
+  - "@tanstack/router-generator"
+  - "@testing-library/user-event"
 blockExoticSubdeps: true

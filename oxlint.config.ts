@@ -33,6 +33,10 @@ export default defineConfig({
   plugins: ["typescript"],
   overrides: [
     {
+      files: ["packages/app/**/*.{ts,tsx}"],
+      plugins: ["react"],
+    },
+    {
       files: ["packages/web/**/*.{ts,tsx}"],
       plugins: ["react"],
       rules: {

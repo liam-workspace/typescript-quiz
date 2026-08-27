@@ -91,6 +91,19 @@ export function createRawBodyJsonMiddleware(
       total += chunk.length
 
       if (total > maxBytes) {
+        // The chunk that pushed the total over the limit may itself carry
+        // most (or all) of the bytes -- on a small request the whole body
+        // often arrives in one "data" event, so `chunks` can still be empty
+        // here. Slice the overflowing chunk down to whatever room is left
+        // so the capture is a real truncated prefix up to maxBytes, not
+        // whatever happened to be buffered from PRIOR whole chunks alone.
+        const bufferedSoFar = chunks.reduce((sum, c) => sum + c.length, 0)
+        const remainingCapacity = maxBytes - bufferedSoFar
+
+        if (remainingCapacity > 0) {
+          chunks.push(chunk.subarray(0, remainingCapacity))
+        }
+
         req.rawBody = Buffer.concat(chunks)
         req.rawBodyByteCount = total
         // Stop consuming, but do not `req.destroy()` here: destroying the

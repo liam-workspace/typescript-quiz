@@ -7,8 +7,10 @@ import { migrateToLatest } from "@pp/db"
 import { inject } from "vitest"
 import { AppModule } from "../../src/app.module.js"
 import { JWKS_VERIFIER } from "../../src/auth/tokens.js"
-import { CLOCK } from "../../src/database/tokens.js"
+import { CLOCK, REQUEST_POOL } from "../../src/database/tokens.js"
+import { FailedWriteCaptureFilter } from "../../src/durability/failed-write-capture.filter.js"
 import { createRawBodyJsonMiddleware } from "../../src/http/raw-body-json.middleware.js"
+import { ZodBodyValidationPipe } from "../../src/validation/zod-body-validation.pipe.js"
 import { createTokenFactory } from "./token.js"
 
 const JWKS_URL = "https://auth.test/.well-known/jwks.json"
@@ -66,9 +68,21 @@ export async function createTestApp(
   // never serves -- the tests would agree with the code and both would
   // disagree with the contract.
   http.setGlobalPrefix("api", { exclude: ["health"] })
+  // Mirror main.ts: without this, tests exercise a different validation
+  // pipeline than production and would never see the pipe reject anything.
+  http.useGlobalPipes(new ZodBodyValidationPipe())
   // Mirror main.ts: without this, tests exercise a different error pipeline
   // than production and any assertion on an error body would be fiction.
-  http.useGlobalFilters(new AllExceptionsFilter())
+  // FailedWriteCaptureFilter MUST come last -- see the verified note on the
+  // filter itself for why (Nest reverses the global filter array before
+  // matching).
+  http.useGlobalFilters(
+    new AllExceptionsFilter(),
+    new FailedWriteCaptureFilter(
+      moduleRef.get(REQUEST_POOL),
+      moduleRef.get(CLOCK),
+    ),
+  )
   await http.init()
 
   return {

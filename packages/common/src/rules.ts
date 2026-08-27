@@ -33,6 +33,16 @@ export function canSetPosition(
  * same call atomically inside one SQL statement's WHERE clause, because a
  * separate read-then-write here would race two concurrent taps into
  * over-spending the cap.
+ *
+ * WHAT IT IS FOR, since nothing calls it yet: a CLIENT-SIDE affordance --
+ * greying out the Play button once the cap is spent, so a child is not
+ * invited to tap something that will be refused. It is deliberately NOT a
+ * server-side gate.
+ *
+ * Do not "helpfully" wire this in front of `claimPlay`. Checking here and
+ * writing there is exactly the read-then-write the SQL WHERE clause exists
+ * to avoid, and it would let two concurrent taps both pass a cap of 3 at
+ * playsUsed = 2. The atomic statement must remain the only decision-maker.
  */
 export function canClaimPlay(
   maxPlays: number | null,

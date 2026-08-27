@@ -16,6 +16,8 @@ import {
   loadRunnerEnvelope,
   loadRunningOwnedAttempt,
   loadSectionBrief,
+  SectionExpiredError,
+  setPosition as setPositionRow,
   startOrResumeAttempt,
   TestNotFoundError,
   type AttemptRow,
@@ -108,6 +110,31 @@ function sectionStillOpenError(): HttpException {
       status: HttpStatus.CONFLICT,
     },
     HttpStatus.CONFLICT,
+  )
+}
+
+/** `409`, contract: "this section runs forward only." */
+function navigationLockedError(): HttpException {
+  return new HttpException(
+    {
+      type: "navigation_locked",
+      title: "This section runs forward only.",
+      status: HttpStatus.CONFLICT,
+    },
+    HttpStatus.CONFLICT,
+  )
+}
+
+/** `410`, contract: the section clock elapsed while the attempt remains live. */
+function sectionExpiredError(): HttpException {
+  return new HttpException(
+    {
+      type: "section_expired",
+      title: "The section's clock ran out.",
+      status: HttpStatus.GONE,
+      retryable: false,
+    },
+    HttpStatus.GONE,
   )
 }
 
@@ -300,6 +327,59 @@ export class AttemptsService {
     }
 
     return { entry: outcome.entry, section }
+  }
+
+  /**
+   * Records the runner's reload position after the same owned/running check
+   * as every attempt-scoped mutation. A forward-only section rejects only
+   * a lower target ordinal; moving forward and re-confirming the current
+   * question both remain legal.
+   */
+  async setPosition(
+    subjectClaim: string,
+    attemptId: string,
+    sectionId: string,
+    questionId: string,
+  ): Promise<void> {
+    const student = await findStudentBySubject(this.pool, subjectClaim)
+
+    if (!student) {
+      throw notYourAttemptError()
+    }
+
+    const now = this.clock.now()
+    const result = await loadRunningOwnedAttempt(this.pool, {
+      attemptId,
+      studentId: student.id,
+      now,
+    })
+
+    if (!result.attempt) {
+      if (result.finalized) {
+        throw attemptExpiredError(result.finalized)
+      }
+
+      throw notYourAttemptError()
+    }
+
+    try {
+      const outcome = await setPositionRow(this.pool, {
+        attemptId: result.attempt.id,
+        sectionId,
+        questionId,
+        now,
+      })
+
+      if (!outcome.ok) {
+        throw navigationLockedError()
+      }
+    } catch (error) {
+      if (error instanceof SectionExpiredError) {
+        throw sectionExpiredError()
+      }
+
+      throw error
+    }
   }
 
   /**

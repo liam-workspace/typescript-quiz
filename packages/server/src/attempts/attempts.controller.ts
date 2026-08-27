@@ -6,6 +6,7 @@ import {
   HttpCode,
   Param,
   Post,
+  Put,
   Res,
   UnauthorizedException,
   UseGuards,
@@ -26,6 +27,11 @@ import {
  */
 interface StatusSettable {
   status(code: number): unknown
+}
+
+interface PositionBody {
+  sectionId: string
+  questionId: string
 }
 
 /**
@@ -223,6 +229,26 @@ export class AttemptsController {
     )
 
     return toSectionEntryView(result, this.attempts.now())
+  }
+
+  /**
+   * Full replacement of the runner's singleton reload position. A 204 has
+   * no representation, so the repository/service outcome deliberately does
+   * not escape this controller as a response body.
+   */
+  @Put(":id/position")
+  @HttpCode(204)
+  async setPosition(
+    @CurrentStudent() claims: JwtClaims,
+    @Param("id") id: string,
+    @Body() body: PositionBody,
+  ): Promise<void> {
+    await this.attempts.setPosition(
+      subjectOf(claims),
+      id,
+      body.sectionId,
+      body.questionId,
+    )
   }
 
   /**

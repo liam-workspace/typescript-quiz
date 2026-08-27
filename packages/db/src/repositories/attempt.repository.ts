@@ -3,6 +3,7 @@ import { scoreAttempt, type RecordedAnswer } from "@pp/common/scoring"
 import { withTransaction, type PgQueryable } from "@liam-public/node-postgres"
 import type pg from "pg"
 import { loadForScoring } from "../scoring.js"
+import { SectionExpiredError } from "./section-expired.error.js"
 
 export interface AttemptRow {
   id: string
@@ -217,6 +218,99 @@ export async function loadRunningOwnedAttempt(
   })
 
   return { attempt: null, finalized }
+}
+
+interface PositionContextDbRow {
+  navigation: "free" | "forward_only"
+  target_ordinal: number
+  current_ordinal: number | null
+  section_expires_at: Date
+}
+
+/**
+ * Persists the runner's singleton position. The attempt row is locked while
+ * the navigation decision is made so two debounced writes cannot both read
+ * the same old question and let the later write move a forward-only section
+ * backward.
+ */
+export async function setPosition(
+  db: PgQueryable,
+  input: {
+    attemptId: string
+    sectionId: string
+    questionId: string
+    now: Date
+  },
+): Promise<{ ok: true } | { ok: false; reason: "navigation_locked" }> {
+  const result = await withTransaction(db as pg.Pool, (tx) =>
+    setPositionInTransaction(tx, input),
+  )
+
+  return result
+}
+
+async function setPositionInTransaction(
+  tx: PgQueryable,
+  input: {
+    attemptId: string
+    sectionId: string
+    questionId: string
+    now: Date
+  },
+): Promise<{ ok: true } | { ok: false; reason: "navigation_locked" }> {
+  const { rows } = await tx.query<PositionContextDbRow>(
+    `SELECT ts.navigation,
+            target.ordinal AS target_ordinal,
+            current.ordinal AS current_ordinal,
+            position_section.expires_at AS section_expires_at
+       FROM attempt a
+       JOIN test_section ts
+         ON ts.id = $2 AND ts.test_version_id = a.test_version_id
+       JOIN attempt_section position_section
+         ON position_section.attempt_id = a.id
+        AND position_section.test_section_id = ts.id
+        AND position_section.completed_at IS NULL
+       JOIN question target
+         ON target.id = $3 AND target.test_version_id = a.test_version_id
+       JOIN question_group target_group
+         ON target_group.id = target.question_group_id
+        AND target_group.test_section_id = ts.id
+       LEFT JOIN question current
+         ON current.id = a.current_question_id
+        AND current.test_version_id = a.test_version_id
+      WHERE a.id = $1
+      FOR UPDATE OF a`,
+    [input.attemptId, input.sectionId, input.questionId],
+  )
+
+  if (rows.length === 0) {
+    throw new Error(
+      `position ${input.sectionId}/${input.questionId} is not valid for attempt ${input.attemptId}`,
+    )
+  }
+
+  const [context] = rows
+
+  if (context.section_expires_at <= input.now) {
+    throw new SectionExpiredError()
+  }
+
+  if (
+    context.navigation === "forward_only" &&
+    context.current_ordinal !== null &&
+    context.target_ordinal < context.current_ordinal
+  ) {
+    return { ok: false, reason: "navigation_locked" }
+  }
+
+  await tx.query(
+    `UPDATE attempt
+        SET current_section_id = $2, current_question_id = $3
+      WHERE id = $1`,
+    [input.attemptId, input.sectionId, input.questionId],
+  )
+
+  return { ok: true }
 }
 
 export interface SectionEntryRow {

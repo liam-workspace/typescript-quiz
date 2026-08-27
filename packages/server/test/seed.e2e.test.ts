@@ -123,7 +123,7 @@ describe("seed-test", () => {
       .expect(201)
 
     const listRes = await request(a.http.getHttpServer() as App)
-      .get("/api/tests")
+      .get("/api/tests?limit=50")
       .set("Authorization", `Bearer ${token}`)
       .expect(200)
 

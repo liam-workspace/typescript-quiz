@@ -5,6 +5,7 @@ import {
   finalizeExpiredAttempt,
   loadOwnedAttempt,
   loadRunningOwnedAttempt,
+  setPosition,
   startOrResumeAttempt,
   TestNotFoundError,
   type AttemptRow,
@@ -12,6 +13,7 @@ import {
   type SectionEntryRow,
   type StartResult,
 } from "./repositories/attempt.repository.js"
+import { SectionExpiredError } from "./repositories/section-expired.error.js"
 import {
   InvalidCursorError,
   listPublishedTests,
@@ -74,6 +76,8 @@ export {
   loadOwnedAttempt,
   finalizeExpiredAttempt,
   loadRunningOwnedAttempt,
+  SectionExpiredError,
+  setPosition,
   startOrResumeAttempt,
   enterSection,
   TestNotFoundError,

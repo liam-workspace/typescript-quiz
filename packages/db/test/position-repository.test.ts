@@ -231,6 +231,49 @@ describe("setPosition", () => {
       })
     }))
 
+  // Before the question navigator, Previous/Next inside the OPEN section was
+  // the only caller, so completed_at was always null and this path could not
+  // be reached. The navigator can offer a cell in a section already finished.
+  // `completed_at IS NULL` used to sit in the JOIN, so a closed section
+  // produced zero rows and a bare `throw new Error` -- a 500 on a
+  // well-formed request from an authorized student, and a status
+  // /attempts/{id}/position does not declare. It must refuse the way the
+  // contract says this route refuses: 409 navigation_locked.
+  it("refuses a position write into a CLOSED section as navigation_locked, not a 500", () =>
+    withDatabase(async (pool) => {
+      await seedPositionFixture(pool, {
+        sectionId: FREE_SECTION_ID,
+        questionId: FREE_QUESTION_IDS[0],
+      })
+      // The attempt_section_counts_reconcile constraint refuses a
+      // completed_at without the full score breakdown beside it -- closing a
+      // section and leaving its counts null is exactly the fail-open shape
+      // that constraint exists to stop, so the fixture closes it honestly.
+      await pool.query(
+        `UPDATE attempt_section
+            SET completed_at = $3,
+                points_earned = 1, points_possible = 3,
+                answered_count = 1, unanswered_count = 2,
+                correct_count = 1, incorrect_count = 0
+          WHERE attempt_id = $1 AND test_section_id = $2`,
+        [ATTEMPT_ID, FREE_SECTION_ID, NOW],
+      )
+
+      const result = await setPosition(pool, {
+        attemptId: ATTEMPT_ID,
+        sectionId: FREE_SECTION_ID,
+        questionId: FREE_QUESTION_IDS[1],
+        now: NOW,
+      })
+
+      expect(result).toEqual({ ok: false, reason: "navigation_locked" })
+      // And it did not move the student.
+      expect(await readPosition(pool)).toEqual({
+        sectionId: FREE_SECTION_ID,
+        questionId: FREE_QUESTION_IDS[0],
+      })
+    }))
+
   it("persists currentSectionId and currentQuestionId on success", () =>
     withDatabase(async (pool) => {
       await seedPositionFixture(pool, {

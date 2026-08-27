@@ -578,6 +578,7 @@ interface PositionContextDbRow {
   target_ordinal: number
   current_ordinal: number | null
   section_expires_at: Date
+  section_completed_at: Date | null
 }
 
 /**
@@ -615,14 +616,14 @@ async function setPositionInTransaction(
     `SELECT ts.navigation,
             target.ordinal AS target_ordinal,
             current.ordinal AS current_ordinal,
-            position_section.expires_at AS section_expires_at
+            position_section.expires_at AS section_expires_at,
+            position_section.completed_at AS section_completed_at
        FROM attempt a
        JOIN test_section ts
          ON ts.id = $2 AND ts.test_version_id = a.test_version_id
        JOIN attempt_section position_section
          ON position_section.attempt_id = a.id
         AND position_section.test_section_id = ts.id
-        AND position_section.completed_at IS NULL
        JOIN question target
          ON target.id = $3 AND target.test_version_id = a.test_version_id
        JOIN question_group target_group
@@ -646,6 +647,19 @@ async function setPositionInTransaction(
 
   if (isPastDeadline(context.section_expires_at, input.now)) {
     throw new SectionExpiredError()
+  }
+
+  // A CLOSED section refuses a position write, and must refuse it the way
+  // the contract says this route refuses things: 409 navigation_locked.
+  // `completed_at IS NULL` used to sit in the JOIN above, which turned a
+  // closed section into zero rows and therefore into the bare Error below
+  // -- a 500 on a well-formed request from an authorized student, and a
+  // status this operation does not declare. It was unreachable while
+  // Previous/Next inside the open section was the only caller; the question
+  // navigator, which can offer a cell in a section already finished, is
+  // what makes it reachable.
+  if (context.section_completed_at !== null) {
+    return { ok: false, reason: "navigation_locked" }
   }
 
   if (

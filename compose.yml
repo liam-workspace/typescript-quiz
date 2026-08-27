@@ -25,6 +25,11 @@ services:
       # Comma-separated allowlist checked at sign-in; leaving it unset
       # rejects every sign-in, so set it in the environment or a .env file.
       ALLOWED_EMAILS: ${ALLOWED_EMAILS:-}
+      # Required by config.ts (`required(env, ...)`), so its absence is not a
+      # degraded mode -- the process throws on boot. No default: a signing
+      # secret with a fallback is the secret the deployment actually ships
+      # with, and it is what stops a media URL being forgeable.
+      MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET:?set MEDIA_SIGNING_SECRET}
       MEDIA_ROOT: /media
       MEDIA_MAX_BYTES: ${MEDIA_MAX_BYTES:-20971520}
     volumes:

@@ -27,7 +27,16 @@ COPY packages/db ./packages/db
 COPY packages/server ./packages/server
 
 # common -> db -> server, each via `tsc -p tsconfig.build.json`.
-RUN pnpm build
+# Build only what this image ships. The root `pnpm build` also names
+# `@pp/app`, whose sources are deliberately NOT copied here -- the SPA is not
+# served from this process until plan 6's deploy task wires it. Left as the
+# root script, `--filter @pp/app` would match nothing, print "No projects
+# matched the filters" and EXIT 0, so the image would report a successful
+# build of something it never built. Naming the packages explicitly makes the
+# omission deliberate and visible instead of silent.
+RUN pnpm --filter @pp/common build \
+    && pnpm --filter @pp/db build \
+    && pnpm --filter @pp/server build
 
 # ---- PROD-DEPS (production-only node_modules, no dev tooling) ----
 # A fresh --prod install rather than `pnpm prune --prod` on the builder's

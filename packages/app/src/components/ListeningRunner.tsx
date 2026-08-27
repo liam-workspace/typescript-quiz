@@ -24,7 +24,10 @@ export interface ListeningExpiredState {
 export interface ListeningRunnerProps {
   readonly question: RunnerQuestion
   readonly stimulus: StimulusWire | undefined
-  readonly selectedChoiceId: string | null
+  // Every currently-selected choice id for the CURRENT question -- length 0
+  // or 1 for a single_choice question, any length for multi_choice. See
+  // ChoiceListProps.selectedIds.
+  readonly selectedChoiceIds: readonly string[]
   // See ChoiceListProps.locked -- computed by the page from
   // envelope.responses and the section's allowAnswerChange.
   readonly locked: boolean
@@ -58,7 +61,7 @@ export interface ListeningRunnerProps {
 export function ListeningRunner({
   question,
   stimulus,
-  selectedChoiceId,
+  selectedChoiceIds,
   locked,
   onSelectChoice,
   onClaimPlay,
@@ -129,7 +132,8 @@ export function ListeningRunner({
       <p>{question.prompt}</p>
       <ChoiceList
         choices={question.choices}
-        selectedId={selectedChoiceId}
+        questionType={question.type}
+        selectedIds={selectedChoiceIds}
         onSelect={onSelectChoice}
         locked={locked}
       />

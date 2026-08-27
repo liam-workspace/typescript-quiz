@@ -108,6 +108,70 @@ const listeningEnvelope: RunnerEnvelope = {
   responses: [],
 }
 
+// A multi_choice question is graded by exact set equality
+// (@pp/common/scoring's isQuestionCorrect) -- no fixture anywhere in this
+// package constructed one before this fix, which is exactly how a
+// single-select-only ChoiceList made every multi_choice question
+// unanswerable without a single test catching it.
+const multiChoiceEnvelope: RunnerEnvelope = {
+  id: "attempt-1",
+  status: "in_progress",
+  expiresAt: "2026-08-27T10:00:00.000Z",
+  serverTime: "2026-08-27T09:00:00.000Z",
+  questionCount: 20,
+  answeredCount: 0,
+  unansweredOrdinals: [3, 4],
+  currentSectionId: "section-listening",
+  currentQuestionId: "q-1",
+  sections: [
+    {
+      id: "section-listening",
+      type: "listening",
+      status: "open",
+      completedAt: null,
+      navigation: "forward_only",
+      // Unlike listeningEnvelope, this is allowAnswerChange: true, so these
+      // tests exercise the multi-select MECHANICS without the lock policy
+      // confounding them. The no-changes-allowed case is covered separately
+      // below, and it is not a hypothetical: locking on the first checkbox
+      // left a multi_choice question permanently half-answered, which
+      // exact-set-equality grading then marks wrong.
+      allowAnswerChange: true,
+      expiresAt: "2026-08-27T09:25:00.000Z",
+      groups: [
+        {
+          id: "group-1",
+          stimulus: cappedAudio,
+          questions: [
+            {
+              id: "q-1",
+              ordinal: 3,
+              type: "multi_choice",
+              prompt: "Which animals did the boy see?",
+              choices: [
+                { id: "c-1", label: "A dog" },
+                { id: "c-2", label: "A cat" },
+                { id: "c-3", label: "A bird" },
+              ],
+            },
+            {
+              id: "q-2",
+              ordinal: 4,
+              type: "single_choice",
+              prompt: "Where was he?",
+              choices: [
+                { id: "c-4", label: "The park" },
+                { id: "c-5", label: "School" },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  responses: [],
+}
+
 const passageOne: RunnerEnvelope["sections"][number]["groups"][number]["stimulus"] =
   {
     id: "stim-r1",
@@ -515,6 +579,109 @@ describe("RunScreen", () => {
           selectedChoiceIds: ["c-2"],
         }),
       ],
+    })
+  })
+
+  // The half of the multi_choice defect that survived the first fix.
+  // `locked` fired on the FIRST selection, which is correct for
+  // single_choice ("your answer is final") but left a multi_choice question
+  // in a no-changes section permanently half-answered -- and then graded
+  // wrong, since isQuestionCorrect requires the set to match exactly.
+  // Nothing in the schema stops a multi_choice question sitting in such a
+  // section: allow_answer_change is per-section, type is per-question, and
+  // no constraint links them.
+  it("lets a multi_choice question be fully answered even when the section forbids answer changes", async () => {
+    const user = userEvent.setup()
+    const [section] = multiChoiceEnvelope.sections
+    const envelope: RunnerEnvelope = {
+      ...multiChoiceEnvelope,
+      sections: [{ ...section, allowAnswerChange: false }],
+    }
+
+    renderRunScreen(envelope)
+
+    await user.click(screen.getByRole("checkbox", { name: "A dog" }))
+    await user.click(screen.getByRole("checkbox", { name: "A bird" }))
+
+    expect(screen.getByRole("checkbox", { name: "A dog" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    )
+    expect(screen.getByRole("checkbox", { name: "A bird" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    )
+  })
+
+  it("durably records BOTH ids when two checkboxes are tapped on a multi_choice question", async () => {
+    const user = userEvent.setup()
+
+    renderRunScreen(multiChoiceEnvelope)
+
+    await user.click(screen.getByRole("checkbox", { name: "A dog" }))
+    await user.click(screen.getByRole("checkbox", { name: "A bird" }))
+
+    expect(screen.getByRole("checkbox", { name: "A dog" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    )
+    expect(screen.getByRole("checkbox", { name: "A cat" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    )
+    expect(screen.getByRole("checkbox", { name: "A bird" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    )
+
+    const [queued] = await waitFor(async () => {
+      const items = await getQueue().snapshotForSection(
+        "attempt-1",
+        "section-listening",
+      )
+
+      expect(items).toHaveLength(1)
+
+      return items
+    })
+
+    // Exact set equality (isQuestionCorrect, @pp/common/scoring) is what
+    // this whole fix is for -- a selection that lost either id here would
+    // grade a fully-correct multi_choice answer as wrong.
+    expect(queued).toMatchObject({
+      questionId: "q-1",
+      selectedChoiceIds: ["c-1", "c-3"],
+    })
+  })
+
+  it("removes an id from the recorded selection when its checkbox is tapped again", async () => {
+    const user = userEvent.setup()
+
+    renderRunScreen(multiChoiceEnvelope)
+
+    await user.click(screen.getByRole("checkbox", { name: "A dog" }))
+    await user.click(screen.getByRole("checkbox", { name: "A cat" }))
+    await user.click(screen.getByRole("checkbox", { name: "A dog" }))
+
+    expect(screen.getByRole("checkbox", { name: "A dog" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    )
+
+    const [queued] = await waitFor(async () => {
+      const items = await getQueue().snapshotForSection(
+        "attempt-1",
+        "section-listening",
+      )
+
+      expect(items).toHaveLength(1)
+
+      return items
+    })
+
+    expect(queued).toMatchObject({
+      questionId: "q-1",
+      selectedChoiceIds: ["c-2"],
     })
   })
 

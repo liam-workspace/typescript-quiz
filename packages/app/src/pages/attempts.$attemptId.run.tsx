@@ -202,9 +202,24 @@ export function RunScreen({
 
   const { question, stimulus } = currentEntry
   const existingResponse = responses.get(question.id)
-  const selectedChoiceId = existingResponse?.[0] ?? null
-  const locked =
-    !section.allowAnswerChange && (existingResponse?.length ?? 0) > 0
+  const selectedChoiceIds = existingResponse ?? []
+  // `allowAnswerChange: false` means "your answer is final once given". For
+  // single_choice that is a single tap, so locking on the first selection is
+  // exactly right. For multi_choice it is not: BUILDING the set is how the
+  // question gets answered, and locking on the first checkbox would leave a
+  // two-correct-answer question permanently half-answered -- and then graded
+  // wrong, because isQuestionCorrect requires the set to match exactly.
+  // So a multi_choice question locks on what the SERVER already had when
+  // this screen loaded (a genuine earlier answer), never on the set the
+  // child is assembling right now.
+  const priorServerResponse = envelope.responses.find(
+    (response) => response.questionId === question.id,
+  )
+  const answeredBefore =
+    question.type === "multi_choice"
+      ? (priorServerResponse?.selectedChoiceIds.length ?? 0) > 0
+      : (existingResponse?.length ?? 0) > 0
+  const locked = !section.allowAnswerChange && answeredBefore
 
   // Durable before sent (spec §5 rule 1): `queue.recordAnswer` writes to
   // IndexedDB -- surviving a tab close from this point on -- alongside the
@@ -213,8 +228,29 @@ export function RunScreen({
   // FlushController already owns retry/backoff internally, and awaiting it
   // here would make every tap wait on the network the queue exists to
   // route around.
+  //
+  // ChoiceList reports which choice the child just tapped, not the new
+  // selection -- this is where that tap becomes a full selectedChoiceIds
+  // array, because what it means depends on question.type: single_choice
+  // replaces the selection (a fresh [choiceId], matching a RadioGroup's own
+  // one-at-a-time semantics), multi_choice toggles that id in or out of the
+  // existing set. isQuestionCorrect (@pp/common/scoring) grades multi_choice
+  // by exact set equality, so every currently-selected id has to reach the
+  // queue intact, not just the one that was last tapped.
+  const nextChoiceIdsFor = (choiceId: string): string[] => {
+    if (question.type !== "multi_choice") {
+      return [choiceId]
+    }
+
+    return selectedChoiceIds.includes(choiceId)
+      ? selectedChoiceIds.filter((id) => id !== choiceId)
+      : [...selectedChoiceIds, choiceId]
+  }
+
   const handleSelectChoice = (choiceId: string): void => {
-    setResponses((prev) => new Map(prev).set(question.id, [choiceId]))
+    const nextChoiceIds = nextChoiceIdsFor(choiceId)
+
+    setResponses((prev) => new Map(prev).set(question.id, nextChoiceIds))
 
     void queue
       .recordAnswer(
@@ -222,7 +258,7 @@ export function RunScreen({
           attemptId,
           sectionId: section.id,
           questionId: question.id,
-          selectedChoiceIds: [choiceId],
+          selectedChoiceIds: nextChoiceIds,
           timeSpentMs: null,
         },
         new Date(),
@@ -437,7 +473,7 @@ export function RunScreen({
       <ListeningRunner
         question={question}
         stimulus={displayStimulus}
-        selectedChoiceId={selectedChoiceId}
+        selectedChoiceIds={selectedChoiceIds}
         locked={locked}
         onSelectChoice={handleSelectChoice}
         onClaimPlay={handleClaimPlay}
@@ -469,7 +505,7 @@ export function RunScreen({
         passageLastOrdinal={
           currentEntry.groupQuestions.at(-1)?.ordinal ?? question.ordinal
         }
-        selectedChoiceId={selectedChoiceId}
+        selectedChoiceIds={selectedChoiceIds}
         locked={locked}
         onSelectChoice={handleSelectChoice}
         questionCount={envelope.questionCount}

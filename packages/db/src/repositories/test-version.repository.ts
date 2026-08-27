@@ -28,6 +28,7 @@ interface RunnerRow {
   st_title: string | null
   st_body: string | null
   st_filename: string | null
+  st_media_kind: string | null
   st_max_plays: number | null
   st_allow_pause: boolean | null
   st_allow_seek: boolean | null
@@ -77,7 +78,7 @@ export async function loadForRunner(
             ts.default_allow_seek s_allow_seek,
             g.id g_id, g.ordinal g_ordinal,
             st.id st_id, st.type::text st_type, st.title st_title, st.body_text st_body,
-            ma.filename st_filename, st.max_plays st_max_plays,
+            ma.filename st_filename, ma.kind::text st_media_kind, st.max_plays st_max_plays,
             st.allow_pause st_allow_pause, st.allow_seek st_allow_seek,
             sp.play_count plays_used,
             q.id q_id, q.ordinal q_ordinal, q.type::text q_type, q.prompt q_prompt,
@@ -154,6 +155,23 @@ function findOrCreateGroup(section: RunnerSection, r: RunnerRow): RunnerGroup {
 function buildStimulus(r: RunnerRow, stimulusId: string): RunnerStimulus {
   const maxPlays = r.st_max_plays ?? r.s_max_plays ?? null
 
+  // "mixed" names only "text plus media", never WHICH media -- unlike the
+  // audio/image branches, whose type IS the discriminator. media_asset.kind
+  // has always carried the answer (stimulus_mixed_has_both guarantees a
+  // mixed stimulus has a media_asset_id, and media_asset.kind is NOT NULL),
+  // so a mixed row here with no valid st_media_kind means this SELECT and
+  // that guarantee have come apart. Same precedent as loadReview
+  // (attempt-result.repository.ts).
+  if (
+    r.st_type === "mixed" &&
+    r.st_media_kind !== "audio" &&
+    r.st_media_kind !== "image"
+  ) {
+    throw new Error(
+      `runner mixed stimulus ${stimulusId} is missing its media kind`,
+    )
+  }
+
   return {
     id: asStimulusId(stimulusId),
     type: r.st_type as RunnerStimulus["type"],
@@ -168,6 +186,9 @@ function buildStimulus(r: RunnerRow, stimulusId: string): RunnerStimulus {
     // directly because there is no cap left to defeat.
     ...(maxPlays === null && r.st_filename
       ? { mediaUrl: `/media/${r.st_filename}` }
+      : {}),
+    ...(r.st_type === "mixed"
+      ? { mediaKind: r.st_media_kind as "audio" | "image" }
       : {}),
   }
 }

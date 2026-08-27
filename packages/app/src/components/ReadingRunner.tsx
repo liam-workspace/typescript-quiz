@@ -27,7 +27,10 @@ export interface ReadingRunnerProps {
   readonly passageOrdinal: number
   readonly passageFirstOrdinal: number
   readonly passageLastOrdinal: number
-  readonly selectedChoiceId: string | null
+  // Every currently-selected choice id for the CURRENT question -- length 0
+  // or 1 for a single_choice question, any length for multi_choice. See
+  // ChoiceListProps.selectedIds.
+  readonly selectedChoiceIds: readonly string[]
   // Computed by the page from envelope.responses and the section's
   // allowAnswerChange -- the exact same formula ListeningRunner's `locked`
   // uses. The seeded reading section always has allowAnswerChange: true, so
@@ -71,7 +74,7 @@ export function ReadingRunner({
   passageOrdinal,
   passageFirstOrdinal,
   passageLastOrdinal,
-  selectedChoiceId,
+  selectedChoiceIds,
   locked,
   onSelectChoice,
   questionCount,
@@ -139,7 +142,8 @@ export function ReadingRunner({
       <p>{question.prompt}</p>
       <ChoiceList
         choices={question.choices}
-        selectedId={selectedChoiceId}
+        questionType={question.type}
+        selectedIds={selectedChoiceIds}
         onSelect={onSelectChoice}
         locked={locked}
       />

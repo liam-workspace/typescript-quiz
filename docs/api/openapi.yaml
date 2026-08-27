@@ -1347,11 +1347,20 @@ components:
         id: { type: string }
         type: { $ref: "#/components/schemas/StimulusType" }
         title: { type: string }
-        bodyText: { type: string, description: Present for a passage. }
+        bodyText:
+          {
+            type: string,
+            description: Present for a passage or a mixed stimulus.,
+          }
         maxPlays: { type: integer, minimum: 1 }
         playsUsed: { type: integer, minimum: 0 }
         allowPause: { type: boolean }
         allowSeek: { type: boolean }
+        mediaKind:
+          $ref: "#/components/schemas/MediaKind"
+          description: |
+            Present only for `type: mixed` -- `mixed` means "text plus media" and its own `type`
+            never says which. Absent for every other type, whose `type` already is the answer.
 
     OpenStimulus:
       type: object
@@ -1364,11 +1373,20 @@ components:
         id: { type: string }
         type: { $ref: "#/components/schemas/StimulusType" }
         title: { type: string }
-        bodyText: { type: string, description: Present for a passage. }
+        bodyText:
+          {
+            type: string,
+            description: Present for a passage or a mixed stimulus.,
+          }
         maxPlays: { type: "null" }
         mediaUrl: { type: string }
         allowPause: { type: boolean }
         allowSeek: { type: boolean }
+        mediaKind:
+          $ref: "#/components/schemas/MediaKind"
+          description: |
+            Present only for `type: mixed` -- `mixed` means "text plus media" and its own `type`
+            never says which. Absent for every other type, whose `type` already is the answer.
 
     Stimulus:
       description: Capped or uncapped. The distinction decides whether `mediaUrl` may appear at all.

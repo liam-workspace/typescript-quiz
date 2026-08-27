@@ -6,7 +6,7 @@ import type {
 } from "@pp/common"
 import { describe, expect, it } from "vitest"
 import { withDatabase } from "./helpers/database.js"
-import { seedPublishedTest } from "./helpers/fixtures.js"
+import { seedMixedStimulusTest, seedPublishedTest } from "./helpers/fixtures.js"
 import {
   loadForRunner,
   loadForScoring,
@@ -224,6 +224,53 @@ describe("projections", () => {
           "navigation",
           "type",
         ])
+      }
+    })
+  }, 120_000)
+
+  // `mixed` names only "text plus media", never WHICH media -- unlike the
+  // audio/image branches, whose type IS the discriminator. This fixture is
+  // deliberately image-backed (see seedMixedStimulusTest's own doc comment):
+  // exactly the case a projection that assumes audio gets wrong.
+  it("loadForRunner projects mediaKind for a mixed stimulus", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedMixedStimulusTest(pool)
+      const sections = await loadForRunner(pool, f.versionId, null)
+      const stimulus = sections.flatMap(groupsOf).map(stimulusOf).find(Boolean)
+
+      expect(stimulus).toBeDefined()
+      expect(stimulus?.type).toBe("mixed")
+      expect(stimulus?.mediaKind).toBe("image")
+    })
+  }, 120_000)
+
+  // The fixture's mixed stimulus has no max_plays set anywhere (neither on
+  // the stimulus nor the section default), so it is uncapped -- mediaUrl
+  // should still appear, exactly like an uncapped image or audio stimulus.
+  it("loadForRunner keeps mediaUrl for an uncapped mixed stimulus", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedMixedStimulusTest(pool)
+      const sections = await loadForRunner(pool, f.versionId, null)
+      const stimulus = sections.flatMap(groupsOf).map(stimulusOf).find(Boolean)
+
+      expect(stimulus?.maxPlays).toBeNull()
+      expect(stimulus?.mediaUrl).toBe("/media/m01.png")
+    })
+  }, 120_000)
+
+  // No key other than "mixed" ever carries mediaKind -- it would be a
+  // silently-wrong signal on a type whose own `type` already IS the media
+  // discriminator (audio, image, passage).
+  it("loadForRunner omits mediaKind for a non-mixed stimulus", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const sections = await loadForRunner(pool, f.versionId, null)
+      const stimuli = sections.flatMap(groupsOf).map(stimulusOf)
+
+      expect(stimuli.length).toBeGreaterThan(0)
+
+      for (const s of stimuli) {
+        expect(s && "mediaKind" in s).toBe(false)
       }
     })
   }, 120_000)

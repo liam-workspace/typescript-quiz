@@ -44,7 +44,7 @@ const baseProps = {
   question,
   onHandIn: vi.fn(),
   stimulus: cappedAudio,
-  selectedChoiceId: null,
+  selectedChoiceIds: [],
   locked: false,
   onSelectChoice: vi.fn(),
   onClaimPlay: vi.fn<() => Promise<void>>().mockResolvedValue(),
@@ -80,6 +80,27 @@ describe("ListeningRunner", () => {
     await user.click(screen.getByRole("radio", { name: "A cat" }))
 
     expect(onSelectChoice).toHaveBeenCalledExactlyOnceWith("c-2")
+  })
+
+  it("renders checkboxes instead of radios for a multi_choice question", () => {
+    render(
+      <ListeningRunner
+        {...baseProps}
+        question={{ ...question, type: "multi_choice" }}
+        selectedChoiceIds={["c-1", "c-2"]}
+      />,
+    )
+
+    expect(screen.getAllByRole("checkbox")).toHaveLength(2)
+    expect(screen.queryAllByRole("radio")).toHaveLength(0)
+    expect(screen.getByRole("checkbox", { name: "A dog" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    )
+    expect(screen.getByRole("checkbox", { name: "A cat" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    )
   })
 
   it("calls onClaimPlay when the play button is clicked", async () => {

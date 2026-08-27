@@ -53,7 +53,7 @@ const baseProps = {
   passageOrdinal: 1,
   passageFirstOrdinal: 5,
   passageLastOrdinal: 6,
-  selectedChoiceId: null,
+  selectedChoiceIds: [],
   locked: false,
   onSelectChoice: vi.fn(),
   questionCount: 20,
@@ -163,7 +163,7 @@ describe("ReadingRunner", () => {
     render(
       <ReadingRunner
         {...baseProps}
-        selectedChoiceId="c-1"
+        selectedChoiceIds={["c-1"]}
         locked={false}
         onSelectChoice={onSelectChoice}
       />,
@@ -174,6 +174,23 @@ describe("ReadingRunner", () => {
     await user.click(screen.getByRole("radio", { name: "A city" }))
 
     expect(onSelectChoice).toHaveBeenCalledExactlyOnceWith("c-2")
+  })
+
+  it("renders checkboxes instead of radios for a multi_choice question", () => {
+    render(
+      <ReadingRunner
+        {...baseProps}
+        question={{ ...question, type: "multi_choice" }}
+        selectedChoiceIds={["c-1"]}
+      />,
+    )
+
+    expect(screen.getAllByRole("checkbox")).toHaveLength(2)
+    expect(screen.queryAllByRole("radio")).toHaveLength(0)
+    expect(screen.getByRole("checkbox", { name: "A forest" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    )
   })
 
   it("calls onHandIn when Hand in is tapped", async () => {

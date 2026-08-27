@@ -74,5 +74,53 @@ export function QuestionMedia({
     )
   }
 
+  // `mixed` means text AND media together, and its OWN `type` never says
+  // which media -- unlike the audio/image branches above, whose type IS the
+  // discriminator. `mediaKind` (projected from media_asset.kind the same
+  // way the review screen's ReviewMixedStimulus already does -- see
+  // attempts.$attemptId.review.tsx's showsImage/showsAudio) is what this
+  // branches on instead. This used to fall through to `return null`,
+  // showing a child a blank panel for a real, publishable stimulus type.
+  if (stimulus.type === "mixed") {
+    const handlePlay = (): void => {
+      onClaimPlay().catch(() => {
+        // Handled by the caller -- see the component doc comment above.
+      })
+    }
+
+    // A capped stimulus carries no mediaUrl regardless of media kind (see
+    // StimulusWire's doc comment) -- only an open one does.
+    const mediaUrl = stimulus.maxPlays === null ? stimulus.mediaUrl : undefined
+
+    return (
+      <div className="mixed-stimulus">
+        <div className="passage">{stimulus.bodyText}</div>
+        {stimulus.mediaKind === "image" && mediaUrl ? (
+          <img
+            src={mediaUrl}
+            alt=""
+            className="mt-3 max-h-60 w-auto rounded-md"
+          />
+        ) : null}
+        {stimulus.mediaKind === "audio" ? (
+          <div className="audio-box mt-3">
+            <button
+              type="button"
+              className="h-11 min-w-11 touch-manipulation rounded-md border border-teal-700 bg-teal-50 px-4 text-sm font-bold text-teal-900 select-none disabled:cursor-not-allowed disabled:opacity-55"
+              onClick={handlePlay}
+              disabled={
+                playing ||
+                (stimulus.maxPlays !== null &&
+                  stimulus.playsUsed >= stimulus.maxPlays)
+              }
+            >
+              {t("listening.playButton")}
+            </button>
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
   return null
 }

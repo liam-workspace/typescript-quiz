@@ -45,6 +45,10 @@ export interface RunnerStimulus {
   allowPause: boolean
   allowSeek: boolean
   mediaUrl?: string
+  // Present only for `type: "mixed"` -- "mixed" means text AND media, and
+  // its own `type` never says which. media_asset.kind carries the answer;
+  // see packages/db/src/repositories/test-version.repository.ts.
+  mediaKind?: "audio" | "image"
 }
 
 export interface RunnerGroup {

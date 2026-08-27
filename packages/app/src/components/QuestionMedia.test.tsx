@@ -136,15 +136,93 @@ describe("QuestionMedia", () => {
     expect(onClaimPlay).toHaveBeenCalledTimes(1)
   })
 
-  it("renders nothing for an unhandled stimulus type", () => {
+  // `mixed` means text AND media together, and its own `type` never says
+  // which media -- only `mediaKind` does (mirrors the review screen's
+  // ReviewMixedStimulus). This used to fall through QuestionMedia's `return
+  // null`, showing a child a blank panel for a real, publishable stimulus
+  // type; see the "renders nothing for an unhandled stimulus type" test
+  // this replaces, which had pinned that blank panel as correct.
+  it("renders both the bodyText and the image for an open, image-backed mixed stimulus", () => {
+    const openMixedImage: OpenStimulusWire = {
+      id: "stim-mixed-image",
+      type: "mixed",
+      maxPlays: null,
+      bodyText: "Look at the picture.",
+      mediaUrl: "/api/media/mixed1.png?exp=1&sig=x",
+      mediaKind: "image",
+    }
+
     const { container } = render(
       <QuestionMedia
-        stimulus={{ ...openImage, type: "mixed" }}
+        stimulus={openMixedImage}
         onClaimPlay={vi.fn()}
         playing={false}
       />,
     )
 
-    expect(container).toBeEmptyDOMElement()
+    expect(screen.getByText("Look at the picture.")).toBeInTheDocument()
+    expect(container.querySelector("img")).toHaveAttribute(
+      "src",
+      "/api/media/mixed1.png?exp=1&sig=x",
+    )
+  })
+
+  it("renders both the bodyText and a play button for a capped, audio-backed mixed stimulus", async () => {
+    const cappedMixedAudio: CappedStimulusWire = {
+      id: "stim-mixed-audio",
+      type: "mixed",
+      maxPlays: 2,
+      playsUsed: 0,
+      allowPause: false,
+      allowSeek: false,
+      bodyText: "Listen and look.",
+      mediaKind: "audio",
+    }
+    const onClaimPlay = vi.fn<() => Promise<void>>().mockResolvedValue()
+    const user = userEvent.setup()
+
+    render(
+      <QuestionMedia
+        stimulus={cappedMixedAudio}
+        onClaimPlay={onClaimPlay}
+        playing={false}
+      />,
+    )
+
+    expect(screen.getByText("Listen and look.")).toBeInTheDocument()
+
+    const button = screen.getByRole("button", { name: "Play recording" })
+    expect(button).toBeEnabled()
+
+    await user.click(button)
+
+    expect(onClaimPlay).toHaveBeenCalledTimes(1)
+  })
+
+  it("never renders an image for a capped mixed stimulus, even if mediaKind is image", () => {
+    const cappedMixedImage: CappedStimulusWire = {
+      id: "stim-mixed-image-capped",
+      type: "mixed",
+      maxPlays: 1,
+      playsUsed: 0,
+      allowPause: false,
+      allowSeek: false,
+      bodyText: "Look at the picture.",
+      mediaKind: "image",
+    }
+
+    const { container } = render(
+      <QuestionMedia
+        stimulus={cappedMixedImage}
+        onClaimPlay={vi.fn()}
+        playing={false}
+      />,
+    )
+
+    // CappedStimulusWire structurally carries no mediaUrl at all -- this
+    // pins that a capped mixed stimulus never leaks one into an <img>, the
+    // same play-cap-bypass concern api-types.test.ts pins at the type level.
+    expect(container.querySelector("img")).not.toBeInTheDocument()
+    expect(screen.getByText("Look at the picture.")).toBeInTheDocument()
   })
 })

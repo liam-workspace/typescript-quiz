@@ -36,6 +36,7 @@
   "sectionRules.expired.sectionMessage": "このセクションの制限時間が終了しました。",
   "sectionRules.expired.attemptMessage": "テストの制限時間が終了しました。解答は提出済みです。",
   "sectionRules.expired.viewResult": "結果を見る",
+  "choices.selectAllThatApply": "当てはまるものをすべて選んでください。",
   "listening.rule.playsOnce": "各録音は一度だけ再生されます。",
   "listening.rule.noPauseRewind": "一時停止や巻き戻しはできません。",
   "listening.rule.noReturn": "一度進んだ問題には戻れません。",

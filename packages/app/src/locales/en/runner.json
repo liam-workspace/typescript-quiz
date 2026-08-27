@@ -36,6 +36,7 @@
   "sectionRules.expired.sectionMessage": "This section's time ran out.",
   "sectionRules.expired.attemptMessage": "Your test time ran out. Your answers have been submitted.",
   "sectionRules.expired.viewResult": "View result",
+  "choices.selectAllThatApply": "Select all that apply.",
   "listening.rule.playsOnce": "Each recording plays once.",
   "listening.rule.noPauseRewind": "You cannot pause or rewind.",
   "listening.rule.noReturn": "You cannot return to a question you have passed.",

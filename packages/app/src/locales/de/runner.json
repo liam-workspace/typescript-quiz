@@ -36,6 +36,7 @@
   "sectionRules.expired.sectionMessage": "Die Zeit für diesen Abschnitt ist abgelaufen.",
   "sectionRules.expired.attemptMessage": "Deine Testzeit ist abgelaufen. Deine Antworten wurden abgegeben.",
   "sectionRules.expired.viewResult": "Ergebnis ansehen",
+  "choices.selectAllThatApply": "Wähle alle zutreffenden Antworten aus.",
   "listening.rule.playsOnce": "Jede Aufnahme wird nur einmal abgespielt.",
   "listening.rule.noPauseRewind": "Du kannst nicht pausieren oder zurückspulen.",
   "listening.rule.noReturn": "Du kannst nicht zu einer bereits beantworteten Frage zurückkehren.",

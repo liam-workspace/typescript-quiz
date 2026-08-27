@@ -73,6 +73,10 @@ export interface CappedStimulusWire {
   playsUsed: number
   allowPause: boolean
   allowSeek: boolean
+  // Present only for `type: "mixed"` -- "mixed" means text AND media, and
+  // its own `type` never says which. See ReviewStimulus's mediaKind for the
+  // same distinction on the review side.
+  mediaKind?: "audio" | "image"
 }
 
 // A stimulus with no play limit -- an image, a passage, or audio a student
@@ -89,6 +93,8 @@ export interface OpenStimulusWire {
   mediaUrl?: string
   allowPause?: boolean
   allowSeek?: boolean
+  // Present only for `type: "mixed"` -- see CappedStimulusWire's mediaKind.
+  mediaKind?: "audio" | "image"
 }
 
 // Capped or uncapped. The distinction decides whether `mediaUrl` may appear

@@ -10,33 +10,7 @@ import {
 } from "@pp/db"
 import { ProblemException } from "../attempts/problem.exception.js"
 import { REQUEST_POOL } from "../database/tokens.js"
-
-const MIN_LIMIT = 1
-const MAX_LIMIT = 50
-const DEFAULT_LIMIT = 20
-
-/**
- * A silently clamped limit would make a client's pagination arithmetic
- * wrong with no signal, so anything outside `1..50` is 400 rather than
- * rounded into range.
- */
-function parseLimit(raw: string | undefined): number {
-  if (raw === undefined) {
-    return DEFAULT_LIMIT
-  }
-
-  const value = Number(raw)
-
-  if (!Number.isInteger(value) || value < MIN_LIMIT || value > MAX_LIMIT) {
-    throw new ProblemException({
-      type: "bad_limit",
-      title: "The limit query parameter is invalid.",
-      status: HttpStatus.BAD_REQUEST,
-    })
-  }
-
-  return value
-}
+import { parseLimit } from "../pagination.js"
 
 @Injectable()
 export class CatalogService {

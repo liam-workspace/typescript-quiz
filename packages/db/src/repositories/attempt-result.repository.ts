@@ -9,10 +9,170 @@ import {
   type GradableResponse,
   type GradableSection,
   type GradeResult,
+  type SectionScore,
 } from "@pp/common"
 import type { ScoringQuestion } from "@pp/common/scoring"
 import type { PgPool, PgQueryable } from "@liam-public/node-postgres"
+import { InvalidCursorError } from "./catalog.repository.js"
 import { loadForScoring } from "./test-version.repository.js"
+
+export interface AttemptHistoryRow {
+  id: string
+  testTitle: string
+  submittedAt: Date
+  status: "submitted" | "expired"
+  pointsEarned: number
+  pointsPossible: number
+  percentage: number
+  sections: SectionScore[]
+}
+
+export interface ListAttemptHistoryResult {
+  attempts: AttemptHistoryRow[]
+  nextCursor: string | null
+}
+
+interface AttemptHistoryCursor {
+  submittedAt: string
+  id: string
+}
+
+interface AttemptHistoryDbRow {
+  id: string
+  test_version_id: string
+  test_title: string
+  submitted_at: Date
+  cursor_submitted_at: string
+  status: "submitted" | "expired"
+  points_earned: number
+  points_possible: number
+  percentage: string
+}
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function encodeAttemptHistoryCursor(cursor: AttemptHistoryCursor): string {
+  return Buffer.from(JSON.stringify(cursor)).toString("base64url")
+}
+
+function isAttemptHistoryCursor(value: unknown): value is AttemptHistoryCursor {
+  if (typeof value !== "object" || value === null) {
+    return false
+  }
+
+  const candidate = value as Record<string, unknown>
+
+  return (
+    typeof candidate.submittedAt === "string" &&
+    !Number.isNaN(Date.parse(candidate.submittedAt)) &&
+    typeof candidate.id === "string" &&
+    UUID_PATTERN.test(candidate.id)
+  )
+}
+
+function decodeAttemptHistoryCursor(raw: string): AttemptHistoryCursor {
+  let parsed: unknown = undefined
+
+  try {
+    parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"))
+  } catch {
+    throw new InvalidCursorError("bad_cursor")
+  }
+
+  if (!isAttemptHistoryCursor(parsed)) {
+    throw new InvalidCursorError("bad_cursor")
+  }
+
+  return parsed
+}
+
+/**
+ * This student's terminal attempts in the exact order supported by
+ * attempt_history_idx: submitted_at DESC, then id ASC. The UUID is the
+ * total-order tiebreaker because submitted_at can legitimately tie.
+ */
+export async function listAttemptHistory(
+  pool: PgPool,
+  input: {
+    studentId: string
+    status: "finished" | "submitted" | "expired"
+    limit: number
+    cursor: string | null
+  },
+): Promise<ListAttemptHistoryResult> {
+  const cursor =
+    input.cursor === null ? null : decodeAttemptHistoryCursor(input.cursor)
+  const { rows } = await pool.query<AttemptHistoryDbRow>(
+    `SELECT a.id, a.test_version_id, tv.title AS test_title,
+            a.submitted_at, a.submitted_at::text AS cursor_submitted_at,
+            a.status,
+            a.points_earned, a.points_possible, a.percentage
+       FROM attempt a
+       JOIN test_version tv ON tv.id = a.test_version_id
+      WHERE a.student_id = $1
+        AND a.status <> 'in_progress'
+        AND ($2 = 'finished' OR a.status::text = $2)
+        AND (
+          $3::timestamptz IS NULL
+          OR a.submitted_at < $3
+          OR (a.submitted_at = $3 AND a.id > $4::uuid)
+        )
+      ORDER BY a.submitted_at DESC, a.id ASC
+      LIMIT $5`,
+    [
+      input.studentId,
+      input.status,
+      cursor?.submittedAt ?? null,
+      cursor?.id ?? null,
+      input.limit + 1,
+    ],
+  )
+
+  const hasMore = rows.length > input.limit
+  const pageRows = hasMore ? rows.slice(0, input.limit) : rows
+
+  const attempts = await Promise.all(
+    pageRows.map(async (row): Promise<AttemptHistoryRow> => {
+      // Deliberate N+1, capped at 50: gradeExistingAttempt is the one pure
+      // implementation of the section breakdown. Re-deriving correctness in
+      // a SQL aggregate would create a second grading implementation that can
+      // silently drift from gradeAttempt.
+      const fresh = await gradeExistingAttempt(pool, {
+        attemptId: row.id,
+        testVersionId: row.test_version_id,
+      })
+
+      return {
+        id: row.id,
+        testTitle: row.test_title,
+        submittedAt: row.submitted_at,
+        status: row.status,
+        pointsEarned: row.points_earned,
+        pointsPossible: row.points_possible,
+        // Node-postgres returns numeric as a string. Normalize it at the
+        // repository boundary so every consumer sees the contract's number.
+        percentage: Number(row.percentage),
+        sections: fresh.sections,
+      }
+    }),
+  )
+
+  const lastRow = pageRows[pageRows.length - 1]
+
+  return {
+    attempts,
+    nextCursor: hasMore
+      ? encodeAttemptHistoryCursor({
+          // Keep PostgreSQL's full microsecond precision. A JS Date would
+          // truncate this key to milliseconds and skip a tied row when the
+          // tie straddles two pages.
+          submittedAt: lastRow.cursor_submitted_at,
+          id: lastRow.id,
+        })
+      : null,
+  }
+}
 
 export type AttemptResultOutcome =
   | { kind: "not_found" }

@@ -7,13 +7,19 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
   Put,
   Res,
   Req,
   UseFilters,
   UseGuards,
 } from "@nestjs/common"
-import type { RunnerEnvelopeRow, SectionBriefRow, StartResult } from "@pp/db"
+import type {
+  AttemptHistoryRow,
+  RunnerEnvelopeRow,
+  SectionBriefRow,
+  StartResult,
+} from "@pp/db"
 import { CurrentStudent } from "../auth/current-student.decorator.js"
 import { JwksGuard } from "../auth/jwks.guard.js"
 import { ProblemException } from "./problem.exception.js"
@@ -175,11 +181,60 @@ function toSectionEntryView(
   }
 }
 
+interface AttemptHistoryView {
+  id: string
+  test: { title: string }
+  submittedAt: Date
+  status: "submitted" | "expired"
+  pointsEarned: number
+  pointsPossible: number
+  percentage: number
+  sections: AttemptHistoryRow["sections"]
+}
+
+interface AttemptHistoryPageView {
+  attempts: AttemptHistoryView[]
+  nextCursor: string | null
+}
+
+function toAttemptHistoryView(row: AttemptHistoryRow): AttemptHistoryView {
+  return {
+    id: row.id,
+    test: { title: row.testTitle },
+    submittedAt: row.submittedAt,
+    status: row.status,
+    pointsEarned: row.pointsEarned,
+    pointsPossible: row.pointsPossible,
+    percentage: row.percentage,
+    sections: row.sections,
+  }
+}
+
 @Controller("attempts")
 @UseGuards(JwksGuard)
 @UseFilters(ProblemExceptionFilter)
 export class AttemptsController {
   constructor(private readonly attempts: AttemptsService) {}
+
+  @Get()
+  async list(
+    @CurrentStudent() claims: JwtClaims,
+    @Query("status") status?: string,
+    @Query("limit") limit?: string,
+    @Query("cursor") cursor?: string,
+  ): Promise<AttemptHistoryPageView> {
+    const result = await this.attempts.listHistory(
+      subjectOf(claims),
+      status,
+      limit,
+      cursor ?? null,
+    )
+
+    return {
+      attempts: result.attempts.map(toAttemptHistoryView),
+      nextCursor: result.nextCursor,
+    }
+  }
 
   /**
    * One call covers start, resume and re-attempt (spec §4): the partial

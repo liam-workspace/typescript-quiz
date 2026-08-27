@@ -6,6 +6,8 @@ import {
   enterSection as enterSectionRow,
   findStudentBySubject,
   applyResponse,
+  InvalidCursorError,
+  listAttemptHistory,
   loadRunnerEnvelope,
   loadRunningOwnedAttempt,
   loadSectionBrief,
@@ -17,6 +19,7 @@ import {
   type AttemptRow,
   type AttemptScoreRow,
   type FinalizedAttemptRow,
+  type ListAttemptHistoryResult,
   type RunnerEnvelopeRow,
   type SectionBriefRow,
   type SectionEntryRow,
@@ -25,6 +28,7 @@ import {
 import { loadServerConfig } from "../config.js"
 import { CLOCK, REQUEST_POOL } from "../database/tokens.js"
 import { signMediaUrl } from "../media/media-signing.js"
+import { parseLimit } from "../pagination.js"
 import type { CapturedRequest } from "../http/raw-body-json.middleware.js"
 import {
   applyResponseItems,
@@ -66,6 +70,24 @@ export interface SubmitResultView {
 export interface SubmittedAttemptResult {
   alreadySubmitted: boolean
   view: SubmitResultView
+}
+
+type AttemptHistoryStatus = "finished" | "submitted" | "expired"
+
+function parseHistoryStatus(raw: string | undefined): AttemptHistoryStatus {
+  if (raw === undefined) {
+    return "finished"
+  }
+
+  if (raw === "finished" || raw === "submitted" || raw === "expired") {
+    return raw
+  }
+
+  throw new ProblemException({
+    type: "bad_status",
+    title: "The status query parameter is invalid.",
+    status: HttpStatus.BAD_REQUEST,
+  })
 }
 
 /** How long a signed media URL stays valid after `POST /play` issues it. */
@@ -206,6 +228,42 @@ export class AttemptsService {
   /** The contract's `serverTime`: authoritative, and the only clock a client may trust. */
   now(): Date {
     return this.clock.now()
+  }
+
+  async listHistory(
+    subjectClaim: string,
+    statusRaw: string | undefined,
+    limitRaw: string | undefined,
+    cursor: string | null,
+  ): Promise<ListAttemptHistoryResult> {
+    const status = parseHistoryStatus(statusRaw)
+    const limit = parseLimit(limitRaw)
+    const student = await findStudentBySubject(this.pool, subjectClaim)
+
+    // The operation declares no 404: a valid subject with no provisioned
+    // profile owns no attempts, so its scoped collection is simply empty.
+    if (!student) {
+      return { attempts: [], nextCursor: null }
+    }
+
+    try {
+      return await listAttemptHistory(this.pool, {
+        studentId: student.id,
+        status,
+        limit,
+        cursor,
+      })
+    } catch (error) {
+      if (error instanceof InvalidCursorError) {
+        throw new ProblemException({
+          type: "bad_cursor",
+          title: "The cursor could not be decoded.",
+          status: HttpStatus.BAD_REQUEST,
+        })
+      }
+
+      throw error
+    }
   }
 
   async start(

@@ -18,8 +18,11 @@ import {
   type SubmitOutcome,
 } from "./repositories/attempt.repository.js"
 import {
+  listAttemptHistory,
   loadAttemptResult,
+  type AttemptHistoryRow,
   type AttemptResultOutcome,
+  type ListAttemptHistoryResult,
 } from "./repositories/attempt-result.repository.js"
 import { SectionExpiredError } from "./repositories/section-expired.error.js"
 import {
@@ -87,7 +90,11 @@ export type {
   SubmitOutcome,
 }
 
-export type { AttemptResultOutcome }
+export type {
+  AttemptHistoryRow,
+  AttemptResultOutcome,
+  ListAttemptHistoryResult,
+}
 
 export type { RunnerEnvelopeRow }
 
@@ -112,6 +119,7 @@ export {
   loadSectionBrief,
   InvalidCursorError,
   loadOwnedAttempt,
+  listAttemptHistory,
   loadAttemptResult,
   finalizeAttempt,
   finalizeExpiredAttempt,

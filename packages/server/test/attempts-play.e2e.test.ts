@@ -237,6 +237,43 @@ describe("POST /attempts/:id/stimuli/:stimulusId/play", () => {
       })
   })
 
+  // The ownership guard was tested in NEITHER direction: every other test
+  // here claims a play on the claimant's own attempt, so
+  // loadRunningOwnedAttempt's student check could have been deleted and all
+  // of them would still pass. A play claim spends a capped, irreplaceable
+  // resource against a specific child's attempt -- another child must not
+  // be able to spend it, and a signed media URL must not be issued to them.
+  it("403s a play claim on another student's attempt, and spends no play", async () => {
+    const a = ready()
+    const slug = `play-foreign-${randomUUID()}`
+    const { sectionId, stimulusId } = await importAndPublish(
+      a,
+      slug,
+      "foreign.mp3",
+    )
+
+    const { token: ownerToken } = await provision(a, `${SUB}-owner`)
+    const attemptId = await startAndEnter(a, ownerToken, slug, sectionId)
+
+    const { token: intruderToken } = await provision(a, `${SUB}-intruder`)
+
+    await request(a.http.getHttpServer() as App)
+      .post(`/api/attempts/${attemptId}/stimuli/${stimulusId}/play`)
+      .set("Authorization", `Bearer ${intruderToken}`)
+      .expect(403)
+
+    // ...and the cap is untouched, so the owner still has their one play.
+    const owner = await request(a.http.getHttpServer() as App)
+      .post(`/api/attempts/${attemptId}/stimuli/${stimulusId}/play`)
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .expect(200)
+
+    const body = owner.body as PlayGrantBody
+
+    expect(body.playsUsed).toBe(1)
+    expect(body.playsRemaining).toBe(0)
+  })
+
   it("409s the second claim on a capped stimulus", async () => {
     const a = ready()
     const slug = `play-second-${randomUUID()}`

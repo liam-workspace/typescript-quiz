@@ -673,6 +673,37 @@ describe("RunScreen", () => {
   // "0 answered" on a test they had actually completed. These two tests
   // prove the opposite -- a selection survives a tab close from the moment
   // it is tapped (durably queued in IndexedDB) and reaches the server.
+  // My own gap, found by the review's test-quality pass. `clockStarted` was
+  // hardcoded `true`, so the menu told a child "the clock keeps running
+  // while you are away" before they had started anything -- false, and
+  // exactly what would stop a child leaving a test they had not begun. I
+  // fixed the wiring and did not test it. AppMenu covers both branches of
+  // the COMPONENT; nothing asserted the run shell passes the right value.
+  //
+  // openapi.yaml is explicit that an attempt's expiresAt "stays null until
+  // the first section entry", so that null IS the not-started signal.
+  it("tells the child the clock is running only once the attempt has a deadline", async () => {
+    const user = userEvent.setup()
+
+    renderRunScreen()
+    await user.click(screen.getByRole("button", { name: "Open menu" }))
+
+    expect(
+      screen.getByText("The clock keeps running while you are away."),
+    ).toBeInTheDocument()
+
+    cleanup()
+
+    renderRunScreen({ ...listeningEnvelope, expiresAt: null })
+    await user.click(screen.getByRole("button", { name: "Open menu" }))
+
+    expect(
+      screen.getByText(
+        "Nothing has started yet. The clock begins when you tap I'm ready.",
+      ),
+    ).toBeInTheDocument()
+  })
+
   it("durably records a new choice selection in the local answer queue immediately on select", async () => {
     const user = userEvent.setup()
 

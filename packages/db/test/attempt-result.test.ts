@@ -230,6 +230,39 @@ describe("loadAttemptResult", () => {
         kind: "ready",
         result: { score: { pointsEarned: 0 }, isPersonalBest: false },
       })
+
+      // The half this test's NAME promised and did not deliver. Both
+      // attempts above belong to one student, so the subquery's
+      // `better.student_id = a.student_id` could be deleted and everything
+      // above would still pass. Another child scoring higher on the same
+      // test must not take this child's badge away.
+      const rivalId = randomUUID()
+      await pool.query(
+        `INSERT INTO student (id, subject_claim, email, display_name)
+         VALUES ($1, 'sub-rival', 'rival@example.test', 'Rival')`,
+        [rivalId],
+      )
+      const rivalAttemptId = randomUUID()
+      await pool.query(
+        `INSERT INTO attempt
+           (id, student_id, test_version_id, status, started_at, expires_at,
+            submitted_at, points_earned, points_possible, percentage,
+            question_count, answered_count, unanswered_count,
+            correct_count, incorrect_count)
+         VALUES ($1, $2, $3, 'submitted', $4, $5, $5,
+                 99, 100, 99, 2, 2, 0, 2, 0)`,
+        [rivalAttemptId, rivalId, fixture.versionId, STARTED_AT, NOW],
+      )
+
+      const stillBest = await loadAttemptResult(pool, {
+        attemptId: bestId,
+        now: NOW,
+      })
+
+      expect(stillBest).toMatchObject({
+        kind: "ready",
+        result: { isPersonalBest: true },
+      })
     })
   }, 120_000)
 })

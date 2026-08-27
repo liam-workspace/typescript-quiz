@@ -5,6 +5,7 @@ import { join, resolve } from "node:path"
 import request from "supertest"
 import type { App } from "supertest/types.js"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { AdminService } from "../src/admin/admin.service.js"
 import { createTestApp, type TestApp } from "./helpers/app.js"
 
 const SUB = "google-oauth2|media-test"
@@ -213,8 +214,10 @@ describe("POST /admin/media", () => {
 
     const body = res.body as { id: string; filename: string }
 
-    // The client-supplied name survives as metadata only (media_asset.filename)...
-    expect(body.filename).toBe("../../evil.mp3")
+    // Busboy's basename() default strips the traversal before this app sees
+    // it -- a real layer, deliberately left on. The metadata therefore holds
+    // the stripped name.
+    expect(body.filename).toBe("evil.mp3")
 
     // ...and the stored path is derived from the server-generated id, so
     // the traversal never reaches the filesystem as a path.
@@ -227,5 +230,30 @@ describe("POST /admin/media", () => {
 
     expect(existsSync(oneLevelUp)).toBe(false)
     expect(existsSync(twoLevelsUp)).toBe(false)
+  })
+
+  it("ignores a traversing originalname even with no parser in the way", async () => {
+    const a = ready()
+
+    // The case above proves the HTTP path is safe, but only because busboy
+    // strips first -- it cannot show what this app would do with a name that
+    // got past the parser. Calling the service directly removes that
+    // ambiguity: `uploadMedia` never uses `originalname` as a path, so the
+    // defense holds whether or not anything stripped it earlier. If busboy's
+    // default ever changes, this is the test that still fails.
+    const service = a.get(AdminService)
+    const result = await service.uploadMedia("audio", {
+      originalname: "../../../escaped.mp3",
+      mimetype: "audio/mpeg",
+      buffer: Buffer.from("evil-bytes"),
+    })
+
+    const files = await readdir(mediaRoot)
+
+    expect(files).toContain(`${result.id}.audio`)
+    expect(files).not.toContain("escaped.mp3")
+    expect(
+      existsSync(resolve(mediaRoot, "..", "..", "..", "escaped.mp3")),
+    ).toBe(false)
   })
 })

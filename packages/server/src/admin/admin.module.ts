@@ -14,21 +14,18 @@ import { AdminService } from "./admin.service.js"
     // before the controller ever runs -- see `transformException` in
     // `@nestjs/platform-express/multer/multer/multer.utils.js`.
     //
-    // `preservePath: true` turns OFF busboy's own default of running the
-    // uploaded filename through `basename()` (see
-    // `busboy/lib/types/multipart.js`). That default would otherwise
-    // silently absorb a traversal attempt before AdminService ever saw it
-    // -- true, but only as an accident of this particular multipart
-    // parser, not because this codebase decided a traversing name is
-    // safe. The actual defense is AdminService.uploadMedia: `filename` is
-    // stored as inert metadata and never used to build a filesystem path
-    // (see media.repository.ts and the resolve-and-prefix-check in
-    // admin.service.ts). Disabling busboy's stripping is what lets that
-    // defense be the one under test, rather than one this app does not
-    // control.
+    // Busboy's default of running the uploaded filename through
+    // `basename()` is left ON. An earlier version disabled it so that an
+    // e2e test could watch a traversing name reach this app's own defense
+    // -- but that traded a real layer in production for a more legible
+    // test. Both belong in production: `AdminService.uploadMedia` never
+    // uses `originalname` as a path (it writes `<row id>.<ext>`), so the
+    // defense is structural and unconditional, and busboy stripping first
+    // costs nothing. The unconditional half is proved directly in
+    // `admin.service` unit coverage, where a traversing `originalname` can
+    // be handed in without a multipart parser in the way.
     MulterModule.registerAsync({
       useFactory: () => ({
-        preservePath: true,
         limits: { fileSize: loadServerConfig().mediaMaxBytes },
       }),
     }),

@@ -3,6 +3,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  ConflictException,
   NotFoundException,
 } from "@nestjs/common"
 import type { Clock } from "@pp/common"
@@ -72,7 +73,14 @@ export class AttemptsService {
       })
     } catch (error) {
       if (error instanceof TestNotFoundError) {
-        throw new NotFoundException("test_not_found")
+        // 409, not 404: the contract declares exactly 200/201/401/409 for
+        // this operation, with 409 as "The test is not published." A slug
+        // that names nothing and a slug whose version is still a draft are
+        // the same answer to the student -- there is nothing here you can
+        // start -- and collapsing them also stops the response from
+        // distinguishing "no such test" from "not published yet", which
+        // would leak the existence of unpublished content.
+        throw new ConflictException("test_not_published")
       }
 
       if (isActiveAttemptRace(error)) {

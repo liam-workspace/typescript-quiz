@@ -160,7 +160,7 @@ describe("POST /attempts", () => {
       .expect(404)
   })
 
-  it("404s for a slug with no published test", async () => {
+  it("409s for a slug with no published test", async () => {
     const a = ready()
     const { token } = await provision(a, `${SUB}-bad-slug`)
 
@@ -168,7 +168,7 @@ describe("POST /attempts", () => {
       .post("/api/attempts")
       .set("Authorization", `Bearer ${token}`)
       .send({ slug: `does-not-exist-${randomUUID()}` })
-      .expect(404)
+      .expect(409)
   })
 
   it("201s a new attempt with resumed: false and no finalizedPriorAttempt", async () => {

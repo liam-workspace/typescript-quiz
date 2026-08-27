@@ -47,6 +47,27 @@ function toFailedWrite(row: FailedWriteDbRow): FailedWriteRow {
  * Clock, never the column's `now()` default, so capture time is
  * deterministic under test.
  */
+/**
+ * Postgres `text` cannot hold a literal NUL: the insert dies with
+ * `invalid byte sequence for encoding "UTF8": 0x00` (verified against a real
+ * database, not assumed).
+ *
+ * That matters more here than anywhere else in the schema. This table exists
+ * to keep what the server refused, and the payloads most likely to be refused
+ * are the malformed ones -- a truncated upload, a binary body sent to a JSON
+ * route, a corrupted request. Those are exactly the bodies that carry NULs.
+ * Left unhandled, the capture itself throws, so the answer is lost AND the
+ * mechanism meant to preserve it fails in the same breath -- the precise
+ * failure spec §5.4 exists to prevent.
+ *
+ * Escaped rather than stripped: `\x00` keeps the byte count and the position
+ * honest, so a later reader can see the body was binary rather than wondering
+ * why it looks subtly short. `byte_size` still records the ORIGINAL length.
+ */
+function sanitiseForTextColumn(raw: string): string {
+  return raw.replaceAll("\u0000", "\\x00")
+}
+
 export async function insertFailedWrite(
   db: PgQueryable,
   input: {
@@ -71,7 +92,7 @@ export async function insertFailedWrite(
       input.attemptId,
       input.route,
       input.reason,
-      input.rawBody,
+      sanitiseForTextColumn(input.rawBody),
       input.byteSize,
       input.clientVersion,
       input.clientInstanceId,

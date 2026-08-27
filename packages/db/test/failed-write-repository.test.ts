@@ -72,4 +72,31 @@ describe("failed_write repository", () => {
       expect(typeof row.byteSize).toBe("number")
     })
   }, 120_000)
+
+  it("captures a body containing a NUL byte instead of throwing", async () => {
+    await withDatabase(async (pool) => {
+      // A truncated upload or a binary body sent to a JSON route carries
+      // NULs, and Postgres text rejects them outright with
+      // `invalid byte sequence for encoding "UTF8": 0x00`. Those are exactly
+      // the payloads most likely to be refused, so an unsanitised capture
+      // throws precisely when it is most needed.
+      const binaryish = `head${String.fromCharCode(0)}tail`
+
+      const row = await insertFailedWrite(pool, {
+        attemptId: null,
+        route: "/api/attempts/x/responses",
+        reason: "unparseable",
+        rawBody: binaryish,
+        byteSize: binaryish.length,
+        clientVersion: null,
+        clientInstanceId: null,
+        now: new Date("2026-08-27T00:00:00.000Z"),
+      })
+
+      expect(row.rawBody).toBe("head\\x00tail")
+      // The ORIGINAL length survives, so a reader can tell the body was
+      // binary rather than assuming it was short.
+      expect(row.byteSize).toBe(binaryish.length)
+    })
+  }, 120_000)
 })

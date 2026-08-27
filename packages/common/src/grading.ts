@@ -9,18 +9,6 @@ export interface GradableSection {
   type: SectionType
 }
 
-/**
- * `ScoringQuestion` itself does not carry `sectionId` yet -- `loadForScoring`
- * (packages/db) projects it from `question`/`choice` alone, with no join
- * back to `question_group`/`test_section`. Plan 5's Task 4 is the one that
- * wires the section join through; until then this local intersection is the
- * honest input type for `gradeAttempt`, which cannot group by section
- * without it. Widening `ScoringQuestion` itself in `./scoring.js` is out of
- * this task's scope and would break the field's existing callers/tests, so
- * this type -- not a `scoring.ts` edit -- is the seam Task 4 fills in.
- */
-export type GradableQuestion = ScoringQuestion & { sectionId: SectionId }
-
 export interface GradableResponse {
   questionId: QuestionId
   selectedChoiceIds: ChoiceId[]
@@ -55,7 +43,7 @@ interface SectionBucket {
 
 export function gradeAttempt(input: {
   sections: GradableSection[]
-  questions: GradableQuestion[]
+  questions: ScoringQuestion[]
   responses: GradableResponse[]
 }): GradeResult {
   const responseByQuestion = new Map(

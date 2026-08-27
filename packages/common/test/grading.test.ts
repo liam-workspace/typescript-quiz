@@ -2,11 +2,10 @@ import { asChoiceId, asQuestionId, asSectionId } from "../src/domain/ids.js"
 import {
   gradeAttempt,
   isQuestionCorrect,
-  type GradableQuestion,
   type GradableResponse,
   type GradableSection,
 } from "../src/grading.js"
-import type { ScoringChoice } from "../src/scoring.js"
+import type { ScoringChoice, ScoringQuestion } from "../src/scoring.js"
 import { describe, expect, it } from "vitest"
 
 const SECTION_A = asSectionId("section-a")
@@ -26,7 +25,7 @@ function question(input: {
   points: number
   type?: "single_choice" | "multi_choice"
   choices: Array<{ id: string; isCorrect: boolean }>
-}): GradableQuestion {
+}): ScoringQuestion {
   const choices: ScoringChoice[] = input.choices.map((c) => ({
     id: asChoiceId(c.id),
     label: c.id,

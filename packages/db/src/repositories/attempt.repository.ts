@@ -137,7 +137,7 @@ export async function finalizeExpiredAttempt(
     }
   }
 
-  const questions = await loadForScoring(db as pg.Pool, attempt.test_version_id)
+  const questions = await loadForScoring(db, attempt.test_version_id)
   const { rows: answerRows } = await db.query<AnswerRow>(
     `SELECT r.question_id,
             COALESCE(array_agg(rc.choice_id) FILTER (WHERE rc.choice_id IS NOT NULL), '{}') AS choice_ids

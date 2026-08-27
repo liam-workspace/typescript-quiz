@@ -7,7 +7,6 @@ import {
   type RunnerSectionState,
 } from "@pp/common"
 import type { PgQueryable } from "@liam-public/node-postgres"
-import type pg from "pg"
 import { loadForRunner } from "./test-version.repository.js"
 
 /** Content merged with this attempt's per-section progress. */
@@ -79,7 +78,7 @@ export async function loadRunnerEnvelope(
   >
 > {
   const [content, stateResult, responseResult] = await Promise.all([
-    loadForRunner(db as pg.Pool, input.testVersionId, input.attemptId),
+    loadForRunner(db, input.testVersionId, input.attemptId),
     db.query<SectionStateRow>(SECTION_STATE_QUERY, [input.attemptId]),
     db.query<ResponseRow>(RESPONSES_QUERY, [input.attemptId]),
   ])

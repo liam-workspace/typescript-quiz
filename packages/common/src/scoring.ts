@@ -1,4 +1,4 @@
-import type { ChoiceId, QuestionId } from "./domain/ids.js"
+import type { ChoiceId, QuestionId, SectionId } from "./domain/ids.js"
 import type { RunnerChoice, RunnerQuestion } from "./domain/test.js"
 import { isQuestionCorrect } from "./grading.js"
 
@@ -8,6 +8,7 @@ export interface ScoringChoice extends RunnerChoice {
 }
 
 export interface ScoringQuestion extends Omit<RunnerQuestion, "choices"> {
+  sectionId: SectionId
   points: number
   choices: ScoringChoice[]
 }

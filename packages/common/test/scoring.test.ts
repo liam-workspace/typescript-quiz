@@ -1,4 +1,4 @@
-import { asChoiceId, asQuestionId } from "../src/domain/ids.js"
+import { asChoiceId, asQuestionId, asSectionId } from "../src/domain/ids.js"
 import {
   scoreAttempt,
   type RecordedAnswer,
@@ -26,6 +26,7 @@ function question(input: {
 
   return {
     id: asQuestionId(input.id),
+    sectionId: asSectionId("section-1"),
     ordinal: 1,
     type: "multi_choice",
     prompt: "prompt",

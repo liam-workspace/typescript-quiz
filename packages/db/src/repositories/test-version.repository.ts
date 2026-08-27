@@ -10,7 +10,7 @@ import {
   type RunnerStimulus,
 } from "@pp/common"
 import type { ScoringQuestion } from "@pp/common/scoring"
-import type pg from "pg"
+import type { PgQueryable } from "@liam-public/node-postgres"
 
 interface RunnerRow {
   s_id: string
@@ -47,6 +47,7 @@ interface ScoringRow {
   q_type: string
   q_prompt: string
   q_points: number
+  section_id: string
   c_id: string
   c_label: string
   c_correct: boolean
@@ -65,11 +66,11 @@ interface ScoringRow {
  * and RunnerSection does not claim to carry.
  */
 export async function loadForRunner(
-  pool: pg.Pool,
+  db: PgQueryable,
   versionId: string,
   attemptId: string | null,
 ): Promise<RunnerSection[]> {
-  const { rows } = await pool.query<RunnerRow>(
+  const { rows } = await db.query<RunnerRow>(
     `SELECT ts.id s_id, ts.type::text s_type, ts.ordinal s_ordinal,
             ts.navigation::text s_navigation, ts.allow_answer_change s_allow_change,
             ts.default_max_plays s_max_plays, ts.default_allow_pause s_allow_pause,
@@ -199,13 +200,17 @@ function findOrCreateQuestion(
  * service; no student-facing route may import it.
  */
 export async function loadForScoring(
-  pool: pg.Pool,
+  db: PgQueryable,
   versionId: string,
 ): Promise<ScoringQuestion[]> {
-  const { rows } = await pool.query<ScoringRow>(
+  const { rows } = await db.query<ScoringRow>(
     `SELECT q.id q_id, q.ordinal q_ordinal, q.type::text q_type, q.prompt q_prompt,
-            q.points q_points, c.id c_id, c.label c_label, c.is_correct c_correct
-       FROM question q JOIN choice c ON c.question_id = q.id
+            q.points q_points, ts.id section_id,
+            c.id c_id, c.label c_label, c.is_correct c_correct
+       FROM question q
+       JOIN question_group g ON g.id = q.question_group_id
+       JOIN test_section ts ON ts.id = g.test_section_id
+       JOIN choice c ON c.question_id = q.id
       WHERE q.test_version_id = $1
       ORDER BY q.ordinal, c.ordinal`,
     [versionId],
@@ -237,6 +242,7 @@ function findOrCreateScoringQuestion(
 
   const question: ScoringQuestion = {
     id: asQuestionId(r.q_id),
+    sectionId: asSectionId(r.section_id),
     ordinal: r.q_ordinal,
     type: r.q_type as ScoringQuestion["type"],
     prompt: r.q_prompt,

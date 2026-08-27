@@ -1,6 +1,8 @@
 // @ts-expect-error -- ScoringChoice must NOT be reachable from the default barrel
 import type { ScoringChoice as _Leaked } from "@pp/common"
 import { expect, it } from "vitest"
+import { withDatabase } from "./helpers/database.js"
+import { seedPublishedTest } from "./helpers/fixtures.js"
 
 it("does not expose the scoring projection from the default entry point", async () => {
   const surface = await import("@pp/db")
@@ -13,6 +15,24 @@ it("exposes it from the scoring entry point", async () => {
 
   expect(typeof scoring.loadForScoring).toBe("function")
 })
+
+// The retype to PgQueryable and the new question_group/test_section join
+// (Task 4) must not silently drop sectionId under the fenced entry point --
+// proving it here, not just against the internal repository import, is what
+// pins the fence and the field together.
+it("loadForScoring, reached only through @pp/db/scoring, still carries sectionId", async () => {
+  const { loadForScoring } = await import("@pp/db/scoring")
+
+  await withDatabase(async (pool) => {
+    const f = await seedPublishedTest(pool)
+    const questions = await loadForScoring(pool, f.versionId)
+
+    expect(questions.length).toBeGreaterThan(0)
+    for (const question of questions) {
+      expect(question.sectionId).toBeDefined()
+    }
+  })
+}, 120_000)
 
 // `exportTestDocument` emits isCorrect on every choice (test-import.repository.ts),
 // the same disclosure risk that sent loadForScoring behind @pp/db/scoring above.

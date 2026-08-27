@@ -35,7 +35,10 @@ export const ResponseSnapshotItemSchema = z.strictObject({
   seq: z.number().int().nonnegative(),
   selectedChoiceIds: z
     .array(UuidStringSchema)
-    .refine((ids) => new Set(ids).size === ids.length, "duplicate_choice"),
+    .refine(
+      (ids) => new Set(ids.map((id) => id.toLowerCase())).size === ids.length,
+      "duplicate_choice",
+    ),
   answeredAt: z.iso.datetime().optional(),
   timeSpentMs: z.number().int().nonnegative().max(2_147_483_647).optional(),
 })

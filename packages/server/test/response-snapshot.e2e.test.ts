@@ -472,6 +472,89 @@ describe("PATCH /attempts/:id/responses", () => {
     })
   })
 
+  it("enforces answer-change rules for uppercase UUID spellings", async () => {
+    const context = ready()
+    const { fixture, token } = await setup({
+      allowAnswerChange: false,
+      navigation: "forward_only",
+      sectionType: "listening",
+    })
+    const url = `/api/attempts/${fixture.attemptId}/responses`
+
+    await request(context.app.http.getHttpServer() as App)
+      .patch(url)
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        clientInstanceId: "device-uppercase",
+        responses: [
+          {
+            questionId: fixture.appliedQuestionId,
+            seq: 1,
+            selectedChoiceIds: [fixture.choiceIds[0]],
+          },
+        ],
+      })
+      .expect(200)
+
+    const identical = await request(context.app.http.getHttpServer() as App)
+      .patch(url)
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        clientInstanceId: "device-uppercase",
+        responses: [
+          {
+            questionId: fixture.appliedQuestionId.toUpperCase(),
+            seq: 2,
+            selectedChoiceIds: [fixture.choiceIds[0].toUpperCase()],
+          },
+        ],
+      })
+
+    expect(identical.status).toBe(200)
+    expect(identical.body).toMatchObject({
+      results: [
+        {
+          questionId: fixture.appliedQuestionId.toUpperCase(),
+          status: "applied",
+        },
+      ],
+    })
+
+    const changed = await request(context.app.http.getHttpServer() as App)
+      .patch(url)
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        clientInstanceId: "device-uppercase",
+        responses: [
+          {
+            questionId: fixture.appliedQuestionId.toUpperCase(),
+            seq: 3,
+            selectedChoiceIds: [fixture.choiceIds[1].toUpperCase()],
+          },
+        ],
+      })
+
+    expect(changed.status).toBe(200)
+    const { results } = changed.body as SnapshotResponseBody
+
+    expect(results[0]).toMatchObject({
+      questionId: fixture.appliedQuestionId.toUpperCase(),
+      status: "rejected",
+      reason: "answer_change_not_allowed",
+      retryable: false,
+    })
+    expect(
+      await loadResponse(context.pool, {
+        attemptId: fixture.attemptId,
+        questionId: fixture.appliedQuestionId,
+      }),
+    ).toEqual({
+      clientInstanceId: "device-uppercase",
+      seq: 2,
+      selectedChoiceIds: [fixture.choiceIds[0]],
+    })
+  })
+
   it("refuses and captures a snapshot spanning two sections", async () => {
     const context = ready()
     const { fixture, token } = await setup({ includeOtherSection: true })
@@ -612,7 +695,7 @@ describe("PATCH /attempts/:id/responses", () => {
         clientInstanceId: "device-expired-invalid",
         responses: [
           {
-            questionId: fixture.appliedQuestionId,
+            questionId: fixture.appliedQuestionId.toUpperCase(),
             seq: "not-a-number",
             selectedChoiceIds: [fixture.choiceIds[0]],
           },

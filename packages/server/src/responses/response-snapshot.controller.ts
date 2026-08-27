@@ -48,6 +48,10 @@ interface FlushResult {
   }
 }
 
+function canonicalUuid(value: string): string {
+  return value.toLowerCase()
+}
+
 @Controller("attempts/:id/responses")
 @UseGuards(JwksGuard)
 @UseFilters(ResponseHttpExceptionFilter)
@@ -93,7 +97,7 @@ export class ResponseSnapshotController {
     }
 
     const firstResolvedItem = questionIdentities.find((item) =>
-      sectionInfo.has(item.questionId),
+      sectionInfo.has(canonicalUuid(item.questionId)),
     )
     let sharedRules: SectionRules | undefined = undefined
 
@@ -131,7 +135,7 @@ export class ResponseSnapshotController {
       }
 
       const item = parsed.data
-      const info = sectionInfo.get(item.questionId)
+      const info = sectionInfo.get(canonicalUuid(item.questionId))
       const rules = info
         ? await resolveSectionRules(this.pool, {
             attempt,

@@ -50,8 +50,8 @@ function sameSelection(a: string[], b: string[]): boolean {
     return false
   }
 
-  const sortedA = [...a].sort()
-  const sortedB = [...b].sort()
+  const sortedA = a.map((id) => id.toLowerCase()).sort()
+  const sortedB = b.map((id) => id.toLowerCase()).sort()
 
   return sortedA.every((id, index) => id === sortedB[index])
 }

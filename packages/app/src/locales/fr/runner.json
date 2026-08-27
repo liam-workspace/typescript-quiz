@@ -118,5 +118,7 @@
   "history.empty": "Aucune tentative terminée pour le moment.",
   "history.loadMoreError": "Impossible de charger les anciennes tentatives. Réessaie.",
   "history.unauthorized": "Reconnecte-toi pour voir l’historique de tes tentatives.",
-  "history.error": "Impossible de charger l’historique des tentatives. Réessaie."
+  "history.error": "Impossible de charger l’historique des tentatives. Réessaie.",
+  "notFound.message": "Cette page n'existe pas.",
+  "notFound.goToHistory": "Voir tes tentatives"
 }

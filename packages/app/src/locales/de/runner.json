@@ -118,5 +118,7 @@
   "history.empty": "Noch keine abgeschlossenen Versuche.",
   "history.loadMoreError": "Ältere Versuche konnten nicht geladen werden. Versuche es erneut.",
   "history.unauthorized": "Melde dich erneut an, um deinen Versuchsverlauf anzusehen.",
-  "history.error": "Der Versuchsverlauf konnte nicht geladen werden. Bitte versuche es erneut."
+  "history.error": "Der Versuchsverlauf konnte nicht geladen werden. Bitte versuche es erneut.",
+  "notFound.message": "Diese Seite gibt es nicht.",
+  "notFound.goToHistory": "Deine Versuche ansehen"
 }

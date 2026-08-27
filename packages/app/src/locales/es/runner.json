@@ -118,5 +118,7 @@
   "history.empty": "Aún no hay intentos terminados.",
   "history.loadMoreError": "No se pudieron cargar los intentos anteriores. Inténtalo de nuevo.",
   "history.unauthorized": "Vuelve a iniciar sesión para ver tu historial de intentos.",
-  "history.error": "No se pudo cargar el historial de intentos. Inténtalo de nuevo."
+  "history.error": "No se pudo cargar el historial de intentos. Inténtalo de nuevo.",
+  "notFound.message": "Esa página no está aquí.",
+  "notFound.goToHistory": "Ver tus intentos"
 }

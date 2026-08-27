@@ -115,5 +115,7 @@
   "history.empty": "完了した受験はまだありません。",
   "history.loadMoreError": "以前の受験を読み込めませんでした。もう一度お試しください。",
   "history.unauthorized": "受験履歴を表示するには、もう一度ログインしてください。",
-  "history.error": "受験履歴を読み込めませんでした。もう一度お試しください。"
+  "history.error": "受験履歴を読み込めませんでした。もう一度お試しください。",
+  "notFound.message": "そのページはありません。",
+  "notFound.goToHistory": "これまでの記録を見る"
 }

@@ -1,6 +1,22 @@
-import type { ChoiceId, QuestionId, SectionId } from "./domain/ids.js"
+import type { SectionId } from "./domain/ids.js"
 import type { RunnerChoice, RunnerQuestion } from "./domain/test.js"
-import { isQuestionCorrect } from "./grading.js"
+
+/**
+ * The answer key's types, and only those.
+ *
+ * This module is a FENCE, not a utility shelf: it is reachable as
+ * `@pp/common/scoring` and deliberately absent from the package's default
+ * barrel, so a student-facing route cannot import `isCorrect` by accident.
+ * `packages/db/test/boundary.test.ts` asserts that in both directions.
+ *
+ * It once also held `scoreAttempt`, a whole-attempt scorer that
+ * `gradeAttempt` (./grading.js) superseded by doing the same work plus the
+ * per-section breakdown the result screen needs. It kept a nine-case test
+ * suite and zero production callers -- coverage that proved nothing about
+ * shipped behaviour, and a second scoring implementation sitting one import
+ * away from being wired in by mistake. Removed rather than documented,
+ * because the honest fix for dead code is deletion.
+ */
 
 /** Used only by the scoring service. Never serialized to a student. */
 export interface ScoringChoice extends RunnerChoice {
@@ -11,76 +27,4 @@ export interface ScoringQuestion extends Omit<RunnerQuestion, "choices"> {
   sectionId: SectionId
   points: number
   choices: ScoringChoice[]
-}
-
-export interface RecordedAnswer {
-  questionId: QuestionId
-  selectedChoiceIds: ChoiceId[]
-}
-
-export interface AttemptScoreSummary {
-  pointsEarned: number
-  pointsPossible: number
-  percentage: number
-  answeredCount: number
-  unansweredCount: number
-  correctCount: number
-  incorrectCount: number
-  questionCount: number
-}
-
-/**
- * Pure. A question is correct when the selected set equals the correct
- * set exactly — single_choice's "exactly one correct" and multi_choice's
- * "all of them, none extra" are the same rule once expressed as set
- * equality, so there is one comparison, not two branches by type.
- *
- * That comparison lives in `isQuestionCorrect` (./grading.js) — the ONLY
- * place it is implemented. `gradeAttempt` (grading.ts, plan 5 Task 2) needs
- * the identical rule for its section-broken-down score, and a second inline
- * copy here would let the two silently drift apart on exactly the case that
- * matters most: what a partial multi_choice selection scores.
- */
-export function scoreAttempt(
-  questions: ScoringQuestion[],
-  answers: RecordedAnswer[],
-): AttemptScoreSummary {
-  const byQuestion = new Map(answers.map((a) => [a.questionId, a]))
-  let pointsEarned = 0
-  let pointsPossible = 0
-  let correctCount = 0
-  let incorrectCount = 0
-  let answeredCount = 0
-
-  for (const question of questions) {
-    pointsPossible += question.points
-    const answer = byQuestion.get(question.id)
-
-    if (!answer || answer.selectedChoiceIds.length === 0) {
-      continue
-    }
-
-    answeredCount += 1
-
-    if (isQuestionCorrect(question, answer.selectedChoiceIds)) {
-      correctCount += 1
-      pointsEarned += question.points
-    } else {
-      incorrectCount += 1
-    }
-  }
-
-  return {
-    pointsEarned,
-    pointsPossible,
-    percentage:
-      pointsPossible === 0
-        ? 0
-        : Math.round((pointsEarned / pointsPossible) * 10000) / 100,
-    answeredCount,
-    unansweredCount: questions.length - answeredCount,
-    correctCount,
-    incorrectCount,
-    questionCount: questions.length,
-  }
 }

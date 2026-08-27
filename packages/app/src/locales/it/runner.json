@@ -118,5 +118,7 @@
   "history.empty": "Non ci sono ancora tentativi completati.",
   "history.loadMoreError": "Impossibile caricare i tentativi precedenti. Riprova.",
   "history.unauthorized": "Accedi di nuovo per vedere la cronologia dei tentativi.",
-  "history.error": "Impossibile caricare la cronologia dei tentativi. Riprova."
+  "history.error": "Impossibile caricare la cronologia dei tentativi. Riprova.",
+  "notFound.message": "Questa pagina non c'è.",
+  "notFound.goToHistory": "Vedi i tuoi tentativi"
 }

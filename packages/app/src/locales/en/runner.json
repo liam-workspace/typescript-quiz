@@ -118,5 +118,7 @@
   "history.empty": "No finished attempts yet.",
   "history.loadMoreError": "Older attempts could not be loaded. Try again.",
   "history.unauthorized": "Sign in again to view your attempt history.",
-  "history.error": "Attempt history could not be loaded. Please try again."
+  "history.error": "Attempt history could not be loaded. Please try again.",
+  "notFound.message": "That page isn't here.",
+  "notFound.goToHistory": "See your attempts"
 }

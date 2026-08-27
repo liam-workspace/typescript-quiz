@@ -6,13 +6,18 @@ import { HttpException } from "@nestjs/common"
  * `AttemptExpiredProblem`'s `attempt`, `PayloadCaptured`'s `capturedAs`, the
  * publish 422's `violations`. Those extra keys are NOT flattened away --
  * whatever is passed to the constructor IS the response body, verbatim.
+ *
+ * `retryable` is `false` for every 4xx this API declares -- a rule decision,
+ * never a transient fault (see `Problem`'s own schema doc in openapi.yaml).
+ * `true` is reserved for the one schema that is NOT a `Problem` allOf,
+ * `UnexpectedErrorProblem` (a 5xx) -- see `captureUnexpectedWriteError`.
  */
 export interface ProblemBody {
   type: string
   title: string
   status: number
   detail?: string
-  retryable?: false
+  retryable?: boolean
   [extra: string]: unknown
 }
 

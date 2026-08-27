@@ -567,6 +567,12 @@ export class AttemptsService {
           now,
           req,
           write: (input) => applyResponse(tx, input),
+          // `this.pool`, NOT `tx` -- `tx` is submit's own transaction,
+          // which an unrecognised write error aborts (rolls back). See
+          // `ApplyResponseItemsInput.capturePool`'s doc comment: writing
+          // the failed_write capture through `tx` would have that same
+          // rollback erase it.
+          capturePool: this.pool,
         })
 
         return results

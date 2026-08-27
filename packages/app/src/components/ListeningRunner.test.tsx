@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
@@ -50,6 +50,8 @@ const baseProps = {
   onClaimPlay: vi.fn<() => Promise<void>>().mockResolvedValue(),
   audioSrc: null,
   onAudioEnded: vi.fn(),
+  onAudioError: vi.fn(),
+  audioFailed: false,
   questionCount: 20,
   pips,
   hasNext: true,
@@ -132,6 +134,86 @@ describe("ListeningRunner", () => {
       "src",
       "/api/media/audio1.mp3?exp=1&sig=x",
     )
+  })
+
+  // Defect fix: the `<audio>` element previously had no `onError` at all,
+  // so a stalled or failed load left the page with no way to hear about it
+  // and the play button stuck disabled forever (see run.tsx's `PlayState`
+  // "failed" variant doc comment). This only proves the presentational
+  // half: the element forwards its native `error` event to the page's
+  // callback, and an honest message renders once the page says the last
+  // play failed -- state ownership (resetting `playing`, deciding when to
+  // show `audioFailed`) is the page's, exercised in run.test.tsx.
+  it("forwards the audio element's error event to onAudioError", () => {
+    const onAudioError = vi.fn()
+
+    render(
+      <ListeningRunner
+        {...baseProps}
+        audioSrc="/api/media/audio1.mp3?exp=1&sig=x"
+        onAudioError={onAudioError}
+      />,
+    )
+
+    fireEvent.error(screen.getByTestId("audio-player"))
+
+    expect(onAudioError).toHaveBeenCalledTimes(1)
+  })
+
+  it("shows nothing about a failed play until the page says one failed", () => {
+    render(<ListeningRunner {...baseProps} audioFailed={false} />)
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+  })
+
+  it("tells the child their play was used and offers a retry when plays remain", () => {
+    render(
+      <ListeningRunner
+        {...baseProps}
+        stimulus={{ ...cappedAudio, maxPlays: 2, playsUsed: 1 }}
+        audioSrc={null}
+        audioFailed
+      />,
+    )
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "That play has been used",
+    )
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "tap Play recording to try again",
+    )
+  })
+
+  // The dishonest failure mode this exists to prevent: telling a child to
+  // "try again" when the play button is about to be disabled anyway
+  // because every play is already spent.
+  it("does not invite a retry once every play for this stimulus is spent", () => {
+    render(
+      <ListeningRunner
+        {...baseProps}
+        stimulus={{ ...cappedAudio, maxPlays: 2, playsUsed: 2 }}
+        audioSrc={null}
+        audioFailed
+      />,
+    )
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "no plays left for this question",
+    )
+    expect(screen.getByRole("alert")).not.toHaveTextContent("try again")
+  })
+
+  it("re-enables the play button once the failed play's element is gone", () => {
+    render(
+      <ListeningRunner
+        {...baseProps}
+        stimulus={{ ...cappedAudio, maxPlays: 2, playsUsed: 1 }}
+        audioSrc={null}
+        audioFailed
+      />,
+    )
+
+    expect(screen.getByRole("button", { name: "Play recording" })).toBeEnabled()
   })
 
   it("shows no Previous button", () => {

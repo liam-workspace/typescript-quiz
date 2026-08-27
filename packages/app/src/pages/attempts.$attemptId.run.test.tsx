@@ -1,7 +1,22 @@
 import "fake-indexeddb/auto"
-import { cleanup, render, screen, waitFor } from "@testing-library/react"
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { isRedirect } from "@tanstack/react-router"
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockInstance,
+} from "vitest"
 import "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
@@ -12,9 +27,55 @@ import {
 } from "../lib/attempts-api.js"
 import type { CappedStimulusWire, RunnerEnvelope } from "../lib/api-types.js"
 import { getCurrentStudent } from "../lib/session-api.js"
-import { loadRunScreenData, RunScreen } from "./attempts.$attemptId.run.js"
+import {
+  loadRunRouteData,
+  loadRunScreenData,
+  RunRouteError,
+  RunScreen,
+} from "./attempts.$attemptId.run.js"
 
 const DB_NAME = "pp-answer-queue-run-test"
+
+// Top-level, not inline: a named function passed by reference (rather than
+// an arrow written at the call site) adds no callback-nesting depth at the
+// describe/beforeEach/it it is used from -- see `loadRunRouteData /
+// RunRouteError`'s `beforeEach`, which is already three levels deep before
+// this is even involved.
+function closeQueue(queue: AnswerQueue): Promise<void> {
+  return queue.close()
+}
+
+// `loadRunRouteData("attempt-1").catch(...)` below needs the rejection
+// VALUE, not to re-throw it -- `(error: unknown) => error` inline would be
+// a fourth nested callback at that call site.
+function asRejectionValue(error: unknown): unknown {
+  return error
+}
+
+/**
+ * `loadRunRouteData` opens a REAL AnswerQueue (fake-indexeddb-backed,
+ * default DB name -- distinct from this file's own `DB_NAME`) alongside the
+ * envelope fetch, per its own doc comment, even when the envelope half
+ * rejects and the queue is never handed back to the caller to close. Left
+ * open, that connection is exactly the kind of dangling handle that made
+ * fake-indexeddb's shared, cross-file job queue flaky for unrelated later
+ * tests. This wraps `AnswerQueue.open` to capture every instance it mints
+ * into `sink`, so the describe block's own `afterEach` can close them --
+ * fixing the test's hygiene rather than changing `loadRunRouteData`'s
+ * production behaviour just to suit it.
+ */
+function trackingOpener(
+  original: (name?: string) => Promise<AnswerQueue>,
+  sink: AnswerQueue[],
+): (name?: string) => Promise<AnswerQueue> {
+  return async function tracked(name?: string): Promise<AnswerQueue> {
+    const opened = await original(name)
+
+    sink.push(opened)
+
+    return opened
+  }
+}
 
 vi.mock("../lib/attempts-api.js", () => ({
   claimPlay: vi.fn(),
@@ -359,6 +420,95 @@ describe("RunScreen", () => {
         envelope: listeningEnvelope,
         student: undefined,
       })
+    })
+  })
+
+  // Defect A: run.tsx had no errorComponent, so a network blip mid-test
+  // dropped a child onto TanStack Router's bare default error page. The
+  // loader is wrapped as `loadRunRouteData` (exported, above) so both halves
+  // of the fix -- the 410 redirect and the fallback to RunRouteError -- are
+  // testable directly, matching result.tsx's own `loadResult` convention.
+  describe("loadRunRouteData / RunRouteError", () => {
+    const openedQueues: AnswerQueue[] = []
+    let openSpy: MockInstance | undefined = undefined
+
+    beforeEach(() => {
+      // Captured BEFORE `spyOn` runs: `spyOn` replaces `AnswerQueue.open`
+      // with the spy as a side effect of the call itself, so reading
+      // `AnswerQueue.open` afterwards (even in the same expression, as an
+      // argument evaluated after that side effect) would capture the SPY,
+      // not the real implementation -- `tracked` calling "the original"
+      // would then call itself, infinitely.
+      const originalOpen = AnswerQueue.open.bind(AnswerQueue)
+
+      openSpy = vi
+        .spyOn(AnswerQueue, "open")
+        .mockImplementation(trackingOpener(originalOpen, openedQueues))
+    })
+
+    afterEach(async () => {
+      openSpy?.mockRestore()
+      await Promise.all(openedQueues.splice(0).map(closeQueue))
+    })
+
+    it("redirects to the result screen on a 410 attempt_expired, rather than erroring", async () => {
+      mockGetRunnerEnvelope.mockRejectedValue(
+        new ApiError({
+          type: "attempt_expired",
+          title: "The attempt was past its deadline and has been finalized.",
+          status: 410,
+          attempt: {
+            id: "attempt-1",
+            status: "expired",
+            submittedAt: "2026-08-27T09:25:00.000Z",
+            resultUrl: "/attempts/attempt-1/result",
+          },
+        }),
+      )
+
+      const thrown: unknown =
+        await loadRunRouteData("attempt-1").catch(asRejectionValue)
+
+      expect(isRedirect(thrown)).toBe(true)
+
+      if (!isRedirect(thrown)) {
+        throw new Error("Expected a TanStack Router redirect")
+      }
+
+      expect(thrown.options.href).toBe("/attempts/attempt-1/result")
+    })
+
+    it("propagates a plain network failure for RunRouteError to render", async () => {
+      mockGetRunnerEnvelope.mockRejectedValue(new TypeError("Failed to fetch"))
+
+      await expect(loadRunRouteData("attempt-1")).rejects.toBeInstanceOf(
+        TypeError,
+      )
+    })
+
+    it("renders an honest, actionable message -- reassures answers are safe, offers a retry", () => {
+      render(<RunRouteError error={new TypeError("Failed to fetch")} />)
+
+      expect(screen.getByRole("alert")).toHaveTextContent("Nothing is lost")
+      expect(
+        screen.getByRole("button", { name: "Try again" }),
+      ).toBeInTheDocument()
+    })
+
+    it("reloads the page rather than losing queued answers on a silent client-side retry", async () => {
+      const reload = vi.fn()
+      // Not `{ ...window.location, reload }`: `Location` is a class
+      // instance, and spreading one loses its prototype (oxlint's
+      // `no-misused-spread`). RunRouteError's retry button only ever calls
+      // `window.location.reload()`, so a minimal stand-in is both enough
+      // and honest about what this test actually exercises.
+      vi.stubGlobal("location", { reload })
+      const user = userEvent.setup()
+
+      render(<RunRouteError error={new TypeError("Failed to fetch")} />)
+      await user.click(screen.getByRole("button", { name: "Try again" }))
+
+      expect(reload).toHaveBeenCalledOnce()
     })
   })
 
@@ -737,6 +887,95 @@ describe("RunScreen", () => {
     for (const pip of pips) {
       expect(pip.tagName).not.toBe("BUTTON")
     }
+  })
+
+  // Defect B: ListeningRunner's `<audio>` had no `onError`, so a stalled or
+  // failed media load left `playState` stuck at `{status: "granted"}`
+  // forever -- the play button disabled with no recovery, even though the
+  // play itself was already counted server-side. `handleAudioError` (this
+  // page) is the actual fix; ListeningRunner.test.tsx already proves the
+  // presentational half (the element forwards its native `error` event).
+  describe("a failed audio load recovers, honestly", () => {
+    it("re-enables the play button and tells the child their play was used, without silently spending another", async () => {
+      mockClaimPlay.mockResolvedValueOnce({
+        stimulusId: "stim-1",
+        playsUsed: 1,
+        playsRemaining: 1,
+        mediaUrl: "/api/media/audio1.mp3?exp=1&sig=x",
+        urlExpiresAt: "2026-08-27T09:05:00.000Z",
+      })
+      const user = userEvent.setup()
+
+      renderRunScreen()
+
+      await user.click(screen.getByRole("button", { name: "Play recording" }))
+      const audio = await screen.findByTestId("audio-player")
+
+      expect(mockClaimPlay).toHaveBeenCalledTimes(1)
+
+      fireEvent.error(audio)
+
+      // The stuck-forever bug: before this fix, `playing` (and hence the
+      // button's `disabled`) never went back to false once a play was
+      // granted, because only `onEnded` -- never a failed load -- reset it.
+      expect(
+        await screen.findByRole("button", { name: "Play recording" }),
+      ).toBeEnabled()
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "That play has been used",
+      )
+      // The other half of "honest": no second claim happened on its own.
+      // Recovery is the child's own tap, not an automatic retry that would
+      // spend a play they never asked for.
+      expect(mockClaimPlay).toHaveBeenCalledTimes(1)
+      expect(screen.queryByTestId("audio-player")).not.toBeInTheDocument()
+
+      // A deliberate retap is a perfectly ordinary new claim, and clears
+      // the failure message once it succeeds.
+      mockClaimPlay.mockResolvedValueOnce({
+        stimulusId: "stim-1",
+        playsUsed: 2,
+        playsRemaining: 0,
+        mediaUrl: "/api/media/audio2.mp3?exp=1&sig=y",
+        urlExpiresAt: "2026-08-27T09:06:00.000Z",
+      })
+
+      await user.click(screen.getByRole("button", { name: "Play recording" }))
+
+      expect(await screen.findByTestId("audio-player")).toHaveAttribute(
+        "src",
+        "/api/media/audio2.mp3?exp=1&sig=y",
+      )
+      expect(mockClaimPlay).toHaveBeenCalledTimes(2)
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    })
+
+    it("does not invite a retry once the failed play was the last one available", async () => {
+      mockClaimPlay.mockResolvedValueOnce({
+        stimulusId: "stim-1",
+        playsUsed: 2,
+        playsRemaining: 0,
+        mediaUrl: "/api/media/audio1.mp3?exp=1&sig=x",
+        urlExpiresAt: "2026-08-27T09:05:00.000Z",
+      })
+      const user = userEvent.setup()
+
+      renderRunScreen()
+
+      await user.click(screen.getByRole("button", { name: "Play recording" }))
+      const audio = await screen.findByTestId("audio-player")
+
+      fireEvent.error(audio)
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "no plays left for this question",
+      )
+      // Honest about the OTHER direction too: the button reflects the real
+      // play cap (exhausted), not the stuck-disabled bug this fix removes.
+      expect(
+        screen.getByRole("button", { name: "Play recording" }),
+      ).toBeDisabled()
+    })
   })
 
   // Carried over from Task 9: a capped stimulus's signed URL expires, and

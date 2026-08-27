@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next"
 import { ApiError } from "../lib/api-client.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
 import { getRunnerEnvelope, submitAttempt } from "../lib/attempts-api.js"
+import { redirectExpiredAttemptToResult } from "../lib/expired-attempt-redirect.js"
 import { buildSubmitRemainder } from "../lib/lifecycleFlush.js"
 import { sameOriginPath } from "../lib/same-origin-path.js"
 import type { RunnerEnvelope } from "../lib/api-types.js"
@@ -281,15 +282,71 @@ export function HandInScreen({
   )
 }
 
-export const Route = createFileRoute("/attempts/$attemptId/hand-in")({
-  loader: async ({ params }) => {
+/**
+ * This screen is the other one (with run.tsx) live during a timed test, so
+ * it gets the same error boundary for the same reason -- see run.tsx's
+ * `RunRouteError` doc comment. Reusing its `runError.*` strings rather than
+ * minting hand-in-specific ones: the failure (this screen's own envelope
+ * load) and the honest response to it (nothing is lost, reload costs
+ * nothing) are identical.
+ */
+export interface HandInRouteErrorProps {
+  readonly error: unknown
+}
+
+export function HandInRouteError(_props: HandInRouteErrorProps) {
+  const { t } = useTranslation("runner")
+
+  return (
+    <div className="mx-auto max-w-xl px-4 py-12">
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("runError.title")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p role="alert">{t("runError.message")}</p>
+          <Button
+            className="h-11 min-w-11 touch-manipulation select-none"
+            onClick={() => {
+              window.location.reload()
+            }}
+          >
+            {t("runError.retry")}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+/**
+ * Exported, like run.tsx's `loadRunRouteData`, so the 410 redirect below is
+ * testable directly rather than only reachable through the router.
+ */
+export async function loadHandInRouteData(attemptId: string): Promise<{
+  envelope: RunnerEnvelope
+  queue: AnswerQueue
+}> {
+  try {
     const [envelope, queue] = await Promise.all([
-      getRunnerEnvelope(params.attemptId),
+      getRunnerEnvelope(attemptId),
       AnswerQueue.open(),
     ])
 
     return { envelope, queue }
-  },
+  } catch (error) {
+    // Same reasoning as run.tsx's loader: a 410 attempt_expired here
+    // means THIS load finalized the attempt, so the honest destination is
+    // the result screen it names, not an error page.
+    redirectExpiredAttemptToResult(error)
+
+    throw error
+  }
+}
+
+export const Route = createFileRoute("/attempts/$attemptId/hand-in")({
+  loader: ({ params }) => loadHandInRouteData(params.attemptId),
+  errorComponent: HandInRouteError,
   component: RouteComponent,
 })
 

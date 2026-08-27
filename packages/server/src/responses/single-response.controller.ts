@@ -1,6 +1,6 @@
 import type { PgPool } from "@liam-public/node-postgres"
 import type { JwtClaims } from "@liam-workspace/node-auth-server"
-import { writeResponse } from "@pp/db"
+import { writeResponse, type WriteOutcome } from "@pp/db"
 import {
   Body,
   Controller,
@@ -18,7 +18,7 @@ import { CurrentStudent } from "../auth/current-student.decorator.js"
 import { JwksGuard } from "../auth/jwks.guard.js"
 import { REQUEST_POOL } from "../database/tokens.js"
 import type { CapturedRequest } from "../http/raw-body-json.middleware.js"
-import { captureRejection } from "./capture.js"
+import { captureRejection, captureUnexpectedWriteError } from "./capture.js"
 import { SingleResponseWriteDto } from "./dto.js"
 import { ResponseWriteService } from "./response-write.service.js"
 import { mapWriteConflict, resolveSectionRules } from "./section-rules.js"
@@ -67,18 +67,35 @@ export class SingleResponseController {
       })
     }
 
-    const outcome = await writeResponse(this.pool, {
-      attemptId,
-      questionId,
-      testVersionId: attempt.testVersionId,
-      clientInstanceId: body.clientInstanceId,
-      seq: body.seq,
-      selectedChoiceIds: body.selectedChoiceIds,
-      answeredAt: body.answeredAt ? new Date(body.answeredAt) : null,
-      timeSpentMs: body.timeSpentMs ?? null,
-      allowAnswerChange: rules.allowAnswerChange,
-      now,
-    })
+    // See apply-response.ts's matching catch for why this exists: an
+    // unrecognised database error (deadlock, lock timeout, serialization
+    // failure) must never reach AllExceptionsFilter uncaptured -- it would
+    // return Nest's bare `{statusCode, message, error}` shape, not
+    // `application/problem+json`, with no `failed_write` row recorded.
+    const outcome: WriteOutcome = await (async () => {
+      try {
+        return await writeResponse(this.pool, {
+          attemptId,
+          questionId,
+          testVersionId: attempt.testVersionId,
+          clientInstanceId: body.clientInstanceId,
+          seq: body.seq,
+          selectedChoiceIds: body.selectedChoiceIds,
+          answeredAt: body.answeredAt ? new Date(body.answeredAt) : null,
+          timeSpentMs: body.timeSpentMs ?? null,
+          allowAnswerChange: rules.allowAnswerChange,
+          now,
+        })
+      } catch (error) {
+        throw await captureUnexpectedWriteError(this.pool, req, {
+          attemptId,
+          body,
+          now,
+          clientInstanceId: body.clientInstanceId,
+          error,
+        })
+      }
+    })()
 
     if (outcome.kind === "rejected") {
       throw await captureRejection(this.pool, req, {

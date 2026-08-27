@@ -7,7 +7,7 @@ import {
 } from "@pp/db"
 import type { CapturedRequest } from "../http/raw-body-json.middleware.js"
 import { CapturableBadRequestException } from "../validation/zod-body-validation.pipe.js"
-import { captureItemRejection } from "./capture.js"
+import { captureItemRejection, captureUnexpectedWriteError } from "./capture.js"
 import {
   ResponseSnapshotItemSchema,
   ResponseSnapshotQuestionIdentitySchema,
@@ -37,6 +37,17 @@ interface ApplyResponseItemsInput {
   now: Date
   req: CapturedRequest
   write: (input: ResponseWriteInput) => Promise<WriteOutcome>
+  // A stable, non-transactional handle for `captureUnexpectedWriteError`
+  // specifically -- deliberately NOT the same as this function's own `db`
+  // parameter. For the snapshot-flush caller `db` already IS the request
+  // pool, so the two coincide; for submit, `db` is the SHARED transaction
+  // `submitAttemptRow` opened, which an unrecognised write error aborts
+  // (this function throws, submit rolls the whole thing back) -- writing
+  // the `failed_write` capture through THAT transaction would have it
+  // erased by the very rollback it exists to survive. `capturePool` is
+  // always the app's ordinary request pool, so the capture commits
+  // independently of whatever the write transaction decides.
+  capturePool: PgQueryable
 }
 
 export interface AppliedResponseItems {
@@ -147,18 +158,46 @@ export async function applyResponseItems(
       continue
     }
 
-    const outcome = await input.write({
-      attemptId: input.attempt.id,
-      questionId: item.questionId,
-      testVersionId: input.attempt.testVersionId,
-      clientInstanceId: input.clientInstanceId,
-      seq: item.seq,
-      selectedChoiceIds: item.selectedChoiceIds,
-      answeredAt: item.answeredAt ? new Date(item.answeredAt) : null,
-      timeSpentMs: item.timeSpentMs ?? null,
-      allowAnswerChange: rules?.allowAnswerChange ?? true,
-      now: input.now,
-    })
+    // `input.write` (`writeResponse` for a PATCH flush, or `applyResponse`
+    // sharing submit's own transaction) rethrows a database error it does
+    // not recognise as one of its own rejection reasons -- see
+    // `captureUnexpectedWriteError`'s doc comment for why this catch has to
+    // exist at all. Deliberately aborts the WHOLE request rather than
+    // trying to keep processing the rest of `parsedItems`: every item
+    // already applied in THIS loop committed in its own transaction (for
+    // the PATCH path) or shares submit's still-open one, either way safely
+    // -- but the client never sees `results` for anything from here on, so
+    // per FlushController's own reconcile rule ("absent from results
+    // entirely... stays queued and rides the next flush") nothing is lost,
+    // only possibly redundantly resent, which the reorder guard makes a
+    // no-op.
+    const outcome: WriteOutcome = await (async () => {
+      try {
+        return await input.write({
+          attemptId: input.attempt.id,
+          questionId: item.questionId,
+          testVersionId: input.attempt.testVersionId,
+          clientInstanceId: input.clientInstanceId,
+          seq: item.seq,
+          selectedChoiceIds: item.selectedChoiceIds,
+          answeredAt: item.answeredAt ? new Date(item.answeredAt) : null,
+          timeSpentMs: item.timeSpentMs ?? null,
+          allowAnswerChange: rules?.allowAnswerChange ?? true,
+          now: input.now,
+        })
+      } catch (error) {
+        // `input.capturePool`, NOT `db` -- see `ApplyResponseItemsInput`'s
+        // doc comment on `capturePool` for why this specific call must not
+        // use whatever transaction `db` might be.
+        throw await captureUnexpectedWriteError(input.capturePool, input.req, {
+          attemptId: input.attempt.id,
+          body: item,
+          now: input.now,
+          clientInstanceId: input.clientInstanceId,
+          error,
+        })
+      }
+    })()
 
     if (outcome.kind === "rejected") {
       results.push({

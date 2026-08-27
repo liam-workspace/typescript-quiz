@@ -67,6 +67,42 @@ function overlappingIds(left: string[], right: string[]): string[] {
 }
 
 describe("listAttemptHistory", () => {
+  // A privacy boundary with no negative case is a half-blind guard: every
+  // other test here seeds one student, so `WHERE a.student_id = $1` could be
+  // deleted entirely and all of them would still pass. This is the test that
+  // fails if it ever is -- one child must never see another child's results.
+  it("returns nothing belonging to another student", async () => {
+    await withDatabase(async (pool) => {
+      const fixture = await seedPublishedTest(pool)
+      const mine = await insertAttempt(pool, fixture)
+
+      const otherStudentId = randomUUID()
+      await pool.query(
+        `INSERT INTO student (id, subject_claim, email, display_name)
+         VALUES ($1, 'sub-someone-else', 'else@example.test', 'Someone Else')`,
+        [otherStudentId],
+      )
+      const theirs = randomUUID()
+      await pool.query(
+        `INSERT INTO attempt
+           (id, student_id, test_version_id, status, started_at, expires_at)
+         VALUES ($1, $2, $3, 'in_progress',
+                 $4::timestamptz - interval '30 minutes', $4)`,
+        [theirs, otherStudentId, fixture.versionId, NOW],
+      )
+      await finalizeAttempt(pool, {
+        attemptId: theirs,
+        status: "submitted",
+        submittedAt: NOW,
+      })
+
+      const result = await listAttemptHistory(pool, historyInput(fixture))
+
+      expect(attemptIds(result.attempts)).toEqual([mine])
+      expect(attemptIds(result.attempts)).not.toContain(theirs)
+    })
+  }, 120_000)
+
   it("lists finished attempts newest-submitted-first", async () => {
     await withDatabase(async (pool) => {
       const fixture = await seedPublishedTest(pool)

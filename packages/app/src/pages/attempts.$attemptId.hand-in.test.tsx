@@ -1,14 +1,68 @@
 import "fake-indexeddb/auto"
 import { cleanup, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { isRedirect } from "@tanstack/react-router"
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockInstance,
+} from "vitest"
 import "../i18n.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
 import type { RunnerEnvelope } from "../lib/api-types.js"
-import { HandInScreen } from "./attempts.$attemptId.hand-in.js"
+import {
+  HandInRouteError,
+  HandInScreen,
+  loadHandInRouteData,
+} from "./attempts.$attemptId.hand-in.js"
 
 const DB_NAME = "pp-answer-queue-handin-test"
 const NOW = new Date("2026-08-27T09:00:00.000Z")
+
+// Top-level, not inline: a named function passed by reference (rather than
+// an arrow written at the call site) adds no callback-nesting depth at the
+// describe/beforeEach/it it is used from -- see `loadHandInRouteData /
+// HandInRouteError`'s `beforeEach` below, which is already several levels
+// deep before this is even involved.
+function closeQueue(queue: AnswerQueue): Promise<void> {
+  return queue.close()
+}
+
+// `loadHandInRouteData("attempt-1").catch(...)` below needs the rejection
+// VALUE, not to re-throw it -- `(error: unknown) => error` inline would add
+// a callback nesting level at that call site.
+function asRejectionValue(error: unknown): unknown {
+  return error
+}
+
+/**
+ * `loadHandInRouteData` opens a REAL AnswerQueue (fake-indexeddb-backed,
+ * default DB name -- distinct from this file's own `DB_NAME`) alongside the
+ * envelope fetch, per its own doc comment, even when the envelope half
+ * rejects and the queue is never handed back to the caller to close. Left
+ * open, that connection is exactly the kind of dangling handle that made
+ * fake-indexeddb's shared, cross-file job queue flaky for unrelated later
+ * tests. This wraps `AnswerQueue.open` to capture every instance it mints
+ * into `sink`, so the describe block's own `afterEach` can close them --
+ * fixing the test's hygiene rather than changing `loadHandInRouteData`'s
+ * production behaviour just to suit it.
+ */
+function trackingOpener(
+  original: (name?: string) => Promise<AnswerQueue>,
+  sink: AnswerQueue[],
+): (name?: string) => Promise<AnswerQueue> {
+  return async function tracked(name?: string): Promise<AnswerQueue> {
+    const opened = await original(name)
+
+    sink.push(opened)
+
+    return opened
+  }
+}
 
 const baseEnvelope: RunnerEnvelope = {
   id: "attempt-1",
@@ -338,5 +392,104 @@ describe("HandInScreen", () => {
     } finally {
       await queue.close()
     }
+  })
+})
+
+// Defect A: hand-in.tsx had no errorComponent either -- same missing
+// boundary as run.tsx, same fix shape. See run.test.tsx's matching describe
+// for the full rationale.
+describe("loadHandInRouteData / HandInRouteError", () => {
+  const openedQueues: AnswerQueue[] = []
+  let openSpy: MockInstance | undefined = undefined
+
+  beforeEach(() => {
+    // Captured BEFORE `spyOn` runs -- see run.test.tsx's matching
+    // `beforeEach` for why: reading `AnswerQueue.open` afterwards would
+    // capture the spy itself, not the real implementation, and `tracked`
+    // calling "the original" would then call itself, infinitely.
+    const originalOpen = AnswerQueue.open.bind(AnswerQueue)
+
+    openSpy = vi
+      .spyOn(AnswerQueue, "open")
+      .mockImplementation(trackingOpener(originalOpen, openedQueues))
+  })
+
+  afterEach(async () => {
+    cleanup()
+    vi.unstubAllGlobals()
+    openSpy?.mockRestore()
+    await Promise.all(openedQueues.splice(0).map(closeQueue))
+  })
+
+  it("redirects to the result screen on a 410 attempt_expired, rather than erroring", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            type: "attempt_expired",
+            title: "The attempt was past its deadline and has been finalized.",
+            status: 410,
+            attempt: {
+              id: "attempt-1",
+              status: "expired",
+              submittedAt: "2026-08-27T09:25:00.000Z",
+              resultUrl: "/attempts/attempt-1/result",
+            },
+          }),
+          {
+            status: 410,
+            headers: { "content-type": "application/problem+json" },
+          },
+        ),
+      ),
+    )
+
+    const thrown: unknown =
+      await loadHandInRouteData("attempt-1").catch(asRejectionValue)
+
+    expect(isRedirect(thrown)).toBe(true)
+
+    if (!isRedirect(thrown)) {
+      throw new Error("Expected a TanStack Router redirect")
+    }
+
+    expect(thrown.options.href).toBe("/attempts/attempt-1/result")
+  })
+
+  it("propagates a plain network failure for HandInRouteError to render", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockRejectedValue(new TypeError("Failed to fetch")),
+    )
+
+    await expect(loadHandInRouteData("attempt-1")).rejects.toBeInstanceOf(
+      TypeError,
+    )
+  })
+
+  it("renders an honest, actionable message -- reassures answers are safe, offers a retry", () => {
+    render(<HandInRouteError error={new TypeError("Failed to fetch")} />)
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Nothing is lost")
+    expect(
+      screen.getByRole("button", { name: "Try again" }),
+    ).toBeInTheDocument()
+  })
+
+  it("reloads the page rather than losing queued answers on a silent client-side retry", async () => {
+    const reload = vi.fn()
+    // Not `{ ...window.location, reload }`: `Location` is a class instance,
+    // and spreading one loses its prototype (oxlint's `no-misused-spread`).
+    // HandInRouteError's retry button only ever calls
+    // `window.location.reload()`, so a minimal stand-in is both enough and
+    // honest about what this test actually exercises.
+    vi.stubGlobal("location", { reload })
+    const user = userEvent.setup()
+
+    render(<HandInRouteError error={new TypeError("Failed to fetch")} />)
+    await user.click(screen.getByRole("button", { name: "Try again" }))
+
+    expect(reload).toHaveBeenCalledOnce()
   })
 })

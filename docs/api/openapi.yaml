@@ -444,6 +444,7 @@ paths:
             }
         "410": { $ref: "#/components/responses/SectionOrAttemptExpired" }
         "413": { $ref: "#/components/responses/PayloadCaptured" }
+        "500": { $ref: "#/components/responses/UnexpectedWriteError" }
 
   /attempts/{id}/responses:
     patch:
@@ -492,6 +493,7 @@ paths:
         "403": { $ref: "#/components/responses/NotYourAttempt" }
         "410": { $ref: "#/components/responses/SectionOrAttemptExpired" }
         "413": { $ref: "#/components/responses/PayloadCaptured" }
+        "500": { $ref: "#/components/responses/UnexpectedWriteError" }
 
   /attempts/{id}/position:
     put:
@@ -586,6 +588,7 @@ paths:
 
         # ─────────────────────────────────────────────────────────── Results ──
         "413": { $ref: "#/components/responses/PayloadCaptured" }
+        "500": { $ref: "#/components/responses/UnexpectedWriteError" }
 
   /attempts/{id}/result:
     get:
@@ -992,6 +995,17 @@ components:
             oneOf:
               - { $ref: "#/components/schemas/SectionExpiredProblem" }
               - { $ref: "#/components/schemas/AttemptExpiredProblem" }
+    UnexpectedWriteError:
+      description: |
+        A database error this write did not recognise as one of its own rejection reasons — a
+        deadlock, a lock timeout, a serialization failure, or anything else this API has not
+        classified. Captured as a `failed_write` BEFORE this response is returned, the same as
+        every other refused write (rule 4). Unlike every 4xx this API declares, `retryable` is
+        true here: the identical body may well succeed on a later attempt, so the client backs
+        off and retries (rule 5) rather than stopping dead.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/UnexpectedErrorProblem" }
 
   schemas:
     SectionExpiredProblem:
@@ -1040,6 +1054,22 @@ components:
             When present, always false — every 4xx this API declares is a rule decision, not a
             transient fault, and a retried 409 is a storm rather than a recovery. A retryable
             condition (429, or any 5xx) would carry its own schema rather than relax this one.
+
+    UnexpectedErrorProblem:
+      type: object
+      description: |
+        The retryable 5xx `Problem`'s own schema promises — see `UnexpectedWriteError` for when
+        this is returned, and `Problem`'s own `retryable` doc for why it is a separate schema
+        rather than a relaxed `Problem` (`retryable` there is `const: false`, unconditionally).
+      required: [type, title, status, retryable, capturedAs]
+      additionalProperties: false
+      properties:
+        type: { type: string, const: unexpected_error }
+        title: { type: string }
+        status: { type: integer, const: 500 }
+        detail: { type: string }
+        retryable: { type: boolean, const: true }
+        capturedAs: { type: string }
 
     Student:
       type: object

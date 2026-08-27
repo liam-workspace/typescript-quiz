@@ -1,3 +1,10 @@
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@liam-public/browser-react-ui"
 import { createFileRoute } from "@tanstack/react-router"
 import { useEffect, useRef, useState, type JSX } from "react"
 import { useTranslation } from "react-i18next"
@@ -12,6 +19,7 @@ import {
   getRunnerEnvelope,
   setPosition,
 } from "../lib/attempts-api.js"
+import { redirectExpiredAttemptToResult } from "../lib/expired-attempt-redirect.js"
 import { FlushController, type Scheduler } from "../lib/flushController.js"
 import { apiFlushHttp } from "../lib/flushHttp.js"
 import { registerPagehideFlush } from "../lib/lifecycleFlush.js"
@@ -72,6 +80,17 @@ function flattenSection(section: RunnerSection): FlatEntry[] {
 type PlayState =
   | { readonly status: "idle" }
   | { readonly status: "granted"; readonly mediaUrl: string }
+  // The granted media's own `<audio>` element fired `error` (Defect fix:
+  // ListeningRunner previously had no `onError` at all, so a stalled or
+  // failed load left `playing` -- and hence the play button -- stuck true
+  // forever, with no way for the child to recover or even know why. The
+  // play itself is NOT retried here: `POST /play` already counted it before
+  // the browser ever started fetching, so this only clears `audioSrc` (the
+  // failed element unmounts, `playing` goes back to false) and tells
+  // ListeningRunner to show an honest message. A fresh tap on the play
+  // button is a deliberate, ordinary new claim through `handleClaimPlay`,
+  // exactly like any other replay.
+  | { readonly status: "failed" }
 
 interface ExpiredState {
   readonly kind: "section" | "attempt"
@@ -270,6 +289,18 @@ export function RunScreen({
           `/attempts/${attemptId}/responses`,
         ),
       )
+      .catch(() => {
+        // Deliberately not re-thrown, and deliberately not surfaced as UI
+        // state (unlike moveToQuestion/handleNavigatorNavigate's own
+        // `.catch`, which react to `attempt_expired`/`section_expired`):
+        // FlushController already owns retry/backoff internally (see the
+        // "fire-and-forget on purpose" comment above), and the answer is
+        // already durable in IndexedDB regardless of whether THIS flush
+        // attempt succeeds -- the next one (the next tap, pagehide, or
+        // hand-in) carries it. Only exists so a rejection here (including a
+        // queue closed out from under an in-flight flush, e.g. on unmount)
+        // is never left as an unhandled promise rejection.
+      })
   }
 
   const handleClaimPlay = async (): Promise<void> => {
@@ -316,6 +347,10 @@ export function RunScreen({
 
   const handleAudioEnded = (): void => {
     setPlayState({ status: "idle" })
+  }
+
+  const handleAudioError = (): void => {
+    setPlayState({ status: "failed" })
   }
 
   const nextEntry = entries.at(currentIndex + 1)
@@ -479,6 +514,8 @@ export function RunScreen({
         onClaimPlay={handleClaimPlay}
         audioSrc={playState.status === "granted" ? playState.mediaUrl : null}
         onAudioEnded={handleAudioEnded}
+        onAudioError={handleAudioError}
+        audioFailed={playState.status === "failed"}
         questionCount={envelope.questionCount}
         pips={pips}
         hasNext={Boolean(nextEntry)}
@@ -640,18 +677,82 @@ export async function loadRunScreenData(attemptId: string): Promise<{
   return { envelope, student }
 }
 
-export const Route = createFileRoute("/attempts/$attemptId/run")({
-  // The queue is opened once per route entry, alongside the envelope fetch,
-  // matching the hand-in screen's own loader (`attempts.$attemptId.hand-in.tsx`)
-  // -- not inside the component, so a re-render never reopens it.
-  loader: async ({ params }) => {
+/**
+ * The route loader proper: `loadRunScreenData`'s envelope+identity plus the
+ * queue, opened once per route entry (not inside the component, so a
+ * re-render never reopens it) -- and the 410 attempt_expired redirect
+ * described on `RunRouteError` below. Exported, like `loadRunScreenData`,
+ * so the redirect is testable directly rather than only reachable through
+ * the router (mirrors `attempts.$attemptId.result.tsx`'s `loadResult`).
+ */
+export async function loadRunRouteData(attemptId: string): Promise<{
+  envelope: RunnerEnvelope
+  student: MenuStudent | undefined
+  queue: AnswerQueue
+}> {
+  try {
     const [{ envelope, student }, queue] = await Promise.all([
-      loadRunScreenData(params.attemptId),
+      loadRunScreenData(attemptId),
       AnswerQueue.open(),
     ])
 
     return { envelope, student, queue }
-  },
+  } catch (error) {
+    // A 410 attempt_expired here means THIS load finalized the attempt --
+    // the honest destination is the result screen it names, not an error
+    // page for a request that actually succeeded at what it was for
+    // (finding out the attempt is over). Every other failure (a network
+    // blip, 401/403, a blocked IndexedDB open) falls through to
+    // RunRouteError below.
+    redirectExpiredAttemptToResult(error)
+
+    throw error
+  }
+}
+
+/**
+ * The runner screen has no default TanStack error page to fall back on --
+ * this is one of the two screens (with hand-in.tsx) live during a timed
+ * test, so a bare "something went wrong" with no way back would leave a
+ * child staring at a dead end while their clock keeps running. Honest on
+ * both fronts the fallback page cannot be: every answer is durably queued
+ * in IndexedDB (`lib/answerQueue.ts`) BEFORE it is ever sent, and reloading
+ * this route re-runs the loader without touching that queue at all -- so
+ * "try again" here costs nothing that was not already lost by the network
+ * blip that brought the loader down in the first place.
+ */
+export interface RunRouteErrorProps {
+  readonly error: unknown
+}
+
+export function RunRouteError(_props: RunRouteErrorProps) {
+  const { t } = useTranslation("runner")
+
+  return (
+    <div className="mx-auto max-w-xl px-4 py-12">
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("runError.title")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p role="alert">{t("runError.message")}</p>
+          <Button
+            className="h-11 min-w-11 touch-manipulation select-none"
+            onClick={() => {
+              window.location.reload()
+            }}
+          >
+            {t("runError.retry")}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+export const Route = createFileRoute("/attempts/$attemptId/run")({
+  loader: ({ params }) => loadRunRouteData(params.attemptId),
+  errorComponent: RunRouteError,
   component: RouteComponent,
 })
 

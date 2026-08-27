@@ -4,7 +4,7 @@ import { Test } from "@nestjs/testing"
 import { AllExceptionsFilter } from "@liam-public/node-nest-common"
 import { createJwksVerifier } from "@liam-workspace/node-auth-server"
 import { createFixedClock } from "@pp/common"
-import { migrateToLatest } from "@pp/db"
+import { createRequestPool, loadDbConfig, migrateToLatest } from "@pp/db"
 import express, { type Express } from "express"
 import { inject } from "vitest"
 import { AppModule } from "../../src/app.module.js"
@@ -14,6 +14,7 @@ import { FailedWriteCaptureFilter } from "../../src/durability/failed-write-capt
 import { createRawBodyJsonMiddleware } from "../../src/http/raw-body-json.middleware.js"
 import { SpaFallbackFilter } from "../../src/spa/spa-fallback.filter.js"
 import { ZodBodyValidationPipe } from "../../src/validation/zod-body-validation.pipe.js"
+import { createFaultInjectingPool } from "./fault-injecting-pool.js"
 import { createTokenFactory } from "./token.js"
 
 const JWKS_URL = "https://auth.test/.well-known/jwks.json"
@@ -37,7 +38,16 @@ export interface TestApp {
 }
 
 export async function createTestApp(
-  options: { now?: Date; allowedEmails?: string } = {},
+  options: {
+    now?: Date
+    allowedEmails?: string
+    // Wraps REQUEST_POOL in `createFaultInjectingPool` (see that helper's
+    // doc comment) -- used only by response-write-db-error.e2e.test.ts to
+    // simulate a database error `response.repository.ts`'s
+    // `rejectionReasonFor` does not recognise, without touching every other
+    // query this app makes (fixture seeding included).
+    poolFault?: { matches: (sql: string) => boolean; error: Error }
+  } = {},
 ): Promise<TestApp> {
   process.env.DATABASE_URL = inject("postgresConnectionUri")
   process.env.JWKS_URL = JWKS_URL
@@ -59,6 +69,19 @@ export async function createTestApp(
 
   if (options.now) {
     builder.overrideProvider(CLOCK).useValue(createFixedClock(options.now))
+  }
+
+  if (options.poolFault) {
+    const { matches, error } = options.poolFault
+
+    builder.overrideProvider(REQUEST_POOL).useFactory({
+      factory: () =>
+        createFaultInjectingPool(
+          createRequestPool(loadDbConfig()),
+          matches,
+          error,
+        ),
+    })
   }
 
   const moduleRef = await builder.compile()

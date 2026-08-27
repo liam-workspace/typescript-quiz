@@ -38,6 +38,17 @@ export interface ListeningRunnerProps {
   // from the PlayGrant it gets back from `claimPlay`.
   readonly audioSrc: string | null
   readonly onAudioEnded: () => void
+  // The most recent claimed play's media stalled or failed to load (the
+  // `<audio>` element's own `error` event, not a claim-time rejection --
+  // QuestionMedia's own doc comment already covers those). The play was
+  // already counted server-side by the time this fires (`POST /play`
+  // resolves, incrementing `playsUsed`, before the browser ever starts
+  // fetching bytes from the granted URL), so this is never used to pretend
+  // the play was not spent -- only to tell the child honestly that the
+  // recording did not come through, and whether tapping the button again
+  // would even be able to help.
+  readonly onAudioError: () => void
+  readonly audioFailed: boolean
   readonly questionCount: number
   // One entry per question in the CURRENT section, in section order --
   // "the section's own question ordinals," not 1..questionCount. Read-only:
@@ -67,6 +78,8 @@ export function ListeningRunner({
   onClaimPlay,
   audioSrc,
   onAudioEnded,
+  onAudioError,
+  audioFailed,
   questionCount,
   pips,
   hasNext,
@@ -124,7 +137,16 @@ export function ListeningRunner({
               src={audioSrc}
               autoPlay
               onEnded={onAudioEnded}
+              onError={onAudioError}
             />
+          ) : null}
+          {stimulus.type === "audio" && audioFailed ? (
+            <p role="alert">
+              {stimulus.maxPlays !== null &&
+              stimulus.playsUsed >= stimulus.maxPlays
+                ? t("listening.playbackFailed.noPlaysLeft")
+                : t("listening.playbackFailed.retry")}
+            </p>
           ) : null}
         </>
       ) : null}

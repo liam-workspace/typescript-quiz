@@ -58,6 +58,7 @@ export class ResponseSnapshotController {
       now,
       req,
       write: (input) => writeResponse(this.pool, input),
+      capturePool: this.pool,
     })
 
     return {

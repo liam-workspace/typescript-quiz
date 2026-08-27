@@ -1,6 +1,6 @@
 services:
-  # Serves the REST API and /media (the built SPA is served from this same
-  # process once plan 6's deploy task lands). Boot ordering against postgres
+  # Serves the REST API, /media, and the built SPA (fallback-served from the
+  # same process; see SPA_ROOT and main.ts). Boot ordering against postgres
   # is handled by `waitForDatabase` in the application itself — `depends_on`
   # only waits for the container to start, not for postgres to accept
   # connections.

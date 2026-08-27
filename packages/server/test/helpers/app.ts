@@ -1,15 +1,18 @@
-import type { INestApplication } from "@nestjs/common"
+import { existsSync } from "node:fs"
+import type { ExceptionFilter, INestApplication } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
 import { AllExceptionsFilter } from "@liam-public/node-nest-common"
 import { createJwksVerifier } from "@liam-workspace/node-auth-server"
 import { createFixedClock } from "@pp/common"
 import { migrateToLatest } from "@pp/db"
+import express, { type Express } from "express"
 import { inject } from "vitest"
 import { AppModule } from "../../src/app.module.js"
 import { JWKS_VERIFIER } from "../../src/auth/tokens.js"
 import { CLOCK, REQUEST_POOL } from "../../src/database/tokens.js"
 import { FailedWriteCaptureFilter } from "../../src/durability/failed-write-capture.filter.js"
 import { createRawBodyJsonMiddleware } from "../../src/http/raw-body-json.middleware.js"
+import { SpaFallbackFilter } from "../../src/spa/spa-fallback.filter.js"
 import { ZodBodyValidationPipe } from "../../src/validation/zod-body-validation.pipe.js"
 import { createTokenFactory } from "./token.js"
 
@@ -64,6 +67,19 @@ export async function createTestApp(
   // pipeline than production, and any assertion on rawBody/failed_write
   // capture would be fiction.
   http.use(createRawBodyJsonMiddleware(262_144))
+
+  // Mirror main.ts: SPA_ROOT is unset in the ordinary unit-test run, so this
+  // is a no-op there. spa.e2e.test.ts is the one suite that sets it (and
+  // only when packages/app has actually been built alongside this checkout)
+  // -- without mirroring main.ts's static-asset mount here too, that test
+  // could never pass even under the right conditions, only skip.
+  const spaRoot = process.env.SPA_ROOT
+
+  if (spaRoot && existsSync(spaRoot)) {
+    const server = http.getHttpAdapter().getInstance() as Express
+    server.use(express.static(spaRoot, { index: false }))
+  }
+
   // Mirror main.ts. Without this the suite would assert paths production
   // never serves -- the tests would agree with the code and both would
   // disagree with the contract.
@@ -73,16 +89,23 @@ export async function createTestApp(
   http.useGlobalPipes(new ZodBodyValidationPipe())
   // Mirror main.ts: without this, tests exercise a different error pipeline
   // than production and any assertion on an error body would be fiction.
-  // FailedWriteCaptureFilter MUST come last -- see the verified note on the
-  // filter itself for why (Nest reverses the global filter array before
-  // matching).
-  http.useGlobalFilters(
-    new AllExceptionsFilter(),
+  // Registration order matters -- see main.ts's note on why
+  // AllExceptionsFilter (unconditional @Catch()) must come first (checked
+  // last after Nest's array reversal), and FailedWriteCaptureFilter /
+  // SpaFallbackFilter (non-overlapping @Catch() lists) after it.
+  const filters: ExceptionFilter[] = [new AllExceptionsFilter()]
+
+  if (spaRoot && existsSync(spaRoot)) {
+    filters.push(new SpaFallbackFilter(spaRoot))
+  }
+
+  filters.push(
     new FailedWriteCaptureFilter(
       moduleRef.get(REQUEST_POOL),
       moduleRef.get(CLOCK),
     ),
   )
+  http.useGlobalFilters(...filters)
   await http.init()
 
   return {

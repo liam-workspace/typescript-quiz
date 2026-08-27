@@ -10,6 +10,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.json .npmrc ./
 COPY packages/common/package.json ./packages/common/
 COPY packages/db/package.json ./packages/db/
 COPY packages/server/package.json ./packages/server/
+COPY packages/app/package.json ./packages/app/
 
 # ---- BUILDER (full deps, compiles dist/) ----
 FROM base AS builder
@@ -25,18 +26,19 @@ RUN --mount=type=secret,id=node_auth_token,required=true \
 COPY packages/common ./packages/common
 COPY packages/db ./packages/db
 COPY packages/server ./packages/server
+COPY packages/app ./packages/app
 
-# common -> db -> server, each via `tsc -p tsconfig.build.json`.
-# Build only what this image ships. The root `pnpm build` also names
-# `@pp/app`, whose sources are deliberately NOT copied here -- the SPA is not
-# served from this process until plan 6's deploy task wires it. Left as the
-# root script, `--filter @pp/app` would match nothing, print "No projects
-# matched the filters" and EXIT 0, so the image would report a successful
-# build of something it never built. Naming the packages explicitly makes the
-# omission deliberate and visible instead of silent.
+# common -> db -> server -> app, each via its own build script (`tsc -p
+# tsconfig.build.json` for the three backend packages, that plus `vite build`
+# for @pp/app). Named explicitly rather than delegating to the root `pnpm
+# build` script or a `--filter` pattern: a pattern that matches nothing exits
+# 0 and prints "No projects matched the filters", so the image would report a
+# successful build of something it never built. Naming every package this
+# image ships makes an accidental omission loud instead of silent.
 RUN pnpm --filter @pp/common build \
     && pnpm --filter @pp/db build \
-    && pnpm --filter @pp/server build
+    && pnpm --filter @pp/server build \
+    && pnpm --filter @pp/app build
 
 # ---- PROD-DEPS (production-only node_modules, no dev tooling) ----
 # A fresh --prod install rather than `pnpm prune --prod` on the builder's
@@ -69,6 +71,14 @@ COPY --from=builder /app/packages/common/dist ./packages/common/dist
 COPY --from=builder /app/packages/db/dist ./packages/db/dist
 COPY --from=builder /app/packages/db/migrations ./packages/db/migrations
 COPY --from=builder /app/packages/server/dist ./packages/server/dist
+
+# The built SPA is static output only -- no node_modules, no package.json,
+# just the files express.static serves (see main.ts). SPA_ROOT tells the
+# server where to find them; main.ts no-ops the static/fallback wiring when
+# it's unset or the directory doesn't exist, so this is also what makes the
+# SPA optional outside this image (e.g. `pnpm --filter @pp/server start`).
+COPY --from=builder /app/packages/app/dist /app/public
+ENV SPA_ROOT=/app/public
 
 # /media is a named volume at runtime. Docker seeds an empty named volume from
 # the image's directory, ownership included, so creating it as `node` here is

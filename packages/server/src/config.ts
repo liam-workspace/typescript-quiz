@@ -14,6 +14,7 @@ export interface ServerConfig {
   allowedEmails: string[]
   mediaSigningSecret: string
   requestBodyMaxBytes: number
+  spaRoot: string | null
 }
 
 function required(env: Environment, key: string): string {
@@ -48,5 +49,9 @@ export function loadServerConfig(
       "REQUEST_BODY_MAX_BYTES",
       262_144,
     ),
+    // `null` by default: outside Docker (e.g. `pnpm --filter @pp/server
+    // start`) there is no built SPA sitting alongside the server, so this
+    // must not default to a path that doesn't exist.
+    spaRoot: env.SPA_ROOT ?? null,
   }
 }

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
 import type { AttemptHistoryPage } from "../lib/api-types.js"
+import { renderWithRouter } from "../test/renderWithRouter.js"
 import { HistoryRouteError, HistoryScreen, loadHistory } from "./history.js"
 
 const firstPage: AttemptHistoryPage = {
@@ -97,6 +98,13 @@ function response(body: unknown, status = 200): Response {
   })
 }
 
+function renderHistory(initialPage: AttemptHistoryPage) {
+  return renderWithRouter(
+    <HistoryScreen initialPage={initialPage} />,
+    "/history",
+  )
+}
+
 describe("attempt history page", () => {
   afterEach(() => {
     cleanup()
@@ -119,7 +127,7 @@ describe("attempt history page", () => {
   })
 
   it("renders one row per finished attempt with its per-section and total scores", () => {
-    render(<HistoryScreen initialPage={firstPage} />)
+    renderHistory(firstPage)
 
     const submittedRow = screen.getByRole("row", {
       name: /Practice Test 04/u,
@@ -147,7 +155,7 @@ describe("attempt history page", () => {
   })
 
   it("renders 'Time ran out' styling, not the ordinary 'Handed in' text, for a status: expired row", () => {
-    render(<HistoryScreen initialPage={firstPage} />)
+    renderHistory(firstPage)
 
     const row = screen.getByRole("row", { name: /Practice Test 03/u })
     expect(within(row).getByText("Time ran out")).toHaveClass("text-amber-700")
@@ -155,7 +163,7 @@ describe("attempt history page", () => {
   })
 
   it("renders ordinary 'Handed in' styling, not 'Time ran out', for a status: submitted row", () => {
-    render(<HistoryScreen initialPage={firstPage} />)
+    renderHistory(firstPage)
 
     const row = screen.getByRole("row", { name: /Practice Test 04/u })
     expect(within(row).getByText("Handed in")).toHaveClass("text-stone-600")
@@ -168,7 +176,7 @@ describe("attempt history page", () => {
       .mockResolvedValue(response(lastPage))
     vi.stubGlobal("fetch", fetchMock)
     const user = userEvent.setup()
-    render(<HistoryScreen initialPage={firstPage} />)
+    renderHistory(firstPage)
 
     const loadMore = screen.getByRole("button", { name: "Load more" })
     expect(loadMore).toBeEnabled()
@@ -189,7 +197,7 @@ describe("attempt history page", () => {
   })
 
   it("disables Load more when nextCursor is null", () => {
-    render(<HistoryScreen initialPage={lastPage} />)
+    renderHistory(lastPage)
 
     expect(
       screen.getByRole("button", { name: "No older attempts" }),
@@ -208,7 +216,7 @@ describe("attempt history page", () => {
     })
     vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockReturnValue(pendingPage))
     const user = userEvent.setup()
-    render(<HistoryScreen initialPage={firstPage} />)
+    renderHistory(firstPage)
 
     const loadMore = screen.getByRole("button", { name: "Load more" })
     await user.click(loadMore)
@@ -241,7 +249,7 @@ describe("attempt history page", () => {
       ),
     )
     const user = userEvent.setup()
-    render(<HistoryScreen initialPage={firstPage} />)
+    renderHistory(firstPage)
 
     await user.click(screen.getByRole("button", { name: "Load more" }))
 
@@ -255,7 +263,7 @@ describe("attempt history page", () => {
   })
 
   it("renders a useful empty state when there are no finished attempts", () => {
-    render(<HistoryScreen initialPage={{ attempts: [], nextCursor: null }} />)
+    renderHistory({ attempts: [], nextCursor: null })
 
     expect(screen.getByText("No finished attempts yet.")).toBeInTheDocument()
     expect(
@@ -263,21 +271,29 @@ describe("attempt history page", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("marks a section as not included when another test establishes that column", () => {
-    render(
-      <HistoryScreen
-        initialPage={{
-          attempts: [
-            firstPage.attempts[0],
-            {
-              ...lastPage.attempts[0],
-              sections: [lastPage.attempts[0].sections[0]],
-            },
-          ],
-          nextCursor: null,
-        }}
-      />,
+  it("navigates back to the registered library route without reloading the document", async () => {
+    const user = userEvent.setup()
+    const { router } = renderWithRouter(
+      <HistoryScreen initialPage={lastPage} />,
+      "/history",
     )
+
+    await user.click(screen.getByRole("link", { name: "Back to library" }))
+
+    expect(router.state.location.pathname).toBe("/")
+  })
+
+  it("marks a section as not included when another test establishes that column", () => {
+    renderHistory({
+      attempts: [
+        firstPage.attempts[0],
+        {
+          ...lastPage.attempts[0],
+          sections: [lastPage.attempts[0].sections[0]],
+        },
+      ],
+      nextCursor: null,
+    })
 
     const row = screen.getByRole("row", { name: /Practice Test 02/u })
     expect(within(row).getByText("14 / 20")).toBeInTheDocument()

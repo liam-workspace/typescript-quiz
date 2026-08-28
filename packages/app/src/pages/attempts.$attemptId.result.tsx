@@ -4,7 +4,7 @@ import {
   CardContent,
   CardFooter,
 } from "@liam-public/browser-react-ui"
-import { createFileRoute, redirect } from "@tanstack/react-router"
+import { Link, createFileRoute, redirect } from "@tanstack/react-router"
 import { useTranslation } from "react-i18next"
 import { ApiError } from "../lib/api-client.js"
 import type { AttemptResult, AttemptSectionScore } from "../lib/api-types.js"
@@ -156,7 +156,7 @@ export function ResultScreen({ result }: ResultScreenProps) {
             size="sm"
             className="h-11 min-w-11 touch-manipulation select-none"
           >
-            <a href="/">{t("result.backToLibrary")}</a>
+            <Link to="/">{t("result.backToLibrary")}</Link>
           </Button>
           <Button
             asChild

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './pages/__root'
 import { Route as HistoryRouteImport } from './pages/history'
+import { Route as IndexRouteImport } from './pages/index'
 import { Route as AttemptsAttemptIdRunRouteImport } from './pages/attempts.$attemptId.run'
 import { Route as AttemptsAttemptIdReviewRouteImport } from './pages/attempts.$attemptId.review'
 import { Route as AttemptsAttemptIdResultRouteImport } from './pages/attempts.$attemptId.result'
@@ -19,6 +20,11 @@ import { Route as AttemptsAttemptIdSectionsSectionIdRulesRouteImport } from './p
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
   path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AttemptsAttemptIdRunRoute = AttemptsAttemptIdRunRouteImport.update({
@@ -49,6 +55,7 @@ const AttemptsAttemptIdSectionsSectionIdRulesRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof IndexRoute
   '/history': typeof HistoryRoute
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/attempts/$attemptId/sections/$sectionId/rules': typeof AttemptsAttemptIdSectionsSectionIdRulesRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof IndexRoute
   '/history': typeof HistoryRoute
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/history': typeof HistoryRoute
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
@@ -76,6 +85,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/history'
     | '/attempts/$attemptId/hand-in'
     | '/attempts/$attemptId/result'
@@ -84,6 +94,7 @@ export interface FileRouteTypes {
     | '/attempts/$attemptId/sections/$sectionId/rules'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/history'
     | '/attempts/$attemptId/hand-in'
     | '/attempts/$attemptId/result'
@@ -92,6 +103,7 @@ export interface FileRouteTypes {
     | '/attempts/$attemptId/sections/$sectionId/rules'
   id:
     | '__root__'
+    | '/'
     | '/history'
     | '/attempts/$attemptId/hand-in'
     | '/attempts/$attemptId/result'
@@ -101,6 +113,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   HistoryRoute: typeof HistoryRoute
   AttemptsAttemptIdHandInRoute: typeof AttemptsAttemptIdHandInRoute
   AttemptsAttemptIdResultRoute: typeof AttemptsAttemptIdResultRoute
@@ -116,6 +129,13 @@ declare module '@tanstack/react-router' {
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/attempts/$attemptId/run': {
@@ -157,6 +177,7 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   HistoryRoute: HistoryRoute,
   AttemptsAttemptIdHandInRoute: AttemptsAttemptIdHandInRoute,
   AttemptsAttemptIdResultRoute: AttemptsAttemptIdResultRoute,

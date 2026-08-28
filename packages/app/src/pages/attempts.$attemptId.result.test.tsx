@@ -1,9 +1,11 @@
 import { cleanup, render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { isRedirect } from "@tanstack/react-router"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
 import type { AttemptResult } from "../lib/api-types.js"
+import { renderWithRouter } from "../test/renderWithRouter.js"
 import {
   ResultRouteError,
   ResultScreen,
@@ -52,6 +54,13 @@ function response(body: unknown, status = 200): Response {
   })
 }
 
+function renderResult(result: AttemptResult) {
+  return renderWithRouter(
+    <ResultScreen result={result} />,
+    `/attempts/${result.attemptId}/result`,
+  )
+}
+
 describe("attempt result page", () => {
   afterEach(() => {
     cleanup()
@@ -65,7 +74,7 @@ describe("attempt result page", () => {
     vi.stubGlobal("fetch", fetchMock)
 
     const result = await loadResult("attempt-1")
-    render(<ResultScreen result={result} />)
+    renderResult(result)
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/attempts/attempt-1/result")
     expect(fetchMock.mock.calls[0]?.[1]?.method).toBeUndefined()
@@ -90,30 +99,38 @@ describe("attempt result page", () => {
   })
 
   it("shows a personal-best callout only when isPersonalBest is true", () => {
-    render(<ResultScreen result={bestResult} />)
+    renderResult(bestResult)
 
     expect(screen.getByText("Your best score so far.")).toBeInTheDocument()
   })
 
   it("does not show a personal-best callout when isPersonalBest is false", () => {
-    render(
-      <ResultScreen
-        result={{
-          ...bestResult,
-          attemptId: "attempt-2",
-          score: {
-            ...bestResult.score,
-            pointsEarned: 28,
-            percentage: 70,
-            isPersonalBest: false,
-          },
-        }}
-      />,
-    )
+    renderResult({
+      ...bestResult,
+      attemptId: "attempt-2",
+      score: {
+        ...bestResult.score,
+        pointsEarned: 28,
+        percentage: 70,
+        isPersonalBest: false,
+      },
+    })
 
     expect(
       screen.queryByText("Your best score so far."),
     ).not.toBeInTheDocument()
+  })
+
+  it("navigates back to the registered library route without reloading the document", async () => {
+    const user = userEvent.setup()
+    const { router } = renderWithRouter(
+      <ResultScreen result={bestResult} />,
+      "/attempts/attempt-1/result",
+    )
+
+    await user.click(screen.getByRole("link", { name: "Back to library" }))
+
+    expect(router.state.location.pathname).toBe("/")
   })
 
   it("redirects to the runner rather than rendering a score when the attempt is still running (409)", async () => {

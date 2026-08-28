@@ -4,7 +4,7 @@ import {
   CardContent,
   CardFooter,
 } from "@liam-public/browser-react-ui"
-import { createFileRoute } from "@tanstack/react-router"
+import { Link, createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiError } from "../lib/api-client.js"
@@ -232,7 +232,7 @@ export function HistoryScreen({ initialPage }: HistoryScreenProps) {
             size="sm"
             className="h-11 min-w-11 touch-manipulation select-none"
           >
-            <a href="/">{t("history.backToLibrary")}</a>
+            <Link to="/">{t("history.backToLibrary")}</Link>
           </Button>
         </CardFooter>
       </Card>

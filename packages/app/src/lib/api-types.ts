@@ -1,5 +1,42 @@
 export type SectionType = "listening" | "reading" | "vocabulary" | "grammar"
 
+export type StudentLevel = "primary-step-1" | "primary-step-2"
+
+export interface AttemptRef {
+  attemptId: string
+  submittedAt: string
+  pointsEarned: number
+  pointsPossible: number
+  percentage: number
+}
+
+export interface TestCard {
+  id: string
+  slug: string
+  title: string
+  level: StudentLevel
+  durationSeconds: number
+  sections: Array<{
+    type: SectionType
+    questionCount: number
+  }>
+  inProgressAttemptId: string | null
+  attemptCount: number
+  bestAttempt: AttemptRef | null
+}
+
+export interface StudentSummary {
+  attemptCount: number
+  averagePct: number
+  bestPct: number
+}
+
+export interface TestCatalogPage {
+  tests: TestCard[]
+  nextCursor: string | null
+  summary: StudentSummary
+}
+
 export type NavigationMode = "free" | "forward_only"
 
 export type QuestionType = "single_choice" | "multi_choice"
@@ -304,6 +341,6 @@ export interface Student {
   id: string
   displayName: string
   email: string
-  level: "primary-step-1" | "primary-step-2" | null
+  level: StudentLevel | null
   isAdmin: boolean
 }

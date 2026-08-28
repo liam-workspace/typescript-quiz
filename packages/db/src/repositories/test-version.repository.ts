@@ -28,6 +28,7 @@ interface RunnerRow {
   st_title: string | null
   st_body: string | null
   st_filename: string | null
+  st_image_svg: string | null
   st_media_kind: string | null
   st_max_plays: number | null
   st_allow_pause: boolean | null
@@ -79,7 +80,8 @@ export async function loadForRunner(
             ts.default_allow_seek s_allow_seek,
             g.id g_id, g.ordinal g_ordinal,
             st.id st_id, st.type::text st_type, st.title st_title, st.body_text st_body,
-            ma.filename st_filename, ma.kind::text st_media_kind, st.max_plays st_max_plays,
+            ma.filename st_filename, st.image_svg st_image_svg,
+            ma.kind::text st_media_kind, st.max_plays st_max_plays,
             st.allow_pause st_allow_pause, st.allow_seek st_allow_seek,
             sp.play_count plays_used,
             q.id q_id, q.ordinal q_ordinal, q.type::text q_type, q.prompt q_prompt,
@@ -192,6 +194,7 @@ function buildStimulus(r: RunnerRow, stimulusId: string): RunnerStimulus {
     ...(maxPlays === null && r.st_filename
       ? { mediaUrl: `/media/${r.st_filename}` }
       : {}),
+    ...(r.st_image_svg ? { imageSvg: r.st_image_svg } : {}),
     ...(r.st_type === "mixed"
       ? { mediaKind: r.st_media_kind as "audio" | "image" }
       : {}),

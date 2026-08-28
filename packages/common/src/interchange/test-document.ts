@@ -1,5 +1,97 @@
 import { z } from "zod"
 
+// Both a choice and a stimulus can carry inline <svg> markup rather than a
+// filename (migrations 1005/1006) -- the source pictograms use
+// `stroke="currentColor"`, which only resolves rendered straight into the
+// DOM, and the runner does that with dangerouslySetInnerHTML.
+//
+// That makes THIS the one XSS-relevant boundary in the import pipeline, and
+// it is checked with an ALLOWLIST, not a denylist: enumerating the small,
+// deliberately inert vocabulary a decorative line-art icon actually needs
+// (a handful of shape tags, a handful of geometry/style attributes) and
+// rejecting anything outside it fails CLOSED on whatever was not
+// anticipated -- <script>, <foreignObject>, <use>/<image> with a hostile
+// href, any `on*` handler under any spelling or quoting. A denylist
+// (reject known-bad substrings) fails OPEN the same way and was the
+// earlier draft here; it is bypassable by construction, an allowlist is
+// not.
+const SVG_ALLOWED_TAGS = new Set([
+  "svg",
+  "g",
+  "path",
+  "circle",
+  "ellipse",
+  "rect",
+  "line",
+  "polyline",
+  "polygon",
+])
+
+const SVG_ALLOWED_ATTRS = new Set([
+  "viewbox",
+  "xmlns",
+  "role",
+  "aria-hidden",
+  "fill",
+  "stroke",
+  "stroke-width",
+  "stroke-linecap",
+  "stroke-linejoin",
+  "d",
+  "cx",
+  "cy",
+  "r",
+  "rx",
+  "ry",
+  "x",
+  "y",
+  "x1",
+  "y1",
+  "x2",
+  "y2",
+  "points",
+  "transform",
+  "width",
+  "height",
+])
+
+const SVG_TAG_PATTERN = /<\/?([a-zA-Z][\w-]*)/gu
+// Double-quoted, single-quoted AND unquoted values -- an allowlist that
+// only recognised one quoting style would silently skip (not reject) an
+// attribute written another way, which defeats the point of an allowlist.
+const SVG_ATTR_PATTERN =
+  /([a-zA-Z_:][-\w:.]*)\s*=\s*("[^"]*"|'[^']*'|[^\s"'=<>`]+)/gu
+
+function isSafeInlineSvg(svg: string): boolean {
+  if (/<!|<\?/u.test(svg)) {
+    return false
+  }
+
+  for (const match of svg.matchAll(SVG_TAG_PATTERN)) {
+    if (!SVG_ALLOWED_TAGS.has(match[1].toLowerCase())) {
+      return false
+    }
+  }
+
+  for (const match of svg.matchAll(SVG_ATTR_PATTERN)) {
+    if (!SVG_ALLOWED_ATTRS.has(match[1].toLowerCase())) {
+      return false
+    }
+  }
+
+  return true
+}
+
+const svgImageSchema = z
+  .string()
+  .min(1)
+  .max(20_000)
+  .regex(/^\s*<svg[\s>]/iu, "must be an <svg> element")
+  .refine(
+    isSafeInlineSvg,
+    "contains a tag or attribute outside the safe SVG allowlist",
+  )
+
 const playbackSchema = z
   .object({
     maxPlays: z.number().int().positive().nullable(),
@@ -11,22 +103,9 @@ const playbackSchema = z
 const choiceSchema = z.object({
   label: z.string().min(1),
   isCorrect: z.boolean(),
-  // Inline <svg> markup for a picture choice (TOEFL Primary's
-  // listen_pick_picture / read_word_picture questions), not a filename --
-  // see migration 1005. The shape check mirrors the DB's
-  // choice_image_svg_shape constraint; the script/tag check is this
-  // pipeline's one XSS guard, since the runner renders it with
-  // dangerouslySetInnerHTML.
-  imageSvg: z
-    .string()
-    .min(1)
-    .max(20_000)
-    .regex(/^\s*<svg[\s>]/iu, "imageSvg must be an <svg> element")
-    .refine(
-      (svg) => !/<script[\s>]|on\w+\s*=/iu.test(svg),
-      "imageSvg must not contain script tags or event handler attributes",
-    )
-    .optional(),
+  // Inline <svg> for a picture choice (TOEFL Primary's listen_pick_picture)
+  // -- see migration 1005 and svgImageSchema above.
+  imageSvg: svgImageSchema.optional(),
 })
 
 const questionSchema = z
@@ -69,6 +148,11 @@ const stimulusSchema = z.object({
   title: z.string().min(1).optional(),
   bodyText: z.string().min(1).optional(),
   mediaFilename: z.string().min(1).optional(),
+  // An `image` stimulus's alternative to mediaFilename -- inline <svg>,
+  // for the same reason as choiceSchema.imageSvg (TOEFL Primary's
+  // read_word_picture: a pictogram above the question, text choices below,
+  // the mirror image of listen_pick_picture). See migration 1006.
+  imageSvg: svgImageSchema.optional(),
   maxPlays: z.number().int().positive().optional(),
   allowPause: z.boolean().optional(),
   allowSeek: z.boolean().optional(),

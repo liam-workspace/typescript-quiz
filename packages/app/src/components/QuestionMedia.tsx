@@ -36,6 +36,20 @@ export function QuestionMedia({
   }
 
   if (stimulus.type === "image" && stimulus.maxPlays === null) {
+    // Inline <svg> (a pictogram above the question -- see Choice.imageSvg
+    // for why) takes priority: it is trusted content from the same import
+    // pipeline as a choice's imageSvg, never from a student.
+    if (stimulus.imageSvg) {
+      return (
+        <span
+          aria-hidden="true"
+          className="stimulus-image"
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: stimulus.imageSvg }}
+        />
+      )
+    }
+
     if (!stimulus.mediaUrl) {
       return null
     }

@@ -159,6 +159,19 @@
     height: 100%;
   }
 
+  /* A read_word_picture stimulus's pictogram -- same inline-SVG mechanism
+   * as .choice-image, one level up (above the question, not per-choice). */
+  .stimulus-image {
+    display: block;
+    max-height: 240px;
+    width: auto;
+  }
+  .stimulus-image svg {
+    display: block;
+    height: 100%;
+    width: auto;
+  }
+
   /* A navigator cell. Five states, five looks -- see the note above. */
   .np-cell {
     display: grid;

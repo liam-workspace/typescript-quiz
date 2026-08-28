@@ -165,6 +165,9 @@ export interface OpenStimulusWire {
   bodyText?: string
   maxPlays: null
   mediaUrl?: string
+  // An `image` stimulus's alternative to mediaUrl -- inline <svg>, for the
+  // same currentColor reason as RunnerChoice.imageSvg.
+  imageSvg?: string
   allowPause?: boolean
   allowSeek?: boolean
   // Present only for `type: "mixed"` -- see CappedStimulusWire's mediaKind.
@@ -331,9 +334,18 @@ export interface ReviewChoice {
 export type ReviewStimulus =
   | {
       id: string
-      type: "audio" | "image"
+      type: "audio"
       title?: string
       mediaUrl: string
+      replayable: true
+    }
+  | {
+      id: string
+      type: "image"
+      title?: string
+      // Exactly one of these two is present, never neither.
+      mediaUrl?: string
+      imageSvg?: string
       replayable: true
     }
   | {

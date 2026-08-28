@@ -138,4 +138,84 @@ describe("testDocumentSchema", () => {
       allowSeek: false,
     })
   })
+
+  // Allowlist is the one XSS-relevant check in this pipeline (both fields
+  // render with dangerouslySetInnerHTML) -- these pin that the allowlist
+  // rejects what it should, and does not reject an ordinary pictogram in
+  // the same shape the real TOEFL Primary content uses.
+  //
+  // Built as a fresh literal rather than mutating `valid`: `valid` is typed
+  // from its own literal shape (no `imageSvg` in it), and safeParse's input
+  // is `unknown` anyway -- there is nothing to gain by fighting that here.
+  describe("imageSvg", () => {
+    const pictogram =
+      '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true"><path d="M50 40 L50 76" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="50" cy="30" r="10" fill="currentColor"/></svg>'
+
+    function docWithChoiceImage(imageSvg: string): unknown {
+      const doc = structuredClone(valid)
+
+      return {
+        ...doc,
+        sections: [
+          {
+            ...doc.sections[0],
+            groups: [
+              {
+                ...doc.sections[0].groups[0],
+                questions: [
+                  {
+                    ...doc.sections[0].groups[0].questions[0],
+                    choices: [
+                      {
+                        ...doc.sections[0].groups[0].questions[0].choices[0],
+                        imageSvg,
+                      },
+                      doc.sections[0].groups[0].questions[0].choices[1],
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }
+    }
+
+    it("accepts an ordinary pictogram on a choice", () => {
+      const parsed = testDocumentSchema.parse(docWithChoiceImage(pictogram))
+
+      expect(
+        parsed.sections[0].groups[0].questions[0].choices[0].imageSvg,
+      ).toBe(pictogram)
+    })
+
+    it("accepts an ordinary pictogram on a stimulus", () => {
+      const doc = docWith({ type: "image", imageSvg: pictogram })
+      const parsed = testDocumentSchema.parse(doc)
+
+      expect(parsed.sections[0].groups[0].stimulus?.imageSvg).toBe(pictogram)
+    })
+
+    it.each([
+      ["a script tag", `${pictogram}<script>alert(1)</script>`],
+      ["an onload handler", '<svg onload="alert(1)"><path d="M0 0"/></svg>'],
+      [
+        "an unquoted onload handler",
+        "<svg onload=alert(1)><path d='M0 0'/></svg>",
+      ],
+      [
+        "a foreignObject",
+        "<svg><foreignObject><p>hi</p></foreignObject></svg>",
+      ],
+      [
+        "an image tag with an href",
+        '<svg><image href="javascript:alert(1)"/></svg>',
+      ],
+      ["a disallowed attribute", '<svg style="x"><path d="M0 0"/></svg>'],
+    ])("rejects %s", (_label, svg) => {
+      expect(
+        testDocumentSchema.safeParse(docWithChoiceImage(svg)).success,
+      ).toBe(false)
+    })
+  })
 })

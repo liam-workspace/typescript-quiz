@@ -78,21 +78,35 @@ function choiceDotClasses(choice: ReviewChoice): string {
  * media -- only `mediaKind` does. Branching on `type` alone rendered every
  * mixed stimulus as an audio player, so a mixed passage-and-picture question
  * showed a child a dead audio control and no image.
+ *
+ * An `image` stimulus itself now has two shapes (a signed mediaUrl, or
+ * inline imageSvg -- see Choice.imageSvg for why), so this returns the
+ * relevant one rather than narrowing to a single `mediaUrl: string` member
+ * the way it used to: `Extract<ReviewStimulus, { mediaUrl: string }>` would
+ * silently drop the image variant now that ITS mediaUrl is optional.
  */
-type MediaBearing = Extract<ReviewStimulus, { mediaUrl: string }>
-
-function showsImage(stimulus: ReviewStimulus): stimulus is MediaBearing {
-  return (
-    stimulus.type === "image" ||
-    (stimulus.type === "mixed" && stimulus.mediaKind === "image")
-  )
+function imageSvgOf(stimulus: ReviewStimulus): string | undefined {
+  return stimulus.type === "image" ? stimulus.imageSvg : undefined
 }
 
-function showsAudio(stimulus: ReviewStimulus): stimulus is MediaBearing {
-  return (
-    stimulus.type === "audio" ||
-    (stimulus.type === "mixed" && stimulus.mediaKind === "audio")
-  )
+function imageUrlOf(stimulus: ReviewStimulus): string | undefined {
+  if (stimulus.type === "image") {
+    return stimulus.mediaUrl
+  }
+
+  return stimulus.type === "mixed" && stimulus.mediaKind === "image"
+    ? stimulus.mediaUrl
+    : undefined
+}
+
+function audioUrlOf(stimulus: ReviewStimulus): string | undefined {
+  if (stimulus.type === "audio") {
+    return stimulus.mediaUrl
+  }
+
+  return stimulus.type === "mixed" && stimulus.mediaKind === "audio"
+    ? stimulus.mediaUrl
+    : undefined
 }
 
 interface ReviewStimulusViewProps {
@@ -112,17 +126,25 @@ function ReviewStimulusView({ stimulus }: ReviewStimulusViewProps) {
           {stimulus.bodyText}
         </p>
       ) : null}
-      {showsImage(stimulus) ? (
+      {imageSvgOf(stimulus) ? (
+        <span
+          aria-hidden="true"
+          className="stimulus-image mt-3"
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: imageSvgOf(stimulus) ?? "" }}
+        />
+      ) : null}
+      {!imageSvgOf(stimulus) && imageUrlOf(stimulus) ? (
         <img
           className="mt-3 max-h-80 rounded-lg object-contain"
-          src={stimulus.mediaUrl}
+          src={imageUrlOf(stimulus)}
           alt={stimulus.title ?? t("review.imageAlt")}
         />
       ) : null}
-      {showsAudio(stimulus) ? (
+      {audioUrlOf(stimulus) ? (
         <audio
           className="mt-3 w-full"
-          src={stimulus.mediaUrl}
+          src={audioUrlOf(stimulus)}
           controls
           aria-label={t("review.replayAudio")}
         />

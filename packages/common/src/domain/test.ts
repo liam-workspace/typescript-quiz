@@ -49,6 +49,9 @@ export interface RunnerStimulus {
   allowPause: boolean
   allowSeek: boolean
   mediaUrl?: string
+  // An `image` stimulus's alternative to mediaUrl -- inline <svg>, for the
+  // same currentColor reason as RunnerChoice.imageSvg. See migration 1006.
+  imageSvg?: string
   // Present only for `type: "mixed"` -- "mixed" means text AND media, and
   // its own `type` never says which. media_asset.kind carries the answer;
   // see packages/db/src/repositories/test-version.repository.ts.

@@ -237,9 +237,20 @@ export interface ReviewChoice {
 export type ReviewStimulus =
   | {
       id: string
-      type: "audio" | "image"
+      type: "audio"
       title?: string
       mediaUrl: string
+      replayable: true
+    }
+  | {
+      id: string
+      type: "image"
+      title?: string
+      // Exactly one of these two is present, never neither -- see
+      // Choice.imageSvg (openapi.yaml) for why an image stimulus may be
+      // inline markup instead of a signed URL.
+      mediaUrl?: string
+      imageSvg?: string
       replayable: true
     }
   | {
@@ -306,6 +317,7 @@ interface ReviewDbRow {
   st_title: string | null
   st_body: string | null
   st_filename: string | null
+  st_image_svg: string | null
   st_media_kind: string | null
 }
 
@@ -523,7 +535,7 @@ export async function loadReview(
             c.id c_id, c.label c_label, c.is_correct c_is_correct,
             (rc.choice_id IS NOT NULL) c_selected, c.image_svg c_image_svg,
             st.id st_id, st.type::text st_type, st.title st_title,
-            st.body_text st_body, ma.filename st_filename,
+            st.body_text st_body, ma.filename st_filename, st.image_svg st_image_svg,
             ma.kind::text st_media_kind
        FROM question q
        JOIN question_group g ON g.id = q.question_group_id
@@ -625,16 +637,34 @@ function buildReviewStimulus(
   const id = asStimulusId(stimulusId)
   const mediaUrl = row.st_filename ? mediaUrlFor(row.st_filename) : null
 
-  if (row.st_type === "audio" || row.st_type === "image") {
+  if (row.st_type === "audio") {
     if (!mediaUrl) {
       throw new Error(`review stimulus ${stimulusId} is missing media`)
     }
 
     return {
       id,
-      type: row.st_type,
+      type: "audio",
       ...(row.st_title ? { title: row.st_title } : {}),
       mediaUrl,
+      replayable: true,
+    }
+  }
+
+  if (row.st_type === "image") {
+    // Unlike audio, an image may be inline <svg> instead of a media_asset
+    // (migration 1006) -- exactly one of the two is present, never neither
+    // (stimulus_media_has_asset enforces this at the DB).
+    if (!mediaUrl && !row.st_image_svg) {
+      throw new Error(`review stimulus ${stimulusId} is missing media`)
+    }
+
+    return {
+      id,
+      type: "image",
+      ...(row.st_title ? { title: row.st_title } : {}),
+      ...(mediaUrl ? { mediaUrl } : {}),
+      ...(row.st_image_svg ? { imageSvg: row.st_image_svg } : {}),
       replayable: true,
     }
   }

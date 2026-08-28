@@ -246,6 +246,65 @@ describe("projections", () => {
     })
   }, 120_000)
 
+  it("loadForRunner carries imageSvg for a read_word_picture stimulus", async () => {
+    await withDatabase(async (pool) => {
+      const { rows: testRows } = await pool.query<{ id: string }>(
+        `INSERT INTO test (slug) VALUES ('picture-stimulus-check') RETURNING id`,
+      )
+      const testId = testRows[0].id
+      const { rows: versionRows } = await pool.query<{ id: string }>(
+        `INSERT INTO test_version (test_id, version, title, duration_seconds)
+         VALUES ($1, 1, 'Picture stimulus check', 600) RETURNING id`,
+        [testId],
+      )
+      const draftVersionId = versionRows[0].id
+      const { rows: sectionRows } = await pool.query<{ id: string }>(
+        `INSERT INTO test_section (test_version_id, ordinal, title, type, duration_seconds,
+                                    navigation, allow_answer_change,
+                                    default_max_plays, default_allow_pause, default_allow_seek)
+         VALUES ($1, 1, 'Reading', 'reading', 300, 'free', true, NULL, NULL, NULL)
+         RETURNING id`,
+        [draftVersionId],
+      )
+      const sectionId = sectionRows[0].id
+      const svg = '<svg viewBox="0 0 10 10"><circle r="4"/></svg>'
+      const { rows: stimulusRows } = await pool.query<{ id: string }>(
+        `INSERT INTO stimulus (test_version_id, type, image_svg)
+         VALUES ($1, 'image', $2) RETURNING id`,
+        [draftVersionId, svg],
+      )
+      const stimulusId = stimulusRows[0].id
+      const { rows: groupRows } = await pool.query<{ id: string }>(
+        `INSERT INTO question_group (test_version_id, test_section_id, stimulus_id, ordinal)
+         VALUES ($1, $2, $3, 1) RETURNING id`,
+        [draftVersionId, sectionId, stimulusId],
+      )
+      const groupId = groupRows[0].id
+      const { rows: questionRows } = await pool.query<{ id: string }>(
+        `INSERT INTO question (test_version_id, question_group_id, question_key, ordinal, prompt, type, points)
+         VALUES ($1, $2, 'wq1', 1, 'Which word?', 'single_choice', 1) RETURNING id`,
+        [draftVersionId, groupId],
+      )
+      // Insert a choice too: loadForRunner's query JOINs through choice,
+      // not LEFT JOINs -- a question with none makes its whole
+      // group/stimulus vanish from the result set rather than surface
+      // with an empty choices array.
+      await pool.query(
+        `INSERT INTO choice (question_id, ordinal, label, is_correct)
+         VALUES ($1, 1, 'key', true), ($1, 2, 'pen', false)`,
+        [questionRows[0].id],
+      )
+
+      const sections = await loadForRunner(pool, draftVersionId, null)
+      const stimulus = sections
+        .flatMap(groupsOf)
+        .find(idEquals(groupId))?.stimulus
+
+      expect(stimulus?.imageSvg).toBe(svg)
+      expect(stimulus?.mediaUrl).toBeUndefined()
+    })
+  }, 120_000)
+
   it("loadForRunner returns sections and questions in ordinal order", async () => {
     await withDatabase(async (pool) => {
       const f = await seedPublishedTest(pool)

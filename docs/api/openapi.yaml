@@ -1465,6 +1465,11 @@ components:
           }
         maxPlays: { type: "null" }
         mediaUrl: { type: string }
+        imageSvg:
+          type: string
+          description: |
+            An `image` stimulus's alternative to `mediaUrl` -- inline <svg> markup, not a URL.
+            See Choice.imageSvg for why (currentColor theming only works rendered into the DOM).
         allowPause: { type: boolean }
         allowSeek: { type: boolean }
         mediaKind:
@@ -1892,18 +1897,20 @@ components:
     ReviewMediaStimulus:
       type: object
       description: |
-        Audio or image, as the student saw it. `mediaUrl` is REQUIRED here and SIGNED, with a
-        short-lived expiry. "The cap no longer applies" does not mean "send a bare URL": `/media`
-        refuses a capped filename without a valid signature and cannot tell review from mid-test,
-        because an `<audio src>` sends no bearer token. A bare URL here is one the client could
-        never fetch.
-      required: [id, type, mediaUrl, replayable]
+        Audio or image, as the student saw it. For `type: audio`, `mediaUrl` is REQUIRED and
+        SIGNED, with a short-lived expiry -- "the cap no longer applies" does not mean "send a
+        bare URL": `/media` refuses a capped filename without a valid signature and cannot tell
+        review from mid-test, because an `<audio src>` sends no bearer token. For `type: image`,
+        EITHER `mediaUrl` or `imageSvg` is present, never neither -- see Choice.imageSvg for why
+        a picture stimulus may be inline markup instead of a URL.
+      required: [id, type, replayable]
       additionalProperties: false
       properties:
         id: { type: string }
         type: { type: string, enum: [audio, image] }
         title: { type: string }
         mediaUrl: { type: string }
+        imageSvg: { type: string }
         replayable: { type: boolean, const: true }
 
     ReviewMixedStimulus:
@@ -2024,6 +2031,10 @@ components:
                         title: { type: string, minLength: 1 }
                         bodyText: { type: string, minLength: 1 }
                         mediaFilename: { type: string, minLength: 1 }
+                        imageSvg:
+                          type: string
+                          minLength: 1
+                          description: An `image` stimulus's alternative to mediaFilename. See Choice.imageSvg.
                         maxPlays: { type: integer, minimum: 1 }
                         allowPause: { type: boolean }
                         allowSeek: { type: boolean }

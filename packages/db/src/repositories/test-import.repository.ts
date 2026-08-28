@@ -99,14 +99,15 @@ export function importTestDocument(
 
           const ins = await tx.query<{ id: string }>(
             `INSERT INTO stimulus (test_version_id, type, title, body_text, media_asset_id,
-                                   max_plays, allow_pause, allow_seek)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+                                   image_svg, max_plays, allow_pause, allow_seek)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
             [
               versionId,
               st.type,
               st.title ?? null,
               st.bodyText ?? null,
               mediaAssetId,
+              st.imageSvg ?? null,
               st.maxPlays ?? null,
               st.allowPause ?? null,
               st.allowSeek ?? null,
@@ -178,6 +179,7 @@ interface ExportRow {
   st_title: string | null
   st_body: string | null
   st_filename: string | null
+  st_image_svg: string | null
   st_max_plays: number | null
   st_allow_pause: boolean | null
   st_allow_seek: boolean | null
@@ -218,6 +220,7 @@ function toStimulus(row: ExportRow): Group["stimulus"] {
     ...(row.st_title ? { title: row.st_title } : {}),
     ...(row.st_body ? { bodyText: row.st_body } : {}),
     ...(row.st_filename ? { mediaFilename: row.st_filename } : {}),
+    ...(row.st_image_svg ? { imageSvg: row.st_image_svg } : {}),
     ...(row.st_max_plays !== null ? { maxPlays: row.st_max_plays } : {}),
     ...(row.st_allow_pause !== null ? { allowPause: row.st_allow_pause } : {}),
     ...(row.st_allow_seek !== null ? { allowSeek: row.st_allow_seek } : {}),
@@ -279,7 +282,7 @@ export async function exportTestDocument(
             ts.default_allow_seek s_allow_seek,
             g.ordinal g_ordinal,
             st.type::text st_type, st.title st_title, st.body_text st_body,
-            ma.filename st_filename, st.max_plays st_max_plays,
+            ma.filename st_filename, st.image_svg st_image_svg, st.max_plays st_max_plays,
             st.allow_pause st_allow_pause, st.allow_seek st_allow_seek,
             q.ordinal q_ordinal, q.question_key q_key, q.prompt q_prompt,
             q.type::text q_type, q.points q_points,

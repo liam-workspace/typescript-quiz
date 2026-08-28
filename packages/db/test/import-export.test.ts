@@ -285,4 +285,52 @@ describe("import / export", () => {
       expect("imageSvg" in choiceB).toBe(false)
     })
   }, 120_000)
+
+  // A read_word_picture stimulus: the pictogram is one level up from a
+  // choice's imageSvg -- above the question, not per-choice -- and round
+  // trips the same way.
+  it("round-trips a stimulus's imageSvg", async () => {
+    const svg = '<svg viewBox="0 0 10 10"><circle r="4"/></svg>'
+    const svgDoc: TestDocument = testDocumentSchema.parse({
+      title: "Picture stimulus",
+      slug: "picture-stimulus-01",
+      durationSeconds: 100,
+      sections: [
+        {
+          title: "S",
+          type: "reading",
+          durationSeconds: 100,
+          navigation: "free",
+          allowAnswerChange: true,
+          playback: null,
+          instructions: [],
+          groups: [
+            {
+              stimulus: { type: "image", imageSvg: svg },
+              questions: [
+                {
+                  questionKey: "q1",
+                  prompt: "Which word matches?",
+                  type: "single_choice",
+                  points: 1,
+                  choices: [
+                    { label: "key", isCorrect: true },
+                    { label: "pen", isCorrect: false },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+
+    await withDatabase(async (pool) => {
+      const { versionId } = await importTestDocument(pool, svgDoc)
+      const out = await exportTestDocument(pool, versionId)
+
+      expect(out).toEqual(svgDoc)
+      expect(out.sections[0].groups[0].stimulus?.imageSvg).toBe(svg)
+    })
+  }, 120_000)
 })

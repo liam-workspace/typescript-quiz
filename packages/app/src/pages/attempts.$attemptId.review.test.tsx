@@ -313,6 +313,31 @@ describe("attempt review page", () => {
     expect(document.querySelectorAll(".choice-image")).toHaveLength(1)
   })
 
+  it("renders an image stimulus's imageSvg inline, and no <img> alongside it", () => {
+    render(
+      <ReviewScreen
+        review={{
+          attemptId: "attempt-1",
+          items: [
+            {
+              ...reviewPayload.items[0],
+              stimulus: {
+                id: "stimulus-word-picture",
+                type: "image",
+                imageSvg:
+                  '<svg data-testid="stimulus-picture"><circle r="4" /></svg>',
+                replayable: true,
+              },
+            },
+          ],
+        }}
+      />,
+    )
+
+    expect(screen.getByTestId("stimulus-picture")).toBeInTheDocument()
+    expect(screen.queryByRole("img")).not.toBeInTheDocument()
+  })
+
   it("moves through the loaded payload without a network refetch and respects both navigation bounds", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

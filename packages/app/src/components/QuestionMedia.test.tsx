@@ -64,6 +64,24 @@ describe("QuestionMedia", () => {
     )
   })
 
+  it("renders an image stimulus's imageSvg inline, in place of mediaUrl", () => {
+    const svgImage: OpenStimulusWire = {
+      ...openImage,
+      imageSvg: '<svg data-testid="word-picture"><circle r="4" /></svg>',
+    }
+
+    render(
+      <QuestionMedia
+        stimulus={svgImage}
+        onClaimPlay={vi.fn()}
+        playing={false}
+      />,
+    )
+
+    expect(screen.getByTestId("word-picture")).toBeInTheDocument()
+    expect(document.querySelector("img")).not.toBeInTheDocument()
+  })
+
   it("renders a play button for an audio stimulus and calls onClaimPlay on click", async () => {
     const onClaimPlay = vi.fn<() => Promise<void>>().mockResolvedValue()
     const user = userEvent.setup()

@@ -30,7 +30,14 @@ services:
     environment:
       PORT: 3000
       DATABASE_URL: postgresql://pp:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/pp
-      JWKS_URL: ${JWKS_URL:-https://auth.icovn.me/.well-known/jwks.json}
+      # Verified against the issuer's own discovery document, not guessed:
+      # https://auth.icovn.me/.well-known/openid-configuration reports
+      # `jwks_uri: https://auth.icovn.me/jwks`. The previous default pointed
+      # at /.well-known/jwks.json, which 404s on BOTH issuers -- a stack
+      # brought up without overriding it would reject every token, and the
+      # symptom (401 on a valid sign-in) looks nothing like a wrong URL.
+      # Dev uses https://auth-dev.icovn.me/jwks.
+      JWKS_URL: ${JWKS_URL:-https://auth.icovn.me/jwks}
       # Comma-separated allowlist checked at sign-in; leaving it unset
       # rejects every sign-in, so set it in the environment or a .env file.
       ALLOWED_EMAILS: ${ALLOWED_EMAILS:-}

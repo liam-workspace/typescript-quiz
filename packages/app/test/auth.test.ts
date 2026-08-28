@@ -18,6 +18,15 @@ function jsonResponse(body: unknown, status = 200): Response {
   })
 }
 
+/**
+ * A request that never settles -- what a CORS-refused fetch looked like from
+ * the page during the browser pass. Declared here rather than inline so its
+ * executor is not a fourth nested callback.
+ */
+const NEVER = new Promise<Response>(() => {
+  // Never settles, on purpose.
+})
+
 describe("auth", () => {
   beforeEach(() => {
     tokenStore.clear()
@@ -31,6 +40,36 @@ describe("auth", () => {
   })
 
   describe("startSignIn", () => {
+    // Found in the browser pass: auth-dev.icovn.me sends no
+    // access-control-allow-origin, so the browser refused the discovery
+    // fetch and the promise never settled. sign-in.tsx already handles a
+    // REJECTION -- it shows a retry -- but a request that hangs never
+    // rejects, so the button sat spinning with nothing for a child to do.
+    // Bounding it turns "silently broken forever" into a state the screen
+    // can render honestly.
+    it("rejects rather than hanging when the issuer never answers", async () => {
+      vi.useFakeTimers()
+
+      try {
+        vi.stubGlobal("location", {
+          assign: vi.fn(),
+          origin: "http://localhost:3000",
+        })
+        vi.stubGlobal("fetch", vi.fn<typeof fetch>().mockReturnValue(NEVER))
+
+        const pending = startSignIn()
+        const settled = vi.fn()
+
+        void pending.catch(settled)
+
+        await vi.advanceTimersByTimeAsync(10_000)
+
+        await expect(pending).rejects.toThrow(/sign-in service/u)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
     it("builds the authorize URL from configuration (never a hardcoded host), with PKCE and offline_access, and navigates there", async () => {
       const assign = vi.fn()
       vi.stubGlobal("location", { assign, origin: "http://localhost:3000" })

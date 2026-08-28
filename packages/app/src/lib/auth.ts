@@ -146,8 +146,42 @@ export function currentAccessToken(): string | null {
   return tokenStore.get("access_token")
 }
 
+/**
+ * Building the authorize URL is not local work: the client fetches the
+ * issuer's discovery document first, so this call is only as reliable as the
+ * network between a home iPad and auth.icovn.me.
+ *
+ * The timeout is the point. `sign-in.tsx` already catches a REJECTION and
+ * shows a retry, but a request that hangs never rejects -- and a promise
+ * that never settles leaves the button spinning with no error, no redirect
+ * and nothing for a child to do. That is exactly what a CORS-blocked
+ * discovery fetch produced during the browser pass: the issuer returns no
+ * `access-control-allow-origin`, so the browser refuses the request and the
+ * screen simply sat there.
+ *
+ * Bounding it converts "silently broken forever" into "failed, try again",
+ * which is a state the screen can already render honestly. An unreachable
+ * issuer on home wifi is routine, not exceptional.
+ */
+const AUTHORIZE_URL_TIMEOUT_MS = 10_000
+
 export async function startSignIn(): Promise<void> {
-  const url = await getAuthClient().getAuthorizationUrl()
+  const url = await Promise.race([
+    getAuthClient().getAuthorizationUrl(),
+    new Promise<never>((_, reject) => {
+      globalThis.setTimeout(
+        () =>
+          reject(
+            new Error(
+              `Could not reach the sign-in service within ${String(
+                AUTHORIZE_URL_TIMEOUT_MS,
+              )}ms.`,
+            ),
+          ),
+        AUTHORIZE_URL_TIMEOUT_MS,
+      )
+    }),
+  ])
 
   globalThis.location.assign(url)
 }

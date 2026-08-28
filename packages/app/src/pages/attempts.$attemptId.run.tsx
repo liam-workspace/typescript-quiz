@@ -15,6 +15,11 @@ import { ReadingRunner } from "../components/ReadingRunner.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
 import { ApiError } from "../lib/api-client.js"
 import {
+  createServerCountdown,
+  formatCountdown,
+  type TimeSource,
+} from "../lib/countdown.js"
+import {
   claimPlay,
   finishSection,
   getRunnerEnvelope,
@@ -28,10 +33,11 @@ import {
   registerPagehideFlush,
   reconcileFinalFlush,
 } from "../lib/lifecycleFlush.js"
-import { sameOriginPath } from "../lib/same-origin-path.js"
 import { getCurrentStudent } from "../lib/session-api.js"
+import { storeTimeUpAttempt } from "../lib/time-up-navigation.js"
 import type { NavigatorSource } from "../lib/navigator-state.js"
 import type {
+  FinalizedAttempt,
   RunnerEnvelope,
   RunnerQuestion,
   RunnerSection,
@@ -107,7 +113,12 @@ export interface RunScreenProps {
   readonly envelope: RunnerEnvelope
   readonly queue: AnswerQueue
   readonly student?: MenuStudent
-  readonly navigate: (path: string) => void
+  readonly navigate: (path: string, state?: TimeUpNavigationState) => void
+  readonly now?: TimeSource
+}
+
+export interface TimeUpNavigationState {
+  readonly attempt: FinalizedAttempt
 }
 
 type RunnerPanel = "menu" | "navigator" | null
@@ -118,6 +129,7 @@ export function RunScreen({
   queue,
   student,
   navigate,
+  now = Date.now,
 }: RunScreenProps) {
   const { t } = useTranslation("runner")
   const section = envelope.currentSectionId
@@ -156,6 +168,15 @@ export function RunScreen({
   const [panel, setPanel] = useState<RunnerPanel>(null)
   const [finishingSection, setFinishingSection] = useState(false)
   const [sectionTransitionFailed, setSectionTransitionFailed] = useState(false)
+  const [readRemainingMs, setReadRemainingMs] = useState<(() => number) | null>(
+    () =>
+      envelope.expiresAt
+        ? createServerCountdown(envelope.expiresAt, envelope.serverTime, now)
+        : null,
+  )
+  const [remainingMs, setRemainingMs] = useState<number | null>(() =>
+    readRemainingMs ? readRemainingMs() : null,
+  )
   // Defect B5 fix: a per-item terminal rejection (FlushController's
   // `rejectedQuestionIds` -- an `answer_change_not_allowed`, an unknown
   // question, anything spec §5 rule 5 says "stop dead" on) used to vanish
@@ -184,6 +205,60 @@ export function RunScreen({
     sectionId: string
   } | null>(null)
   const pendingAnswerWritesRef = useRef<Set<Promise<unknown>>>(new Set())
+  const zeroTouchStartedRef = useRef(false)
+
+  useEffect(() => {
+    if (!readRemainingMs) {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      setRemainingMs(readRemainingMs())
+    }, 1_000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [readRemainingMs])
+
+  useEffect(() => {
+    if (remainingMs !== 0 || zeroTouchStartedRef.current) {
+      return
+    }
+
+    zeroTouchStartedRef.current = true
+
+    void getRunnerEnvelope(attemptId)
+      .then((freshEnvelope) => {
+        // Zero was only a prompt. A successful response means the server
+        // still considers the attempt active, so recalibrate from this new
+        // envelope and keep the runner open.
+        if (!freshEnvelope.expiresAt) {
+          return
+        }
+
+        const refreshedCountdown = createServerCountdown(
+          freshEnvelope.expiresAt,
+          freshEnvelope.serverTime,
+          now,
+        )
+
+        zeroTouchStartedRef.current = false
+        setReadRemainingMs(() => refreshedCountdown)
+        setRemainingMs(refreshedCountdown())
+      })
+      .catch((error: unknown) => {
+        if (
+          error instanceof ApiError &&
+          error.problem.type === "attempt_expired" &&
+          error.problem.attempt
+        ) {
+          navigate(`/attempts/${attemptId}/time-up`, {
+            attempt: error.problem.attempt,
+          })
+        }
+      })
+  }, [attemptId, navigate, now, remainingMs])
 
   // Refs are read outside render (event handlers, effects); writing one
   // must live there too, never inline in the render body, so this update
@@ -496,11 +571,8 @@ export function RunScreen({
       }
 
       if (error.problem.type === "attempt_expired" && error.problem.attempt) {
-        const parsed = sameOriginPath.safeParse(error.problem.attempt.resultUrl)
-
-        setExpired({
-          kind: "attempt",
-          resultUrl: parsed.success ? parsed.data : null,
+        navigate(`/attempts/${attemptId}/time-up`, {
+          attempt: error.problem.attempt,
         })
 
         return
@@ -557,13 +629,8 @@ export function RunScreen({
         }
 
         if (error.problem.type === "attempt_expired" && error.problem.attempt) {
-          const parsed = sameOriginPath.safeParse(
-            error.problem.attempt.resultUrl,
-          )
-
-          setExpired({
-            kind: "attempt",
-            resultUrl: parsed.success ? parsed.data : null,
+          navigate(`/attempts/${attemptId}/time-up`, {
+            attempt: error.problem.attempt,
           })
 
           // Debounced/fire-and-forget for anything else (e.g. a stale
@@ -630,13 +697,8 @@ export function RunScreen({
         }
 
         if (error.problem.type === "attempt_expired" && error.problem.attempt) {
-          const parsed = sameOriginPath.safeParse(
-            error.problem.attempt.resultUrl,
-          )
-
-          setExpired({
-            kind: "attempt",
-            resultUrl: parsed.success ? parsed.data : null,
+          navigate(`/attempts/${attemptId}/time-up`, {
+            attempt: error.problem.attempt,
           })
 
           return
@@ -723,13 +785,8 @@ export function RunScreen({
         }
 
         if (error.problem.type === "attempt_expired" && error.problem.attempt) {
-          const parsed = sameOriginPath.safeParse(
-            error.problem.attempt.resultUrl,
-          )
-
-          setExpired({
-            kind: "attempt",
-            resultUrl: parsed.success ? parsed.data : null,
+          navigate(`/attempts/${attemptId}/time-up`, {
+            attempt: error.problem.attempt,
           })
         }
       })
@@ -821,6 +878,18 @@ export function RunScreen({
         <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">
           {t(`runner.sectionChip.${section.type}`)}
         </span>
+        {remainingMs !== null ? (
+          <span
+            aria-label={t("runner.timeRemaining")}
+            className={`rounded-device bg-surface border-line border px-3 py-1 text-sm font-bold tabular-nums ${
+              // Five minutes gives a child a calm, useful warning without
+              // making the majority of a short practice section feel urgent.
+              remainingMs < 5 * 60 * 1_000 ? "text-clay" : "text-ink-2"
+            }`}
+          >
+            {formatCountdown(remainingMs)}
+          </span>
+        ) : null}
       </header>
 
       <div>{runner}</div>
@@ -1032,7 +1101,11 @@ function RouteComponent() {
   // Same stand-in as sections.$sectionId.rules.tsx: no typed route exists
   // yet for the section-rules destination from here without inventing its
   // contract early.
-  const navigate = (path: string): void => {
+  const navigate = (path: string, state?: TimeUpNavigationState): void => {
+    if (state) {
+      storeTimeUpAttempt(window.sessionStorage, state.attempt)
+    }
+
     window.location.assign(path)
   }
 

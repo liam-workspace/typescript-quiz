@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './pages/__root'
 import { Route as HistoryRouteImport } from './pages/history'
 import { Route as IndexRouteImport } from './pages/index'
 import { Route as TestsSlugRouteImport } from './pages/tests.$slug'
+import { Route as AttemptsAttemptIdTimeUpRouteImport } from './pages/attempts.$attemptId.time-up'
 import { Route as AttemptsAttemptIdRunRouteImport } from './pages/attempts.$attemptId.run'
 import { Route as AttemptsAttemptIdReviewRouteImport } from './pages/attempts.$attemptId.review'
 import { Route as AttemptsAttemptIdResultRouteImport } from './pages/attempts.$attemptId.result'
@@ -31,6 +32,11 @@ const IndexRoute = IndexRouteImport.update({
 const TestsSlugRoute = TestsSlugRouteImport.update({
   id: '/tests/$slug',
   path: '/tests/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AttemptsAttemptIdTimeUpRoute = AttemptsAttemptIdTimeUpRouteImport.update({
+  id: '/attempts/$attemptId/time-up',
+  path: '/attempts/$attemptId/time-up',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AttemptsAttemptIdRunRoute = AttemptsAttemptIdRunRouteImport.update({
@@ -68,6 +74,7 @@ export interface FileRoutesByFullPath {
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
   '/attempts/$attemptId/review': typeof AttemptsAttemptIdReviewRoute
   '/attempts/$attemptId/run': typeof AttemptsAttemptIdRunRoute
+  '/attempts/$attemptId/time-up': typeof AttemptsAttemptIdTimeUpRoute
   '/attempts/$attemptId/sections/$sectionId/rules': typeof AttemptsAttemptIdSectionsSectionIdRulesRoute
 }
 export interface FileRoutesByTo {
@@ -78,6 +85,7 @@ export interface FileRoutesByTo {
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
   '/attempts/$attemptId/review': typeof AttemptsAttemptIdReviewRoute
   '/attempts/$attemptId/run': typeof AttemptsAttemptIdRunRoute
+  '/attempts/$attemptId/time-up': typeof AttemptsAttemptIdTimeUpRoute
   '/attempts/$attemptId/sections/$sectionId/rules': typeof AttemptsAttemptIdSectionsSectionIdRulesRoute
 }
 export interface FileRoutesById {
@@ -89,6 +97,7 @@ export interface FileRoutesById {
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
   '/attempts/$attemptId/review': typeof AttemptsAttemptIdReviewRoute
   '/attempts/$attemptId/run': typeof AttemptsAttemptIdRunRoute
+  '/attempts/$attemptId/time-up': typeof AttemptsAttemptIdTimeUpRoute
   '/attempts/$attemptId/sections/$sectionId/rules': typeof AttemptsAttemptIdSectionsSectionIdRulesRoute
 }
 export interface FileRouteTypes {
@@ -101,6 +110,7 @@ export interface FileRouteTypes {
     | '/attempts/$attemptId/result'
     | '/attempts/$attemptId/review'
     | '/attempts/$attemptId/run'
+    | '/attempts/$attemptId/time-up'
     | '/attempts/$attemptId/sections/$sectionId/rules'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -111,6 +121,7 @@ export interface FileRouteTypes {
     | '/attempts/$attemptId/result'
     | '/attempts/$attemptId/review'
     | '/attempts/$attemptId/run'
+    | '/attempts/$attemptId/time-up'
     | '/attempts/$attemptId/sections/$sectionId/rules'
   id:
     | '__root__'
@@ -121,6 +132,7 @@ export interface FileRouteTypes {
     | '/attempts/$attemptId/result'
     | '/attempts/$attemptId/review'
     | '/attempts/$attemptId/run'
+    | '/attempts/$attemptId/time-up'
     | '/attempts/$attemptId/sections/$sectionId/rules'
   fileRoutesById: FileRoutesById
 }
@@ -132,6 +144,7 @@ export interface RootRouteChildren {
   AttemptsAttemptIdResultRoute: typeof AttemptsAttemptIdResultRoute
   AttemptsAttemptIdReviewRoute: typeof AttemptsAttemptIdReviewRoute
   AttemptsAttemptIdRunRoute: typeof AttemptsAttemptIdRunRoute
+  AttemptsAttemptIdTimeUpRoute: typeof AttemptsAttemptIdTimeUpRoute
   AttemptsAttemptIdSectionsSectionIdRulesRoute: typeof AttemptsAttemptIdSectionsSectionIdRulesRoute
 }
 
@@ -156,6 +169,13 @@ declare module '@tanstack/react-router' {
       path: '/tests/$slug'
       fullPath: '/tests/$slug'
       preLoaderRoute: typeof TestsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/attempts/$attemptId/time-up': {
+      id: '/attempts/$attemptId/time-up'
+      path: '/attempts/$attemptId/time-up'
+      fullPath: '/attempts/$attemptId/time-up'
+      preLoaderRoute: typeof AttemptsAttemptIdTimeUpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/attempts/$attemptId/run': {
@@ -204,6 +224,7 @@ const rootRouteChildren: RootRouteChildren = {
   AttemptsAttemptIdResultRoute: AttemptsAttemptIdResultRoute,
   AttemptsAttemptIdReviewRoute: AttemptsAttemptIdReviewRoute,
   AttemptsAttemptIdRunRoute: AttemptsAttemptIdRunRoute,
+  AttemptsAttemptIdTimeUpRoute: AttemptsAttemptIdTimeUpRoute,
   AttemptsAttemptIdSectionsSectionIdRulesRoute:
     AttemptsAttemptIdSectionsSectionIdRulesRoute,
 }

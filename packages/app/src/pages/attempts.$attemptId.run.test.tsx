@@ -1,5 +1,6 @@
 import "fake-indexeddb/auto"
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -121,6 +122,43 @@ const finishWasCalled = (): void => {
   expect(mockFinishSection).toHaveBeenCalledOnce()
 }
 
+class TestClock {
+  public reads = 0
+  private currentMs: number
+
+  public constructor(initialMs: number) {
+    this.currentMs = initialMs
+  }
+
+  public read(): number {
+    this.reads += 1
+
+    return this.currentMs
+  }
+
+  public advance(ms: number): void {
+    this.currentMs += ms
+  }
+}
+
+function advanceClock(clock: TestClock, ms: number): void {
+  act(() => {
+    clock.advance(ms)
+    vi.advanceTimersByTime(ms)
+  })
+}
+
+async function advanceClockAndFlush(
+  clock: TestClock,
+  ms: number,
+): Promise<void> {
+  await act(async () => {
+    clock.advance(ms)
+    vi.advanceTimersByTime(ms)
+    await Promise.resolve()
+  })
+}
+
 function toAppliedFinishItem(item: ResponseSnapshotItem) {
   return { questionId: item.questionId, status: "applied" as const }
 }
@@ -215,6 +253,13 @@ const listeningEnvelope: RunnerEnvelope = {
     },
   ],
   responses: [],
+}
+
+const finalizedAttempt = {
+  id: "attempt-1",
+  status: "expired" as const,
+  submittedAt: "2026-08-28T10:00:01.000Z",
+  resultUrl: "/attempts/attempt-1/result",
 }
 
 // A multi_choice question is graded by exact set equality
@@ -420,6 +465,7 @@ function getQueue(): AnswerQueue {
 function renderRunScreen(
   envelope: RunnerEnvelope = listeningEnvelope,
   navigate = vi.fn(),
+  now?: () => number,
 ) {
   const utils = render(
     <RunScreen
@@ -427,6 +473,7 @@ function renderRunScreen(
       envelope={envelope}
       queue={getQueue()}
       navigate={navigate}
+      now={now}
     />,
   )
 
@@ -589,6 +636,166 @@ describe("RunScreen", () => {
     renderRunScreen()
 
     expect(screen.getByTestId("listening-runner")).toBeInTheDocument()
+  })
+
+  describe("attempt countdown", () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it("renders server-based remaining time and decreases when the injected clock advances", () => {
+      const clock = new TestClock(Date.parse("2026-08-28T11:00:00.000Z"))
+      renderRunScreen(
+        {
+          ...listeningEnvelope,
+          expiresAt: "2026-08-28T10:25:00.000Z",
+          serverTime: "2026-08-28T10:00:00.000Z",
+        },
+        undefined,
+        clock.read.bind(clock),
+      )
+
+      expect(screen.getByLabelText("Time remaining")).toHaveTextContent("25:00")
+
+      advanceClock(clock, 1_000)
+
+      expect(screen.getByLabelText("Time remaining")).toHaveTextContent("24:59")
+    })
+
+    it("switches from the normal treatment to a calm at-risk treatment below five minutes", () => {
+      const clock = new TestClock(Date.parse("2026-08-28T11:00:00.000Z"))
+      renderRunScreen(
+        {
+          ...listeningEnvelope,
+          expiresAt: "2026-08-28T10:05:01.000Z",
+          serverTime: "2026-08-28T10:00:00.000Z",
+        },
+        undefined,
+        clock.read.bind(clock),
+      )
+
+      const timer = screen.getByLabelText("Time remaining")
+      expect(timer.className).toContain("text-ink-2")
+      expect(timer.className).not.toContain("text-clay")
+
+      advanceClock(clock, 2_000)
+
+      expect(timer.className).toContain("text-clay")
+    })
+
+    it("stops reading the clock after the runner unmounts", () => {
+      const clock = new TestClock(Date.parse("2026-08-28T11:00:00.000Z"))
+      const { unmount } = renderRunScreen(
+        {
+          ...listeningEnvelope,
+          expiresAt: "2026-08-28T10:25:00.000Z",
+          serverTime: "2026-08-28T10:00:00.000Z",
+        },
+        undefined,
+        clock.read.bind(clock),
+      )
+
+      expect(clock.reads).toBeGreaterThan(0)
+
+      unmount()
+      const readsAtUnmount = clock.reads
+
+      advanceClock(clock, 2_000)
+
+      expect(clock.reads).toBe(readsAtUnmount)
+    })
+  })
+
+  describe("when the attempt countdown reaches zero", () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it("touches the attempt and carries the server's 410 payload to the time-up route", async () => {
+      const clock = new TestClock(Date.parse("2026-08-28T11:00:00.000Z"))
+      mockGetRunnerEnvelope.mockRejectedValue(
+        new ApiError({
+          type: "attempt_expired",
+          title: "The attempt was past its deadline and has been finalized.",
+          status: 410,
+          attempt: finalizedAttempt,
+        }),
+      )
+      const { navigate } = renderRunScreen(
+        {
+          ...listeningEnvelope,
+          expiresAt: "2026-08-28T10:00:01.000Z",
+          serverTime: "2026-08-28T10:00:00.000Z",
+        },
+        undefined,
+        clock.read.bind(clock),
+      )
+
+      await advanceClockAndFlush(clock, 1_000)
+
+      expect(mockGetRunnerEnvelope).toHaveBeenCalledExactlyOnceWith("attempt-1")
+      expect(navigate).toHaveBeenCalledExactlyOnceWith(
+        "/attempts/attempt-1/time-up",
+        { attempt: finalizedAttempt },
+      )
+    })
+
+    it("keeps the child in the runner when the server says the attempt is still active", async () => {
+      const clock = new TestClock(Date.parse("2026-08-28T11:00:00.000Z"))
+      mockGetRunnerEnvelope.mockResolvedValue({
+        ...listeningEnvelope,
+        expiresAt: "2026-08-28T10:00:10.000Z",
+        serverTime: "2026-08-28T10:00:01.000Z",
+      })
+      const { navigate } = renderRunScreen(
+        {
+          ...listeningEnvelope,
+          expiresAt: "2026-08-28T10:00:01.000Z",
+          serverTime: "2026-08-28T10:00:00.000Z",
+        },
+        undefined,
+        clock.read.bind(clock),
+      )
+
+      await advanceClockAndFlush(clock, 1_000)
+
+      expect(navigate).not.toHaveBeenCalled()
+      expect(screen.getByTestId("listening-runner")).toBeInTheDocument()
+      expect(screen.getByLabelText("Time remaining")).toHaveTextContent("00:09")
+    })
+
+    it("touches the attempt only once while the zero display keeps ticking", async () => {
+      const clock = new TestClock(Date.parse("2026-08-28T11:00:00.000Z"))
+      mockGetRunnerEnvelope.mockRejectedValue(
+        new ApiError({
+          type: "attempt_expired",
+          title: "The attempt was past its deadline and has been finalized.",
+          status: 410,
+          attempt: finalizedAttempt,
+        }),
+      )
+      renderRunScreen(
+        {
+          ...listeningEnvelope,
+          expiresAt: "2026-08-28T10:00:01.000Z",
+          serverTime: "2026-08-28T10:00:00.000Z",
+        },
+        undefined,
+        clock.read.bind(clock),
+      )
+
+      await advanceClockAndFlush(clock, 6_000)
+
+      expect(mockGetRunnerEnvelope).toHaveBeenCalledOnce()
+    })
   })
 
   describe("runner panels", () => {
@@ -1351,63 +1558,25 @@ describe("RunScreen", () => {
       )
     })
 
-    it("shows the attempt-expired message with a result link on a 410 attempt_expired", async () => {
+    it("moves to time-up with the finalized attempt on a 410 attempt_expired", async () => {
       mockClaimPlay.mockRejectedValue(
         new ApiError({
           type: "attempt_expired",
           title: "The attempt was past its deadline and has been finalized.",
           status: 410,
-          attempt: {
-            id: "attempt-1",
-            status: "expired",
-            submittedAt: "2026-08-27T09:25:00.000Z",
-            resultUrl: "/attempts/attempt-1/result",
-          },
+          attempt: finalizedAttempt,
         }),
       )
       const user = userEvent.setup()
 
-      renderRunScreen()
+      const { navigate } = renderRunScreen()
 
       await user.click(screen.getByRole("button", { name: "Play recording" }))
 
-      expect(await screen.findByRole("alert")).toHaveTextContent(
-        "Your test time ran out. Your answers have been submitted.",
+      expect(navigate).toHaveBeenCalledExactlyOnceWith(
+        "/attempts/attempt-1/time-up",
+        { attempt: finalizedAttempt },
       )
-      expect(screen.getByRole("link", { name: "View result" })).toHaveAttribute(
-        "href",
-        "/attempts/attempt-1/result",
-      )
-    })
-
-    // oxlint-disable-next-line no-script-url -- the hostile scheme IS the fixture
-    it("does not render a result link when the 410 attempt_expired response carries a javascript: resultUrl", async () => {
-      const javascriptUrl = ["java", "script:alert(1)"].join("")
-      mockClaimPlay.mockRejectedValue(
-        new ApiError({
-          type: "attempt_expired",
-          title: "The attempt was past its deadline and has been finalized.",
-          status: 410,
-          attempt: {
-            id: "attempt-1",
-            status: "expired",
-            submittedAt: "2026-08-27T09:25:00.000Z",
-            resultUrl: javascriptUrl,
-          },
-        }),
-      )
-      const user = userEvent.setup()
-
-      renderRunScreen()
-
-      await user.click(screen.getByRole("button", { name: "Play recording" }))
-
-      expect(await screen.findByRole("alert")).toHaveTextContent(
-        "Your test time ran out. Your answers have been submitted.",
-      )
-      expect(
-        screen.queryByRole("link", { name: "View result" }),
-      ).not.toBeInTheDocument()
     })
   })
 

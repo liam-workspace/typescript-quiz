@@ -1,6 +1,8 @@
 /node_modules
 /config
 .env
+.env.*
+!.env.example
 .secrets
 release.json
 web2

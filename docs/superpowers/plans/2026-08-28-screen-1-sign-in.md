@@ -26,17 +26,45 @@ Both issuers were probed and answer a standard OIDC discovery document at
 
 **One button, not two.** Discovery exposes no provider/connection/idp parameter, so the gateway presents its own Google-or-Microsoft chooser. The app sends one authorize request and lets `auth.icovn.me` handle the choice. **Therefore the prototype's "Continue with Google" copy is now wrong** — it predates Microsoft support. Use provider-neutral copy ("Sign in", "Continue"), and do not name a single provider in any of the six locales.
 
-## BLOCKER — an OIDC client must be registered before Task 2 can finish
+## The registration — supplied by the owner and verified against the live issuer
 
-A probe of `auth-dev.icovn.me/auth` with the prototype's `client_id=primary-practice` and `redirect_uri=http://localhost:5173/auth/callback` returns **400**. Either that client id is not registered or that redirect URI is not allowed — the prototype invented the name and nothing has ever run against the real service.
+**UNBLOCKED.** The earlier probe with the prototype's invented
+`client_id=primary-practice` returned 400. With the real values it returns
+**`303 → /interaction/…`**, which is the confirmation that matters: the
+client is registered, PKCE is accepted, and the gateway is handing off to
+its OWN login interaction — where the Google-or-Microsoft choice happens.
+That settles the "one button" question above from observation rather than
+inference.
 
-Needed from the owner, for BOTH issuers:
+Configuration lives in `packages/app/.env.local`, which is gitignored
+(`.gitignore` covers `.env.*`; it previously covered only `.env`, and that
+gap was closed before anything was written). `packages/app/.env.example` is
+committed and carries the shape with no secret.
 
-1. the real `client_id` for this app;
-2. allowed `redirect_uri` values — at minimum the local dev origin and the deployed origin;
-3. confirmation that it is registered as a **public** client (a browser SPA holds no secret, which is what PKCE is for).
+| Variable                 | Value                                       |
+| ------------------------ | ------------------------------------------- |
+| `VITE_AUTH_ISSUER`       | `https://auth-dev.icovn.me`                 |
+| `VITE_AUTH_CLIENT_ID`    | `local-dev`                                 |
+| `VITE_AUTH_REDIRECT_URI` | `http://localhost:3000/callback`            |
+| `VITE_DEV_AUTH`          | `true` in local development                 |
+| `VITE_DEV_AUTH_TOKEN`    | a real credential — never commit, never log |
+| `VITE_DEV_EMAIL`         | the account the dev token stands for        |
 
-Tasks 1 and 3 do not depend on this and can proceed. **Do not work around a 400 by disabling PKCE, by inventing a different client id, or by falling back to the dev token.** Stop and report.
+**Two corrections this forces on the rest of this plan.** A redirect URI
+matches exactly or not at all, so neither is a preference:
+
+1. **The dev server must run on port 3000.** `packages/app/vite.config.ts`
+   currently sets `port: 5173`. Change it, and check nothing else in the
+   repo assumes 5173 (the compose file, any docs, the browser pass).
+2. **The callback route is `/callback`, not `/auth/callback`.** Task 3
+   below still says `auth.callback.tsx`; the registered path wins.
+
+**`VITE_DEV_AUTH` is a development shortcut, not a bypass to build around.**
+It supplies a pre-issued token that the SERVER still verifies against the
+real JWKS — so it exercises the true authenticated path without the
+interactive round trip, which is what makes the browser pass possible before
+the full flow is finished. It must be impossible to enable in a deployed
+build: assert that, do not merely intend it.
 
 ---
 
@@ -56,8 +84,8 @@ The backend for this screen is **complete**. Do not rebuild it.
 ## What is missing
 
 1. No OIDC client. The prototype names `@liam-workspace/auth-client`; **it is not installed** — confirm whether it is reachable from this registry before designing around it. If it is not, a hand-rolled PKCE flow against the discovery document above is viable (the endpoints and S256 support are confirmed) but materially larger: say so in your report rather than silently absorbing it.
-2. No `/auth/callback` route to receive `?code=` and exchange it.
-3. No token store. `dev-auth.ts` must become one implementation of an interface, not the only path.
+2. No `/callback` route to receive `?code=` and exchange it (the registered redirect path).
+3. No token store. `dev-auth.ts` must become one implementation of an interface, not the only path, and `VITE_DEV_AUTH_TOKEN` replaces the old `VITE_DEV_BEARER_TOKEN`.
 4. No sign-in screen.
 5. No route guard: every existing route assumes a token already exists.
 
@@ -80,7 +108,7 @@ The backend for this screen is **complete**. Do not rebuild it.
 
 ### Task 2: The OIDC round trip
 
-- [ ] **Step 1:** Confirm `@liam-workspace/auth-client` installs. If it does not, STOP and report — do not hand-roll PKCE without saying so.
+- [ ] **Step 1:** Confirm `@liam-workspace/auth-client` installs. If it does not, a hand-rolled PKCE flow is now viable and grounded — the endpoints, S256 support and the registration are all verified — but it is materially more work: say so in your report rather than absorbing it silently.
 - [ ] **Step 2: Failing test** for a `startSignIn()` that builds the authorize URL with `client_id`, `redirect_uri`, `response_type=code`, `scope=openid email profile roles offline_access`, and an S256 `code_challenge`, and persists the verifier for the callback. Read the issuer from configuration, never a hardcoded host: dev and production differ by one value and must not differ by a code change.
 - [ ] **Step 3: Failing test** for `completeSignIn(code)`: exchanges the code with the verifier, stores the resulting token, then calls `POST /api/session` **once**, and returns the profile. Assert the ORDER: the session call cannot precede a token.
 - [ ] **Step 4:** Implement both. `POST /api/session` returns `200` for an existing student and `201` when provisioned; both are success. `403` means the email is not on the allowlist — that is a real, renderable state, not an error to swallow, and with two account types it is the likely outcome of signing in with the wrong one.
@@ -89,7 +117,7 @@ The backend for this screen is **complete**. Do not rebuild it.
 ### Task 3: The sign-in screen and callback route
 
 - [ ] **Step 1: Failing test** for `packages/app/src/pages/sign-in.tsx`: renders the prototype's title and subtitle, and ONE provider-neutral sign-in button that calls `startSignIn`. Assert the copy does not name Google or Microsoft — the gateway chooses, and naming one of two supported providers is a lie to whoever holds the other.
-- [ ] **Step 2: Failing test** for `packages/app/src/pages/auth.callback.tsx`: on mount with `?code=`, calls `completeSignIn` and navigates to `/`; on `403` renders "this account cannot use this app" without a retry loop; on any other failure offers one honest retry back to sign-in.
+- [ ] **Step 2: Failing test** for the callback route at **`/callback`** (the registered redirect URI — not `/auth/callback`): on mount with `?code=`, calls `completeSignIn` and navigates to `/`; on `403` renders "this account cannot use this app" without a retry loop; on any other failure offers one honest retry back to sign-in.
 - [ ] **Step 3:** Implement both, six locales.
 
 ### Task 4: Guard every other route
@@ -100,7 +128,7 @@ The backend for this screen is **complete**. Do not rebuild it.
 
 ### Task 5: End to end against the real stack
 
-- [ ] `docker compose up` with `JWKS_URL=https://auth-dev.icovn.me/jwks` and `ALLOWED_EMAILS` covering the family accounts. Sign in with a Google account AND with a Microsoft account; confirm `POST /api/session` provisions each, `GET /api/me` returns the profile, and a protected route loads. Record what you observed, not what you expected — including which provider the gateway offered and in what order.
+- [ ] Move the Vite dev server to **port 3000** first (`packages/app/vite.config.ts`), since the registered redirect URI names it. Then `docker compose up` with `JWKS_URL=https://auth-dev.icovn.me/jwks` and `ALLOWED_EMAILS` covering the family accounts. Sign in with a Google account AND with a Microsoft account; confirm `POST /api/session` provisions each, `GET /api/me` returns the profile, and a protected route loads. Record what you observed, not what you expected — including which provider the gateway offered and in what order.
 
 ## Definition of Done
 

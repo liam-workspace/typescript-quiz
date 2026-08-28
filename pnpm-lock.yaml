@@ -66,6 +66,9 @@ importers:
       '@liam-public/browser-react-ui':
         specifier: ^0.1.0
         version: 0.1.0(@types/react-dom@19.2.3(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@liam-workspace/auth-client':
+        specifier: ^0.1.1
+        version: 0.1.1
       '@pp/common':
         specifier: workspace:*
         version: link:../common
@@ -549,6 +552,9 @@ packages:
 
   '@liam-public/node-webauthn@0.1.1':
     resolution: {integrity: sha512-GdMeEW3muXN/+ub5o6Bdoa9Yhv4Ia+cVU3Wx/LLsPHljAnJXDaqeaOLuf8DbFS2CBhYPIx3cOeP7AqiTaY9vvw==}
+
+  '@liam-workspace/auth-client@0.1.1':
+    resolution: {integrity: sha512-B2N5fnnaDEUBgXCYr+/wGhaIw0DxR0J6O3EBSGLSH7T6SbxzfozNBsPeylsrEwuxdsFQDeCUpZgnVwzfmtl+LQ==, tarball: https://npm.pkg.github.com/download/@liam-workspace/auth-client/0.1.1/59d837cc0c220c2557ef0bf50e86405f37e7b32c}
 
   '@liam-workspace/node-auth-server@0.5.1':
     resolution: {integrity: sha512-c78LNcTLLQeW3XV4Pvid6S4I1v+oif1Q0itDHgZ1YEoQyh18kCcKf+lo9fCyXdIxclgR4m963IyZgdxP09uwfQ==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-auth-server/0.5.1/a57226121801f3a0851b0926b3528fddc808bbb3}
@@ -4468,6 +4474,8 @@ snapshots:
   '@liam-public/node-webauthn@0.1.1':
     dependencies:
       '@simplewebauthn/server': 13.3.2
+
+  '@liam-workspace/auth-client@0.1.1': {}
 
   '@liam-workspace/node-auth-server@0.5.1':
     dependencies:

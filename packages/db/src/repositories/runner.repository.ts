@@ -97,15 +97,26 @@ const ATTEMPT_INTRO_QUERY = `
 const SECTION_INTRO_QUERY = `
   SELECT ts.id, ts.title, ts.duration_seconds,
          count(DISTINCT q.id) AS question_count,
+         -- Instructions come from a correlated subquery, NOT from a join
+         -- aggregated alongside the questions. Joining section_instruction
+         -- into the same row set multiplies it by the question count, so a
+         -- section with 3 instructions and 20 questions emitted 60 entries
+         -- and the rules screen rendered each instruction twenty times.
+         --
+         -- count(DISTINCT q.id) above already guards the count against
+         -- that same fan-out, which is the tell: the multiplication was
+         -- known about for the count and missed for the aggregate.
          COALESCE(
-           jsonb_agg(si.text ORDER BY si.ordinal)
-             FILTER (WHERE si.text IS NOT NULL),
+           (
+             SELECT jsonb_agg(si.text ORDER BY si.ordinal)
+               FROM section_instruction si
+              WHERE si.test_section_id = ts.id
+           ),
            '[]'::jsonb
          ) AS instructions
     FROM test_section ts
     JOIN question_group qg ON qg.test_section_id = ts.id
     JOIN question q ON q.question_group_id = qg.id
-    LEFT JOIN section_instruction si ON si.test_section_id = ts.id
    WHERE ts.test_version_id = $1
    GROUP BY ts.id, ts.title, ts.duration_seconds, ts.ordinal
    ORDER BY ts.ordinal

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import type pg from "pg"
 import { describe, expect, it } from "vitest"
 import { loadRunnerEnvelope } from "../src/repositories/runner.repository.js"
@@ -130,6 +131,113 @@ describe("loadRunnerEnvelope", () => {
         questionCount: 1,
         durationSeconds: 1500,
         instructions: [],
+      })
+    })
+  }, 120_000)
+
+  // The shared fixture gives each section ONE question and one instruction,
+  // so 1 x 1 = 1 and a fan-out is invisible. This seeds its own version with
+  // three instructions and three questions in one section: joined and
+  // aggregated that yields nine entries, and the rules screen rendered each
+  // instruction three times -- twenty times against real content. Found in
+  // the browser pass, not here.
+  //
+  // Self-contained because content must be written BEFORE publication; the
+  // immutability trigger refuses inserts once published_at is set, so this
+  // cannot be appended to the shared already-published fixture.
+  it("returns each instruction once for a section with many questions", async () => {
+    await withDatabase(async (pool) => {
+      const studentId = "11111111-1111-1111-1111-111111111113"
+      const testId = "22222222-2222-2222-2222-222222222224"
+      const versionId = "a0000000-0000-0000-0000-000000000003"
+      const sectionId = "b0000000-0000-0000-0000-000000000004"
+      const groupId = "c0000000-0000-0000-0000-000000000004"
+
+      await pool.query(
+        `INSERT INTO student (id, subject_claim, email, display_name)
+         VALUES ($1,'sub-fanout','fanout@example.test','Fanout')`,
+        [studentId],
+      )
+      await pool.query(`INSERT INTO test (id, slug) VALUES ($1,'fanout')`, [
+        testId,
+      ])
+      await pool.query(
+        `INSERT INTO test_version (id, test_id, version, title, duration_seconds)
+         VALUES ($1,$2,1,'Fan-out check',600)`,
+        [versionId, testId],
+      )
+      await pool.query(
+        `INSERT INTO test_section (id, test_version_id, ordinal, title, type,
+                                   duration_seconds, navigation, allow_answer_change)
+         VALUES ($1,$2,1,'Listening','listening',600,'free',true)`,
+        [sectionId, versionId],
+      )
+      await pool.query(
+        `INSERT INTO section_instruction (test_section_id, ordinal, text)
+         VALUES ($1,1,'First.'), ($1,2,'Second.'), ($1,3,'Third.')`,
+        [sectionId],
+      )
+      await pool.query(
+        `INSERT INTO question_group (id, test_version_id, test_section_id, ordinal)
+         VALUES ($1,$2,$3,1)`,
+        [groupId, versionId, sectionId],
+      )
+
+      const questionIds = [randomUUID(), randomUUID(), randomUUID()]
+
+      // One statement each rather than a loop of awaits: three questions in
+      // ONE section is the whole point of this fixture, and the fan-out it
+      // exposes does not care how the rows got there.
+      await pool.query(
+        `INSERT INTO question (id, test_version_id, question_group_id,
+                               question_key, ordinal, prompt, type, points)
+         VALUES ($1,$4,$5,'qa',1,'A prompt?','single_choice',1),
+                ($2,$4,$5,'qb',2,'A prompt?','single_choice',1),
+                ($3,$4,$5,'qc',3,'A prompt?','single_choice',1)`,
+        [...questionIds, versionId, groupId],
+      )
+      await pool.query(
+        `INSERT INTO choice (id, question_id, ordinal, label, is_correct)
+         SELECT gen_random_uuid(), q, o.ordinal, o.label, o.is_correct
+           FROM unnest($1::uuid[]) AS q,
+                (VALUES (1,'Yes',true),(2,'No',false))
+                  AS o(ordinal, label, is_correct)`,
+        [questionIds],
+      )
+
+      await pool.query(
+        `UPDATE test_version SET published_at = now() WHERE id = $1`,
+        [versionId],
+      )
+      await pool.query(
+        `UPDATE test SET current_version_id = $1 WHERE id = $2`,
+        [versionId, testId],
+      )
+
+      const attemptId = randomUUID()
+      const startedAt = new Date()
+
+      await pool.query(
+        `INSERT INTO attempt (id, student_id, test_version_id, status,
+                              started_at, expires_at)
+         VALUES ($1,$2,$3,'in_progress',$4,$5)`,
+        [
+          attemptId,
+          studentId,
+          versionId,
+          startedAt,
+          new Date(startedAt.getTime() + 600_000),
+        ],
+      )
+
+      const envelope = await loadRunnerEnvelope(pool, {
+        attemptId,
+        testVersionId: versionId,
+      })
+
+      expect(sectionStateOf(envelope, sectionId)).toMatchObject({
+        questionCount: 3,
+        instructions: ["First.", "Second.", "Third."],
       })
     })
   }, 120_000)

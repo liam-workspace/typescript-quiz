@@ -22,10 +22,17 @@ import { ApiError } from "../lib/api-client.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
 import {
   claimPlay,
+  finishSection,
   getRunnerEnvelope,
   setPosition,
 } from "../lib/attempts-api.js"
-import type { CappedStimulusWire, RunnerEnvelope } from "../lib/api-types.js"
+import type {
+  CappedStimulusWire,
+  FinishSectionRequest,
+  FinishSectionResult,
+  ResponseSnapshotItem,
+  RunnerEnvelope,
+} from "../lib/api-types.js"
 import { getCurrentStudent } from "../lib/session-api.js"
 import {
   loadRunRouteData,
@@ -79,6 +86,7 @@ function trackingOpener(
 
 vi.mock("../lib/attempts-api.js", () => ({
   claimPlay: vi.fn(),
+  finishSection: vi.fn(),
   setPosition: vi.fn(),
   getRunnerEnvelope: vi.fn(),
 }))
@@ -88,6 +96,7 @@ vi.mock("../lib/session-api.js", () => ({
 }))
 
 const mockClaimPlay = vi.mocked(claimPlay)
+const mockFinishSection = vi.mocked(finishSection)
 const mockGetCurrentStudent = vi.mocked(getCurrentStudent)
 const mockGetRunnerEnvelope = vi.mocked(getRunnerEnvelope)
 const mockSetPosition = vi.mocked(setPosition)
@@ -106,6 +115,27 @@ const fetchWasCalled = (): void => {
  */
 const positionWasWritten = (): void => {
   expect(mockSetPosition).toHaveBeenCalledOnce()
+}
+
+const finishWasCalled = (): void => {
+  expect(mockFinishSection).toHaveBeenCalledOnce()
+}
+
+function toAppliedFinishItem(item: ResponseSnapshotItem) {
+  return { questionId: item.questionId, status: "applied" as const }
+}
+
+function finishWithAppliedRemainder(
+  _attemptId: string,
+  sectionId: string,
+  body: FinishSectionRequest,
+): Promise<FinishSectionResult> {
+  return Promise.resolve({
+    sectionId,
+    status: "finished",
+    nextSectionId: "section-reading",
+    finalFlush: (body.responses ?? []).map(toAppliedFinishItem),
+  })
 }
 
 /**
@@ -132,6 +162,8 @@ const cappedAudio: CappedStimulusWire = {
 const listeningEnvelope: RunnerEnvelope = {
   id: "attempt-1",
   status: "in_progress",
+  attemptNumber: 1,
+  testTitle: "Practice Test 04",
   expiresAt: "2026-08-27T10:00:00.000Z",
   serverTime: "2026-08-27T09:00:00.000Z",
   questionCount: 20,
@@ -143,6 +175,10 @@ const listeningEnvelope: RunnerEnvelope = {
     {
       id: "section-listening",
       type: "listening",
+      title: "Listening — Part 1",
+      questionCount: 2,
+      durationSeconds: 1500,
+      instructions: ["Put your headphones on now."],
       status: "open",
       completedAt: null,
       navigation: "forward_only",
@@ -189,6 +225,8 @@ const listeningEnvelope: RunnerEnvelope = {
 const multiChoiceEnvelope: RunnerEnvelope = {
   id: "attempt-1",
   status: "in_progress",
+  attemptNumber: 1,
+  testTitle: "Practice Test 04",
   expiresAt: "2026-08-27T10:00:00.000Z",
   serverTime: "2026-08-27T09:00:00.000Z",
   questionCount: 20,
@@ -200,6 +238,10 @@ const multiChoiceEnvelope: RunnerEnvelope = {
     {
       id: "section-listening",
       type: "listening",
+      title: "Listening — Part 1",
+      questionCount: 2,
+      durationSeconds: 1500,
+      instructions: ["Put your headphones on now."],
       status: "open",
       completedAt: null,
       navigation: "forward_only",
@@ -264,6 +306,8 @@ const passageTwo: RunnerEnvelope["sections"][number]["groups"][number]["stimulus
 const readingEnvelope: RunnerEnvelope = {
   id: "attempt-1",
   status: "in_progress",
+  attemptNumber: 1,
+  testTitle: "Practice Test 04",
   expiresAt: "2026-08-27T10:00:00.000Z",
   serverTime: "2026-08-27T09:00:00.000Z",
   questionCount: 20,
@@ -275,6 +319,10 @@ const readingEnvelope: RunnerEnvelope = {
     {
       id: "section-reading",
       type: "reading",
+      title: "Reading",
+      questionCount: 4,
+      durationSeconds: 1500,
+      instructions: [],
       status: "open",
       completedAt: null,
       navigation: "free",
@@ -337,6 +385,19 @@ const readingEnvelope: RunnerEnvelope = {
     },
   ],
   responses: [],
+}
+
+const sectionBoundaryEnvelope: RunnerEnvelope = {
+  ...listeningEnvelope,
+  currentQuestionId: "q-2",
+  sections: [
+    listeningEnvelope.sections[0],
+    {
+      ...readingEnvelope.sections[0],
+      status: "pending",
+      expiresAt: null,
+    },
+  ],
 }
 
 // Opened fresh in `beforeEach` below (real `AnswerQueue`, IndexedDB-backed
@@ -1091,6 +1152,76 @@ describe("RunScreen", () => {
       "section-listening",
       "q-2",
     )
+  })
+
+  describe("section boundary", () => {
+    it("offers the next section only on the current section's last question", () => {
+      renderRunScreen({
+        ...sectionBoundaryEnvelope,
+        currentQuestionId: "q-1",
+      })
+
+      expect(
+        screen.queryByRole("button", { name: "Continue to Reading" }),
+      ).not.toBeInTheDocument()
+
+      cleanup()
+      renderRunScreen(sectionBoundaryEnvelope)
+
+      expect(
+        screen.getByRole("button", { name: "Continue to Reading" }),
+      ).toBeInTheDocument()
+    })
+
+    it("finishes with an immediately tapped answer, reconciles it, and navigates to the returned rules screen", async () => {
+      mockFinishSection.mockImplementation(finishWithAppliedRemainder)
+      const { navigate } = renderRunScreen(sectionBoundaryEnvelope)
+      const user = userEvent.setup()
+
+      await user.click(screen.getByRole("radio", { name: "School" }))
+      await user.click(
+        screen.getByRole("button", { name: "Continue to Reading" }),
+      )
+
+      await waitFor(finishWasCalled)
+      expect(mockFinishSection).toHaveBeenCalledWith(
+        "attempt-1",
+        "section-listening",
+        expect.objectContaining({
+          responses: [
+            expect.objectContaining({
+              questionId: "q-2",
+              selectedChoiceIds: ["c-4"],
+            }),
+          ],
+        }),
+      )
+      expect(navigate).toHaveBeenCalledExactlyOnceWith(
+        "/attempts/attempt-1/sections/section-reading/rules",
+      )
+      await expect(
+        getQueue().snapshotForSection("attempt-1", "section-listening"),
+      ).resolves.toEqual([])
+    })
+
+    it("offers hand-in instead of a nonexistent next section on the final question", async () => {
+      const finalEnvelope: RunnerEnvelope = {
+        ...readingEnvelope,
+        currentQuestionId: "q-r4",
+      }
+      const { navigate } = renderRunScreen(finalEnvelope)
+
+      expect(
+        screen.queryByRole("button", { name: "Continue to Reading" }),
+      ).not.toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole("button", { name: "Finish test" }))
+
+      expect(mockFinishSection).not.toHaveBeenCalled()
+      expect(navigate).toHaveBeenCalledExactlyOnceWith(
+        "/attempts/attempt-1/hand-in",
+      )
+    })
   })
 
   it("renders the pip/progress strip from questionCount and the section's own question ordinals, read-only", () => {

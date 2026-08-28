@@ -3,6 +3,7 @@ import { ApiError } from "./api-client.js"
 import {
   claimPlay,
   enterSection,
+  finishSection,
   getAttemptResult,
   getRunnerEnvelope,
   setPosition,
@@ -68,6 +69,42 @@ describe("attempts-api", () => {
     )
     expect(fetchMock.mock.calls[0]?.[1]?.method).toBe("POST")
     expect(result).toEqual(entry)
+  })
+
+  it("finishSection calls POST /api/attempts/:id/sections/:sectionId/finish with the queue remainder", async () => {
+    const finished = {
+      sectionId: "section-1",
+      status: "finished" as const,
+      nextSectionId: "section-2",
+      finalFlush: [{ questionId: "question-1", status: "applied" as const }],
+    }
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify(finished), {
+        headers: { "content-type": "application/json" },
+        status: 200,
+      }),
+    )
+    vi.stubGlobal("fetch", fetchMock)
+    const body = {
+      clientInstanceId: "device-1",
+      responses: [
+        {
+          questionId: "question-1",
+          seq: 9,
+          selectedChoiceIds: ["choice-1"],
+          answeredAt: "2026-08-28T09:10:00.000Z",
+        },
+      ],
+    }
+
+    const result = await finishSection("attempt-1", "section-1", body)
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "/api/attempts/attempt-1/sections/section-1/finish",
+    )
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe("POST")
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(JSON.stringify(body))
+    expect(result).toEqual(finished)
   })
 
   it("claimPlay calls POST /api/attempts/:id/stimuli/:stimulusId/play", async () => {

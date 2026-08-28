@@ -3,17 +3,21 @@ import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
-import { enterSection } from "../lib/attempts-api.js"
+import { enterSection, getRunnerEnvelope } from "../lib/attempts-api.js"
+import type { RunnerEnvelope } from "../lib/api-types.js"
 import {
+  loadSectionRulesData,
   SectionRulesScreen,
   searchSchema,
 } from "./attempts.$attemptId.sections.$sectionId.rules.js"
 
 vi.mock("../lib/attempts-api.js", () => ({
   enterSection: vi.fn(),
+  getRunnerEnvelope: vi.fn(),
 }))
 
 const mockEnterSection = vi.mocked(enterSection)
+const mockGetRunnerEnvelope = vi.mocked(getRunnerEnvelope)
 
 // Built by concatenation, not as a string literal -- oxlint's `no-script-url`
 // rule flags a literal `"javascript:..."` token even inside a test that
@@ -26,6 +30,11 @@ const baseProps = {
   attemptId: "attempt-1",
   sectionId: "section-1",
   title: "Listening — Part 1",
+  sectionType: "listening" as const,
+  testTitle: "Practice Test 04",
+  attemptNumber: 3,
+  questionCount: 20,
+  durationSeconds: 1500,
   instructions: ["Each recording plays once.", "You cannot pause or rewind."],
   finalizedPriorAttempt: null,
 }
@@ -42,6 +51,63 @@ describe("SectionRulesScreen", () => {
     expect(screen.getByText("Listening — Part 1")).toBeInTheDocument()
     expect(screen.getByText("Each recording plays once.")).toBeInTheDocument()
     expect(screen.getByText("You cannot pause or rewind.")).toBeInTheDocument()
+  })
+
+  it("renders the section title, question count, duration, untimed notice, and authoritative attempt number", () => {
+    render(<SectionRulesScreen {...baseProps} navigate={vi.fn()} />)
+
+    expect(screen.getByText("Listening — Part 1")).toBeInTheDocument()
+    expect(screen.getByText("20 questions · 25 minutes")).toBeInTheDocument()
+    expect(screen.getByText("25 min when you begin")).toBeInTheDocument()
+    expect(screen.getByText("Practice Test 04 · Attempt 3")).toBeInTheDocument()
+  })
+
+  it("loads the section intro from the canonical runner envelope without starting its clock", async () => {
+    mockGetRunnerEnvelope.mockResolvedValue({
+      id: "attempt-1",
+      status: "in_progress",
+      expiresAt: null,
+      serverTime: "2026-08-28T09:00:00.000Z",
+      attemptNumber: 3,
+      testTitle: "Practice Test 04",
+      questionCount: 20,
+      answeredCount: 0,
+      unansweredOrdinals: [1],
+      currentSectionId: null,
+      currentQuestionId: null,
+      sections: [
+        {
+          id: "section-1",
+          type: "listening",
+          title: "Listening — Part 1",
+          durationSeconds: 1500,
+          questionCount: 20,
+          instructions: ["Put your headphones on now."],
+          status: "pending",
+          completedAt: null,
+          navigation: "forward_only",
+          allowAnswerChange: false,
+          expiresAt: null,
+          groups: [],
+        },
+      ],
+      responses: [],
+    } as RunnerEnvelope)
+
+    await expect(
+      loadSectionRulesData("attempt-1", "section-1"),
+    ).resolves.toMatchObject({
+      attemptId: "attempt-1",
+      sectionId: "section-1",
+      sectionType: "listening",
+      title: "Listening — Part 1",
+      testTitle: "Practice Test 04",
+      attemptNumber: 3,
+      questionCount: 20,
+      durationSeconds: 1500,
+      instructions: ["Put your headphones on now."],
+    })
+    expect(mockEnterSection).not.toHaveBeenCalled()
   })
 
   it("calls enterSection when the ready button is clicked, not on mount", async () => {

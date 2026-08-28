@@ -362,6 +362,51 @@ paths:
             }
         "410": { $ref: "#/components/responses/AttemptExpired" }
 
+  /attempts/{id}/sections/{sectionId}/finish:
+    post:
+      tags: [Attempt]
+      operationId: finishSection
+      summary: Record the section's final answers and finish it
+      description: |
+        Fired from the last question of the current section. Applies the caller's queued response
+        remainder first, then closes and grades the section under the same attempt lock, so an
+        answer tapped immediately before the transition cannot be lost.
+
+        The response names the next section when one exists; the client sends the child to that
+        section's rules screen. A null `nextSectionId` means this was the final section and the
+        child proceeds to hand-in instead. Finishing is irreversible and idempotent while this
+        remains the attempt's current section: a repeated call returns the same next-section
+        decision without applying the remainder again or re-grading the closed section.
+
+        Remainder items have the SAME per-item semantics as `PATCH /responses` and
+        `POST /submit`: one rejected item is captured and reported without rolling back accepted
+        siblings. `finalFlush` lets the client clear or mark each queued item from this response.
+      parameters:
+        - { $ref: "#/components/parameters/AttemptId" }
+        - { $ref: "#/components/parameters/SectionId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FinishSectionRequest" }
+      responses:
+        "200":
+          description: The section is finished, or was already finished by this same transition.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FinishSectionResult" }
+        "400": { $ref: "#/components/responses/InvalidBody" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/NotYourAttempt" }
+        "409":
+          description: The requested section is not the attempt's current open section.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "410": { $ref: "#/components/responses/AttemptExpired" }
+        "413": { $ref: "#/components/responses/PayloadCaptured" }
+        "500": { $ref: "#/components/responses/UnexpectedWriteError" }
+
   /attempts/{id}/stimuli/{stimulusId}/play:
     post:
       tags: [Attempt]
@@ -1442,6 +1487,10 @@ components:
         [
           id,
           type,
+          title,
+          questionCount,
+          durationSeconds,
+          instructions,
           status,
           completedAt,
           navigation,
@@ -1452,6 +1501,13 @@ components:
       properties:
         id: { type: string }
         type: { $ref: "#/components/schemas/SectionType" }
+        title: { type: string }
+        questionCount: { type: integer }
+        durationSeconds: { type: integer }
+        instructions:
+          type: array
+          items: { type: string }
+          description: Rendered on the untimed rules screen before this section is entered.
         status: { type: string, enum: [pending, open, closed] }
         completedAt: { type: [string, "null"], format: date-time }
         navigation: { $ref: "#/components/schemas/NavigationMode" }
@@ -1482,6 +1538,8 @@ components:
         [
           id,
           status,
+          attemptNumber,
+          testTitle,
           expiresAt,
           serverTime,
           questionCount,
@@ -1495,6 +1553,10 @@ components:
       properties:
         id: { type: string }
         status: { type: string, enum: [in_progress] }
+        attemptNumber:
+          type: integer
+          description: The authoritative ordinal returned at attempt creation, repeated for section intros.
+        testTitle: { type: string }
         expiresAt: { type: [string, "null"], format: date-time }
         serverTime: { type: string, format: date-time }
         questionCount: { type: integer }
@@ -1644,6 +1706,36 @@ components:
           type: array
           items: { $ref: "#/components/schemas/ResponseSnapshotItem" }
           description: Whatever the queue still holds; may be empty or absent.
+
+    FinishSectionRequest:
+      type: object
+      required: [clientInstanceId]
+      additionalProperties: false
+      properties:
+        clientInstanceId: { type: string }
+        responses:
+          type: array
+          items: { $ref: "#/components/schemas/ResponseSnapshotItem" }
+          description: |
+            Whatever the queue still holds for this section; may be empty or absent. Applied
+            before the section is closed and graded.
+
+    FinishSectionResult:
+      type: object
+      required: [sectionId, status, nextSectionId, finalFlush]
+      additionalProperties: false
+      properties:
+        sectionId: { type: string }
+        status: { type: string, const: finished }
+        nextSectionId:
+          type: [string, "null"]
+          description: The next section in ordinal order, or null when this was the final section.
+        finalFlush:
+          type: array
+          items: { $ref: "#/components/schemas/ItemResult" }
+          description: |
+            One acknowledgement per item in this call's `responses` array; empty on an
+            idempotent repeat after the original remainder was already applied.
 
     SubmitResult:
       type: object

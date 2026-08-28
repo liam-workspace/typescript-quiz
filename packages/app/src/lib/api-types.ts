@@ -112,6 +112,10 @@ export interface QuestionGroup {
 export interface RunnerSection {
   id: string
   type: SectionType
+  title: string
+  questionCount: number
+  durationSeconds: number
+  instructions: string[]
   status: "pending" | "open" | "closed"
   completedAt: string | null
   navigation: NavigationMode
@@ -131,6 +135,8 @@ export interface RecordedResponse {
 export interface RunnerEnvelope {
   id: string
   status: "in_progress"
+  attemptNumber: number
+  testTitle: string
   expiresAt: string | null
   serverTime: string
   questionCount: number
@@ -163,6 +169,8 @@ export interface SubmitRequest {
   responses?: ResponseSnapshotItem[]
 }
 
+export type FinishSectionRequest = SubmitRequest
+
 // Openapi.yaml `ItemResult` narrowed to the fields the client actually acts
 // on (questionId, status) -- mirrors `ItemAckResult` in lib/flushController.ts,
 // which reconciles the same shape for a section flush's `results`. Submit's
@@ -181,6 +189,13 @@ export interface SubmitResult {
   status: "submitted"
   submittedAt: string
   resultUrl: string
+  finalFlush: SubmitFinalFlushItem[]
+}
+
+export interface FinishSectionResult {
+  sectionId: string
+  status: "finished"
+  nextSectionId: string | null
   finalFlush: SubmitFinalFlushItem[]
 }
 

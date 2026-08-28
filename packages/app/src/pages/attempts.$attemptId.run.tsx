@@ -16,13 +16,18 @@ import { AnswerQueue } from "../lib/answerQueue.js"
 import { ApiError } from "../lib/api-client.js"
 import {
   claimPlay,
+  finishSection,
   getRunnerEnvelope,
   setPosition,
 } from "../lib/attempts-api.js"
 import { redirectExpiredAttemptToResult } from "../lib/expired-attempt-redirect.js"
 import { FlushController, type Scheduler } from "../lib/flushController.js"
 import { apiFlushHttp } from "../lib/flushHttp.js"
-import { registerPagehideFlush } from "../lib/lifecycleFlush.js"
+import {
+  buildSectionFinishRemainder,
+  registerPagehideFlush,
+  reconcileFinalFlush,
+} from "../lib/lifecycleFlush.js"
 import { sameOriginPath } from "../lib/same-origin-path.js"
 import { getCurrentStudent } from "../lib/session-api.js"
 import type { NavigatorSource } from "../lib/navigator-state.js"
@@ -149,6 +154,8 @@ export function RunScreen({
   >({})
   const [expired, setExpired] = useState<ExpiredState | null>(null)
   const [panel, setPanel] = useState<RunnerPanel>(null)
+  const [finishingSection, setFinishingSection] = useState(false)
+  const [sectionTransitionFailed, setSectionTransitionFailed] = useState(false)
   // Defect B5 fix: a per-item terminal rejection (FlushController's
   // `rejectedQuestionIds` -- an `answer_change_not_allowed`, an unknown
   // question, anything spec §5 rule 5 says "stop dead" on) used to vanish
@@ -176,6 +183,7 @@ export function RunScreen({
     attemptId: string
     sectionId: string
   } | null>(null)
+  const pendingAnswerWritesRef = useRef<Set<Promise<unknown>>>(new Set())
 
   // Refs are read outside render (event handlers, effects); writing one
   // must live there too, never inline in the render body, so this update
@@ -415,17 +423,20 @@ export function RunScreen({
       return next
     })
 
-    void queue
-      .recordAnswer(
-        {
-          attemptId,
-          sectionId: section.id,
-          questionId: question.id,
-          selectedChoiceIds: nextChoiceIds,
-          timeSpentMs: null,
-        },
-        new Date(),
-      )
+    const durableWrite = queue.recordAnswer(
+      {
+        attemptId,
+        sectionId: section.id,
+        questionId: question.id,
+        selectedChoiceIds: nextChoiceIds,
+        timeSpentMs: null,
+      },
+      new Date(),
+    )
+
+    pendingAnswerWritesRef.current.add(durableWrite)
+
+    void durableWrite
       .then(() =>
         controller.flushSection(
           attemptId,
@@ -454,6 +465,9 @@ export function RunScreen({
         // hand-in) carries it. Only exists so a rejection here (including a
         // queue closed out from under an in-flight flush, e.g. on unmount)
         // is never left as an unhandled promise rejection.
+      })
+      .finally(() => {
+        pendingAnswerWritesRef.current.delete(durableWrite)
       })
   }
 
@@ -509,6 +523,10 @@ export function RunScreen({
 
   const nextEntry = entries.at(currentIndex + 1)
   const previousEntry = entries.at(currentIndex - 1)
+  const sectionIndex = envelope.sections.findIndex(
+    (candidate) => candidate.id === section.id,
+  )
+  const nextSection = envelope.sections.at(sectionIndex + 1)
 
   // Shared by Next (both sections) and Previous (reading's `free` section
   // only -- listening's forward_only never renders a Previous button, see
@@ -569,6 +587,69 @@ export function RunScreen({
     }
 
     moveToQuestion(previousEntry)
+  }
+
+  const handleFinishSection = (): void => {
+    if (!nextSection || finishingSection) {
+      return
+    }
+
+    setFinishingSection(true)
+    setSectionTransitionFailed(false)
+
+    void Promise.all([...pendingAnswerWritesRef.current])
+      .then(() => buildSectionFinishRemainder(queue, attemptId, section.id))
+      .then((body) =>
+        finishSection(attemptId, section.id, body).then(async (result) => {
+          await reconcileFinalFlush(
+            queue,
+            attemptId,
+            body.responses,
+            result.finalFlush,
+          )
+
+          return result
+        }),
+      )
+      .then((result) => {
+        const { nextSectionId } = result
+
+        navigate(
+          nextSectionId
+            ? `/attempts/${attemptId}/sections/${nextSectionId}/rules`
+            : `/attempts/${attemptId}/hand-in`,
+        )
+      })
+      .catch((error: unknown) => {
+        setFinishingSection(false)
+
+        if (!(error instanceof ApiError)) {
+          setSectionTransitionFailed(true)
+
+          return
+        }
+
+        if (error.problem.type === "attempt_expired" && error.problem.attempt) {
+          const parsed = sameOriginPath.safeParse(
+            error.problem.attempt.resultUrl,
+          )
+
+          setExpired({
+            kind: "attempt",
+            resultUrl: parsed.success ? parsed.data : null,
+          })
+
+          return
+        }
+
+        if (error.problem.type === "section_expired") {
+          setExpired({ kind: "section", resultUrl: null })
+
+          return
+        }
+
+        setSectionTransitionFailed(true)
+      })
   }
 
   const displayStimulus: StimulusWire | undefined =
@@ -743,6 +824,38 @@ export function RunScreen({
       </header>
 
       <div>{runner}</div>
+
+      {!nextEntry ? (
+        <div className="border-line bg-paper rounded-device text-ink-2 mx-3 my-4 flex items-center justify-between gap-3 border p-3">
+          <span className="text-sm font-semibold">
+            {nextSection
+              ? t("runner.sectionComplete")
+              : t("runner.testComplete")}
+          </span>
+          <Button
+            className="bg-teal text-paper h-11 min-w-11 touch-manipulation px-4 select-none"
+            disabled={finishingSection}
+            onClick={() => {
+              if (nextSection) {
+                handleFinishSection()
+              } else {
+                navigate(`/attempts/${attemptId}/hand-in`)
+              }
+            }}
+          >
+            {nextSection
+              ? t("runner.continueToSection", {
+                  section: t(`runner.sectionChip.${nextSection.type}`),
+                })
+              : t("runner.finishTest")}
+          </Button>
+        </div>
+      ) : null}
+      {sectionTransitionFailed ? (
+        <p role="alert" className="text-bad mx-3 text-sm">
+          {t("runner.sectionTransitionError")}
+        </p>
+      ) : null}
 
       <nav className="relative z-[60] flex justify-end border-t border-stone-200 bg-white px-3 py-2">
         <button

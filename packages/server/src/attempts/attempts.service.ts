@@ -1,9 +1,10 @@
-import type { PgPool } from "@liam-public/node-postgres"
+import type { PgPool, PgQueryable } from "@liam-public/node-postgres"
 import { Inject, Injectable, HttpStatus } from "@nestjs/common"
 import type { Clock } from "@pp/common"
 import {
   claimPlay as claimPlayRow,
   enterSection as enterSectionRow,
+  finishSection as finishSectionRow,
   findStudentBySubject,
   applyResponse,
   InvalidCursorError,
@@ -36,6 +37,7 @@ import {
 } from "../responses/apply-response.js"
 import { resolveOwnedAttempt } from "./ownership.js"
 import { ProblemException } from "./problem.exception.js"
+import type { FinishSectionRequest } from "./finish-section-request.schema.js"
 import type { SubmitRequest } from "./submit-request.schema.js"
 
 export interface RunnerEnvelopeResult {
@@ -70,6 +72,13 @@ export interface SubmitResultView {
 export interface SubmittedAttemptResult {
   alreadySubmitted: boolean
   view: SubmitResultView
+}
+
+export interface FinishSectionResultView {
+  sectionId: string
+  status: "finished"
+  nextSectionId: string | null
+  finalFlush: ItemResult[]
 }
 
 type AttemptHistoryStatus = "finished" | "submitted" | "expired"
@@ -174,6 +183,15 @@ function nothingAnsweredError(): ProblemException {
   return new ProblemException({
     type: "nothing_answered",
     title: "Nothing answered.",
+    status: HttpStatus.CONFLICT,
+    retryable: false,
+  })
+}
+
+function sectionNotOpenError(): ProblemException {
+  return new ProblemException({
+    type: "section_not_open",
+    title: "This section is not the attempt's current open section.",
     status: HttpStatus.CONFLICT,
     retryable: false,
   })
@@ -424,6 +442,56 @@ export class AttemptsService {
   }
 
   /**
+   * Records the section's final queued answers, then closes and grades that
+   * section under one repository-owned attempt lock. This is the transition:
+   * there is no separate confirmation or editable intermediate state.
+   */
+  async finishSection(
+    subjectClaim: string,
+    attemptId: string,
+    sectionId: string,
+    body: FinishSectionRequest,
+    req: CapturedRequest,
+  ): Promise<FinishSectionResultView> {
+    const owned = await resolveOwnedAttempt(this.pool, {
+      attemptId,
+      subjectClaim,
+    })
+
+    if (owned.kind !== "ok") {
+      throw notYourAttemptError()
+    }
+
+    const now = this.clock.now()
+    const outcome = await finishSectionRow(this.pool, {
+      attemptId,
+      sectionId,
+      now,
+      applyRemainder: (tx, attempt) =>
+        this.applyResponseRemainder(tx, attempt, body, now, req),
+    })
+
+    if (outcome.kind === "not_found") {
+      throw notYourAttemptError()
+    }
+
+    if (outcome.kind === "already_expired") {
+      throw submittedAttemptExpiredError(outcome.finalized)
+    }
+
+    if (outcome.kind === "section_not_open") {
+      throw sectionNotOpenError()
+    }
+
+    return {
+      sectionId,
+      status: "finished",
+      nextSectionId: outcome.nextSectionId,
+      finalFlush: outcome.finalFlush,
+    }
+  }
+
+  /**
    * Records the runner's reload position after the same owned/running check
    * as every attempt-scoped mutation. A forward-only section rejects only
    * a lower target ordinal; moving forward and re-confirming the current
@@ -559,24 +627,8 @@ export class AttemptsService {
     const outcome = await submitAttemptRow(this.pool, {
       attemptId,
       now,
-      applyRemainder: async (tx, attempt) => {
-        const { results } = await applyResponseItems(tx, {
-          attempt,
-          clientInstanceId: body.clientInstanceId,
-          responses: body.responses ?? [],
-          now,
-          req,
-          write: (input) => applyResponse(tx, input),
-          // `this.pool`, NOT `tx` -- `tx` is submit's own transaction,
-          // which an unrecognised write error aborts (rolls back). See
-          // `ApplyResponseItemsInput.capturePool`'s doc comment: writing
-          // the failed_write capture through `tx` would have that same
-          // rollback erase it.
-          capturePool: this.pool,
-        })
-
-        return results
-      },
+      applyRemainder: (tx, attempt) =>
+        this.applyResponseRemainder(tx, attempt, body, now, req),
     })
 
     if (outcome.kind === "not_found") {
@@ -601,5 +653,28 @@ export class AttemptsService {
         finalFlush: outcome.finalFlush,
       },
     }
+  }
+
+  private async applyResponseRemainder(
+    tx: PgQueryable,
+    attempt: AttemptRow,
+    body: SubmitRequest | FinishSectionRequest,
+    now: Date,
+    req: CapturedRequest,
+  ): Promise<ItemResult[]> {
+    const { results } = await applyResponseItems(tx, {
+      attempt,
+      clientInstanceId: body.clientInstanceId,
+      responses: body.responses ?? [],
+      now,
+      req,
+      write: (input) => applyResponse(tx, input),
+      // `this.pool`, NOT `tx` -- `tx` is the finish/submit transaction,
+      // which an unrecognised write error aborts. The capture must commit
+      // independently so the rollback cannot erase the evidence.
+      capturePool: this.pool,
+    })
+
+    return results
   }
 }

@@ -10,7 +10,7 @@ import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod"
 import { ApiError } from "../lib/api-client.js"
-import { enterSection } from "../lib/attempts-api.js"
+import { enterSection, getRunnerEnvelope } from "../lib/attempts-api.js"
 import { sameOriginPath } from "../lib/same-origin-path.js"
 import type { FinalizedAttempt } from "../lib/api-types.js"
 
@@ -58,7 +58,12 @@ type EnterOutcome =
 export interface SectionRulesScreenProps {
   readonly attemptId: string
   readonly sectionId: string
+  readonly sectionType: "listening" | "reading" | "vocabulary" | "grammar"
   readonly title: string
+  readonly testTitle: string
+  readonly attemptNumber: number
+  readonly questionCount: number
+  readonly durationSeconds: number
   readonly instructions: readonly string[]
   readonly finalizedPriorAttempt: FinalizedAttempt | null
   readonly navigate: (path: string) => void
@@ -67,13 +72,19 @@ export interface SectionRulesScreenProps {
 export function SectionRulesScreen({
   attemptId,
   sectionId,
+  sectionType,
   title,
+  testTitle,
+  attemptNumber,
+  questionCount,
+  durationSeconds,
   instructions,
   finalizedPriorAttempt,
   navigate,
 }: SectionRulesScreenProps) {
   const { t } = useTranslation("runner")
   const [outcome, setOutcome] = useState<EnterOutcome>({ status: "idle" })
+  const durationMinutes = Math.round(durationSeconds / 60)
 
   const handleReady = (): void => {
     setOutcome({ status: "entering" })
@@ -136,41 +147,95 @@ export function SectionRulesScreen({
   }
 
   return (
-    <div>
-      {finalizedPriorAttempt ? (
-        <p>
-          {t("sectionRules.finalizedPriorAttempt.notice")}{" "}
-          <a href={finalizedPriorAttempt.resultUrl}>
-            {t("sectionRules.finalizedPriorAttempt.viewLink")}
-          </a>
+    <div className="bg-surface text-ink min-h-screen">
+      <header className="border-line bg-paper flex items-center justify-between border-b px-4 py-3">
+        <span className="bg-teal-bg text-teal rounded-full px-3 py-1 text-xs font-bold">
+          {t(`runner.sectionChip.${sectionType}`)}
+        </span>
+        <span className="text-ink-2 text-xs font-bold">
+          {t("sectionRules.durationBeforeStart", {
+            minutes: durationMinutes,
+          })}
+        </span>
+      </header>
+      <main className="mx-auto max-w-xl px-4 py-8">
+        <p className="text-faint mb-1 text-xs font-bold tracking-wider uppercase">
+          {t("sectionRules.attemptEyebrow", {
+            testTitle,
+            number: attemptNumber,
+          })}
         </p>
-      ) : null}
-      <Card>
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p>{t("sectionRules.beforeYouBegin")}</p>
-          <ul>
-            {instructions.map((instruction) => (
-              <li key={instruction}>{instruction}</li>
-            ))}
-          </ul>
-          {outcome.status === "refused" ? (
-            <p role="alert">{refusalMessage(outcome.problem.type, t)}</p>
-          ) : null}
-        </CardContent>
-      </Card>
-      <Button
-        className="h-11 min-w-11 touch-manipulation select-none"
-        data-testid="ready-button"
-        onClick={handleReady}
-        disabled={outcome.status === "entering"}
-      >
-        {t("sectionRules.readyButton")}
-      </Button>
+        {finalizedPriorAttempt ? (
+          <p>
+            {t("sectionRules.finalizedPriorAttempt.notice")}{" "}
+            <a href={finalizedPriorAttempt.resultUrl}>
+              {t("sectionRules.finalizedPriorAttempt.viewLink")}
+            </a>
+          </p>
+        ) : null}
+        <Card>
+          <CardHeader>
+            <CardTitle>{title}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-ink-2">
+              {t("sectionRules.questionDuration", {
+                count: questionCount,
+                minutes: durationMinutes,
+              })}
+            </p>
+            <p>{t("sectionRules.beforeYouBegin")}</p>
+            <ul>
+              {instructions.map((instruction) => (
+                <li key={instruction}>{instruction}</li>
+              ))}
+            </ul>
+            {outcome.status === "refused" ? (
+              <p role="alert">{refusalMessage(outcome.problem.type, t)}</p>
+            ) : null}
+          </CardContent>
+        </Card>
+        <Button
+          className="h-11 min-w-11 touch-manipulation select-none"
+          data-testid="ready-button"
+          onClick={handleReady}
+          disabled={outcome.status === "entering"}
+        >
+          {t("sectionRules.readyButton")}
+        </Button>
+      </main>
     </div>
   )
+}
+
+export async function loadSectionRulesData(
+  attemptId: string,
+  sectionId: string,
+): Promise<
+  Omit<SectionRulesScreenProps, "navigate" | "finalizedPriorAttempt">
+> {
+  const envelope = await getRunnerEnvelope(attemptId)
+  const section = envelope.sections.find(
+    (candidate) => candidate.id === sectionId,
+  )
+
+  if (!section) {
+    throw new Error(
+      `section ${sectionId} does not belong to attempt ${attemptId}`,
+    )
+  }
+
+  return {
+    attemptId,
+    sectionId,
+    sectionType: section.type,
+    title: section.title,
+    testTitle: envelope.testTitle,
+    attemptNumber: envelope.attemptNumber,
+    questionCount: section.questionCount,
+    durationSeconds: section.durationSeconds,
+    instructions: section.instructions,
+  }
 }
 
 function refusalMessage(
@@ -189,13 +254,16 @@ export const Route = createFileRoute(
 )({
   validateSearch: searchSchema,
   loaderDeps: ({ search }) => search,
-  loader: ({ deps }) => deps,
+  loader: async ({ deps, params }) => ({
+    ...(await loadSectionRulesData(params.attemptId, params.sectionId)),
+    finalizedPriorAttempt: deps.finalizedPriorAttempt,
+  }),
   component: RouteComponent,
 })
 
 function RouteComponent() {
   const { attemptId, sectionId } = Route.useParams()
-  const { title, instructions, finalizedPriorAttempt } = Route.useLoaderData()
+  const data = Route.useLoaderData()
 
   // No `/attempts/$attemptId/run` route exists in this codebase yet (a later
   // task in this plan builds it), so it cannot be a typed `navigate({ to })`
@@ -208,11 +276,9 @@ function RouteComponent() {
 
   return (
     <SectionRulesScreen
+      {...data}
       attemptId={attemptId}
       sectionId={sectionId}
-      title={title}
-      instructions={instructions}
-      finalizedPriorAttempt={finalizedPriorAttempt}
       navigate={navigate}
     />
   )

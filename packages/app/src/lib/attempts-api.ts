@@ -2,6 +2,8 @@ import { apiFetch } from "./api-client.js"
 import type {
   AttemptHistoryPage,
   AttemptResult,
+  FinishSectionRequest,
+  FinishSectionResult,
   PlayGrant,
   ReviewPayload,
   RunnerEnvelope,
@@ -46,6 +48,17 @@ export function enterSection(
   return apiFetch<SectionEntry>(
     `/attempts/${attemptId}/sections/${sectionId}/enter`,
     { method: "POST" },
+  )
+}
+
+export function finishSection(
+  attemptId: string,
+  sectionId: string,
+  body: FinishSectionRequest,
+): Promise<FinishSectionResult> {
+  return apiFetch<FinishSectionResult>(
+    `/attempts/${attemptId}/sections/${sectionId}/finish`,
+    { method: "POST", body: JSON.stringify(body) },
   )
 }
 

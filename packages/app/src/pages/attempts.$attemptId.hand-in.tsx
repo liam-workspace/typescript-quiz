@@ -12,7 +12,10 @@ import { ApiError } from "../lib/api-client.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
 import { getRunnerEnvelope, submitAttempt } from "../lib/attempts-api.js"
 import { redirectExpiredAttemptToResult } from "../lib/expired-attempt-redirect.js"
-import { buildSubmitRemainder } from "../lib/lifecycleFlush.js"
+import {
+  buildSubmitRemainder,
+  reconcileFinalFlush,
+} from "../lib/lifecycleFlush.js"
 import { sameOriginPath } from "../lib/same-origin-path.js"
 import type { RunnerEnvelope } from "../lib/api-types.js"
 
@@ -45,50 +48,6 @@ export interface HandInScreenProps {
   readonly envelope: RunnerEnvelope
   readonly queue: AnswerQueue
   readonly navigate: (path: string) => void
-}
-
-/**
- * Openapi.yaml: "`finalFlush`... Always present, so the client can clear
- * its queue from this response alone." Mirrors FlushController's own
- * per-item reconcile (Task 9) -- applied/ignored_stale are both settled
- * successes and get acked, rejected becomes a terminal rejection -- kept
- * as a small local function here rather than reaching into
- * FlushController's private method, since that class's public contract is
- * fixed to `flushSection` and this is a different endpoint's response
- * shape.
- */
-// oxlint-disable-next-line max-params
-async function reconcileFinalFlush(
-  queue: AnswerQueue,
-  attemptId: string,
-  sentResponses: ReadonlyArray<{
-    readonly questionId: string
-    readonly seq: number
-  }>,
-  finalFlush: ReadonlyArray<{
-    readonly questionId: string
-    readonly status: string
-  }>,
-): Promise<void> {
-  const seqByQuestion = new Map(
-    sentResponses.map((item) => [item.questionId, item.seq]),
-  )
-
-  for (const result of finalFlush) {
-    const seq = seqByQuestion.get(result.questionId)
-
-    if (seq === undefined) {
-      continue
-    }
-
-    if (result.status === "applied" || result.status === "ignored_stale") {
-      // eslint-disable-next-line no-await-in-loop
-      await queue.ackItem(attemptId, result.questionId, seq)
-    } else {
-      // eslint-disable-next-line no-await-in-loop
-      await queue.markTerminalRejection(attemptId, result.questionId)
-    }
-  }
 }
 
 // A one-time snapshot at load time, not a live countdown -- this screen

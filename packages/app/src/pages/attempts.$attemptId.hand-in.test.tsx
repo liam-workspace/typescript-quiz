@@ -67,6 +67,8 @@ function trackingOpener(
 const baseEnvelope: RunnerEnvelope = {
   id: "attempt-1",
   status: "in_progress",
+  attemptNumber: 1,
+  testTitle: "Practice Test 04",
   expiresAt: "2026-08-27T09:30:00.000Z",
   serverTime: "2026-08-27T09:00:00.000Z",
   questionCount: 40,

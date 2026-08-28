@@ -28,11 +28,13 @@ import type { CapturedRequest } from "../http/raw-body-json.middleware.js"
 import {
   AttemptsService,
   type PlayGrant,
+  type FinishSectionResultView,
   type RunnerEnvelopeResult,
   type SectionEntryResult,
   type SubmitResultView,
 } from "./attempts.service.js"
 import { SubmitRequestDto } from "./submit-request.schema.js"
+import { FinishSectionRequestDto } from "./finish-section-request.schema.js"
 
 /**
  * Structural rather than express's Response: @types/express is not a
@@ -309,6 +311,28 @@ export class AttemptsController {
     )
 
     return toSectionEntryView(result, this.attempts.now())
+  }
+
+  /**
+   * The section boundary itself: apply the last queued answers, close and
+   * grade this section, then tell the runner which rules screen comes next.
+   */
+  @Post(":id/sections/:sectionId/finish")
+  @HttpCode(200)
+  finishSection(
+    @CurrentStudent() claims: JwtClaims,
+    @Param("id") id: string,
+    @Param("sectionId") sectionId: string,
+    @Body() body: FinishSectionRequestDto,
+    @Req() req: CapturedRequest,
+  ): Promise<FinishSectionResultView> {
+    return this.attempts.finishSection(
+      subjectOf(claims),
+      id,
+      sectionId,
+      body,
+      req,
+    )
   }
 
   /**

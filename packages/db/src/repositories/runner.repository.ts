@@ -9,8 +9,15 @@ import {
 import type { PgQueryable } from "@liam-public/node-postgres"
 import { loadForRunner } from "./test-version.repository.js"
 
-/** Content merged with this attempt's per-section progress. */
-type RunnerSectionView = RunnerSection & RunnerSectionState
+interface RunnerSectionIntro {
+  title: string
+  questionCount: number
+  durationSeconds: number
+  instructions: string[]
+}
+
+/** Content merged with this attempt's per-section progress and untimed intro. */
+type RunnerSectionView = RunnerSection & RunnerSectionState & RunnerSectionIntro
 
 /**
  * The four fields left out here (id, status, expiresAt,
@@ -22,6 +29,8 @@ export interface RunnerEnvelopeRow {
   id: string
   status: "in_progress"
   expiresAt: string | null
+  attemptNumber: number
+  testTitle: string
   questionCount: number
   answeredCount: number
   unansweredOrdinals: number[]
@@ -46,6 +55,19 @@ interface ResponseRow {
   choice_ids: string[]
 }
 
+interface AttemptIntroRow {
+  attempt_number: string
+  test_title: string
+}
+
+interface SectionIntroRow {
+  id: string
+  title: string
+  question_count: string
+  duration_seconds: number
+  instructions: string[]
+}
+
 const SECTION_STATE_QUERY = `
   SELECT test_section_id, entered_at, expires_at, completed_at
     FROM attempt_section WHERE attempt_id = $1
@@ -59,6 +81,34 @@ const RESPONSES_QUERY = `
       ON rc.attempt_id = r.attempt_id AND rc.question_id = r.question_id
    WHERE r.attempt_id = $1
    GROUP BY r.question_id, r.client_instance_id, r.client_seq, r.answered_at
+`
+
+const ATTEMPT_INTRO_QUERY = `
+  SELECT tv.title AS test_title,
+         (SELECT count(*)
+            FROM attempt sibling
+           WHERE sibling.student_id = a.student_id
+             AND sibling.test_version_id = a.test_version_id) AS attempt_number
+    FROM attempt a
+    JOIN test_version tv ON tv.id = a.test_version_id
+   WHERE a.id = $1 AND a.test_version_id = $2
+`
+
+const SECTION_INTRO_QUERY = `
+  SELECT ts.id, ts.title, ts.duration_seconds,
+         count(DISTINCT q.id) AS question_count,
+         COALESCE(
+           jsonb_agg(si.text ORDER BY si.ordinal)
+             FILTER (WHERE si.text IS NOT NULL),
+           '[]'::jsonb
+         ) AS instructions
+    FROM test_section ts
+    JOIN question_group qg ON qg.test_section_id = ts.id
+    JOIN question q ON q.question_group_id = qg.id
+    LEFT JOIN section_instruction si ON si.test_section_id = ts.id
+   WHERE ts.test_version_id = $1
+   GROUP BY ts.id, ts.title, ts.duration_seconds, ts.ordinal
+   ORDER BY ts.ordinal
 `
 
 /**
@@ -77,18 +127,41 @@ export async function loadRunnerEnvelope(
     "id" | "status" | "expiresAt" | "currentSectionId" | "currentQuestionId"
   >
 > {
-  const [content, stateResult, responseResult] = await Promise.all([
-    loadForRunner(db, input.testVersionId, input.attemptId),
-    db.query<SectionStateRow>(SECTION_STATE_QUERY, [input.attemptId]),
-    db.query<ResponseRow>(RESPONSES_QUERY, [input.attemptId]),
-  ])
+  const [content, stateResult, responseResult, attemptIntro, sectionIntro] =
+    await Promise.all([
+      loadForRunner(db, input.testVersionId, input.attemptId),
+      db.query<SectionStateRow>(SECTION_STATE_QUERY, [input.attemptId]),
+      db.query<ResponseRow>(RESPONSES_QUERY, [input.attemptId]),
+      db.query<AttemptIntroRow>(ATTEMPT_INTRO_QUERY, [
+        input.attemptId,
+        input.testVersionId,
+      ]),
+      db.query<SectionIntroRow>(SECTION_INTRO_QUERY, [input.testVersionId]),
+    ])
+
+  const intro = attemptIntro.rows.find((_row, index) => index === 0)
+
+  if (!intro) {
+    throw new Error(`attempt ${input.attemptId} has no runner intro metadata`)
+  }
 
   const stateBySection = new Map(
     stateResult.rows.map((r) => [r.test_section_id, r]),
   )
-  const sections = content.map((section) =>
-    mergeSectionState(section, stateBySection.get(section.id)),
-  )
+  const introBySection = new Map(sectionIntro.rows.map((row) => [row.id, row]))
+  const sections = content.map((section) => {
+    const sectionIntroRow = introBySection.get(section.id)
+
+    if (!sectionIntroRow) {
+      throw new Error(`section ${section.id} has no runner intro metadata`)
+    }
+
+    return mergeSectionState(
+      section,
+      stateBySection.get(section.id),
+      sectionIntroRow,
+    )
+  })
 
   const questionCount = sections.reduce(
     (sum, s) =>
@@ -108,6 +181,8 @@ export async function loadRunnerEnvelope(
     .sort((a, b) => a - b)
 
   return {
+    attemptNumber: Number(intro.attempt_number),
+    testTitle: intro.test_title,
     questionCount,
     answeredCount: answeredOrdinals.size,
     unansweredOrdinals,
@@ -119,13 +194,28 @@ export async function loadRunnerEnvelope(
 function mergeSectionState(
   section: RunnerSection,
   state: SectionStateRow | undefined,
+  intro: SectionIntroRow,
 ): RunnerSectionView {
+  const sectionIntro = {
+    title: intro.title,
+    questionCount: Number(intro.question_count),
+    durationSeconds: intro.duration_seconds,
+    instructions: intro.instructions,
+  }
+
   if (!state) {
-    return { ...section, status: "pending", completedAt: null, expiresAt: null }
+    return {
+      ...section,
+      ...sectionIntro,
+      status: "pending",
+      completedAt: null,
+      expiresAt: null,
+    }
   }
 
   return {
     ...section,
+    ...sectionIntro,
     status: state.completed_at ? "closed" : "open",
     completedAt: state.completed_at ? state.completed_at.toISOString() : null,
     expiresAt: state.expires_at.toISOString(),

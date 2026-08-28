@@ -438,6 +438,16 @@ export type SubmitOutcome<T> =
       finalFlush: T[]
     }
 
+export type FinishSectionOutcome<T> =
+  | { kind: "not_found" }
+  | { kind: "already_expired"; finalized: AttemptScoreRow }
+  | { kind: "section_not_open" }
+  | {
+      kind: "finished"
+      nextSectionId: string | null
+      finalFlush: T[]
+    }
+
 interface AttemptSubmitStateDbRow extends AttemptDbRow {
   submitted_at: Date | null
 }
@@ -538,6 +548,127 @@ export function submitAttempt<T>(
       finalized,
       finalFlush,
     }
+  })
+}
+
+interface AttemptSectionFinishStateDbRow {
+  completed_at: Date | null
+}
+
+async function loadNextSectionId(
+  tx: PgQueryable,
+  sectionId: string,
+): Promise<string | null> {
+  const { rows } = await tx.query<{ id: string }>(
+    `SELECT next_section.id
+       FROM test_section current_section
+       JOIN test_section next_section
+         ON next_section.test_version_id = current_section.test_version_id
+        AND next_section.ordinal > current_section.ordinal
+      WHERE current_section.id = $1
+      ORDER BY next_section.ordinal
+      LIMIT 1`,
+    [sectionId],
+  )
+
+  return rows[0]?.id ?? null
+}
+
+/**
+ * Applies one section's final queue remainder and closes it under the same
+ * attempt-row lock. A completed row is the idempotence marker: while that
+ * section remains current, a repeat returns the same next-section decision
+ * without applying the remainder or grading again.
+ */
+export function finishSection<T>(
+  pool: PgPool,
+  input: {
+    attemptId: string
+    sectionId: string
+    now: Date
+    applyRemainder: (tx: PgQueryable, attempt: AttemptRow) => Promise<T[]>
+  },
+): Promise<FinishSectionOutcome<T>> {
+  return withTransaction(pool, async (tx) => {
+    const { rows } = await tx.query<AttemptDbRow>(
+      `SELECT ${ATTEMPT_COLUMNS}
+         FROM attempt
+        WHERE id = $1
+        FOR UPDATE`,
+      [input.attemptId],
+    )
+
+    if (rows.length === 0) {
+      return { kind: "not_found" }
+    }
+
+    const attempt = toAttempt(rows[0])
+
+    if (attempt.status === "expired") {
+      const finalized = await finalizeAttemptTx(tx, {
+        attemptId: attempt.id,
+        status: "expired",
+        submittedAt: attempt.expiresAt ?? input.now,
+      })
+
+      if (!finalized) {
+        throw new Error(`attempt ${attempt.id} vanished while locked`)
+      }
+
+      return { kind: "already_expired", finalized }
+    }
+
+    if (attempt.status !== "in_progress") {
+      return { kind: "section_not_open" }
+    }
+
+    if (isPastDeadline(attempt.expiresAt, input.now)) {
+      const finalized = await finalizeAttemptTx(tx, {
+        attemptId: attempt.id,
+        status: "expired",
+        submittedAt: attempt.expiresAt ?? input.now,
+      })
+
+      if (!finalized) {
+        throw new Error(`attempt ${attempt.id} vanished while locked`)
+      }
+
+      return { kind: "already_expired", finalized }
+    }
+
+    if (attempt.currentSectionId !== input.sectionId) {
+      return { kind: "section_not_open" }
+    }
+
+    const { rows: sectionRows } =
+      await tx.query<AttemptSectionFinishStateDbRow>(
+        `SELECT completed_at
+           FROM attempt_section
+          WHERE attempt_id = $1 AND test_section_id = $2
+          FOR UPDATE`,
+        [attempt.id, input.sectionId],
+      )
+    const sectionState = sectionRows.find((_row, index) => index === 0)
+
+    if (!sectionState) {
+      return { kind: "section_not_open" }
+    }
+
+    const nextSectionId = await loadNextSectionId(tx, input.sectionId)
+
+    if (sectionState.completed_at !== null) {
+      return { kind: "finished", nextSectionId, finalFlush: [] }
+    }
+
+    const finalFlush = await input.applyRemainder(tx, attempt)
+
+    await closeSection(tx, {
+      attemptId: attempt.id,
+      sectionId: input.sectionId,
+      completedAt: input.now,
+    })
+
+    return { kind: "finished", nextSectionId, finalFlush }
   })
 }
 
@@ -798,9 +929,10 @@ async function enterSectionInTransaction(
   )
 
   if (expired) {
-    await closeExpiredSection(tx, {
+    await closeSection(tx, {
       attemptId: input.attemptId,
       sectionId: expired.test_section_id,
+      completedAt: null,
     })
   }
 
@@ -1068,8 +1200,10 @@ async function createAttempt(
 }
 
 /**
- * Closes one section that is past its deadline, writing its score
- * breakdown in the same statement.
+ * Closes and grades one section, whether its clock expired or the child
+ * deliberately finished early. Both paths share this implementation so the
+ * score/count constraint can never be satisfied differently by transition
+ * and timeout.
  *
  * `attempt_section_counts_reconcile` refuses a `completed_at` unless
  * points_earned/possible AND all four counts are present and
@@ -1078,19 +1212,18 @@ async function createAttempt(
  * as finished without an honest account of what happened in it is exactly
  * the fail-open shape the constraint exists to stop.
  *
- * `completed_at` is pinned to `expires_at` in SQL, never to `now`. The
- * section ended when its clock ended, not when someone next touched the
- * attempt -- the same reasoning as `attempt_expired_pins_deadline`, and the
- * same reason it is done in SQL: round-tripping a Postgres microsecond
- * timestamp through a millisecond JS Date truncates it.
+ * Expiry passes `completedAt: null`, which pins `completed_at` directly to
+ * `expires_at` in SQL and preserves Postgres microsecond precision. An early
+ * finish passes the request clock time because that tap is the section's
+ * actual completion boundary.
  *
  * Correctness comes from `isQuestionCorrect`, the one exact-match rule,
  * rather than a second comparison written here -- two copies would drift on
  * precisely the case that matters most, a partial multi_choice selection.
  */
-async function closeExpiredSection(
+async function closeSection(
   tx: PgQueryable,
-  input: { attemptId: string; sectionId: string },
+  input: { attemptId: string; sectionId: string; completedAt: Date | null },
 ): Promise<void> {
   const { rows: attemptRows } = await tx.query<{ test_version_id: string }>(
     `SELECT test_version_id FROM attempt WHERE id = $1`,
@@ -1127,7 +1260,7 @@ async function closeExpiredSection(
 
   await tx.query(
     `UPDATE attempt_section
-        SET completed_at     = expires_at,
+        SET completed_at     = COALESCE($9, expires_at),
             points_earned    = $3,
             points_possible  = $4,
             answered_count   = $5,
@@ -1146,6 +1279,7 @@ async function closeExpiredSection(
       questions.length - answered,
       correct,
       answered - correct,
+      input.completedAt,
     ],
   )
 }

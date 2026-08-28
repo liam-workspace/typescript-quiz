@@ -146,3 +146,67 @@ export async function buildSubmitRemainder(
     })),
   }
 }
+
+/** The finish-section counterpart to buildSubmitRemainder, scoped to one section. */
+export async function buildSectionFinishRemainder(
+  queue: AnswerQueue,
+  attemptId: string,
+  sectionId: string,
+): Promise<{
+  clientInstanceId: string
+  responses: Array<{
+    questionId: string
+    seq: number
+    selectedChoiceIds: string[]
+    answeredAt: string
+    timeSpentMs?: number
+  }>
+}> {
+  const items = await queue.snapshotForSection(attemptId, sectionId)
+
+  return {
+    clientInstanceId: queue.clientInstanceId(),
+    responses: items.map((item) => ({
+      questionId: item.questionId,
+      seq: item.seq,
+      selectedChoiceIds: item.selectedChoiceIds,
+      answeredAt: item.answeredAt,
+      timeSpentMs: item.timeSpentMs ?? undefined,
+    })),
+  }
+}
+
+/** Reconciles finish/submit per-item acknowledgements against the durable queue. */
+// oxlint-disable-next-line max-params
+export async function reconcileFinalFlush(
+  queue: AnswerQueue,
+  attemptId: string,
+  sentResponses: ReadonlyArray<{
+    readonly questionId: string
+    readonly seq: number
+  }>,
+  finalFlush: ReadonlyArray<{
+    readonly questionId: string
+    readonly status: string
+  }>,
+): Promise<void> {
+  const seqByQuestion = new Map(
+    sentResponses.map((item) => [item.questionId, item.seq]),
+  )
+
+  for (const result of finalFlush) {
+    const seq = seqByQuestion.get(result.questionId)
+
+    if (seq === undefined) {
+      continue
+    }
+
+    if (result.status === "applied" || result.status === "ignored_stale") {
+      // eslint-disable-next-line no-await-in-loop
+      await queue.ackItem(attemptId, result.questionId, seq)
+    } else {
+      // eslint-disable-next-line no-await-in-loop
+      await queue.markTerminalRejection(attemptId, result.questionId)
+    }
+  }
+}

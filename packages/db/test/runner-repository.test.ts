@@ -105,6 +105,35 @@ function sectionStateOf(
 }
 
 describe("loadRunnerEnvelope", () => {
+  it("projects the authoritative attempt number, test title, and section-intro metadata", async () => {
+    await withDatabase(async (pool) => {
+      const fixture = await seedPublishedTest(pool)
+      const attemptId = await insertAttempt(pool, fixture)
+
+      const envelope = await loadRunnerEnvelope(pool, {
+        attemptId,
+        testVersionId: fixture.versionId,
+      })
+
+      expect(envelope.attemptNumber).toBe(1)
+      expect(envelope.testTitle).toBe("TOEFL Primary — Practice Test 04")
+      expect(
+        sectionStateOf(envelope, fixture.listeningSectionId),
+      ).toMatchObject({
+        title: "Listening — Part 1",
+        questionCount: 1,
+        durationSeconds: 1500,
+        instructions: ["Put your headphones on now."],
+      })
+      expect(sectionStateOf(envelope, fixture.readingSectionId)).toMatchObject({
+        title: "Reading",
+        questionCount: 1,
+        durationSeconds: 1500,
+        instructions: [],
+      })
+    })
+  }, 120_000)
+
   it("marks every section pending with null completedAt/expiresAt before any section is entered", async () => {
     await withDatabase(async (pool) => {
       const f = await seedPublishedTest(pool)

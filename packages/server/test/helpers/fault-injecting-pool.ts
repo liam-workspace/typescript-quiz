@@ -77,3 +77,60 @@ export function createFaultInjectingPool(
 
   return wrapped as unknown as PgPool
 }
+
+/** Runs an async test-only barrier immediately before each matching query. */
+export function createQueryInterceptingPool(
+  realPool: PgPool,
+  beforeQuery: (sql: string) => Promise<void>,
+): PgPool {
+  function sqlOf(args: unknown[]): string | undefined {
+    const [first] = args
+
+    if (typeof first === "string") {
+      return first
+    }
+
+    if (
+      typeof first === "object" &&
+      first !== null &&
+      "text" in first &&
+      typeof (first as { text: unknown }).text === "string"
+    ) {
+      return (first as { text: string }).text
+    }
+
+    return undefined
+  }
+
+  async function interceptedQuery(
+    target: { query: (...args: unknown[]) => unknown },
+    args: unknown[],
+  ): Promise<unknown> {
+    const sql = sqlOf(args)
+
+    if (sql !== undefined) {
+      await beforeQuery(sql)
+    }
+
+    return target.query(...args)
+  }
+
+  const wrapped = {
+    query: (...args: unknown[]) => interceptedQuery(realPool, args),
+    connect: async (...args: unknown[]) => {
+      const client = (await (realPool.connect as (...a: unknown[]) => unknown)(
+        ...args,
+      )) as {
+        query: (...a: unknown[]) => unknown
+        release: (...a: unknown[]) => unknown
+      }
+
+      return {
+        query: (...queryArgs: unknown[]) => interceptedQuery(client, queryArgs),
+        release: (...releaseArgs: unknown[]) => client.release(...releaseArgs),
+      }
+    },
+  }
+
+  return wrapped as unknown as PgPool
+}

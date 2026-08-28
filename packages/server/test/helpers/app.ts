@@ -14,7 +14,10 @@ import { FailedWriteCaptureFilter } from "../../src/durability/failed-write-capt
 import { createRawBodyJsonMiddleware } from "../../src/http/raw-body-json.middleware.js"
 import { SpaFallbackFilter } from "../../src/spa/spa-fallback.filter.js"
 import { ZodBodyValidationPipe } from "../../src/validation/zod-body-validation.pipe.js"
-import { createFaultInjectingPool } from "./fault-injecting-pool.js"
+import {
+  createFaultInjectingPool,
+  createQueryInterceptingPool,
+} from "./fault-injecting-pool.js"
 import { createTokenFactory } from "./token.js"
 
 const JWKS_URL = "https://auth.test/.well-known/jwks.json"
@@ -47,6 +50,7 @@ export async function createTestApp(
     // `rejectionReasonFor` does not recognise, without touching every other
     // query this app makes (fixture seeding included).
     poolFault?: { matches: (sql: string) => boolean; error: Error }
+    beforePoolQuery?: (sql: string) => Promise<void>
   } = {},
 ): Promise<TestApp> {
   process.env.DATABASE_URL = inject("postgresConnectionUri")
@@ -80,6 +84,18 @@ export async function createTestApp(
           createRequestPool(loadDbConfig()),
           matches,
           error,
+        ),
+    })
+  }
+
+  if (options.beforePoolQuery) {
+    const beforeQuery = options.beforePoolQuery
+
+    builder.overrideProvider(REQUEST_POOL).useFactory({
+      factory: () =>
+        createQueryInterceptingPool(
+          createRequestPool(loadDbConfig()),
+          beforeQuery,
         ),
     })
   }

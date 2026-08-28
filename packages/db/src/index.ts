@@ -26,6 +26,7 @@ import {
   type AttemptResultOutcome,
   type ListAttemptHistoryResult,
 } from "./repositories/attempt-result.repository.js"
+import { AttemptNotInProgressError } from "./repositories/attempt-not-in-progress.error.js"
 import { SectionExpiredError } from "./repositories/section-expired.error.js"
 import {
   InvalidCursorError,
@@ -127,6 +128,7 @@ export {
   finalizeAttempt,
   finalizeExpiredAttempt,
   loadRunningOwnedAttempt,
+  AttemptNotInProgressError,
   SectionExpiredError,
   setPosition,
   startOrResumeAttempt,

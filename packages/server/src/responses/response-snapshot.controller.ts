@@ -47,19 +47,30 @@ export class ResponseSnapshotController {
     @Body() body: ResponseSnapshotDto,
     @Req() req: CapturedRequest,
   ): Promise<FlushResult> {
+    const subject = subjectOf(claims)
     const { attempt, now } = await this.responseWrites.assertOwnsAttempt(
-      subjectOf(claims),
+      subject,
       attemptId,
     )
-    const { results, sharedRules } = await applyResponseItems(this.pool, {
-      attempt,
-      clientInstanceId: body.clientInstanceId,
-      responses: body.responses,
-      now,
-      req,
-      write: (input) => writeResponse(this.pool, input),
-      capturePool: this.pool,
-    })
+    const { results, sharedRules } = await (async () => {
+      try {
+        return await applyResponseItems(this.pool, {
+          attempt,
+          clientInstanceId: body.clientInstanceId,
+          responses: body.responses,
+          now,
+          req,
+          write: (input) => writeResponse(this.pool, input),
+          capturePool: this.pool,
+        })
+      } catch (error) {
+        return this.responseWrites.mapAttemptNotInProgress(
+          error,
+          subject,
+          attemptId,
+        )
+      }
+    })()
 
     return {
       results,

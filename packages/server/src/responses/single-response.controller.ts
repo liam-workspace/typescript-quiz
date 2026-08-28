@@ -1,6 +1,10 @@
 import type { PgPool } from "@liam-public/node-postgres"
 import type { JwtClaims } from "@liam-workspace/node-auth-server"
-import { writeResponse, type WriteOutcome } from "@pp/db"
+import {
+  AttemptNotInProgressError,
+  writeResponse,
+  type WriteOutcome,
+} from "@pp/db"
 import {
   Body,
   Controller,
@@ -18,7 +22,11 @@ import { CurrentStudent } from "../auth/current-student.decorator.js"
 import { JwksGuard } from "../auth/jwks.guard.js"
 import { REQUEST_POOL } from "../database/tokens.js"
 import type { CapturedRequest } from "../http/raw-body-json.middleware.js"
-import { captureRejection, captureUnexpectedWriteError } from "./capture.js"
+import {
+  captureAttemptNotInProgressWrite,
+  captureRejection,
+  captureUnexpectedWriteError,
+} from "./capture.js"
 import { SingleResponseWriteDto } from "./dto.js"
 import { ResponseWriteService } from "./response-write.service.js"
 import { mapWriteConflict, resolveSectionRules } from "./section-rules.js"
@@ -50,8 +58,9 @@ export class SingleResponseController {
     @Body() body: SingleResponseWriteDto,
     @Req() req: CapturedRequest,
   ): Promise<SingleResponseResult> {
+    const subject = subjectOf(claims)
     const { attempt, now } = await this.responseWrites.assertOwnsAttempt(
-      subjectOf(claims),
+      subject,
       attemptId,
     )
     const rules = await resolveSectionRules(this.pool, { attempt, questionId })
@@ -87,6 +96,20 @@ export class SingleResponseController {
           now,
         })
       } catch (error) {
+        if (error instanceof AttemptNotInProgressError) {
+          await captureAttemptNotInProgressWrite(this.pool, req, {
+            attemptId,
+            body,
+            now,
+            clientInstanceId: body.clientInstanceId,
+          })
+          await this.responseWrites.mapAttemptNotInProgress(
+            error,
+            subject,
+            attemptId,
+          )
+        }
+
         throw await captureUnexpectedWriteError(this.pool, req, {
           attemptId,
           body,

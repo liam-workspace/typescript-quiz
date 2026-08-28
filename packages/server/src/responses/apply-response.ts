@@ -1,5 +1,6 @@
 import type { PgQueryable } from "@liam-public/node-postgres"
 import {
+  AttemptNotInProgressError,
   loadQuestionSectionInfo,
   type AttemptRow,
   type ResponseWriteInput,
@@ -7,7 +8,11 @@ import {
 } from "@pp/db"
 import type { CapturedRequest } from "../http/raw-body-json.middleware.js"
 import { CapturableBadRequestException } from "../validation/zod-body-validation.pipe.js"
-import { captureItemRejection, captureUnexpectedWriteError } from "./capture.js"
+import {
+  captureAttemptNotInProgressWrite,
+  captureItemRejection,
+  captureUnexpectedWriteError,
+} from "./capture.js"
 import {
   ResponseSnapshotItemSchema,
   ResponseSnapshotQuestionIdentitySchema,
@@ -186,6 +191,16 @@ export async function applyResponseItems(
           now: input.now,
         })
       } catch (error) {
+        if (error instanceof AttemptNotInProgressError) {
+          await captureAttemptNotInProgressWrite(input.capturePool, input.req, {
+            attemptId: input.attempt.id,
+            body: item,
+            now: input.now,
+            clientInstanceId: input.clientInstanceId,
+          })
+          throw error
+        }
+
         // `input.capturePool`, NOT `db` -- see `ApplyResponseItemsInput`'s
         // doc comment on `capturePool` for why this specific call must not
         // use whatever transaction `db` might be.

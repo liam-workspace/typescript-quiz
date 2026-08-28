@@ -4,6 +4,7 @@ import {
   type PgQueryable,
 } from "@liam-public/node-postgres"
 import { canAcceptAnswerChange } from "@pp/common"
+import { AttemptNotInProgressError } from "./attempt-not-in-progress.error.js"
 
 export type WriteOutcome =
   | { kind: "applied" }
@@ -92,6 +93,15 @@ export async function applyResponse(
   tx: PgQueryable,
   input: ResponseWriteInput,
 ): Promise<WriteOutcome> {
+  const { rows: attempts } = await tx.query<{ status: string }>(
+    "SELECT status FROM attempt WHERE id = $1 FOR SHARE",
+    [input.attemptId],
+  )
+
+  if (attempts[0]?.status !== "in_progress") {
+    throw new AttemptNotInProgressError()
+  }
+
   await tx.query("SAVEPOINT apply_response_item")
 
   try {

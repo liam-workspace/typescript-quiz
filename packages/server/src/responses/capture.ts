@@ -87,6 +87,17 @@ export function captureItemRejection(
   return captureResponseRejection(pool, req, { ...input, itemOnly: true })
 }
 
+export async function captureAttemptNotInProgressWrite(
+  pool: PgQueryable,
+  req: ResponseRequest,
+  input: Omit<CaptureInput, "itemOnly" | "reason">,
+): Promise<void> {
+  await captureResponseRejection(pool, req, {
+    ...input,
+    reason: "attempt_expired",
+  })
+}
+
 /**
  * A database error `writeResponse`/`applyResponse` (`@pp/db`) did not
  * recognise as one of ITS OWN rejection reasons (23503/23505/22P02/22003) --

@@ -1,6 +1,7 @@
 import type { PgPool } from "@liam-public/node-postgres"
 import type { Clock } from "@pp/common"
 import {
+  AttemptNotInProgressError,
   findStudentBySubject,
   loadRunningOwnedAttempt,
   type AttemptRow,
@@ -71,5 +72,33 @@ export class ResponseWriteService {
     }
 
     return { attempt: result.attempt, now }
+  }
+
+  async mapAttemptNotInProgress(
+    error: unknown,
+    subjectClaim: string,
+    attemptId: string,
+  ): Promise<never> {
+    if (!(error instanceof AttemptNotInProgressError)) {
+      throw error
+    }
+
+    const student = await findStudentBySubject(this.pool, subjectClaim)
+
+    if (!student) {
+      throw notYourAttemptError()
+    }
+
+    const result = await loadRunningOwnedAttempt(this.pool, {
+      attemptId,
+      studentId: student.id,
+      now: this.clock.now(),
+    })
+
+    if (result.finalized) {
+      throw attemptExpiredError(result.finalized)
+    }
+
+    throw notYourAttemptError()
   }
 }

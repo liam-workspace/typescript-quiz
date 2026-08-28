@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
 import type pg from "pg"
 import { describe, expect, it } from "vitest"
+import { AttemptNotInProgressError } from "../src/repositories/attempt-not-in-progress.error.js"
 import {
   loadResponse,
   writeResponse,
@@ -258,7 +259,7 @@ describe("response repository -- reorder guard", () => {
     })
   }, 120_000)
 
-  it("does not misclassify an unknown attempt as an unknown question", async () => {
+  it("refuses an unknown attempt at the attempt-wide status guard", async () => {
     await withDatabase(async (pool) => {
       const fixture = await seedPublishedTest(pool)
 
@@ -275,7 +276,7 @@ describe("response repository -- reorder guard", () => {
           allowAnswerChange: true,
           now: NOW,
         }),
-      ).rejects.toMatchObject({ constraint: "response_attempt_fk" })
+      ).rejects.toBeInstanceOf(AttemptNotInProgressError)
     })
   }, 120_000)
 

@@ -2,6 +2,7 @@ import type { PgPool, PgQueryable } from "@liam-public/node-postgres"
 import { Inject, Injectable, HttpStatus } from "@nestjs/common"
 import type { Clock } from "@pp/common"
 import {
+  AttemptNotInProgressError,
   claimPlay as claimPlayRow,
   enterSection as enterSectionRow,
   finishSection as finishSectionRow,
@@ -463,13 +464,23 @@ export class AttemptsService {
     }
 
     const now = this.clock.now()
-    const outcome = await finishSectionRow(this.pool, {
-      attemptId,
-      sectionId,
-      now,
-      applyRemainder: (tx, attempt) =>
-        this.applyResponseRemainder(tx, attempt, body, now, req),
-    })
+    const outcome = await (async () => {
+      try {
+        return await finishSectionRow(this.pool, {
+          attemptId,
+          sectionId,
+          now,
+          applyRemainder: (tx, attempt) =>
+            this.applyResponseRemainder(tx, attempt, body, now, req),
+        })
+      } catch (error) {
+        return this.mapAttemptNotInProgress(error, {
+          attemptId,
+          studentId: owned.studentId,
+          now,
+        })
+      }
+    })()
 
     if (outcome.kind === "not_found") {
       throw notYourAttemptError()
@@ -624,12 +635,22 @@ export class AttemptsService {
     }
 
     const now = this.clock.now()
-    const outcome = await submitAttemptRow(this.pool, {
-      attemptId,
-      now,
-      applyRemainder: (tx, attempt) =>
-        this.applyResponseRemainder(tx, attempt, body, now, req),
-    })
+    const outcome = await (async () => {
+      try {
+        return await submitAttemptRow(this.pool, {
+          attemptId,
+          now,
+          applyRemainder: (tx, attempt) =>
+            this.applyResponseRemainder(tx, attempt, body, now, req),
+        })
+      } catch (error) {
+        return this.mapAttemptNotInProgress(error, {
+          attemptId,
+          studentId: owned.studentId,
+          now,
+        })
+      }
+    })()
 
     if (outcome.kind === "not_found") {
       throw notYourAttemptError()
@@ -676,5 +697,22 @@ export class AttemptsService {
     })
 
     return results
+  }
+
+  private async mapAttemptNotInProgress(
+    error: unknown,
+    input: { attemptId: string; studentId: string; now: Date },
+  ): Promise<never> {
+    if (!(error instanceof AttemptNotInProgressError)) {
+      throw error
+    }
+
+    const result = await loadRunningOwnedAttempt(this.pool, input)
+
+    if (result.finalized) {
+      throw attemptExpiredError(result.finalized)
+    }
+
+    throw notYourAttemptError()
   }
 }

@@ -157,10 +157,16 @@ describe("QuestionNavigator", () => {
     expect(incorrect).toHaveAttribute("data-status", "incorrect")
     expect(blank).toHaveAttribute("data-status", "blank")
 
-    // ...and the three actually LOOK different from one another.
-    expect(correct.className).not.toBe(incorrect.className)
-    expect(incorrect.className).not.toBe(blank.className)
-    expect(correct.className).not.toBe(blank.className)
+    // ...and each opts into the styled system, where `.np-cell[data-status]`
+    // (src/index.css, ported from the prototype) gives the five states five
+    // different looks. This used to compare className strings, which only
+    // worked while the colours were inlined per cell; the states are now
+    // distinguished by the data attribute asserted just above, and the
+    // stylesheet keys on it. jsdom applies no CSS, so that the three
+    // actually LOOK different is confirmed in the browser pass, not here.
+    for (const cell of [correct, incorrect, blank]) {
+      expect(cell).toHaveClass("np-cell")
+    }
   })
 
   it("shows a runner legend of answered/current/blank, and a review legend of correct/incorrect/blank", () => {

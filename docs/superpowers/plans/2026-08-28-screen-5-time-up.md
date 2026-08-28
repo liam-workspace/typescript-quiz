@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task.
 
-**Goal:** When a timed test runs out, the child sees *"Time is up — your test was handed in automatically. Everything saved before time ran out has been kept and marked,"* with their answered count and a way to their result. Today there is no countdown on screen and no expiry screen: a child watches a runner that has silently stopped accepting writes.
+**Goal:** When a timed test runs out, the child sees _"Time is up — your test was handed in automatically. Everything saved before time ran out has been kept and marked,"_ with their answered count and a way to their result. Today there is no countdown on screen and no expiry screen: a child watches a runner that has silently stopped accepting writes.
 
 **Prototype:** `#s-expired` — a `00:00` clock, the reassurance above, and "Answered 38".
 
-**The prototype's design note, which is the whole architecture of this screen:** *"Nothing schedules this. The attempt is finalized by whichever request next touches it after the deadline."* Expiry is **discovered, not pushed**. There is no cron, no websocket, no server timer.
+**The prototype's design note, which is the whole architecture of this screen:** _"Nothing schedules this. The attempt is finalized by whichever request next touches it after the deadline."_ Expiry is **discovered, not pushed**. There is no cron, no websocket, no server timer.
 
 ---
 
@@ -14,13 +14,13 @@
 
 The backend is **complete**, and this is the rare screen where the server side is genuinely finished.
 
-| Thing | Status | Where |
-|---|---|---|
-| Lazy finalization on the next touching request | Implemented | `loadRunningOwnedAttempt` → `finalizeExpiredAttempt` |
-| `410 attempt_expired` carrying `{ id, status, submittedAt, resultUrl }` | Implemented | `attempts.service.ts:123,191`; contract `AttemptExpiredProblem` |
-| `submittedAt` pinned to the DEADLINE, not to arrival | Implemented, in SQL | `attempt_expired_pins_deadline` |
-| Result readable for an expired attempt | Implemented | `results.service.ts` |
-| The client already handles a 410 from several call sites | Implemented | `ExpiredState` in `run.tsx`, the runners' expired branch |
+| Thing                                                                   | Status              | Where                                                           |
+| ----------------------------------------------------------------------- | ------------------- | --------------------------------------------------------------- |
+| Lazy finalization on the next touching request                          | Implemented         | `loadRunningOwnedAttempt` → `finalizeExpiredAttempt`            |
+| `410 attempt_expired` carrying `{ id, status, submittedAt, resultUrl }` | Implemented         | `attempts.service.ts:123,191`; contract `AttemptExpiredProblem` |
+| `submittedAt` pinned to the DEADLINE, not to arrival                    | Implemented, in SQL | `attempt_expired_pins_deadline`                                 |
+| Result readable for an expired attempt                                  | Implemented         | `results.service.ts`                                            |
+| The client already handles a 410 from several call sites                | Implemented         | `ExpiredState` in `run.tsx`, the runners' expired branch        |
 
 ## What is missing
 
@@ -67,7 +67,7 @@ The backend is **complete**, and this is the rare screen where the server side i
 
 - [ ] **Step 1: Failing test** for `packages/app/src/pages/attempts.$attemptId.time-up.tsx`: renders `00:00`, the reassurance copy, the answered count, and a link to the result using the `resultUrl` from the 410 payload — which the server already supplies, so nothing needs recomputing.
 - [ ] **Step 2: Failing test:** reached directly (a reload on that URL), it still renders from a plain `GET /result` rather than requiring the 410 payload.
-- [ ] **Step 3:** Implement, six locales. The copy must be honest: *everything saved before time ran out has been kept*. That is true — answers are durable in IndexedDB and flushed — so say it plainly.
+- [ ] **Step 3:** Implement, six locales. The copy must be honest: _everything saved before time ran out has been kept_. That is true — answers are durable in IndexedDB and flushed — so say it plainly.
 
 ## Definition of Done
 

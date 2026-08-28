@@ -4,7 +4,7 @@
 
 **Goal:** A child opens the app on the family iPad, taps one button, signs in with the family Google account through `auth-dev.icovn.me`, and lands in the library with a provisioned profile. Today the app has no sign-in at all: `getDevBearerToken()` reads `VITE_DEV_BEARER_TOKEN` from the build environment, so a production build cannot make an authenticated request and an adult must mint a JWT by hand.
 
-**Prototype:** `docs/prototype/index.html` `#s-signin`. Copy is settled: *"Primary Practice — Listening and reading practice tests for TOEFL Primary, Steps 1 and 2"*, a single **Continue with Google** button, and the reassurance *"You will be taken to auth.icovn.me to sign in, then brought straight back here."*
+**Prototype:** `docs/prototype/index.html` `#s-signin`. Copy is settled: _"Primary Practice — Listening and reading practice tests for TOEFL Primary, Steps 1 and 2"_, a single **Continue with Google** button, and the reassurance _"You will be taken to auth.icovn.me to sign in, then brought straight back here."_
 
 **Spec:** `docs/superpowers/specs/2026-08-25-toefl-primary-fork-design.md`. Identity is the Google account itself — profile and account are one and the same.
 
@@ -14,12 +14,12 @@
 
 The backend for this screen is **complete**. Do not rebuild it.
 
-| Endpoint | Status | Where |
-|---|---|---|
-| `POST /api/session` (`establishSession`) | Implemented | `session.controller.ts:40`, contract line 89 |
-| `GET /api/me` (`getMe`) | Implemented | `session.controller.ts:55`, contract line 131 |
-| Bearer verification against `JWKS_URL` | Implemented | `auth/jwks.guard.ts`, `auth/auth.module.ts` |
-| Email allowlist (`ALLOWED_EMAILS`) | Implemented | `config.ts:39` |
+| Endpoint                                 | Status      | Where                                         |
+| ---------------------------------------- | ----------- | --------------------------------------------- |
+| `POST /api/session` (`establishSession`) | Implemented | `session.controller.ts:40`, contract line 89  |
+| `GET /api/me` (`getMe`)                  | Implemented | `session.controller.ts:55`, contract line 131 |
+| Bearer verification against `JWKS_URL`   | Implemented | `auth/jwks.guard.ts`, `auth/auth.module.ts`   |
+| Email allowlist (`ALLOWED_EMAILS`)       | Implemented | `config.ts:39`                                |
 
 `packages/app/src/lib/session-api.ts` already has `getCurrentStudent()` for `GET /me`. There is **no** client for `POST /session`.
 
@@ -46,7 +46,7 @@ The backend for this screen is **complete**. Do not rebuild it.
 
 - [ ] **Step 1: Failing test.** `packages/app/test/tokenStore.test.ts`: a store returns null when empty, returns what was saved, clears on sign-out, and survives a reload (persisted, not in-memory-only).
 - [ ] **Step 2: Implement** `packages/app/src/lib/tokenStore.ts`. Decide persistence deliberately and write the reason in a doc comment: `sessionStorage` loses the session when the iPad's Safari tab is recycled mid-test; `localStorage` persists a credential on a shared family device. State the tradeoff you chose and why.
-- [ ] **Step 3:** Make `getDevBearerToken()` one *fallback* branch behind the store rather than the primary source, so a dev token still works locally and never shadows a real session.
+- [ ] **Step 3:** Make `getDevBearerToken()` one _fallback_ branch behind the store rather than the primary source, so a dev token still works locally and never shadows a real session.
 
 ### Task 2: The OIDC round trip
 

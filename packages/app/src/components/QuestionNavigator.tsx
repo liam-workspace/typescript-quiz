@@ -23,19 +23,11 @@ export interface QuestionNavigatorProps {
 }
 
 /**
- * The prototype's `.np-cell.<status>` rules (docs/prototype/index.html,
- * lines 529-551), which are the whole point of the status: a review cell
- * that does not LOOK correct or incorrect has recorded its outcome without
- * showing it, and a child sees a grid of identical squares.
+ * Which legend rows a mode shows. The SWATCH colours are not here -- they
+ * come from `.np-key[data-status]` in src/index.css, the same rules that
+ * colour the cells themselves, so a legend can never disagree with the grid
+ * it explains.
  */
-const CELL_STATUS_CLASSES: Record<NavigatorCellStatus, string> = {
-  current: "border-amber-400 bg-amber-300 text-amber-950",
-  answered: "border-teal-700 bg-teal-50 text-teal-800",
-  correct: "border-emerald-700 bg-emerald-50 text-emerald-800",
-  incorrect: "border-rose-700 bg-rose-50 text-rose-800",
-  blank: "border-dashed border-stone-300 bg-stone-100 text-stone-600",
-}
-
 const LEGEND_LABEL_KEY = {
   answered: "navigator.legendAnswered",
   current: "navigator.legendCurrent",
@@ -97,7 +89,7 @@ export function QuestionNavigator({
                       ordinal: cell.ordinal,
                     })}
                     data-status={cell.status}
-                    className={`size-11 touch-manipulation rounded-md border text-sm font-bold tabular-nums select-none disabled:cursor-not-allowed disabled:opacity-55 ${CELL_STATUS_CLASSES[cell.status]}`}
+                    className="np-cell size-11 text-sm"
                     onClick={() => {
                       onNavigate(group.sectionId, cell.questionId)
                     }}
@@ -124,8 +116,8 @@ export function QuestionNavigator({
             <li key={status} className="flex items-center gap-1.5">
               <span
                 aria-hidden="true"
-                data-legend={status}
-                className={`size-3 shrink-0 rounded-sm border ${CELL_STATUS_CLASSES[status]}`}
+                data-status={status}
+                className="np-key shrink-0"
               />
               {t(LEGEND_LABEL_KEY[status])}
             </li>

@@ -4,9 +4,9 @@
 
 **Goal:** The `/` route. A child signs in and sees "Welcome back, Tom · You have one test waiting" with a card per published test, and can start, continue, re-attempt or see a previous result. Today `/` does not exist: two shipped screens link to it and land on a not-found page.
 
-**Prototype:** `#s-home`. The card carries title, step, section counts and duration (*"Step 1 · Listening 20 · Reading 20 · 50 minutes"*) and a **Start test** button.
+**Prototype:** `#s-home`. The card carries title, step, section counts and duration (_"Step 1 · Listening 20 · Reading 20 · 50 minutes"_) and a **Start test** button.
 
-**Prototype's own note, which is the design constraint:** *"Everything on this screen must arrive in one round trip — the card needs the test AND this student's standing against it. A finished test stays re-attemptable, so its card carries both See result and Try again."*
+**Prototype's own note, which is the design constraint:** _"Everything on this screen must arrive in one round trip — the card needs the test AND this student's standing against it. A finished test stays re-attemptable, so its card carries both See result and Try again."_
 
 ---
 
@@ -14,11 +14,11 @@
 
 The backend is **complete**, including the per-student standing that makes this screen possible in one call.
 
-| Thing | Status | Where |
-|---|---|---|
-| `GET /api/tests` (`listTests`), paginated | Implemented | `catalog.controller.ts:24`, contract line 157 |
-| `inProgressAttemptId`, `attemptCount`, `bestAttempt` per card | Implemented | `catalog.repository.ts:11-13,103,134` |
-| `GET /api/me` for the app bar | Implemented | `session.controller.ts:55` |
+| Thing                                                         | Status      | Where                                         |
+| ------------------------------------------------------------- | ----------- | --------------------------------------------- |
+| `GET /api/tests` (`listTests`), paginated                     | Implemented | `catalog.controller.ts:24`, contract line 157 |
+| `inProgressAttemptId`, `attemptCount`, `bestAttempt` per card | Implemented | `catalog.repository.ts:11-13,103,134`         |
+| `GET /api/me` for the app bar                                 | Implemented | `session.controller.ts:55`                    |
 
 There is **no client** for `GET /api/tests` in `packages/app/src/lib/` and no page.
 

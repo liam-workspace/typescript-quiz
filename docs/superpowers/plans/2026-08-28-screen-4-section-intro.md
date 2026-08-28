@@ -2,15 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task.
 
-**Goal:** Make a two-section test completable. A child finishes Listening, passes through a card that says *"Reading — 25 min when you begin"*, taps **I'm ready**, and starts Reading. Today they cannot: `nextEntry` is scoped to the current section, so Next vanishes at the section boundary and nothing navigates onward. **This is the single defect that makes the product unusable end to end.**
+**Goal:** Make a two-section test completable. A child finishes Listening, passes through a card that says _"Reading — 25 min when you begin"_, taps **I'm ready**, and starts Reading. Today they cannot: `nextEntry` is scoped to the current section, so Next vanishes at the section boundary and nothing navigates onward. **This is the single defect that makes the product unusable end to end.**
 
-**Prototype:** `#s-secintro` — *"Listening · 25 min when you begin · Practice Test 04 · Attempt 1 · Listening — Part 1 · 20 questions · 25 minutes"*.
+**Prototype:** `#s-secintro` — _"Listening · 25 min when you begin · Practice Test 04 · Attempt 1 · Listening — Part 1 · 20 questions · 25 minutes"_.
 
 ---
 
 ## The owner's ruling on this screen (binding)
 
-> *"Move between section doesn't mean users/kids can edit, we record responses of the section and submit, not block it."*
+> _"Move between section doesn't mean users/kids can edit, we record responses of the section and submit, not block it."_
 
 So: **finishing a section records and submits that section's responses and moves on.** The child simply cannot edit that section afterwards. There is no negotiation, no confirmation gate, no "are you sure" lock. A section boundary is a card you pass through, not a door you unlock.
 
@@ -18,19 +18,19 @@ This supersedes the earlier framing that treated early exit as a risky product c
 
 ## What already exists (verify before building)
 
-| Thing | Status | Where |
-|---|---|---|
-| `POST /api/attempts/{id}/sections/{sectionId}/enter` (`enterSection`) | Implemented, idempotent | contract line 330 |
-| `/attempts/$attemptId/sections/$sectionId/rules` route + screen | Implemented | `attempts.$attemptId.sections.$sectionId.rules.tsx` |
-| `enterSection` closes a section whose clock expired | Implemented (`ec3971f`) | `attempt.repository.ts` |
-| Section grading on close (points + all four counts) | Implemented | `closeExpiredSection` |
-| `PATCH /api/attempts/{id}/responses` — full-snapshot flush | Implemented | contract line 452 |
+| Thing                                                                 | Status                  | Where                                               |
+| --------------------------------------------------------------------- | ----------------------- | --------------------------------------------------- |
+| `POST /api/attempts/{id}/sections/{sectionId}/enter` (`enterSection`) | Implemented, idempotent | contract line 330                                   |
+| `/attempts/$attemptId/sections/$sectionId/rules` route + screen       | Implemented             | `attempts.$attemptId.sections.$sectionId.rules.tsx` |
+| `enterSection` closes a section whose clock expired                   | Implemented (`ec3971f`) | `attempt.repository.ts`                             |
+| Section grading on close (points + all four counts)                   | Implemented             | `closeExpiredSection`                               |
+| `PATCH /api/attempts/{id}/responses` — full-snapshot flush            | Implemented             | contract line 452                                   |
 
 **The rules screen already exists and is reachable only for the FIRST section.** The single navigation to it (`run.tsx:206`) fires when nothing has been entered yet.
 
 ## What is missing
 
-1. **A finish-section operation.** `enterSection` closes only an *expired* section. A child finishing early has no way to close one.
+1. **A finish-section operation.** `enterSection` closes only an _expired_ section. A child finishing early has no way to close one.
 2. **The onward transition.** Nothing computes "the next section" or navigates to its rules screen.
 3. `hasNext` is section-scoped, so the runner's Next control disappears at the boundary with nothing in its place.
 

@@ -94,13 +94,19 @@ describe("ChoiceList -- single_choice", () => {
 
     const [radio] = screen.getAllByRole("radio")
 
-    expect(radio.className).toMatch(/size-\d/)
-    expect(radio.className).toContain("data-[state=checked]:")
-
-    const row = radio.closest("label")
-
-    expect(row?.className).toContain("data-state=checked")
-    expect(row?.className).toMatch(/min-h-11/)
+    // These used to assert the hand-written Tailwind utilities this
+    // component carried before the prototype's design system was ported
+    // (src/index.css). That was a mechanism assertion: it pinned the exact
+    // class STRINGS rather than the effect, so moving the same styling into
+    // a better home broke it while the render improved.
+    //
+    // What matters, and all jsdom can actually see, is that the control
+    // opts into the styled system rather than rendering bare -- `.choice`
+    // and `.choice-dot` are what carry the border, the 44px floor and the
+    // selected state. The rendered RESULT is verified in the browser pass,
+    // because jsdom applies no CSS and never could confirm it.
+    expect(radio).toHaveClass("choice-dot")
+    expect(radio.closest("label")).toHaveClass("choice")
   })
 
   it("renders a lock indicator when locked is true", () => {
@@ -274,13 +280,8 @@ describe("ChoiceList -- multi_choice", () => {
 
     const [checkbox] = screen.getAllByRole("checkbox")
 
-    expect(checkbox.className).toMatch(/size-\d/)
-    expect(checkbox.className).toContain("data-[state=checked]:")
-
-    const row = checkbox.closest("label")
-
-    expect(row?.className).toContain("data-state=checked")
-    expect(row?.className).toMatch(/min-h-11/)
+    expect(checkbox).toHaveClass("choice-dot")
+    expect(checkbox.closest("label")).toHaveClass("choice")
   })
 
   it("renders a lock indicator when locked is true", () => {

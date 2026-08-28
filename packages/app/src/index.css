@@ -17,11 +17,219 @@
  */
 @source "../node_modules/@liam-public/browser-react-ui/dist";
 
+/*
+ * THE DEVICE PALETTE — ported verbatim from docs/prototype/index.html.
+ *
+ * The prototype is this product's design authority and always was, but
+ * nothing had ever ported it: it defines fifteen `--d-*` tokens and about
+ * thirty component classes, and this stylesheet defined none of them. Every
+ * screen therefore re-derived its own look from raw Tailwind utilities, and
+ * the parts no plan described in prose came out with no styling at all --
+ * ChoiceList rendered Radix's RadioGroup with no className, so a child
+ * could tap an answer and see nothing change, and QuestionNavigator gave
+ * all five cell states one identical grey.
+ *
+ * Those read as separate bugs. They were one: with no shared token to be
+ * missing, "unstyled" and "styled differently" are indistinguishable to
+ * every gate this project has.
+ *
+ * Registering them under `@theme` makes them real Tailwind colours, so
+ * `bg-paper`, `border-line`, `text-ink-2` and friends work in JSX exactly
+ * like any built-in — screens consume the system instead of guessing at it.
+ *
+ * DELIBERATELY LIGHT-ONLY, and this is a choice rather than an omission.
+ * The prototype's own dark block themes its API-documentation chrome
+ * (`--bg`, `--panel`, `--get`, `--post`), never the device screens: those
+ * render on fixed white paper. One child, one iPad, one committed look, so
+ * every colour below is painted explicitly and the page holds on any host
+ * ground.
+ */
+@theme {
+  --color-ink: #1c2530;
+  --color-ink-2: #55636f;
+  --color-faint: #8d9aa6;
+  --color-paper: #ffffff;
+  --color-surface: #f4f7f9;
+  --color-line: #dfe6ec;
+  --color-teal: #0f6e78;
+  --color-teal-bg: #e4f1f2;
+  --color-clay: #a8622f;
+  --color-clay-bg: #f8ede4;
+  --color-good: #2e9e5b;
+  --color-good-bg: #e6f4eb;
+  --color-bad: #c4453f;
+  --color-bad-bg: #faeae9;
+  --color-amber: #e8a33d;
+
+  --radius-device: 10px;
+}
+
 @layer base {
   body {
+    background: var(--color-surface);
+    color: var(--color-ink);
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
+  }
+}
+
+/*
+ * The prototype's component rules, for the pieces whose exact look is part
+ * of the product rather than incidental. Everything else stays plain
+ * Tailwind in the component -- this is a shared vocabulary, not a framework.
+ *
+ * `.choice` and `.np-cell` earn a class each because their STATES carry
+ * meaning a child reads: which answer is mine, which question is still
+ * blank, which one I got wrong. A state rendered identically to another
+ * state is a defect, and both have already been exactly that.
+ */
+@layer components {
+  /* An answer option. Its selected state is the single most important
+   * visual signal in the app: a child taps and must see it took. */
+  .choice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 44px; /* HIG minimum; the kit's own controls stop at 40px */
+    background: var(--color-paper);
+    border: 1.5px solid var(--color-line);
+    border-radius: var(--radius-device);
+    padding: 12px 15px;
+    font: inherit;
+    font-size: 15px;
+    text-align: left;
+    cursor: pointer;
+    color: var(--color-ink);
+    touch-action: manipulation;
+  }
+  .choice:hover {
+    border-color: var(--color-teal);
+  }
+  .choice:has([data-state="checked"]) {
+    border-color: var(--color-teal);
+    background: var(--color-teal-bg);
+    font-weight: 700;
+  }
+  .choice[data-locked="true"] {
+    cursor: not-allowed;
+    opacity: 0.92;
+  }
+  .choice[data-locked="true"]:hover {
+    border-color: var(--color-line);
+  }
+  /* Review only: the attempt is finished, so correctness may be shown. */
+  .choice[data-verdict="correct"] {
+    border-color: var(--color-good);
+    background: var(--color-good-bg);
+  }
+  .choice[data-verdict="incorrect"] {
+    border-color: var(--color-bad);
+    background: var(--color-bad-bg);
+  }
+
+  /* The radio/checkbox mark inside a `.choice`. */
+  .choice-dot {
+    width: 19px;
+    height: 19px;
+    flex: none;
+    border: 2px solid var(--color-line);
+    display: grid;
+    place-items: center;
+    background: var(--color-paper);
+  }
+  .choice-dot[data-state="checked"] {
+    border-color: var(--color-teal);
+    background: var(--color-teal);
+  }
+
+  /* A navigator cell. Five states, five looks -- see the note above. */
+  .np-cell {
+    display: grid;
+    place-items: center;
+    font: inherit;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    border-radius: 7px;
+    border: 1.5px solid var(--color-line);
+    background: var(--color-paper);
+    color: var(--color-ink-2);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .np-cell:hover:not(:disabled) {
+    border-color: var(--color-teal);
+  }
+  .np-cell:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  .np-cell[data-status="answered"] {
+    background: var(--color-teal-bg);
+    border-color: var(--color-teal);
+    color: var(--color-teal);
+  }
+  .np-cell[data-status="current"] {
+    background: var(--color-amber);
+    border-color: var(--color-amber);
+    color: #4a3208;
+  }
+  .np-cell[data-status="correct"] {
+    background: var(--color-good-bg);
+    border-color: var(--color-good);
+    color: var(--color-good);
+  }
+  .np-cell[data-status="incorrect"] {
+    background: var(--color-bad-bg);
+    border-color: var(--color-bad);
+    color: var(--color-bad);
+  }
+  .np-cell[data-status="blank"] {
+    background: var(--color-surface);
+    border-style: dashed;
+  }
+
+  /* The navigator's legend swatch: the same five states at glyph size. */
+  .np-key {
+    width: 11px;
+    height: 11px;
+    border-radius: 3px;
+    border: 1.5px solid var(--color-line);
+  }
+  .np-key[data-status="answered"] {
+    background: var(--color-teal-bg);
+    border-color: var(--color-teal);
+  }
+  .np-key[data-status="current"] {
+    background: var(--color-amber);
+    border-color: var(--color-amber);
+  }
+  .np-key[data-status="blank"] {
+    background: var(--color-surface);
+    border-style: dashed;
+  }
+  .np-key[data-status="correct"] {
+    background: var(--color-good-bg);
+    border-color: var(--color-good);
+  }
+  .np-key[data-status="incorrect"] {
+    background: var(--color-bad-bg);
+    border-color: var(--color-bad);
+  }
+
+  /* Progress pips along the runner chrome. */
+  .pip {
+    width: 19px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--color-line);
+  }
+  .pip[data-state="done"] {
+    background: var(--color-teal);
+  }
+  .pip[data-state="now"] {
+    background: var(--color-amber);
   }
 }

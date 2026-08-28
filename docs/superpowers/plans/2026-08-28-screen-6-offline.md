@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task.
 
-**Goal:** When the iPad loses the network mid-test, the child sees *"We can't reach the server right now. Keep answering — your answers are saved on this iPad and will be sent as soon as the connection is back,"* with a count of what is waiting. Today all of that is true and none of it is visible: the durability machinery works and says nothing.
+**Goal:** When the iPad loses the network mid-test, the child sees _"We can't reach the server right now. Keep answering — your answers are saved on this iPad and will be sent as soon as the connection is back,"_ with a count of what is waiting. Today all of that is true and none of it is visible: the durability machinery works and says nothing.
 
 **Prototype:** `#s-offline` — a "Saving…" chip in the app bar, the banner above, and a "Waiting to be sent" count.
 
-**The prototype's note, and the reason this screen exists:** *"Designed against a real incident in awesome-survey, where answers were lost four different ways. The rule here: an answer is durable on the device BEFORE it is sent, and the server never discards a payload it cannot apply."*
+**The prototype's note, and the reason this screen exists:** _"Designed against a real incident in awesome-survey, where answers were lost four different ways. The rule here: an answer is durable on the device BEFORE it is sent, and the server never discards a payload it cannot apply."_
 
 ---
 
@@ -14,16 +14,16 @@
 
 This screen is **almost entirely presentation over machinery that is already built and tested.** Resist rebuilding any of it.
 
-| Thing | Status | Where |
-|---|---|---|
-| IndexedDB queue, durable before send | Implemented | `lib/answerQueue.ts` |
-| Full-snapshot flush, per-item acks | Implemented | `lib/flushController.ts` |
-| Retry classification (retryable vs terminal) | Implemented | `lib/retryClassifier.ts` |
-| `pagehide` keepalive flush, `/api` + bearer | Implemented (`39fc589`) | `lib/lifecycleFlush.ts` |
-| Queue restored and re-flushed on mount | Implemented (`39fc589`) | `run.tsx` |
-| Terminal rejection surfaced to the child | Implemented (`39fc589`) | `runner.saveFailed` |
-| `PATCH /api/attempts/{id}/responses`, 200 even when items fail | Implemented | contract line 452 |
-| Server captures anything it cannot apply to `failed_write` | Implemented | `durability/` |
+| Thing                                                          | Status                  | Where                    |
+| -------------------------------------------------------------- | ----------------------- | ------------------------ |
+| IndexedDB queue, durable before send                           | Implemented             | `lib/answerQueue.ts`     |
+| Full-snapshot flush, per-item acks                             | Implemented             | `lib/flushController.ts` |
+| Retry classification (retryable vs terminal)                   | Implemented             | `lib/retryClassifier.ts` |
+| `pagehide` keepalive flush, `/api` + bearer                    | Implemented (`39fc589`) | `lib/lifecycleFlush.ts`  |
+| Queue restored and re-flushed on mount                         | Implemented (`39fc589`) | `run.tsx`                |
+| Terminal rejection surfaced to the child                       | Implemented (`39fc589`) | `runner.saveFailed`      |
+| `PATCH /api/attempts/{id}/responses`, 200 even when items fail | Implemented             | contract line 452        |
+| Server captures anything it cannot apply to `failed_write`     | Implemented             | `durability/`            |
 
 ## What is missing
 
@@ -33,9 +33,10 @@ This screen is **almost entirely presentation over machinery that is already bui
 
 ## The one rule this screen must not break
 
-**Never tell a child to stop.** The entire durability design exists so a network failure is a non-event: answers are on the device before they are sent, and they go when the connection returns. The banner's job is to say *keep answering*. It must never block input, never disable a control, and never imply an answer was lost — because it was not.
+**Never tell a child to stop.** The entire durability design exists so a network failure is a non-event: answers are on the device before they are sent, and they go when the connection returns. The banner's job is to say _keep answering_. It must never block input, never disable a control, and never imply an answer was lost — because it was not.
 
 Distinguish three states honestly:
+
 - **Waiting to be sent** — queued, retryable, will go. Reassure.
 - **Saved** — acked by the server. Say so briefly; do not nag.
 - **Did not save** — terminally rejected (`retryClassifier` says stop). Already implemented as `runner.saveFailed`; this screen must not soften it into "waiting", which would be a lie.

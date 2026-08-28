@@ -33,8 +33,10 @@ export interface ChoiceListProps {
 // size, no border and no indicator, so a child could select an answer and
 // see NOTHING change. This is what gives both the radio dot and the
 // checkbox square a visible, 44px-tall row.
-const CHOICE_ROW_CLASS =
-  "mb-2 flex min-h-11 w-full cursor-pointer touch-manipulation items-center gap-3 rounded-xl border-[1.5px] border-stone-300 bg-white px-4 py-3 text-[15px] has-[[data-state=checked]]:border-teal-700 has-[[data-state=checked]]:bg-teal-50 has-[[data-state=checked]]:font-bold"
+// `.choice` is the prototype's own rule (src/index.css), not a local
+// invention: border, padding, the 44px floor and the selected state all
+// come from the design system rather than being re-derived per component.
+const CHOICE_ROW_CLASS = "choice mb-2"
 
 function MultiChoiceList({
   choices,
@@ -58,7 +60,7 @@ function MultiChoiceList({
                 onSelect(choice.id)
               }}
               disabled={locked}
-              className="grid size-5 shrink-0 place-items-center rounded-md border-[1.5px] border-stone-400 bg-white data-[state=checked]:border-teal-700 data-[state=checked]:bg-teal-700"
+              className="choice-dot rounded-[4px]"
             >
               <Checkbox.Indicator className="block size-2.5 rounded-[1px] bg-white" />
             </Checkbox.Root>
@@ -90,7 +92,7 @@ function SingleChoiceList({
           <label key={choice.id} className={CHOICE_ROW_CLASS}>
             <RadioGroup.Item
               value={choice.id}
-              className="grid size-5 shrink-0 place-items-center rounded-full border-[1.5px] border-stone-400 bg-white data-[state=checked]:border-teal-700 data-[state=checked]:bg-teal-700"
+              className="choice-dot rounded-full"
             >
               <RadioGroup.Indicator className="block size-1.5 rounded-full bg-white" />
             </RadioGroup.Item>

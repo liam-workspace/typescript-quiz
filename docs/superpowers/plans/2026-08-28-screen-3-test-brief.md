@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task.
 
-**Goal:** Between "Start test" and the first section's rules, a child reads what they are about to sit: *"Practice Test 04 · Step 1 · Two sections · 50 minutes · Attempt 1 of this test"*, with each section's real rules laid out — 20 questions, 25 min, "Each recording plays once. You cannot go back to an earlier question." Then they commit.
+**Goal:** Between "Start test" and the first section's rules, a child reads what they are about to sit: _"Practice Test 04 · Step 1 · Two sections · 50 minutes · Attempt 1 of this test"_, with each section's real rules laid out — 20 questions, 25 min, "Each recording plays once. You cannot go back to an earlier question." Then they commit.
 
 **Prototype:** `#s-intro`.
 
-**The prototype's design constraint:** *"The brief must state the rules truthfully, so it reads them from the same section rows the server later enforces."* The brief must never paraphrase a rule the server implements differently.
+**The prototype's design constraint:** _"The brief must state the rules truthfully, so it reads them from the same section rows the server later enforces."_ The brief must never paraphrase a rule the server implements differently.
 
 ---
 
@@ -14,11 +14,11 @@
 
 The backend is **complete**.
 
-| Thing | Status | Where |
-|---|---|---|
+| Thing                                                                             | Status      | Where                                         |
+| --------------------------------------------------------------------------------- | ----------- | --------------------------------------------- |
 | `GET /api/tests/{slug}` (`getTest`) — sections, rules, instructions, NO questions | Implemented | `catalog.controller.ts:33`, contract line 188 |
-| `POST /api/attempts` (`startAttempt`) — start, resume and re-attempt in one call | Implemented | `attempts.controller.ts`, contract line 248 |
-| `finalizedPriorAttempt` on the start response | Implemented | `attempts.service.ts:126,194` |
+| `POST /api/attempts` (`startAttempt`) — start, resume and re-attempt in one call  | Implemented | `attempts.controller.ts`, contract line 248   |
+| `finalizedPriorAttempt` on the start response                                     | Implemented | `attempts.service.ts:126,194`                 |
 
 There is **no client** for either, and no page.
 
@@ -38,7 +38,7 @@ There is **no client** for either, and no page.
 
 - Four gates, CHAINED, exit 0. Never commit.
 - `components/` is STATELESS and props-only.
-- i18next, FLAT dotted keys, six locales, real translations. The section rules are *rendered from server data*, not hardcoded English — a rule the server enforces in a language the child cannot read is worse than no rule.
+- i18next, FLAT dotted keys, six locales, real translations. The section rules are _rendered from server data_, not hardcoded English — a rule the server enforces in a language the child cannot read is worse than no rule.
 - `size-11` touch targets.
 - **`docs/api/openapi.yaml` is the authority** on the response shapes. Read it; do not infer from the prototype's sample JSON.
 

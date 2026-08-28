@@ -265,10 +265,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [testId]
+              required: [slug]
               additionalProperties: false
               properties:
-                testId: { type: string }
+                slug: { type: string }
       responses:
         "200":
           description: An in-progress attempt already existed; `resumed` is true.
@@ -1252,6 +1252,7 @@ components:
           id,
           slug,
           title,
+          level,
           durationSeconds,
           attemptCount,
           inProgressAttemptId,
@@ -1261,6 +1262,7 @@ components:
         id: { type: string }
         slug: { type: string }
         title: { type: string }
+        level: { $ref: "#/components/schemas/StudentLevel" }
         durationSeconds: { type: integer }
         attemptCount: { type: integer }
         inProgressAttemptId: { type: [string, "null"] }

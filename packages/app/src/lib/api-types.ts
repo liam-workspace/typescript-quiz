@@ -37,6 +37,28 @@ export interface TestCatalogPage {
   summary: StudentSummary
 }
 
+export interface TestBrief {
+  id: string
+  slug: string
+  title: string
+  level: StudentLevel
+  durationSeconds: number
+  attemptCount: number
+  inProgressAttemptId: string | null
+  sections: Array<{
+    id: string
+    type: SectionType
+    title: string
+    ordinal: number
+    questionCount: number
+    durationSeconds: number
+    navigation: NavigationMode
+    allowAnswerChange: boolean
+    playback: PlaybackRules | null
+    instructions: string[]
+  }>
+}
+
 export type NavigationMode = "free" | "forward_only"
 
 export type QuestionType = "single_choice" | "multi_choice"
@@ -58,6 +80,20 @@ export interface FinalizedAttempt {
   status: "expired"
   submittedAt: string
   resultUrl: string
+}
+
+export interface AttemptStart {
+  id: string
+  attemptNumber: number
+  status: "in_progress"
+  createdAt: string
+  startedAt: string | null
+  expiresAt: string | null
+  serverTime: string
+  resumed: boolean
+  currentSectionId?: string | null
+  currentQuestionId?: string | null
+  finalizedPriorAttempt: FinalizedAttempt | null
 }
 
 export interface SectionEntry {

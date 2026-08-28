@@ -259,6 +259,7 @@ export interface TestBriefRow {
   id: string
   slug: string
   title: string
+  level: "primary-step-1" | "primary-step-2"
   durationSeconds: number
   attemptCount: number
   inProgressAttemptId: string | null
@@ -299,6 +300,7 @@ interface TestBriefDbRow {
   id: string
   slug: string
   title: string
+  level: "primary-step-1" | "primary-step-2"
   duration_seconds: number
   in_progress_attempt_id: string | null
   attempt_count: string
@@ -341,6 +343,7 @@ function toTestBrief(row: TestBriefDbRow): TestBriefRow {
     id: row.id,
     slug: row.slug,
     title: row.title,
+    level: row.level,
     durationSeconds: row.duration_seconds,
     attemptCount: Number(row.attempt_count),
     inProgressAttemptId: row.in_progress_attempt_id,
@@ -361,7 +364,7 @@ function toTestBrief(row: TestBriefDbRow): TestBriefRow {
  * unpublished content is observable.
  */
 const TEST_BRIEF_QUERY = `
-  SELECT t.id, t.slug, tv.title, tv.duration_seconds,
+  SELECT t.id, t.slug, tv.title, tv.level, tv.duration_seconds,
          ip.attempt_id AS in_progress_attempt_id,
          COALESCE(ac.attempt_count, 0) AS attempt_count,
          COALESCE(sec.sections, '[]'::jsonb) AS sections

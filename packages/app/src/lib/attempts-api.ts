@@ -2,6 +2,7 @@ import { apiFetch } from "./api-client.js"
 import type {
   AttemptHistoryPage,
   AttemptResult,
+  AttemptStart,
   FinishSectionRequest,
   FinishSectionResult,
   PlayGrant,
@@ -13,6 +14,13 @@ import type {
 } from "./api-types.js"
 
 const HISTORY_PAGE_SIZE = 20
+
+export function startAttempt(slug: string): Promise<AttemptStart> {
+  return apiFetch<AttemptStart>("/attempts", {
+    method: "POST",
+    body: JSON.stringify({ slug }),
+  })
+}
 
 export function listAttemptHistory(
   cursor: string | null = null,

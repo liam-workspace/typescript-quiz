@@ -1,5 +1,5 @@
 import { apiFetch } from "./api-client.js"
-import type { TestCatalogPage } from "./api-types.js"
+import type { TestBrief, TestCatalogPage } from "./api-types.js"
 
 export function listTests(
   cursor: string | null = null,
@@ -11,4 +11,8 @@ export function listTests(
   const query = new URLSearchParams({ cursor })
 
   return apiFetch<TestCatalogPage>(`/tests?${query.toString()}`)
+}
+
+export function getTest(slug: string): Promise<TestBrief> {
+  return apiFetch<TestBrief>(`/tests/${encodeURIComponent(slug)}`)
 }

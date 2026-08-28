@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './pages/__root'
 import { Route as HistoryRouteImport } from './pages/history'
 import { Route as IndexRouteImport } from './pages/index'
+import { Route as TestsSlugRouteImport } from './pages/tests.$slug'
 import { Route as AttemptsAttemptIdRunRouteImport } from './pages/attempts.$attemptId.run'
 import { Route as AttemptsAttemptIdReviewRouteImport } from './pages/attempts.$attemptId.review'
 import { Route as AttemptsAttemptIdResultRouteImport } from './pages/attempts.$attemptId.result'
@@ -25,6 +26,11 @@ const HistoryRoute = HistoryRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestsSlugRoute = TestsSlugRouteImport.update({
+  id: '/tests/$slug',
+  path: '/tests/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AttemptsAttemptIdRunRoute = AttemptsAttemptIdRunRouteImport.update({
@@ -57,6 +63,7 @@ const AttemptsAttemptIdSectionsSectionIdRulesRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/history': typeof HistoryRoute
+  '/tests/$slug': typeof TestsSlugRoute
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
   '/attempts/$attemptId/review': typeof AttemptsAttemptIdReviewRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/history': typeof HistoryRoute
+  '/tests/$slug': typeof TestsSlugRoute
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
   '/attempts/$attemptId/review': typeof AttemptsAttemptIdReviewRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/history': typeof HistoryRoute
+  '/tests/$slug': typeof TestsSlugRoute
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
   '/attempts/$attemptId/review': typeof AttemptsAttemptIdReviewRoute
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/history'
+    | '/tests/$slug'
     | '/attempts/$attemptId/hand-in'
     | '/attempts/$attemptId/result'
     | '/attempts/$attemptId/review'
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/history'
+    | '/tests/$slug'
     | '/attempts/$attemptId/hand-in'
     | '/attempts/$attemptId/result'
     | '/attempts/$attemptId/review'
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/history'
+    | '/tests/$slug'
     | '/attempts/$attemptId/hand-in'
     | '/attempts/$attemptId/result'
     | '/attempts/$attemptId/review'
@@ -115,6 +127,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   HistoryRoute: typeof HistoryRoute
+  TestsSlugRoute: typeof TestsSlugRoute
   AttemptsAttemptIdHandInRoute: typeof AttemptsAttemptIdHandInRoute
   AttemptsAttemptIdResultRoute: typeof AttemptsAttemptIdResultRoute
   AttemptsAttemptIdReviewRoute: typeof AttemptsAttemptIdReviewRoute
@@ -136,6 +149,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tests/$slug': {
+      id: '/tests/$slug'
+      path: '/tests/$slug'
+      fullPath: '/tests/$slug'
+      preLoaderRoute: typeof TestsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/attempts/$attemptId/run': {
@@ -179,6 +199,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   HistoryRoute: HistoryRoute,
+  TestsSlugRoute: TestsSlugRoute,
   AttemptsAttemptIdHandInRoute: AttemptsAttemptIdHandInRoute,
   AttemptsAttemptIdResultRoute: AttemptsAttemptIdResultRoute,
   AttemptsAttemptIdReviewRoute: AttemptsAttemptIdReviewRoute,

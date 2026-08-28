@@ -176,6 +176,11 @@ describe("SectionRulesScreen", () => {
       />,
     )
 
+    expect(
+      screen.getByText(
+        "Your previous attempt ran out of time and was handed in.",
+      ),
+    ).toBeInTheDocument()
     const link = screen.getByRole("link", { name: "See it" })
     expect(link).toHaveAttribute("href", "/attempts/attempt-0/result")
   })

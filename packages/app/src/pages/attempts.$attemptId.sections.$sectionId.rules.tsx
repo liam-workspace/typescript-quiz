@@ -21,12 +21,11 @@ import type { FinalizedAttempt } from "../lib/api-types.js"
 // click -- never from a loader or an effect on mount, or the student would
 // be charged time they spent reading.
 //
-// `title`/`instructions`/`finalizedPriorAttempt` are all data a prior screen
-// (the not-yet-built test-brief/attempt-start screen) already has client
-// side -- `GET /tests/{slug}` echoes each section's title and instructions,
-// and `POST /attempts` echoes `finalizedPriorAttempt` -- so this route reads
-// them back out of its own search params rather than re-fetching or, worse,
-// inventing a call to `enterSection` just to get something to render.
+// `finalizedPriorAttempt` is news the test-brief/attempt-start screen already
+// has client side from `POST /attempts`, so this route carries it in validated
+// search state. The section's rules and authoritative attempt number come
+// from the canonical runner envelope, without inventing a call to
+// `enterSection` just to get something to render.
 
 const finalizedPriorAttemptSearchSchema = z
   .object({

@@ -83,6 +83,7 @@ interface TestBriefBody {
   id: string
   slug: string
   title: string
+  level: string
   durationSeconds: number
   attemptCount: number
   inProgressAttemptId: string | null
@@ -123,8 +124,8 @@ async function insertPublishedTestWithSections(
     input.slug,
   ])
   await pool.query(
-    `INSERT INTO test_version (id, test_id, version, title, duration_seconds)
-     VALUES ($1, $2, 1, $3, 3000)`,
+    `INSERT INTO test_version (id, test_id, version, title, level, duration_seconds)
+     VALUES ($1, $2, 1, $3, 'primary-step-1', 3000)`,
     [versionId, testId, input.title],
   )
   await pool.query(
@@ -397,6 +398,7 @@ describe("GET /tests/{slug}", () => {
     expect(brief.id).toBe(fixture.testId)
     expect(brief.slug).toBe(slug)
     expect(brief.title).toBe("Brief Test")
+    expect(brief.level).toBe("primary-step-1")
     expect(brief.durationSeconds).toBe(3000)
     expect(brief.attemptCount).toBe(0)
     expect(typeof brief.attemptCount).toBe("number")

@@ -7,11 +7,49 @@ import {
   getAttemptResult,
   getRunnerEnvelope,
   setPosition,
+  startAttempt,
 } from "./attempts-api.js"
 
 describe("attempts-api", () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+  })
+
+  it("startAttempt calls POST /api/attempts with the test slug and returns the authoritative attempt", async () => {
+    const attempt = {
+      id: "attempt-1",
+      attemptNumber: 2,
+      status: "in_progress",
+      createdAt: "2026-08-28T09:00:00.000Z",
+      startedAt: null,
+      expiresAt: null,
+      serverTime: "2026-08-28T09:00:00.100Z",
+      resumed: false,
+      currentSectionId: null,
+      currentQuestionId: null,
+      finalizedPriorAttempt: {
+        id: "attempt-stale",
+        status: "expired",
+        submittedAt: "2026-08-28T08:50:00.000Z",
+        resultUrl: "/attempts/attempt-stale/result",
+      },
+    }
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify(attempt), {
+        headers: { "content-type": "application/json" },
+        status: 201,
+      }),
+    )
+    vi.stubGlobal("fetch", fetchMock)
+
+    const result = await startAttempt("primary-practice-04")
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/attempts")
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe("POST")
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(
+      JSON.stringify({ slug: "primary-practice-04" }),
+    )
+    expect(result).toEqual(attempt)
   })
 
   it("getRunnerEnvelope calls GET /api/attempts/:id and returns the parsed body", async () => {

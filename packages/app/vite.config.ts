@@ -31,11 +31,25 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    // The OIDC redirect URI is registered as `http://localhost:3000/callback`
+    // (plan, "The registration") -- a redirect URI matches exactly or not
+    // at all, so this is not a preference.
+    port: 3000,
     host: "0.0.0.0",
     proxy: {
+      // NOT port 3000: this dev server now IS 3000 (it's what the browser
+      // and the OIDC redirect_uri both see), so proxying `/api` to that
+      // same port would be self-referential. The actual API server
+      // (`@pp/server`, `config.ts`'s `PORT`, default 3000 on ITS OWN) must
+      // run on 3001 for this specific workflow -- e.g.
+      // `PORT=3001 pnpm --filter @pp/server start`, or a docker compose
+      // override mapping host 3001 to the container's port 3000. The
+      // `compose.yml` "everything on one origin" production-like mode
+      // (the api container serving the built SPA itself, no separate vite
+      // dev server in the picture at all) is unaffected -- it never hits
+      // this proxy.
       "/api": {
-        target: "http://localhost:3000",
+        target: "http://localhost:3001",
       },
     },
   },

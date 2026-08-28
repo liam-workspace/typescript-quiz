@@ -1,20 +1,26 @@
 import "fake-indexeddb/auto"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { AnswerQueue } from "../src/lib/answerQueue.js"
+import { resetAuthClientForTests } from "../src/lib/auth.js"
 import {
   buildSubmitRemainder,
   registerPagehideFlush,
 } from "../src/lib/lifecycleFlush.js"
+import { tokenStore } from "../src/lib/tokenStore.js"
 
 const NOW = new Date("2026-08-27T09:00:00.000Z")
 
 beforeEach(() => {
   indexedDB.deleteDatabase("pp-lifecycle-test")
+  tokenStore.clear()
+  resetAuthClientForTests()
 })
 
 describe("registerPagehideFlush", () => {
   afterEach(() => {
     vi.unstubAllEnvs()
+    tokenStore.clear()
+    resetAuthClientForTests()
   })
 
   it("sends a keepalive PATCH with the open section's queued snapshot on pagehide, through the SAME /api base every other write uses", async () => {
@@ -84,7 +90,10 @@ describe("registerPagehideFlush", () => {
   })
 
   it("attaches the dev bearer token, the same as every other authenticated write", async () => {
-    vi.stubEnv("VITE_DEV_BEARER_TOKEN", "dev-token")
+    vi.stubEnv("DEV", true)
+    vi.stubEnv("VITE_DEV_AUTH", "true")
+    vi.stubEnv("VITE_DEV_AUTH_TOKEN", "dev-token")
+    tokenStore.clear()
 
     const queue = await AnswerQueue.open("pp-lifecycle-test")
 
@@ -124,6 +133,57 @@ describe("registerPagehideFlush", () => {
         // content-type still fails.
         expect(new Headers(init?.headers).get("authorization")).toBe(
           "Bearer dev-token",
+        )
+      } finally {
+        unregister()
+      }
+    } finally {
+      await queue.close()
+    }
+  })
+
+  it("prefers the real signed-in session's token over the dev fallback, same priority as apiFetch", async () => {
+    vi.stubEnv("DEV", true)
+    vi.stubEnv("VITE_DEV_AUTH", "true")
+    vi.stubEnv("VITE_DEV_AUTH_TOKEN", "dev-token")
+    tokenStore.set("access_token", "real-access-token")
+    tokenStore.set("id_token", "id-token")
+
+    const queue = await AnswerQueue.open("pp-lifecycle-test")
+
+    try {
+      await queue.recordAnswer(
+        {
+          attemptId: "a1",
+          sectionId: "s1",
+          questionId: "q1",
+          selectedChoiceIds: ["c1"],
+          timeSpentMs: null,
+        },
+        NOW,
+      )
+
+      const fetchSpy = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(null, { status: 200 }))
+      const unregister = registerPagehideFlush(
+        queue,
+        () => ({ attemptId: "a1", sectionId: "s1" }),
+        (attemptId) => `/attempts/${attemptId}/responses`,
+        fetchSpy,
+      )
+
+      try {
+        window.dispatchEvent(new Event("pagehide"))
+
+        await vi.waitFor(() => {
+          expect(fetchSpy).toHaveBeenCalled()
+        })
+
+        const [[, init]] = fetchSpy.mock.calls
+
+        expect(new Headers(init?.headers).get("authorization")).toBe(
+          "Bearer real-access-token",
         )
       } finally {
         unregister()

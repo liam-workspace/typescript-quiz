@@ -9,7 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './pages/__root'
+import { Route as SignInRouteImport } from './pages/sign-in'
 import { Route as HistoryRouteImport } from './pages/history'
+import { Route as CallbackRouteImport } from './pages/callback'
 import { Route as IndexRouteImport } from './pages/index'
 import { Route as TestsSlugRouteImport } from './pages/tests.$slug'
 import { Route as AttemptsAttemptIdTimeUpRouteImport } from './pages/attempts.$attemptId.time-up'
@@ -19,9 +21,19 @@ import { Route as AttemptsAttemptIdResultRouteImport } from './pages/attempts.$a
 import { Route as AttemptsAttemptIdHandInRouteImport } from './pages/attempts.$attemptId.hand-in'
 import { Route as AttemptsAttemptIdSectionsSectionIdRulesRouteImport } from './pages/attempts.$attemptId.sections.$sectionId.rules'
 
+const SignInRoute = SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
   path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CallbackRoute = CallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -68,7 +80,9 @@ const AttemptsAttemptIdSectionsSectionIdRulesRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/callback': typeof CallbackRoute
   '/history': typeof HistoryRoute
+  '/sign-in': typeof SignInRoute
   '/tests/$slug': typeof TestsSlugRoute
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
@@ -79,7 +93,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/callback': typeof CallbackRoute
   '/history': typeof HistoryRoute
+  '/sign-in': typeof SignInRoute
   '/tests/$slug': typeof TestsSlugRoute
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
@@ -91,7 +107,9 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/callback': typeof CallbackRoute
   '/history': typeof HistoryRoute
+  '/sign-in': typeof SignInRoute
   '/tests/$slug': typeof TestsSlugRoute
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
@@ -104,7 +122,9 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/callback'
     | '/history'
+    | '/sign-in'
     | '/tests/$slug'
     | '/attempts/$attemptId/hand-in'
     | '/attempts/$attemptId/result'
@@ -115,7 +135,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/callback'
     | '/history'
+    | '/sign-in'
     | '/tests/$slug'
     | '/attempts/$attemptId/hand-in'
     | '/attempts/$attemptId/result'
@@ -126,7 +148,9 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/callback'
     | '/history'
+    | '/sign-in'
     | '/tests/$slug'
     | '/attempts/$attemptId/hand-in'
     | '/attempts/$attemptId/result'
@@ -138,7 +162,9 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CallbackRoute: typeof CallbackRoute
   HistoryRoute: typeof HistoryRoute
+  SignInRoute: typeof SignInRoute
   TestsSlugRoute: typeof TestsSlugRoute
   AttemptsAttemptIdHandInRoute: typeof AttemptsAttemptIdHandInRoute
   AttemptsAttemptIdResultRoute: typeof AttemptsAttemptIdResultRoute
@@ -150,11 +176,25 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/history': {
       id: '/history'
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/callback': {
+      id: '/callback'
+      path: '/callback'
+      fullPath: '/callback'
+      preLoaderRoute: typeof CallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -218,7 +258,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CallbackRoute: CallbackRoute,
   HistoryRoute: HistoryRoute,
+  SignInRoute: SignInRoute,
   TestsSlugRoute: TestsSlugRoute,
   AttemptsAttemptIdHandInRoute: AttemptsAttemptIdHandInRoute,
   AttemptsAttemptIdResultRoute: AttemptsAttemptIdResultRoute,

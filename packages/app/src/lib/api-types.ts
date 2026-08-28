@@ -380,3 +380,16 @@ export interface Student {
   level: StudentLevel | null
   isAdmin: boolean
 }
+
+/**
+ * Openapi.yaml `SessionResult` -- the response of `POST /session`
+ * (`establishSession`, session.controller.ts). Same fields as `Student`
+ * plus `created`, which distinguishes a `201` (this call provisioned the
+ * row -- first sign-in) from a `200` (the student already existed); both
+ * are success. A `403` is documented separately -- the email is not on the
+ * allowlist -- and is not this shape at all, but an `ApiError` the caller
+ * renders directly.
+ */
+export interface SessionResult extends Student {
+  created: boolean
+}

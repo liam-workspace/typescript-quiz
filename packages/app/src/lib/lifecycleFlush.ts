@@ -1,3 +1,4 @@
+import { currentAccessToken } from "./auth.js"
 import { getDevBearerToken } from "./dev-auth.js"
 import type { AnswerQueue } from "./answerQueue.js"
 
@@ -78,8 +79,14 @@ export function registerPagehideFlush(
         // returning the same un-prefixed path shape every other caller of
         // `apiFetch` uses (e.g. `/attempts/${id}/responses`); the `/api`
         // prefix is added here, not by the caller, exactly like `apiFetch`
-        // adds it for every other write.
-        const token = getDevBearerToken()
+        // adds it for every other write. The real signed-in session's
+        // token takes priority over the dev fallback, same as
+        // `api-client.ts`'s `sendRequest` -- a dev token must never shadow
+        // a real one. No refresh-on-401 here (unlike `apiFetch`): pagehide
+        // cannot await a token refresh round trip before the page is gone,
+        // and per the class doc above this send is one-shot and
+        // unreconciled regardless of how it fails.
+        const token = currentAccessToken() ?? getDevBearerToken()
         const headers: Record<string, string> = {
           "content-type": "application/json",
         }

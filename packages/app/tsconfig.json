@@ -23,5 +23,9 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src", "test"]
+  "include": ["src", "test"],
+  // Spawns a real `vite build` via `node:child_process` -- a Node-context
+  // file like `vite.config.ts`/`vitest.config.ts`, not a browser one, so
+  // it lives under tsconfig.node.json's ["node"] types instead.
+  "exclude": ["test/dev-auth-prod-build.test.ts"]
 }

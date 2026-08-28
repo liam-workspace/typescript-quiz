@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@liam-public/browser-react-ui": "^0.1.0",
+    "@liam-workspace/auth-client": "^0.1.1",
     "@pp/common": "workspace:*",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-router": "1.170.16",

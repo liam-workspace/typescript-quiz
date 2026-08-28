@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@liam-public/browser-react-ui"
 import { createRootRoute } from "@tanstack/react-router"
 import { useTranslation } from "react-i18next"
+import { requireAuth } from "../lib/auth-guard.js"
 import { AppLayout } from "./layout.js"
 
 /**
@@ -26,6 +27,13 @@ function RouteNotFound() {
 }
 
 export const Route = createRootRoute({
+  // ONE guard for every route, here rather than per-page (plan, Task 4):
+  // every route beneath the root runs this `beforeLoad` before its own
+  // loader, so a page cannot forget to add it. `/sign-in` and `/callback`
+  // are the only two routes `requireAuth` itself exempts.
+  beforeLoad: ({ location }) => {
+    requireAuth(location.pathname)
+  },
   component: AppLayout,
   notFoundComponent: RouteNotFound,
 })

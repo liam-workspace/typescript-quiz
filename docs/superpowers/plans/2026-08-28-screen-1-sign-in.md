@@ -2,11 +2,41 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A child opens the app on the family iPad, taps one button, signs in with the family Google account through `auth-dev.icovn.me`, and lands in the library with a provisioned profile. Today the app has no sign-in at all: `getDevBearerToken()` reads `VITE_DEV_BEARER_TOKEN` from the build environment, so a production build cannot make an authenticated request and an adult must mint a JWT by hand.
+**Goal:** A child opens the app on the family iPad, taps one button, signs in through `auth.icovn.me`, and lands in the library with a provisioned profile. Today the app has no sign-in at all: `getDevBearerToken()` reads `VITE_DEV_BEARER_TOKEN` from the build environment, so a production build cannot make an authenticated request and an adult must mint a JWT by hand.
 
-**Prototype:** `docs/prototype/index.html` `#s-signin`. Copy is settled: _"Primary Practice — Listening and reading practice tests for TOEFL Primary, Steps 1 and 2"_, a single **Continue with Google** button, and the reassurance _"You will be taken to auth.icovn.me to sign in, then brought straight back here."_
+**Prototype:** `docs/prototype/index.html` `#s-signin`. Copy is settled apart from one point: _"Primary Practice — Listening and reading practice tests for TOEFL Primary, Steps 1 and 2"_, one sign-in button, and the reassurance _"You will be taken to auth.icovn.me to sign in, then brought straight back here."_
 
-**Spec:** `docs/superpowers/specs/2026-08-25-toefl-primary-fork-design.md`. Identity is the Google account itself — profile and account are one and the same.
+**Spec:** `docs/superpowers/specs/2026-08-25-toefl-primary-fork-design.md`.
+
+## The identity provider (owner-confirmed, and verified live)
+
+|                    |                             |
+| ------------------ | --------------------------- |
+| Production issuer  | `https://auth.icovn.me`     |
+| Development issuer | `https://auth-dev.icovn.me` |
+| Accounts           | **Google _and_ Microsoft**  |
+
+Both issuers were probed and answer a standard OIDC discovery document at
+`/.well-known/openid-configuration`. Confirmed, not assumed:
+
+- `authorization_endpoint` `/auth`, `token_endpoint` `/token`, **`jwks_uri` `/jwks`** — so the server's `JWKS_URL` is `https://auth-dev.icovn.me/jwks` in development.
+- `code_challenge_methods_supported: ["S256"]` — PKCE as the prototype specifies.
+- `scopes_supported` includes `offline_access`, so a **refresh token is obtainable**. Use it. The difference between a refresh token and none is a child being signed out in the middle of a timed test.
+- `end_session_endpoint` and `revocation_endpoint` exist — sign-out should use them rather than only dropping the local token.
+
+**One button, not two.** Discovery exposes no provider/connection/idp parameter, so the gateway presents its own Google-or-Microsoft chooser. The app sends one authorize request and lets `auth.icovn.me` handle the choice. **Therefore the prototype's "Continue with Google" copy is now wrong** — it predates Microsoft support. Use provider-neutral copy ("Sign in", "Continue"), and do not name a single provider in any of the six locales.
+
+## BLOCKER — an OIDC client must be registered before Task 2 can finish
+
+A probe of `auth-dev.icovn.me/auth` with the prototype's `client_id=primary-practice` and `redirect_uri=http://localhost:5173/auth/callback` returns **400**. Either that client id is not registered or that redirect URI is not allowed — the prototype invented the name and nothing has ever run against the real service.
+
+Needed from the owner, for BOTH issuers:
+
+1. the real `client_id` for this app;
+2. allowed `redirect_uri` values — at minimum the local dev origin and the deployed origin;
+3. confirmation that it is registered as a **public** client (a browser SPA holds no secret, which is what PKCE is for).
+
+Tasks 1 and 3 do not depend on this and can proceed. **Do not work around a 400 by disabling PKCE, by inventing a different client id, or by falling back to the dev token.** Stop and report.
 
 ---
 
@@ -25,7 +55,7 @@ The backend for this screen is **complete**. Do not rebuild it.
 
 ## What is missing
 
-1. No OIDC client. The prototype names `@liam-workspace/auth-client`; **it is not installed** — confirm whether it is reachable from this registry before designing around it. If it is not, the fallback is a hand-rolled PKCE flow, which is a materially larger task: say so in your report rather than silently absorbing it.
+1. No OIDC client. The prototype names `@liam-workspace/auth-client`; **it is not installed** — confirm whether it is reachable from this registry before designing around it. If it is not, a hand-rolled PKCE flow against the discovery document above is viable (the endpoints and S256 support are confirmed) but materially larger: say so in your report rather than silently absorbing it.
 2. No `/auth/callback` route to receive `?code=` and exchange it.
 3. No token store. `dev-auth.ts` must become one implementation of an interface, not the only path.
 4. No sign-in screen.
@@ -51,13 +81,14 @@ The backend for this screen is **complete**. Do not rebuild it.
 ### Task 2: The OIDC round trip
 
 - [ ] **Step 1:** Confirm `@liam-workspace/auth-client` installs. If it does not, STOP and report — do not hand-roll PKCE without saying so.
-- [ ] **Step 2: Failing test** for a `startSignIn()` that builds the authorize URL with `client_id`, `redirect_uri`, `response_type=code`, `scope=openid email profile roles`, and an S256 `code_challenge`, and persists the verifier for the callback.
+- [ ] **Step 2: Failing test** for a `startSignIn()` that builds the authorize URL with `client_id`, `redirect_uri`, `response_type=code`, `scope=openid email profile roles offline_access`, and an S256 `code_challenge`, and persists the verifier for the callback. Read the issuer from configuration, never a hardcoded host: dev and production differ by one value and must not differ by a code change.
 - [ ] **Step 3: Failing test** for `completeSignIn(code)`: exchanges the code with the verifier, stores the resulting token, then calls `POST /api/session` **once**, and returns the profile. Assert the ORDER: the session call cannot precede a token.
-- [ ] **Step 4:** Implement both. `POST /api/session` returns `200` for an existing student and `201` when provisioned; both are success. `403` means the email is not on the allowlist — that is a real, renderable state, not an error to swallow.
+- [ ] **Step 4:** Implement both. `POST /api/session` returns `200` for an existing student and `201` when provisioned; both are success. `403` means the email is not on the allowlist — that is a real, renderable state, not an error to swallow, and with two account types it is the likely outcome of signing in with the wrong one.
+- [ ] **Step 5: Failing test** for refresh: an expired access token is refreshed using the stored refresh token WITHOUT sending the child back to sign-in, and a failed refresh falls back to sign-in cleanly. This is the reason `offline_access` is requested; a child must not be ejected from a timed test by an hour-old token.
 
 ### Task 3: The sign-in screen and callback route
 
-- [ ] **Step 1: Failing test** for `packages/app/src/pages/sign-in.tsx`: renders the prototype's title, subtitle and single button; the button calls `startSignIn`.
+- [ ] **Step 1: Failing test** for `packages/app/src/pages/sign-in.tsx`: renders the prototype's title and subtitle, and ONE provider-neutral sign-in button that calls `startSignIn`. Assert the copy does not name Google or Microsoft — the gateway chooses, and naming one of two supported providers is a lie to whoever holds the other.
 - [ ] **Step 2: Failing test** for `packages/app/src/pages/auth.callback.tsx`: on mount with `?code=`, calls `completeSignIn` and navigates to `/`; on `403` renders "this account cannot use this app" without a retry loop; on any other failure offers one honest retry back to sign-in.
 - [ ] **Step 3:** Implement both, six locales.
 
@@ -69,7 +100,7 @@ The backend for this screen is **complete**. Do not rebuild it.
 
 ### Task 5: End to end against the real stack
 
-- [ ] `docker compose up`, `JWKS_URL` pointed at `auth-dev.icovn.me`, sign in as the real family account, confirm `POST /api/session` provisions, `GET /api/me` returns the profile, and a protected route now loads. Record what you observed, not what you expected.
+- [ ] `docker compose up` with `JWKS_URL=https://auth-dev.icovn.me/jwks` and `ALLOWED_EMAILS` covering the family accounts. Sign in with a Google account AND with a Microsoft account; confirm `POST /api/session` provisions each, `GET /api/me` returns the profile, and a protected route loads. Record what you observed, not what you expected — including which provider the gateway offered and in what order.
 
 ## Definition of Done
 

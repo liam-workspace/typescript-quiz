@@ -10,6 +10,15 @@ services:
       dockerfile: Dockerfile
       secrets:
         - node_auth_token
+      # The SPA's auth config is baked at BUILD time -- Vite inlines
+      # `import.meta.env.VITE_*` and never reads it from the container's
+      # environment. Supplying these under `environment:` below would look
+      # right and do nothing. Public values only (issuer, public client id,
+      # redirect URI); the dev token is never passed here.
+      args:
+        VITE_AUTH_ISSUER: ${VITE_AUTH_ISSUER:?set it, e.g. https://auth-dev.icovn.me}
+        VITE_AUTH_CLIENT_ID: ${VITE_AUTH_CLIENT_ID:?set it, e.g. local-dev}
+        VITE_AUTH_REDIRECT_URI: ${VITE_AUTH_REDIRECT_URI:?must match a redirect URI registered with the issuer, exactly}
     # Bound to all interfaces ON PURPOSE, unlike postgres below: the child's
     # iPad reaches this over the home wifi, so loopback would make the app
     # unusable for the one device it exists to serve. What protects it is not

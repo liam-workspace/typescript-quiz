@@ -35,6 +35,31 @@ COPY packages/app ./packages/app
 # 0 and prints "No projects matched the filters", so the image would report a
 # successful build of something it never built. Naming every package this
 # image ships makes an accidental omission loud instead of silent.
+# The SPA's auth configuration must be present HERE, not at container
+# runtime: Vite inlines `import.meta.env.VITE_*` at BUILD time, so a value
+# supplied later is never seen. Without these the image ships a bundle whose
+# issuer/clientId/redirectUri are undefined, and `auth.ts` throws "Auth is
+# not configured" the moment a child taps sign in -- a build defect that
+# presents as an auth bug and cannot be reproduced by any test.
+#
+# ARG, not a secret mount, precisely BECAUSE these three are public: an
+# issuer URL, a public client id and a redirect URI are all visible in the
+# browser's address bar during sign-in and are recoverable from the bundle
+# by anyone who views source. That is what makes them safe here.
+#
+# VITE_DEV_AUTH_TOKEN is deliberately NOT passed and must never be. It is a
+# real credential, an ARG survives in the image history, and a production
+# build inlines what it is given regardless of reachability. It is also
+# unnecessary: `dev-auth.ts` gates on `import.meta.env.DEV`, which Vite
+# replaces with the literal `false` here, so the branch that would read it
+# is dead code in this image.
+ARG VITE_AUTH_ISSUER
+ARG VITE_AUTH_CLIENT_ID
+ARG VITE_AUTH_REDIRECT_URI
+ENV VITE_AUTH_ISSUER=$VITE_AUTH_ISSUER \
+    VITE_AUTH_CLIENT_ID=$VITE_AUTH_CLIENT_ID \
+    VITE_AUTH_REDIRECT_URI=$VITE_AUTH_REDIRECT_URI
+
 RUN pnpm --filter @pp/common build \
     && pnpm --filter @pp/db build \
     && pnpm --filter @pp/server build \

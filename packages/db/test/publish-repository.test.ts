@@ -205,6 +205,184 @@ describe("publishDraftVersion", () => {
     })
   }, 120_000)
 
+  // B6 (external review): a capped image cannot be viewed -- QuestionMedia
+  // only ever renders a plain image when its cap is null, and a capped
+  // mixed image renders text with no image and no claim control. Rather
+  // than shipping content the runner cannot present, publication refuses it
+  // outright, mirroring `missing_media_asset`'s own last-gate reasoning.
+  it("refuses a plain image stimulus with a play cap (image, not audio)", async () => {
+    await withDatabase(async (pool) => {
+      const draft = await insertValidDraft(pool)
+      const mediaAssetId = randomUUID()
+      const stimulusId = randomUUID()
+
+      await pool.query(
+        `INSERT INTO media_asset (id, kind, filename, mime_type, byte_size, checksum)
+         VALUES ($1, 'image', $2, 'image/png', 10, 'checksum')`,
+        [mediaAssetId, `${stimulusId}.png`],
+      )
+      await pool.query(
+        `INSERT INTO stimulus (id, test_version_id, type, media_asset_id, max_plays)
+         VALUES ($1, $2, 'image', $3, 2)`,
+        [stimulusId, draft.versionId, mediaAssetId],
+      )
+      await pool.query(
+        `UPDATE question_group SET stimulus_id = $1 WHERE id = $2`,
+        [stimulusId, draft.groupId],
+      )
+
+      const result = await publishDraftVersion(pool, {
+        testId: draft.testId,
+        now: new Date(),
+      })
+
+      expect(result.ok).toBe(false)
+
+      if (result.ok) {
+        throw new Error("expected publication to fail")
+      }
+
+      expect(codesOf(result.violations)).toEqual(["capped_image_unviewable"])
+      expect(result.violations[0].sectionId).toBe(draft.sectionId)
+    })
+  }, 120_000)
+
+  it("refuses a mixed stimulus whose media resolves to a capped image", async () => {
+    await withDatabase(async (pool) => {
+      const draft = await insertValidDraft(pool)
+      const mediaAssetId = randomUUID()
+      const stimulusId = randomUUID()
+
+      await pool.query(
+        `INSERT INTO media_asset (id, kind, filename, mime_type, byte_size, checksum)
+         VALUES ($1, 'image', $2, 'image/png', 10, 'checksum')`,
+        [mediaAssetId, `${stimulusId}.png`],
+      )
+      await pool.query(
+        `INSERT INTO stimulus (id, test_version_id, type, body_text, media_asset_id, max_plays)
+         VALUES ($1, $2, 'mixed', 'Look at the picture.', $3, 1)`,
+        [stimulusId, draft.versionId, mediaAssetId],
+      )
+      await pool.query(
+        `UPDATE question_group SET stimulus_id = $1 WHERE id = $2`,
+        [stimulusId, draft.groupId],
+      )
+
+      const result = await publishDraftVersion(pool, {
+        testId: draft.testId,
+        now: new Date(),
+      })
+
+      expect(result.ok).toBe(false)
+
+      if (result.ok) {
+        throw new Error("expected publication to fail")
+      }
+
+      expect(codesOf(result.violations)).toEqual(["capped_image_unviewable"])
+    })
+  }, 120_000)
+
+  it("still accepts a capped AUDIO stimulus -- the cap makes sense there, this rule is image-only", async () => {
+    await withDatabase(async (pool) => {
+      const draft = await insertValidDraft(pool)
+      const mediaAssetId = randomUUID()
+      const stimulusId = randomUUID()
+
+      await pool.query(
+        `INSERT INTO media_asset (id, kind, filename, mime_type, byte_size, checksum)
+         VALUES ($1, 'audio', $2, 'audio/mpeg', 10, 'checksum')`,
+        [mediaAssetId, `${stimulusId}.mp3`],
+      )
+      await pool.query(
+        `INSERT INTO stimulus (id, test_version_id, type, media_asset_id, max_plays)
+         VALUES ($1, $2, 'audio', $3, 2)`,
+        [stimulusId, draft.versionId, mediaAssetId],
+      )
+      await pool.query(
+        `UPDATE question_group SET stimulus_id = $1 WHERE id = $2`,
+        [stimulusId, draft.groupId],
+      )
+
+      const result = await publishDraftVersion(pool, {
+        testId: draft.testId,
+        now: new Date(),
+      })
+
+      expect(result.ok).toBe(true)
+    })
+  }, 120_000)
+
+  it("still accepts an UNCAPPED plain image", async () => {
+    await withDatabase(async (pool) => {
+      const draft = await insertValidDraft(pool)
+      const mediaAssetId = randomUUID()
+      const stimulusId = randomUUID()
+
+      await pool.query(
+        `INSERT INTO media_asset (id, kind, filename, mime_type, byte_size, checksum)
+         VALUES ($1, 'image', $2, 'image/png', 10, 'checksum')`,
+        [mediaAssetId, `${stimulusId}.png`],
+      )
+      await pool.query(
+        `INSERT INTO stimulus (id, test_version_id, type, media_asset_id)
+         VALUES ($1, $2, 'image', $3)`,
+        [stimulusId, draft.versionId, mediaAssetId],
+      )
+      await pool.query(
+        `UPDATE question_group SET stimulus_id = $1 WHERE id = $2`,
+        [stimulusId, draft.groupId],
+      )
+
+      const result = await publishDraftVersion(pool, {
+        testId: draft.testId,
+        now: new Date(),
+      })
+
+      expect(result.ok).toBe(true)
+    })
+  }, 120_000)
+
+  it("refuses a plain image capped only via the SECTION's default (no stimulus-level override)", async () => {
+    await withDatabase(async (pool) => {
+      const draft = await insertValidDraft(pool)
+      const mediaAssetId = randomUUID()
+      const stimulusId = randomUUID()
+
+      await pool.query(
+        `UPDATE test_section SET default_max_plays = 3 WHERE id = $1`,
+        [draft.sectionId],
+      )
+      await pool.query(
+        `INSERT INTO media_asset (id, kind, filename, mime_type, byte_size, checksum)
+         VALUES ($1, 'image', $2, 'image/png', 10, 'checksum')`,
+        [mediaAssetId, `${stimulusId}.png`],
+      )
+      await pool.query(
+        `INSERT INTO stimulus (id, test_version_id, type, media_asset_id)
+         VALUES ($1, $2, 'image', $3)`,
+        [stimulusId, draft.versionId, mediaAssetId],
+      )
+      await pool.query(
+        `UPDATE question_group SET stimulus_id = $1 WHERE id = $2`,
+        [stimulusId, draft.groupId],
+      )
+
+      const result = await publishDraftVersion(pool, {
+        testId: draft.testId,
+        now: new Date(),
+      })
+
+      expect(result.ok).toBe(false)
+
+      if (result.ok) {
+        throw new Error("expected publication to fail")
+      }
+
+      expect(codesOf(result.violations)).toEqual(["capped_image_unviewable"])
+    })
+  }, 120_000)
+
   it("returns EVERY violation, not just the first", async () => {
     await withDatabase(async (pool) => {
       const draft = await insertValidDraft(pool)

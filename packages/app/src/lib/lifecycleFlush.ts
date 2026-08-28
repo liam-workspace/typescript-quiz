@@ -1,3 +1,4 @@
+import { getDevBearerToken } from "./dev-auth.js"
 import type { AnswerQueue } from "./answerQueue.js"
 
 /**
@@ -67,10 +68,30 @@ export function registerPagehideFlush(
           })),
         }
 
-        void fetchImpl(urlFor(open.attemptId), {
+        // Same base and credentials every other write in this app uses
+        // (`apiFetch`, `lib/api-client.ts`): production APIs live under
+        // `/api` (`packages/server/src/main.ts`), and every route requires
+        // a bearer token. A prior version of this handler sent neither --
+        // the request landed on an unprefixed, unauthenticated path and
+        // failed twice over, silently, because nothing here awaits or
+        // inspects the response (see the class doc above). `urlFor` keeps
+        // returning the same un-prefixed path shape every other caller of
+        // `apiFetch` uses (e.g. `/attempts/${id}/responses`); the `/api`
+        // prefix is added here, not by the caller, exactly like `apiFetch`
+        // adds it for every other write.
+        const token = getDevBearerToken()
+        const headers: Record<string, string> = {
+          "content-type": "application/json",
+        }
+
+        if (token) {
+          headers.authorization = `Bearer ${token}`
+        }
+
+        void fetchImpl(`/api${urlFor(open.attemptId)}`, {
           method: "PATCH",
           keepalive: true,
-          headers: { "content-type": "application/json" },
+          headers,
           body: JSON.stringify(body),
         })
       })

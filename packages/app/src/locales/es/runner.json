@@ -55,6 +55,7 @@
   "runner.next": "Siguiente",
   "runner.handIn": "Entregar",
   "runner.savedIndicator": "Guardado",
+  "runner.saveFailed": "Esta respuesta no se guardó. Avisa a un adulto, por favor.",
   "runner.sectionChip.listening": "Comprensión auditiva",
   "runner.sectionChip.reading": "Lectura",
   "reading.passageQuestions": "Lectura {{passageNumber}} · preguntas {{first}}–{{last}}",

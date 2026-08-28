@@ -55,6 +55,7 @@
   "runner.next": "Next",
   "runner.handIn": "Hand in",
   "runner.savedIndicator": "Saved",
+  "runner.saveFailed": "This answer didn't save. Please tell an adult.",
   "runner.sectionChip.listening": "Listening",
   "runner.sectionChip.reading": "Reading",
   "reading.passageQuestions": "Passage {{passageNumber}} · questions {{first}}–{{last}}",

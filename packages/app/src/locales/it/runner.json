@@ -55,6 +55,7 @@
   "runner.next": "Avanti",
   "runner.handIn": "Consegna",
   "runner.savedIndicator": "Salvato",
+  "runner.saveFailed": "Questa risposta non è stata salvata. Avvisa un adulto, per favore.",
   "runner.sectionChip.listening": "Ascolto",
   "runner.sectionChip.reading": "Lettura",
   "reading.passageQuestions": "Brano {{passageNumber}} · domande {{first}}–{{last}}",

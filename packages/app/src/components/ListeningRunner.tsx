@@ -49,6 +49,13 @@ export interface ListeningRunnerProps {
   // would even be able to help.
   readonly onAudioError: () => void
   readonly audioFailed: boolean
+  // Defect B5: true once the server has TERMINALLY refused the CURRENT
+  // question's queued answer (FlushController's per-item "rejected",
+  // markTerminalRejection'd so it is never silently resent). The selection
+  // stays shown -- see `selectedChoiceIds` -- but the child must be told it
+  // did not actually save, honestly, rather than trusting an optimistic UI
+  // the server has already disagreed with.
+  readonly saveFailed: boolean
   readonly questionCount: number
   // One entry per question in the CURRENT section, in section order --
   // "the section's own question ordinals," not 1..questionCount. Read-only:
@@ -80,6 +87,7 @@ export function ListeningRunner({
   onAudioEnded,
   onAudioError,
   audioFailed,
+  saveFailed,
   questionCount,
   pips,
   hasNext,
@@ -131,7 +139,19 @@ export function ListeningRunner({
             onClaimPlay={onClaimPlay}
             playing={audioSrc !== null}
           />
-          {stimulus.type === "audio" && audioSrc ? (
+          {/* Defect A3: `mixed` means text AND media together, and its own
+              `type` never says which -- only `mediaKind` does (mirrors
+              QuestionMedia's own branch, and the review screen's
+              showsImage/showsAudio). A `mixed` stimulus with
+              `mediaKind: "audio"` claims a play exactly like a pure `audio`
+              one (QuestionMedia renders the same Play button for both), so
+              it must mount the SAME `<audio>` element to actually play the
+              granted URL -- this used to only ever check
+              `stimulus.type === "audio"`, so a mixed-audio claim spent a
+              capped, irreplaceable play and nothing sounded. */}
+          {(stimulus.type === "audio" ||
+            (stimulus.type === "mixed" && stimulus.mediaKind === "audio")) &&
+          audioSrc ? (
             <audio
               data-testid="audio-player"
               src={audioSrc}
@@ -140,7 +160,9 @@ export function ListeningRunner({
               onError={onAudioError}
             />
           ) : null}
-          {stimulus.type === "audio" && audioFailed ? (
+          {(stimulus.type === "audio" ||
+            (stimulus.type === "mixed" && stimulus.mediaKind === "audio")) &&
+          audioFailed ? (
             <p role="alert">
               {stimulus.maxPlays !== null &&
               stimulus.playsUsed >= stimulus.maxPlays
@@ -159,6 +181,11 @@ export function ListeningRunner({
         onSelect={onSelectChoice}
         locked={locked}
       />
+      {saveFailed ? (
+        <p role="alert" data-testid="save-failed-notice">
+          {t("runner.saveFailed")}
+        </p>
+      ) : null}
 
       {/* No Previous button: this component is only ever rendered for a
           listening section, which spec section 1.4 requires to run

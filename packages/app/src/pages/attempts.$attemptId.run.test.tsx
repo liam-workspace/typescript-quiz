@@ -108,6 +108,18 @@ const positionWasWritten = (): void => {
   expect(mockSetPosition).toHaveBeenCalledOnce()
 }
 
+/**
+ * Hoisted for the same reason as `fetchWasCalled`/`positionWasWritten`
+ * above -- used by the B3 reload-recovery describe block below, which is
+ * already two describes deep.
+ */
+const catRadioIsChecked = (): void => {
+  expect(screen.getByRole("radio", { name: "A cat" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  )
+}
+
 const cappedAudio: CappedStimulusWire = {
   id: "stim-1",
   type: "audio",
@@ -763,6 +775,83 @@ describe("RunScreen", () => {
     })
   })
 
+  // Defect B5: a terminal per-item rejection used to reach this page and be
+  // discarded -- FlushController already classified it correctly (never
+  // resent, per spec §5 rule 5's "stop dead"), but nothing told the child.
+  // The selection stays visibly selected (it is NOT reverted -- the child
+  // did make that choice, and reverting it silently would be its own kind
+  // of dishonesty), alongside an honest notice that it did not save.
+  it("tells the child when the server terminally rejects their answer", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            results: [{ questionId: "q-1", status: "rejected" }],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      ),
+    )
+    const user = userEvent.setup()
+
+    renderRunScreen()
+
+    await user.click(screen.getByRole("radio", { name: "A cat" }))
+
+    expect(await screen.findByTestId("save-failed-notice")).toHaveTextContent(
+      "didn't save",
+    )
+    // The selection itself is untouched -- still visibly checked.
+    expect(screen.getByRole("radio", { name: "A cat" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    )
+  })
+
+  it("clears an earlier save-failed notice once the child changes that answer again", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              results: [{ questionId: "q-1", status: "rejected" }],
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+        )
+        .mockResolvedValue(
+          new Response(JSON.stringify({ results: [] }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+        ),
+    )
+    const user = userEvent.setup()
+    const [section] = listeningEnvelope.sections
+    // Answer changes must be allowed for this test to actually re-tap the
+    // SAME question a second time -- `allowAnswerChange: false` (the
+    // default fixture) locks it after the first selection, which is a
+    // different scenario this test is not about.
+    const envelope: RunnerEnvelope = {
+      ...listeningEnvelope,
+      sections: [{ ...section, allowAnswerChange: true }],
+    }
+
+    renderRunScreen(envelope)
+
+    await user.click(screen.getByRole("radio", { name: "A cat" }))
+    expect(await screen.findByTestId("save-failed-notice")).toBeInTheDocument()
+
+    await user.click(screen.getByRole("radio", { name: "A dog" }))
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("save-failed-notice")).not.toBeInTheDocument()
+    })
+  })
+
   // The half of the multi_choice defect that survived the first fix.
   // `locked` fired on the FIRST selection, which is correct for
   // single_choice ("your answer is final") but left a multi_choice question
@@ -863,6 +952,102 @@ describe("RunScreen", () => {
     expect(queued).toMatchObject({
       questionId: "q-1",
       selectedChoiceIds: ["c-2"],
+    })
+  })
+
+  // Defect B3: the queue opened on mount was never READ from -- an answer
+  // recorded before a crash/reload survived in IndexedDB (that half of
+  // "durable before sent" already worked) but stayed invisible to the
+  // screen and was never re-sent, because `responses` state was seeded
+  // solely from `envelope.responses`. A reload's own envelope naturally
+  // carries no record of an answer the server never acknowledged, so this
+  // simulates exactly that: an item already sitting in the queue when
+  // RunScreen mounts, with an envelope that (correctly, honestly) knows
+  // nothing about it yet.
+  describe("reload recovery (B3): restoring what the queue already held on mount", () => {
+    it("shows a queued-but-unacked answer as selected, not blank", async () => {
+      await getQueue().recordAnswer(
+        {
+          attemptId: "attempt-1",
+          sectionId: "section-listening",
+          questionId: "q-1",
+          selectedChoiceIds: ["c-2"],
+          timeSpentMs: null,
+        },
+        new Date("2026-08-27T09:00:00.000Z"),
+      )
+
+      renderRunScreen()
+
+      await waitFor(catRadioIsChecked)
+    })
+
+    it("re-flushes the restored answer to the server without waiting for another tap", async () => {
+      await getQueue().recordAnswer(
+        {
+          attemptId: "attempt-1",
+          sectionId: "section-listening",
+          questionId: "q-1",
+          selectedChoiceIds: ["c-2"],
+          timeSpentMs: null,
+        },
+        new Date("2026-08-27T09:00:00.000Z"),
+      )
+
+      renderRunScreen()
+
+      await waitFor(fetchWasCalled)
+
+      const [call] = vi.mocked(fetch).mock.calls
+      const [url, init] = call
+
+      expect(url).toBe("/api/attempts/attempt-1/responses")
+      const body: unknown = JSON.parse(
+        (init?.body as string | undefined) ?? "null",
+      )
+      expect(body).toMatchObject({
+        responses: [
+          expect.objectContaining({
+            questionId: "q-1",
+            selectedChoiceIds: ["c-2"],
+          }),
+        ],
+      })
+    })
+
+    it("does not clobber a queued answer with an older server-known response for the same question", async () => {
+      await getQueue().recordAnswer(
+        {
+          attemptId: "attempt-1",
+          sectionId: "section-listening",
+          questionId: "q-1",
+          selectedChoiceIds: ["c-2"],
+          timeSpentMs: null,
+        },
+        new Date("2026-08-27T09:00:00.000Z"),
+      )
+
+      // The server's own envelope may still carry a STALE answer for this
+      // question (e.g. the last one it actually acked, before the queued
+      // one above was ever sent) -- the locally queued value must win,
+      // since it is the more recent one the child actually gave.
+      renderRunScreen({
+        ...listeningEnvelope,
+        responses: [
+          {
+            questionId: "q-1",
+            selectedChoiceIds: ["c-1"],
+            clientInstanceId: "device-1",
+            seq: 1,
+          },
+        ],
+      })
+
+      await waitFor(catRadioIsChecked)
+      expect(screen.getByRole("radio", { name: "A dog" })).toHaveAttribute(
+        "aria-checked",
+        "false",
+      )
     })
   })
 

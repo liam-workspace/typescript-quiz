@@ -194,11 +194,19 @@ describe("FlushController", () => {
       scheduler.schedule(ms),
     )
 
-    await controller.flushSection("a1", "s1", "/attempts/a1/responses")
+    const result = await controller.flushSection(
+      "a1",
+      "s1",
+      "/attempts/a1/responses",
+    )
 
     const remaining = await queue.snapshotForSection("a1", "s1")
     expect(remaining).toHaveLength(0)
     expect(patch).toHaveBeenCalledTimes(1)
+    // B5: the caller must be told WHICH question was terminally rejected --
+    // markTerminalRejection alone silences the queue, but only the return
+    // value gives the page anything to surface to the child.
+    expect(result.rejectedQuestionIds).toEqual(["q1"])
     await queue.close()
   })
 

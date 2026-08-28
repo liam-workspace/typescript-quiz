@@ -56,6 +56,7 @@ const baseProps = {
   selectedChoiceIds: [],
   locked: false,
   onSelectChoice: vi.fn(),
+  saveFailed: false,
   questionCount: 20,
   pips,
   hasPrevious: true,
@@ -264,6 +265,26 @@ describe("ReadingRunner", () => {
     expect(screen.getByRole("link", { name: "View result" })).toHaveAttribute(
       "href",
       "/attempts/attempt-1/result",
+    )
+  })
+
+  // Defect B5, mirrors ListeningRunner.test.tsx's matching pair -- see that
+  // file's doc comment.
+  it("shows nothing about a save failure until the page says one happened", () => {
+    render(<ReadingRunner {...baseProps} saveFailed={false} />)
+
+    expect(screen.queryByTestId("save-failed-notice")).not.toBeInTheDocument()
+  })
+
+  it("tells the child their answer did not save when the page reports a terminal rejection", () => {
+    render(<ReadingRunner {...baseProps} saveFailed />)
+
+    expect(screen.getByTestId("save-failed-notice")).toHaveAttribute(
+      "role",
+      "alert",
+    )
+    expect(screen.getByTestId("save-failed-notice")).toHaveTextContent(
+      "didn't save",
     )
   })
 })

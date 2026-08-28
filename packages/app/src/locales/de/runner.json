@@ -55,6 +55,7 @@
   "runner.next": "Weiter",
   "runner.handIn": "Abgeben",
   "runner.savedIndicator": "Gespeichert",
+  "runner.saveFailed": "Diese Antwort wurde nicht gespeichert. Bitte sag einem Erwachsenen Bescheid.",
   "runner.sectionChip.listening": "Hören",
   "runner.sectionChip.reading": "Lesen",
   "reading.passageQuestions": "Text {{passageNumber}} · Fragen {{first}}–{{last}}",

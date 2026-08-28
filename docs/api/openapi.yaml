@@ -738,8 +738,9 @@ paths:
       description: |
         Runs the cross-row checks column constraints cannot express — every question has at least
         two choices, a `single_choice` question has exactly one correct choice, every cited media
-        asset exists — then marks the version published and immutable. Attempts pin versions, so
-        after this point the content can never change under a recorded score.
+        asset exists, no image stimulus (plain or mixed-media) is left capped since the runner has
+        no way to present one — then marks the version published and immutable. Attempts pin
+        versions, so after this point the content can never change under a recorded score.
       parameters:
         - name: testId
           in: path
@@ -789,6 +790,7 @@ paths:
                                   wrong_correct_count,
                                   missing_media_asset,
                                   duration_mismatch,
+                                  capped_image_unviewable,
                                 ]
                             detail: { type: string }
 

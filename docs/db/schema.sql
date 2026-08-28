@@ -761,7 +761,25 @@ CREATE OR REPLACE VIEW publication_violation AS
            || 's but the test declares ' || tv.duration_seconds || 's'
       FROM test_version tv LEFT JOIN test_section ts ON ts.test_version_id = tv.id
      GROUP BY tv.id, tv.duration_seconds
-    HAVING COALESCE(sum(ts.duration_seconds), 0) <> tv.duration_seconds;
+    HAVING COALESCE(sum(ts.duration_seconds), 0) <> tv.duration_seconds
+
+    UNION ALL
+    -- B6 (external review, migration 1004): an image (plain, or mixed-media
+    -- resolving to an image) that ends up capped can never be viewed -- the
+    -- runner only ever grants access to a CAPPED stimulus's bytes through
+    -- the claim-then-play flow (`POST /play`), which no image UI
+    -- implements. The effective cap is the section default UNLESS the
+    -- stimulus overrides it, the same COALESCE `media-play.repository.ts`'s
+    -- `isFilenameCapped` already uses.
+    SELECT s.test_version_id, NULL::uuid, ts.id,
+           'capped_image_unviewable',
+           'A capped image stimulus in section ' || ts.title || ' cannot be presented by the runner'
+      FROM stimulus s
+      JOIN question_group g   ON g.stimulus_id = s.id
+      JOIN test_section ts    ON ts.id = g.test_section_id
+      LEFT JOIN media_asset ma ON ma.id = s.media_asset_id
+     WHERE COALESCE(s.max_plays, ts.default_max_plays) IS NOT NULL
+       AND (s.type = 'image' OR (s.type = 'mixed' AND ma.kind = 'image'));
 
 -- `missing_media_asset` is absent by construction: stimulus.media_asset_id
 -- is a real foreign key, so an unresolvable asset cannot be stored in the

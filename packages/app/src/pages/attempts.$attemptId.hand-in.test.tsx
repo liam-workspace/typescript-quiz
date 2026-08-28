@@ -89,7 +89,19 @@ describe("HandInScreen", () => {
     vi.unstubAllGlobals()
   })
 
-  it("disables Hand in while the local queue is non-empty", async () => {
+  // Defect B4: this test used to pin the OPPOSITE assertion --
+  // `toBeDisabled()` -- as correct. That made it the smoking gun for the
+  // bug the external review found: `buildSubmitRemainder` already reads the
+  // queue LIVE at submit time and the server's own `POST /submit` already
+  // carries and applies that remainder atomically (`reconcileFinalFlush`
+  // below; openapi.yaml's `finalFlush`), so gating the BUTTON on the same
+  // queue being empty is pure redundancy that turns into real harm the
+  // moment a flush never lands (offline, a slow network, a server hiccup):
+  // the button is disabled by a snapshot taken once on mount and never
+  // rechecked, so "Waiting…" never goes away and the child cannot use the
+  // atomic path the server was built for. Hand-in must let submit carry the
+  // remainder rather than block on it.
+  it("keeps Hand in enabled even while the local queue is non-empty -- submit carries the remainder", async () => {
     const queue = await AnswerQueue.open(DB_NAME)
 
     try {
@@ -113,7 +125,15 @@ describe("HandInScreen", () => {
         />,
       )
 
-      expect(await screen.findByTestId("hand-in-button")).toBeDisabled()
+      await vi.waitFor(() => {
+        expect(screen.getByTestId("hand-in-button")).toBeEnabled()
+      })
+
+      // The child is still told a sync is in flight -- this is informational
+      // now, not a block.
+      expect(
+        await screen.findByRole("status", {}, { timeout: 2000 }),
+      ).toHaveTextContent("Waiting for your last answers to save")
     } finally {
       await queue.close()
     }

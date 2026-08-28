@@ -113,8 +113,19 @@ export function HandInScreen({
   navigate,
 }: HandInScreenProps) {
   const { t } = useTranslation("runner")
-  // Null = still checking; the button stays disabled until this resolves,
-  // so it never flashes enabled before the queue has actually been read.
+  // Defect B4: `pendingCount` used to also gate the Hand-in BUTTON --
+  // disabled whenever it was non-zero, and never rechecked after the
+  // mount-time snapshot that set it. `buildSubmitRemainder` (called fresh,
+  // live, in `handleSubmit` below) already reads the queue at the moment
+  // Hand in is actually pressed, and `POST /submit`'s `finalFlush` already
+  // applies that remainder atomically, server-side -- exactly the path
+  // spec S5 built so the client never has to guarantee an empty queue
+  // before submitting. Gating the button on the same condition the server
+  // already handles left a child stuck on "Waiting…" forever the moment a
+  // flush never landed (offline, a slow network, a server hiccup), unable
+  // to reach the one path that WOULD have gotten their answers in. Now
+  // `pendingCount` is purely informational (the "Waiting for your last
+  // answers to save" notice below); it never disables anything.
   const [pendingCount, setPendingCount] = useState<number | null>(null)
   const [outcome, setOutcome] = useState<Outcome>({ status: "idle" })
 
@@ -219,8 +230,9 @@ export function HandInScreen({
 
   const unansweredCount = envelope.unansweredOrdinals.length
   const minutesLeft = computeMinutesLeft(envelope)
-  const disabled =
-    pendingCount === null || pendingCount > 0 || outcome.status === "submitting"
+  // Not gated on `pendingCount` -- see its declaration above. Submitting
+  // twice concurrently is the only thing this still has to prevent.
+  const disabled = outcome.status === "submitting"
 
   return (
     <div>

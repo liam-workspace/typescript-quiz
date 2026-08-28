@@ -149,6 +149,16 @@ export function RunScreen({
   >({})
   const [expired, setExpired] = useState<ExpiredState | null>(null)
   const [panel, setPanel] = useState<RunnerPanel>(null)
+  // Defect B5 fix: a per-item terminal rejection (FlushController's
+  // `rejectedQuestionIds` -- an `answer_change_not_allowed`, an unknown
+  // question, anything spec §5 rule 5 says "stop dead" on) used to vanish
+  // silently: the queue stopped resending it and nothing else ever told the
+  // child. A questionId in this set means exactly that -- the child's
+  // selection is still shown, but the server has refused to save it, and
+  // they need to know before time runs out on a fix.
+  const [saveFailedQuestionIds, setSaveFailedQuestionIds] = useState<
+    Set<string>
+  >(new Set())
 
   // Constructed once per mount, tied to this attempt's `queue` prop (opened
   // once by the route loader, not re-opened on every render) -- the lazy
@@ -176,6 +186,126 @@ export function RunScreen({
       ? { attemptId, sectionId: section.id }
       : null
   })
+
+  // Shared by every call site that can learn about a newly (or
+  // previously) terminally rejected answer -- the live tap-flush below, the
+  // mount-time flush, and the mount-time read of rejections a PRIOR session
+  // never got to surface. `setState`'s functional form makes this safe to
+  // call from any of them without a stale closure over the current set.
+  const addSaveFailedQuestionIds = (questionIds: readonly string[]): void => {
+    if (questionIds.length === 0) {
+      return
+    }
+
+    setSaveFailedQuestionIds((prev) => new Set([...prev, ...questionIds]))
+  }
+
+  // Defect B3 fix: a reload opens the SAME queue the loader's AnswerQueue
+  // was already holding answers in (IndexedDB survives the reload; the
+  // queue does not), but until now nothing ever read them back out. An
+  // answer recorded before a crash/reload was durable on disk yet invisible
+  // on screen -- gone from the selected choice, gone from the navigator's
+  // answered count -- and, worse, never resent: `envelope.responses` is
+  // necessarily silent about an answer the server never acknowledged, so
+  // there is no other path back to a visible, syncing state for it.
+  //
+  // Runs once on mount, not on every render: `queue` and `attemptId` are
+  // stable for the component's lifetime (the loader opens the queue once
+  // per route entry; `attemptId` is a route param), so this never
+  // re-subscribes.
+  useEffect(() => {
+    let cancelled = false
+
+    void queue
+      .snapshotForAttempt(attemptId)
+      .then((items) => {
+        if (cancelled || items.length === 0) {
+          return
+        }
+
+        // A locally queued answer is, by construction, more recent than
+        // whatever `envelope.responses` says for the same question -- it is
+        // queued precisely because the server has not acknowledged it yet
+        // (or acknowledged something older). It must win the merge, not be
+        // merged away by the initial server-seeded state.
+        setResponses((prev) => {
+          const next = new Map(prev)
+
+          for (const item of items) {
+            next.set(item.questionId, item.selectedChoiceIds)
+          }
+
+          return next
+        })
+      })
+      .catch(() => {
+        // Deliberately not re-thrown: a queue closed out from under this
+        // read (e.g. on unmount, racing the promise settling) must not
+        // surface as an unhandled rejection -- matches handleSelectChoice's
+        // own `.catch()` below for the same reason.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [queue, attemptId])
+
+  // Defect B5's other half: a terminal rejection from a PRIOR session (the
+  // tab closed, or the app was killed, before the child ever saw a notice
+  // about it) is still sitting in the queue -- `markTerminalRejection`
+  // never deletes the record, only excludes it from ordinary snapshots --
+  // so it would otherwise stay invisible forever. Read once on mount,
+  // alongside the restore above.
+  useEffect(() => {
+    let cancelled = false
+
+    void queue
+      .terminalRejectionsForAttempt(attemptId)
+      .then((questionIds) => {
+        if (!cancelled) {
+          addSaveFailedQuestionIds(questionIds)
+        }
+      })
+      .catch(() => {
+        // Deliberately not re-thrown -- see the restore effect above.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [queue, attemptId])
+
+  // Companion to the restore above: whatever the queue is still holding for
+  // the section open right now must be resent on mount, not left waiting
+  // for the next tap, the next pagehide, or hand-in to notice it. `section`
+  // is undefined only before the "no section entered yet" redirect below
+  // fires, in which case there is nothing to flush yet.
+  useEffect(() => {
+    if (!section) {
+      return
+    }
+
+    let cancelled = false
+
+    void controller
+      .flushSection(attemptId, section.id, `/attempts/${attemptId}/responses`)
+      .then((result) => {
+        if (!cancelled) {
+          addSaveFailedQuestionIds(result.rejectedQuestionIds)
+        }
+      })
+      .catch(() => {
+        // Deliberately not re-thrown -- see the restore effect above.
+      })
+
+    return () => {
+      cancelled = true
+    }
+    // Section's identity is stable across re-renders for a fixed
+    // envelope/currentSectionId (envelope.sections.find on an unchanged
+    // array), so this only re-runs on an actual section change, not on
+    // every keystroke-driven re-render.
+  }, [queue, attemptId, controller, section])
 
   // Spec §5 rule 6, "Flush at end of life": a backgrounded/closed tab must
   // not lose whatever the queue is still holding for the open section. The
@@ -270,6 +400,20 @@ export function RunScreen({
     const nextChoiceIds = nextChoiceIdsFor(choiceId)
 
     setResponses((prev) => new Map(prev).set(question.id, nextChoiceIds))
+    // A fresh tap is a genuine new attempt to save this answer --
+    // `recordAnswer` below writes a brand-new record with
+    // `terminalRejection: false`, so any earlier "did not save" notice for
+    // THIS question is stale the instant the child changes it.
+    setSaveFailedQuestionIds((prev) => {
+      if (!prev.has(question.id)) {
+        return prev
+      }
+
+      const next = new Set(prev)
+      next.delete(question.id)
+
+      return next
+    })
 
     void queue
       .recordAnswer(
@@ -289,6 +433,16 @@ export function RunScreen({
           `/attempts/${attemptId}/responses`,
         ),
       )
+      .then((result) => {
+        // Defect B5 fix: a terminal per-item rejection (spec §5 rule 5's
+        // "stop dead") used to reach here and be thrown away -- the queue
+        // stopped resending it, correctly, but nothing ever told the
+        // child. This is the one place that DOES surface it: retry/backoff
+        // successes and in-flight failures still resolve silently (see the
+        // `.catch()` below), because only a settled, terminal rejection is
+        // ever actionable enough to interrupt the child with.
+        addSaveFailedQuestionIds(result.rejectedQuestionIds)
+      })
       .catch(() => {
         // Deliberately not re-thrown, and deliberately not surfaced as UI
         // state (unlike moveToQuestion/handleNavigatorNavigate's own
@@ -516,6 +670,7 @@ export function RunScreen({
         onAudioEnded={handleAudioEnded}
         onAudioError={handleAudioError}
         audioFailed={playState.status === "failed"}
+        saveFailed={saveFailedQuestionIds.has(question.id)}
         questionCount={envelope.questionCount}
         pips={pips}
         hasNext={Boolean(nextEntry)}
@@ -545,6 +700,7 @@ export function RunScreen({
         selectedChoiceIds={selectedChoiceIds}
         locked={locked}
         onSelectChoice={handleSelectChoice}
+        saveFailed={saveFailedQuestionIds.has(question.id)}
         questionCount={envelope.questionCount}
         pips={pips}
         hasPrevious={Boolean(previousEntry)}

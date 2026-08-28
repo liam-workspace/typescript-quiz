@@ -202,6 +202,30 @@ export class AnswerQueue {
   }
 
   /**
+   * B5: the questionIds `markTerminalRejection` has already flagged for
+   * this attempt -- kept in the store (never deleted), just excluded from
+   * every ordinary snapshot above so a terminal rejection is never resent.
+   * A reload/crash between the rejection and the child seeing any UI about
+   * it would otherwise lose that notice for good, since the record itself
+   * is invisible to `snapshotForAttempt`/`snapshotForSection`. Read on
+   * mount (`attempts.$attemptId.run.tsx`) alongside the B3 restore, so a
+   * rejection from an earlier session is still surfaced honestly, not just
+   * one caught live in the same session it happened.
+   */
+  async terminalRejectionsForAttempt(attemptId: string): Promise<string[]> {
+    const tx = this.db.transaction(QUEUE_STORE, "readonly")
+    const all = await promisify(
+      tx.objectStore(QUEUE_STORE).getAll() as IDBRequest<QueuedAnswer[]>,
+    )
+
+    return all
+      .filter(
+        (record) => record.attemptId === attemptId && record.terminalRejection,
+      )
+      .map((record) => record.questionId)
+  }
+
+  /**
    * Cleared only on a per-item ack, never on request completion (spec §5
    * rule 1) -- and only when the ack is not stale relative to what is
    * queued right now: a newer local edit made while the ack was in flight

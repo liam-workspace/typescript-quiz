@@ -54,6 +54,7 @@
   "runner.next": "次へ",
   "runner.handIn": "提出する",
   "runner.savedIndicator": "保存済み",
+  "runner.saveFailed": "この答えは保存されませんでした。おとなの人に伝えてください。",
   "runner.sectionChip.listening": "リスニング",
   "runner.sectionChip.reading": "リーディング",
   "reading.passageQuestions": "パッセージ{{passageNumber}} · 問題{{first}}–{{last}}",

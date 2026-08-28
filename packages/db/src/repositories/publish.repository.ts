@@ -30,20 +30,30 @@ interface MissingMediaRow {
 }
 
 /**
- * `too_few_choices`, `wrong_correct_count` and `duration_mismatch` are read
- * from `publication_violation` (migration 1003), not recomputed here: that
- * view already implements checks 1-3 and this repository's own test suite
- * would otherwise duplicate migration 1003's coverage. `playback_loosened`,
- * the view's fourth rule, is filtered out -- it is not one of the four
- * `rule` values `docs/api/openapi.yaml` declares for this endpoint, and
- * Zod's `sectionSchema` (interchange/test-document.ts) already refuses a
- * loosened stimulus at import time, so nothing reaches the database without
- * going through that check regardless.
+ * `too_few_choices`, `wrong_correct_count`, `duration_mismatch` and
+ * `capped_image_unviewable` are read from `publication_violation`
+ * (migrations 1003 and 1004), not recomputed here: that view already
+ * implements these checks and this repository's own test suite would
+ * otherwise duplicate the view's coverage. `playback_loosened`, the view's
+ * fifth rule, is filtered out -- it is not one of the `rule` values
+ * `docs/api/openapi.yaml` declares for this endpoint, and Zod's
+ * `sectionSchema` (interchange/test-document.ts) already refuses a
+ * loosened stimulus at import time, so nothing reaches the database
+ * without going through that check regardless.
+ *
+ * `capped_image_unviewable` (B6, external review) has no matching import-
+ * time Zod check: the interchange document's `stimulus.type` alone cannot
+ * tell a `mixed` stimulus's media kind (that is only known once a real
+ * media asset is uploaded and joined in), so the view -- which CAN join
+ * `media_asset` -- is the single source of truth for this rule, checked
+ * here at the last gate before immutability, exactly like
+ * `missing_media_asset` below.
  */
 const VIEW_RULES = [
   "too_few_choices",
   "wrong_correct_count",
   "duration_mismatch",
+  "capped_image_unviewable",
 ]
 
 /**

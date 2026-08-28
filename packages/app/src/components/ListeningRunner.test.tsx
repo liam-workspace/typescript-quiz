@@ -52,6 +52,7 @@ const baseProps = {
   onAudioEnded: vi.fn(),
   onAudioError: vi.fn(),
   audioFailed: false,
+  saveFailed: false,
   questionCount: 20,
   pips,
   hasNext: true,
@@ -136,6 +137,43 @@ describe("ListeningRunner", () => {
     )
   })
 
+  // Defect A3: QuestionMedia renders a body and Play button for an
+  // audio-backed `mixed` stimulus (its own test file covers that), but this
+  // component only ever mounted the actual `<audio>` element for
+  // `stimulus.type === "audio"` -- never `"mixed"` with `mediaKind ===
+  // "audio"`. The claim (`POST /play`) still spent a capped, irreplaceable
+  // play; the granted URL was stored; and nothing ever sounded. The blank
+  // panel A3's first pass fixed became a dead button instead.
+  it("mounts and plays the granted audio for a mixed (text + audio) stimulus, not just a pure-audio one", () => {
+    render(
+      <ListeningRunner
+        {...baseProps}
+        stimulus={{ ...cappedAudio, type: "mixed", mediaKind: "audio" }}
+        audioSrc="/api/media/mixed1.mp3?exp=1&sig=x"
+      />,
+    )
+
+    expect(screen.getByTestId("audio-player")).toHaveAttribute(
+      "src",
+      "/api/media/mixed1.mp3?exp=1&sig=x",
+    )
+  })
+
+  it("tells the child about a failed load for a mixed (text + audio) stimulus too", () => {
+    render(
+      <ListeningRunner
+        {...baseProps}
+        stimulus={{ ...cappedAudio, type: "mixed", mediaKind: "audio" }}
+        audioSrc={null}
+        audioFailed
+      />,
+    )
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "tap Play recording to try again",
+    )
+  })
+
   // Defect fix: the `<audio>` element previously had no `onError` at all,
   // so a stalled or failed load left the page with no way to hear about it
   // and the play button stuck disabled forever (see run.tsx's `PlayState`
@@ -164,6 +202,27 @@ describe("ListeningRunner", () => {
     render(<ListeningRunner {...baseProps} audioFailed={false} />)
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+  })
+
+  // Defect B5: a terminal per-item rejection used to reach the page and be
+  // thrown away silently -- the selection stayed on screen, optimistic, with
+  // nothing telling the child the server had actually refused it.
+  it("shows nothing about a save failure until the page says one happened", () => {
+    render(<ListeningRunner {...baseProps} saveFailed={false} />)
+
+    expect(screen.queryByTestId("save-failed-notice")).not.toBeInTheDocument()
+  })
+
+  it("tells the child their answer did not save when the page reports a terminal rejection", () => {
+    render(<ListeningRunner {...baseProps} saveFailed />)
+
+    expect(screen.getByTestId("save-failed-notice")).toHaveAttribute(
+      "role",
+      "alert",
+    )
+    expect(screen.getByTestId("save-failed-notice")).toHaveTextContent(
+      "didn't save",
+    )
   })
 
   it("tells the child their play was used and offers a retry when plays remain", () => {

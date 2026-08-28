@@ -57,7 +57,7 @@ export class FlushController {
     sectionId: string,
     url: string,
     maxAttempts = DEFAULT_MAX_ATTEMPTS,
-  ): Promise<{ flushed: boolean }> {
+  ): Promise<{ flushed: boolean; rejectedQuestionIds: string[] }> {
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       // Re-read the queue on every attempt, not just once before the loop:
       // it is the section's whole current snapshot that must ride along on
@@ -66,7 +66,7 @@ export class FlushController {
       const items = await this.queue.snapshotForSection(attemptId, sectionId)
 
       if (items.length === 0) {
-        return { flushed: true }
+        return { flushed: true, rejectedQuestionIds: [] }
       }
 
       const body = {
@@ -85,9 +85,13 @@ export class FlushController {
 
       if (response.kind === "ok") {
         // eslint-disable-next-line no-await-in-loop
-        await this.reconcile(attemptId, items, response.body.results)
+        const rejectedQuestionIds = await this.reconcile(
+          attemptId,
+          items,
+          response.body.results,
+        )
 
-        return { flushed: true }
+        return { flushed: true, rejectedQuestionIds }
       }
 
       const classification = classifyForRetry(
@@ -100,15 +104,18 @@ export class FlushController {
       if (!classification.retry) {
         // Envelope-level failure: nothing was settled. The whole snapshot
         // stays queued -- it is neither acked nor marked terminal -- so the
-        // next flush carries it again.
-        return { flushed: false }
+        // next flush carries it again. Not a per-item terminal rejection
+        // either (B5): the ENVELOPE was refused, not any one answer, so
+        // there is nothing question-specific to report here -- the caller
+        // still sees `flushed: false`.
+        return { flushed: false, rejectedQuestionIds: [] }
       }
 
       // eslint-disable-next-line no-await-in-loop
       await this.scheduler(classification.backoffMs)
     }
 
-    return { flushed: false }
+    return { flushed: false, rejectedQuestionIds: [] }
   }
 
   /**
@@ -131,10 +138,11 @@ export class FlushController {
     attemptId: string,
     items: Array<{ questionId: string; seq: number }>,
     results: ItemAckResult[],
-  ): Promise<void> {
+  ): Promise<string[]> {
     const seqByQuestion = new Map(
       items.map((item) => [item.questionId, item.seq]),
     )
+    const rejectedQuestionIds: string[] = []
 
     for (const result of results) {
       const seq = seqByQuestion.get(result.questionId)
@@ -149,7 +157,16 @@ export class FlushController {
       } else {
         // eslint-disable-next-line no-await-in-loop
         await this.queue.markTerminalRejection(attemptId, result.questionId)
+        // B5: a terminal per-item rejection used to be silent -- the queue
+        // stopped resending it (correctly: retrying a terminal rejection is
+        // the storm spec §5.5 warns about) but nothing ever told the child
+        // their answer did not save. Reported back to the caller so it can
+        // surface this honestly instead of leaving an optimistic selection
+        // on screen that the server will never grade.
+        rejectedQuestionIds.push(result.questionId)
       }
     }
+
+    return rejectedQuestionIds
   }
 }

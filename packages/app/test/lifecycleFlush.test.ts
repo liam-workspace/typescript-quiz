@@ -1,5 +1,5 @@
 import "fake-indexeddb/auto"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { AnswerQueue } from "../src/lib/answerQueue.js"
 import {
   buildSubmitRemainder,
@@ -13,7 +13,11 @@ beforeEach(() => {
 })
 
 describe("registerPagehideFlush", () => {
-  it("sends a keepalive PATCH with the open section's queued snapshot on pagehide", async () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it("sends a keepalive PATCH with the open section's queued snapshot on pagehide, through the SAME /api base every other write uses", async () => {
     const queue = await AnswerQueue.open("pp-lifecycle-test")
 
     try {
@@ -52,7 +56,12 @@ describe("registerPagehideFlush", () => {
 
         expect(fetchSpy).toHaveBeenCalledTimes(1)
         const [[url, init]] = fetchSpy.mock.calls
-        expect(url).toBe("/attempts/a1/responses")
+        // Defect A2: this used to be the un-prefixed "/attempts/a1/responses"
+        // -- a request that 404s against the server's global `/api` prefix
+        // (packages/server/src/main.ts) and was never caught because the
+        // send is fire-and-forget. Every other write in this app goes
+        // through apiFetch, which adds this same prefix itself.
+        expect(url).toBe("/api/attempts/a1/responses")
         expect(init?.method).toBe("PATCH")
         expect(init?.keepalive).toBe(true)
 
@@ -66,6 +75,56 @@ describe("registerPagehideFlush", () => {
         expect(sentBody.responses).toHaveLength(1)
         expect(sentBody.responses[0].questionId).toBe("q1")
         expect(sentBody.responses[0].selectedChoiceIds).toEqual(["c1"])
+      } finally {
+        unregister()
+      }
+    } finally {
+      await queue.close()
+    }
+  })
+
+  it("attaches the dev bearer token, the same as every other authenticated write", async () => {
+    vi.stubEnv("VITE_DEV_BEARER_TOKEN", "dev-token")
+
+    const queue = await AnswerQueue.open("pp-lifecycle-test")
+
+    try {
+      await queue.recordAnswer(
+        {
+          attemptId: "a1",
+          sectionId: "s1",
+          questionId: "q1",
+          selectedChoiceIds: ["c1"],
+          timeSpentMs: null,
+        },
+        NOW,
+      )
+
+      const fetchSpy = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(null, { status: 200 }))
+      const unregister = registerPagehideFlush(
+        queue,
+        () => ({ attemptId: "a1", sectionId: "s1" }),
+        (attemptId) => `/attempts/${attemptId}/responses`,
+        fetchSpy,
+      )
+
+      try {
+        window.dispatchEvent(new Event("pagehide"))
+
+        await vi.waitFor(() => {
+          expect(fetchSpy).toHaveBeenCalled()
+        })
+
+        const [[, init]] = fetchSpy.mock.calls
+
+        // Defect A2, second half: even with a corrected URL, every route on
+        // the server requires a bearer token -- a request with only
+        // content-type still fails.
+        expect(new Headers(init?.headers).get("authorization")).toBe(
+          "Bearer dev-token",
+        )
       } finally {
         unregister()
       }

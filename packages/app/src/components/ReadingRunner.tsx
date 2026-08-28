@@ -38,6 +38,10 @@ export interface ReadingRunnerProps {
   // `false` here so that fact stays data-driven, not hardcoded per screen.
   readonly locked: boolean
   readonly onSelectChoice: (choiceId: string) => void
+  // Defect B5: mirrors ListeningRunner's own `saveFailed` -- see that
+  // file's doc comment. True once the server has terminally refused the
+  // CURRENT question's queued answer.
+  readonly saveFailed: boolean
   readonly questionCount: number
   // Same read-only pip strip as ListeningRunner: one entry per question in
   // the CURRENT section, in section order, rendered as plain <span>s. A
@@ -77,6 +81,7 @@ export function ReadingRunner({
   selectedChoiceIds,
   locked,
   onSelectChoice,
+  saveFailed,
   questionCount,
   pips,
   hasPrevious,
@@ -147,6 +152,11 @@ export function ReadingRunner({
         onSelect={onSelectChoice}
         locked={locked}
       />
+      {saveFailed ? (
+        <p role="alert" data-testid="save-failed-notice">
+          {t("runner.saveFailed")}
+        </p>
+      ) : null}
 
       <div>
         {hasPrevious ? (

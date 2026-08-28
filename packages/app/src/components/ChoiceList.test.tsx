@@ -156,6 +156,28 @@ describe("ChoiceList -- single_choice", () => {
 
     expect(screen.queryAllByRole("checkbox")).toHaveLength(0)
   })
+
+  it("renders a choice's imageSvg inline, and nothing extra for a choice without one", () => {
+    render(
+      <ChoiceList
+        choices={[
+          {
+            id: "c-1",
+            label: "A dog",
+            imageSvg: '<svg data-testid="dog-pictogram"><circle r="4" /></svg>',
+          },
+          { id: "c-2", label: "A cat" },
+        ]}
+        questionType="single_choice"
+        selectedIds={[]}
+        onSelect={vi.fn()}
+        locked={false}
+      />,
+    )
+
+    expect(screen.getByTestId("dog-pictogram")).toBeInTheDocument()
+    expect(document.querySelectorAll(".choice-image")).toHaveLength(1)
+  })
 })
 
 // A multi_choice question is graded by exact set equality

@@ -189,6 +189,63 @@ describe("projections", () => {
     })
   }, 120_000)
 
+  it("loadForRunner carries imageSvg for a picture choice, and omits it otherwise", async () => {
+    await withDatabase(async (pool) => {
+      const { rows: testRows } = await pool.query<{ id: string }>(
+        `INSERT INTO test (slug) VALUES ('picture-choice-check') RETURNING id`,
+      )
+      const testId = testRows[0].id
+      const { rows: versionRows } = await pool.query<{ id: string }>(
+        `INSERT INTO test_version (test_id, version, title, duration_seconds)
+         VALUES ($1, 1, 'Picture choice check', 600) RETURNING id`,
+        [testId],
+      )
+      const draftVersionId = versionRows[0].id
+      const { rows: sectionRows } = await pool.query<{ id: string }>(
+        `INSERT INTO test_section (test_version_id, ordinal, title, type, duration_seconds,
+                                    navigation, allow_answer_change,
+                                    default_max_plays, default_allow_pause, default_allow_seek)
+         VALUES ($1, 1, 'Listening', 'listening', 300, 'free', true, NULL, NULL, NULL)
+         RETURNING id`,
+        [draftVersionId],
+      )
+      const sectionId = sectionRows[0].id
+      const { rows: groupRows } = await pool.query<{ id: string }>(
+        `INSERT INTO question_group (test_version_id, test_section_id, ordinal)
+         VALUES ($1, $2, 1) RETURNING id`,
+        [draftVersionId, sectionId],
+      )
+      const groupId = groupRows[0].id
+      const { rows: questionRows } = await pool.query<{ id: string }>(
+        `INSERT INTO question (test_version_id, question_group_id, question_key, ordinal, prompt, type, points)
+         VALUES ($1, $2, 'pq1', 1, 'Which picture?', 'single_choice', 1) RETURNING id`,
+        [draftVersionId, groupId],
+      )
+      const questionId = questionRows[0].id
+      const svg = '<svg viewBox="0 0 10 10"><circle r="4"/></svg>'
+
+      await pool.query(
+        `INSERT INTO choice (question_id, ordinal, label, is_correct, image_svg)
+         VALUES ($1, 1, 'A', true, $2)`,
+        [questionId, svg],
+      )
+      await pool.query(
+        `INSERT INTO choice (question_id, ordinal, label, is_correct) VALUES ($1, 2, 'B', false)`,
+        [questionId],
+      )
+
+      const sections = await loadForRunner(pool, draftVersionId, null)
+      const [choiceA, choiceB] =
+        sections
+          .flatMap(groupsOf)
+          .flatMap(questionsOf)
+          .find(idEquals(questionId))?.choices ?? []
+
+      expect(choiceA.imageSvg).toBe(svg)
+      expect("imageSvg" in choiceB).toBe(false)
+    })
+  }, 120_000)
+
   it("loadForRunner returns sections and questions in ordinal order", async () => {
     await withDatabase(async (pool) => {
       const f = await seedPublishedTest(pool)

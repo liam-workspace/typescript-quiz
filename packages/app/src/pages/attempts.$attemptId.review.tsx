@@ -165,6 +165,20 @@ function ReviewChoiceMarker({ choice }: { readonly choice: ReviewChoice }) {
   return null
 }
 
+// Mirrors ChoiceList.tsx's ChoiceImage: inline markup, not a URL, so the
+// pictogram's `stroke="currentColor"` still picks up this row's colour
+// (including the correct/incorrect `.choice` verdict tint here in review).
+function ReviewChoiceImage({ svg }: { readonly svg: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="choice-image"
+      // eslint-disable-next-line react/no-danger
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  )
+}
+
 function ReviewChoiceList({ choices }: ReviewChoiceListProps) {
   const { t } = useTranslation("runner")
 
@@ -179,6 +193,7 @@ function ReviewChoiceList({ choices }: ReviewChoiceListProps) {
             aria-hidden="true"
             className={`size-3 shrink-0 rounded-full border-2 ${choiceDotClasses(choice)}`}
           />
+          {choice.imageSvg ? <ReviewChoiceImage svg={choice.imageSvg} /> : null}
           <span className="min-w-0 flex-1">{choice.label}</span>
           <ReviewChoiceMarker choice={choice} />
         </li>

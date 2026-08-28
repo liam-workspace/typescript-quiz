@@ -24,6 +24,10 @@ export interface Playback {
 export interface RunnerChoice {
   id: ChoiceId
   label: string
+  // Inline <svg> markup, not a URL: the source pictograms use
+  // `stroke="currentColor"` to inherit `.choice`'s ink/selected colour,
+  // which only works rendered into the DOM directly.
+  imageSvg?: string
 }
 
 export interface RunnerQuestion {

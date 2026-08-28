@@ -50,6 +50,7 @@ interface ReviewChoiceView {
   label: string
   isCorrect: boolean
   selected: boolean
+  imageSvg?: string
 }
 
 interface ReviewItemView {
@@ -80,6 +81,7 @@ function toReviewItemView(item: ReviewItem): ReviewItemView {
       label: choice.label,
       isCorrect: choice.isCorrect,
       selected: choice.selected,
+      ...(choice.imageSvg ? { imageSvg: choice.imageSvg } : {}),
     })),
   }
 }

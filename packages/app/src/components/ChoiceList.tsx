@@ -38,6 +38,23 @@ export interface ChoiceListProps {
 // come from the design system rather than being re-derived per component.
 const CHOICE_ROW_CLASS = "choice mb-2"
 
+// The source pictograms are authored with `stroke="currentColor"` so they
+// pick up `.choice`'s ink/selected colour -- only true of markup rendered
+// straight into the DOM, not an `<img src>`. `imageSvg` is trusted content:
+// it only ever reaches here from `@pp/db`'s import pipeline (admin-gated,
+// `choice_image_svg_shape` + the zod script/handler check at import time),
+// never from a student.
+function ChoiceImage({ svg }: { readonly svg: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="choice-image"
+      // eslint-disable-next-line react/no-danger
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  )
+}
+
 function MultiChoiceList({
   choices,
   selectedIds,
@@ -64,6 +81,7 @@ function MultiChoiceList({
             >
               <Checkbox.Indicator className="block size-2.5 rounded-[1px] bg-white" />
             </Checkbox.Root>
+            {choice.imageSvg ? <ChoiceImage svg={choice.imageSvg} /> : null}
             {choice.label}
           </label>
         ))}
@@ -96,6 +114,7 @@ function SingleChoiceList({
             >
               <RadioGroup.Indicator className="block size-1.5 rounded-full bg-white" />
             </RadioGroup.Item>
+            {choice.imageSvg ? <ChoiceImage svg={choice.imageSvg} /> : null}
             {choice.label}
           </label>
         ))}

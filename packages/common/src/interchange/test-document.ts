@@ -11,6 +11,22 @@ const playbackSchema = z
 const choiceSchema = z.object({
   label: z.string().min(1),
   isCorrect: z.boolean(),
+  // Inline <svg> markup for a picture choice (TOEFL Primary's
+  // listen_pick_picture / read_word_picture questions), not a filename --
+  // see migration 1005. The shape check mirrors the DB's
+  // choice_image_svg_shape constraint; the script/tag check is this
+  // pipeline's one XSS guard, since the runner renders it with
+  // dangerouslySetInnerHTML.
+  imageSvg: z
+    .string()
+    .min(1)
+    .max(20_000)
+    .regex(/^\s*<svg[\s>]/iu, "imageSvg must be an <svg> element")
+    .refine(
+      (svg) => !/<script[\s>]|on\w+\s*=/iu.test(svg),
+      "imageSvg must not contain script tags or event handler attributes",
+    )
+    .optional(),
 })
 
 const questionSchema = z

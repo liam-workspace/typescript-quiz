@@ -279,6 +279,40 @@ describe("attempt review page", () => {
     expect(screen.getByText("Look and listen.")).toBeInTheDocument()
   })
 
+  it("renders a picture choice's imageSvg inline in review", () => {
+    render(
+      <ReviewScreen
+        review={{
+          attemptId: "attempt-1",
+          items: [
+            {
+              ...reviewPayload.items[0],
+              choices: [
+                {
+                  id: "choice-7-a",
+                  label: "A",
+                  isCorrect: true,
+                  selected: true,
+                  imageSvg:
+                    '<svg data-testid="picture-a"><circle r="4" /></svg>',
+                },
+                {
+                  id: "choice-7-b",
+                  label: "B",
+                  isCorrect: false,
+                  selected: false,
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    )
+
+    expect(screen.getByTestId("picture-a")).toBeInTheDocument()
+    expect(document.querySelectorAll(".choice-image")).toHaveLength(1)
+  })
+
   it("moves through the loaded payload without a network refetch and respects both navigation bounds", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

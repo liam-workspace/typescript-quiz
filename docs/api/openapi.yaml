@@ -1402,6 +1402,12 @@ components:
       properties:
         id: { type: string }
         label: { type: string }
+        imageSvg:
+          type: string
+          description: |
+            Inline <svg> markup for a picture choice, not a URL -- the source pictograms use
+            `stroke="currentColor"` to inherit the selected/unselected colour, which only
+            works rendered directly into the DOM. Absent for an ordinary text choice.
 
     Question:
       type: object
@@ -1853,6 +1859,9 @@ components:
         label: { type: string }
         isCorrect: { type: boolean }
         selected: { type: boolean }
+        imageSvg:
+          type: string
+          description: Inline <svg> markup, as shown in the runner -- see Choice.imageSvg.
 
     ReviewItem:
       type: object
@@ -2042,3 +2051,7 @@ components:
                               properties:
                                 label: { type: string }
                                 isCorrect: { type: boolean }
+                                imageSvg:
+                                  type: string
+                                  minLength: 1
+                                  description: Inline <svg> markup for a picture choice. See Choice.imageSvg.

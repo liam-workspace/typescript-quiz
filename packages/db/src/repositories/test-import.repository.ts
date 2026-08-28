@@ -142,9 +142,9 @@ export function importTestDocument(
 
           for (const [cIdx, c] of q.choices.entries()) {
             await tx.query(
-              `INSERT INTO choice (question_id, ordinal, label, is_correct)
-               VALUES ($1,$2,$3,$4)`,
-              [questionId, cIdx + 1, c.label, c.isCorrect],
+              `INSERT INTO choice (question_id, ordinal, label, is_correct, image_svg)
+               VALUES ($1,$2,$3,$4,$5)`,
+              [questionId, cIdx + 1, c.label, c.isCorrect, c.imageSvg ?? null],
             )
           }
 
@@ -189,6 +189,7 @@ interface ExportRow {
   c_ordinal: number
   c_label: string
   c_correct: boolean
+  c_image_svg: string | null
 }
 
 // Both booleans are checked together so TypeScript narrows them together:
@@ -282,7 +283,8 @@ export async function exportTestDocument(
             st.allow_pause st_allow_pause, st.allow_seek st_allow_seek,
             q.ordinal q_ordinal, q.question_key q_key, q.prompt q_prompt,
             q.type::text q_type, q.points q_points,
-            c.ordinal c_ordinal, c.label c_label, c.is_correct c_correct
+            c.ordinal c_ordinal, c.label c_label, c.is_correct c_correct,
+            c.image_svg c_image_svg
        FROM test_section ts
        JOIN question_group g ON g.test_section_id = ts.id
        JOIN question q       ON q.question_group_id = g.id
@@ -353,7 +355,11 @@ export async function exportTestDocument(
       group.questions.push(question)
     }
 
-    question.choices.push({ label: r.c_label, isCorrect: r.c_correct })
+    question.choices.push({
+      label: r.c_label,
+      isCorrect: r.c_correct,
+      ...(r.c_image_svg ? { imageSvg: r.c_image_svg } : {}),
+    })
   }
 
   return {

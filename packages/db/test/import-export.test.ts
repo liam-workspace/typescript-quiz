@@ -229,4 +229,60 @@ describe("import / export", () => {
       ])
     })
   }, 120_000)
+
+  // A picture-choice question (TOEFL Primary's listen_pick_picture):
+  // imageSvg round-trips like any other choice field, and a choice with no
+  // imageSvg keeps its key set free of the property entirely -- the same
+  // "absent has one spelling" contract the stimulus tests above enforce.
+  it("round-trips a choice's imageSvg, and omits the key when absent", async () => {
+    const svgDoc: TestDocument = testDocumentSchema.parse({
+      title: "Picture choices",
+      slug: "picture-choices-01",
+      durationSeconds: 100,
+      sections: [
+        {
+          title: "S",
+          type: "listening",
+          durationSeconds: 100,
+          navigation: "free",
+          allowAnswerChange: true,
+          playback: null,
+          instructions: [],
+          groups: [
+            {
+              questions: [
+                {
+                  questionKey: "q1",
+                  prompt: "Which picture?",
+                  type: "single_choice",
+                  points: 1,
+                  choices: [
+                    {
+                      label: "A",
+                      isCorrect: true,
+                      imageSvg:
+                        '<svg viewBox="0 0 10 10"><circle r="4"/></svg>',
+                    },
+                    { label: "B", isCorrect: false },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+
+    await withDatabase(async (pool) => {
+      const { versionId } = await importTestDocument(pool, svgDoc)
+      const out = await exportTestDocument(pool, versionId)
+
+      expect(out).toEqual(svgDoc)
+
+      const [choiceA, choiceB] = out.sections[0].groups[0].questions[0].choices
+
+      expect("imageSvg" in choiceA).toBe(true)
+      expect("imageSvg" in choiceB).toBe(false)
+    })
+  }, 120_000)
 })

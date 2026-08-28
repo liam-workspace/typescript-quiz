@@ -40,6 +40,7 @@ interface RunnerRow {
   c_id: string
   c_ordinal: number
   c_label: string
+  c_image_svg: string | null
 }
 
 interface ScoringRow {
@@ -82,7 +83,7 @@ export async function loadForRunner(
             st.allow_pause st_allow_pause, st.allow_seek st_allow_seek,
             sp.play_count plays_used,
             q.id q_id, q.ordinal q_ordinal, q.type::text q_type, q.prompt q_prompt,
-            c.id c_id, c.ordinal c_ordinal, c.label c_label
+            c.id c_id, c.ordinal c_ordinal, c.label c_label, c.image_svg c_image_svg
        FROM test_section ts
        JOIN question_group g ON g.test_section_id = ts.id
        JOIN question q       ON q.question_group_id = g.id
@@ -101,7 +102,11 @@ export async function loadForRunner(
     const group = findOrCreateGroup(section, r)
     const question = findOrCreateQuestion(group, r)
 
-    question.choices.push({ id: asChoiceId(r.c_id), label: r.c_label })
+    question.choices.push({
+      id: asChoiceId(r.c_id),
+      label: r.c_label,
+      ...(r.c_image_svg ? { imageSvg: r.c_image_svg } : {}),
+    })
   }
 
   return sections

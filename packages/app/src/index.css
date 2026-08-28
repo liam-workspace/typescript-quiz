@@ -145,6 +145,20 @@
     background: var(--color-teal);
   }
 
+  /* A picture choice's pictogram. `stroke="currentColor"` inside the SVG
+   * picks up `.choice`'s ink colour (and the review verdict tint) simply
+   * by inheriting `color` -- no per-state override needed here. */
+  .choice-image {
+    flex: none;
+    width: 40px;
+    height: 40px;
+  }
+  .choice-image svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
   /* A navigator cell. Five states, five looks -- see the note above. */
   .np-cell {
     display: grid;

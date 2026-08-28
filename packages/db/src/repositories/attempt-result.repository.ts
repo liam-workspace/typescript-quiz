@@ -231,6 +231,7 @@ export interface ReviewChoice {
   label: string
   isCorrect: boolean
   selected: boolean
+  imageSvg?: string
 }
 
 export type ReviewStimulus =
@@ -299,6 +300,7 @@ interface ReviewDbRow {
   c_label: string
   c_is_correct: boolean
   c_selected: boolean
+  c_image_svg: string | null
   st_id: string | null
   st_type: string | null
   st_title: string | null
@@ -519,7 +521,7 @@ export async function loadReview(
             q.type::text q_type, q.points q_points,
             ts.id section_id, ts.type::text section_type,
             c.id c_id, c.label c_label, c.is_correct c_is_correct,
-            (rc.choice_id IS NOT NULL) c_selected,
+            (rc.choice_id IS NOT NULL) c_selected, c.image_svg c_image_svg,
             st.id st_id, st.type::text st_type, st.title st_title,
             st.body_text st_body, ma.filename st_filename,
             ma.kind::text st_media_kind
@@ -549,6 +551,7 @@ export async function loadReview(
       label: row.c_label,
       isCorrect: row.c_is_correct,
       selected: row.c_selected,
+      ...(row.c_image_svg ? { imageSvg: row.c_image_svg } : {}),
     })
     accumulator.scoringQuestion.choices.push({
       id: choiceId,

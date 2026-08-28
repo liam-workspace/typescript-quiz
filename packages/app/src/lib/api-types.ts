@@ -123,6 +123,7 @@ export interface PlayGrant {
 export interface RunnerChoice {
   id: string
   label: string
+  imageSvg?: string
 }
 
 export interface RunnerQuestion {
@@ -324,6 +325,7 @@ export interface ReviewChoice {
   label: string
   isCorrect: boolean
   selected: boolean
+  imageSvg?: string
 }
 
 export type ReviewStimulus =

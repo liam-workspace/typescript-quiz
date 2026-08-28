@@ -28,6 +28,80 @@ function fakeScheduler(): {
 }
 
 describe("FlushController", () => {
+  it("reports pending depth after a retryable failure, saved after an ack, and failed without pending after a terminal rejection", async () => {
+    const queue = await AnswerQueue.open("pp-flush-test")
+    await queue.recordAnswer(
+      {
+        attemptId: "a1",
+        sectionId: "s1",
+        questionId: "q1",
+        selectedChoiceIds: ["c1"],
+        timeSpentMs: null,
+      },
+      NOW,
+    )
+
+    const patch = vi
+      .fn()
+      .mockResolvedValueOnce({ kind: "network-error" })
+      .mockResolvedValueOnce({
+        kind: "ok",
+        status: 200,
+        body: { results: [{ questionId: "q1", status: "applied" }] },
+      })
+      .mockResolvedValueOnce({
+        kind: "ok",
+        status: 200,
+        body: { results: [{ questionId: "q1", status: "rejected" }] },
+      })
+    const controller = new FlushController(
+      queue,
+      { patch },
+      fakeScheduler().schedule,
+    )
+
+    const pending = await controller.flushSection(
+      "a1",
+      "s1",
+      "/attempts/a1/responses",
+      1,
+    )
+    const saved = await controller.flushSection(
+      "a1",
+      "s1",
+      "/attempts/a1/responses",
+    )
+    await queue.recordAnswer(
+      {
+        attemptId: "a1",
+        sectionId: "s1",
+        questionId: "q1",
+        selectedChoiceIds: ["c2"],
+        timeSpentMs: null,
+      },
+      NOW,
+    )
+    const failed = await controller.flushSection(
+      "a1",
+      "s1",
+      "/attempts/a1/responses",
+    )
+    await queue.close()
+
+    expect(pending).toMatchObject({
+      saveState: { status: "pending", pendingCount: 1 },
+      outcome: "retryable-failure",
+    })
+    expect(saved).toMatchObject({
+      saveState: { status: "saved", pendingCount: 0 },
+      outcome: "success",
+    })
+    expect(failed).toMatchObject({
+      saveState: { status: "failed", pendingCount: 0 },
+      outcome: "terminal-failure",
+    })
+  })
+
   it("sends every queued answer for the section as one snapshot and acks applied items", async () => {
     const queue = await AnswerQueue.open("pp-flush-test")
     const recorded = await queue.recordAnswer(
@@ -328,6 +402,10 @@ describe("FlushController", () => {
     expect(remaining).toHaveLength(1)
     expect(remaining[0].questionId).toBe("q1")
     await queue.close()
+    expect(result).toMatchObject({
+      saveState: { status: "failed", pendingCount: 0 },
+      outcome: "terminal-failure",
+    })
   })
 
   it("returns flushed:true without calling http when the section has nothing queued", async () => {

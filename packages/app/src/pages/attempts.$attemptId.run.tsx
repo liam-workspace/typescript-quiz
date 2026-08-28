@@ -10,8 +10,10 @@ import { useEffect, useRef, useState, type JSX } from "react"
 import { useTranslation } from "react-i18next"
 import { AppMenu, type MenuStudent } from "../components/AppMenu.js"
 import { ListeningRunner } from "../components/ListeningRunner.js"
+import { OfflineBanner } from "../components/OfflineBanner.js"
 import { QuestionNavigator } from "../components/QuestionNavigator.js"
 import { ReadingRunner } from "../components/ReadingRunner.js"
+import { SaveState, type SaveStateProps } from "../components/SaveState.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
 import { ApiError } from "../lib/api-client.js"
 import {
@@ -26,7 +28,11 @@ import {
   setPosition,
 } from "../lib/attempts-api.js"
 import { redirectExpiredAttemptToResult } from "../lib/expired-attempt-redirect.js"
-import { FlushController, type Scheduler } from "../lib/flushController.js"
+import {
+  FlushController,
+  type FlushResult,
+  type Scheduler,
+} from "../lib/flushController.js"
 import { apiFlushHttp } from "../lib/flushHttp.js"
 import {
   buildSectionFinishRemainder,
@@ -59,7 +65,7 @@ import type {
 // A real setTimeout-backed scheduler for FlushController's retry backoff --
 // the same shape FlushController's own tests inject a fake for, but here
 // there is no fake clock to serve, so this actually waits.
-const scheduler: Scheduler = (delayMs) =>
+const defaultScheduler: Scheduler = (delayMs) =>
   new Promise((resolve) => {
     setTimeout(resolve, delayMs)
   })
@@ -115,6 +121,7 @@ export interface RunScreenProps {
   readonly student?: MenuStudent
   readonly navigate: (path: string, state?: TimeUpNavigationState) => void
   readonly now?: TimeSource
+  readonly flushScheduler?: Scheduler
 }
 
 export interface TimeUpNavigationState {
@@ -130,6 +137,7 @@ export function RunScreen({
   student,
   navigate,
   now = Date.now,
+  flushScheduler = defaultScheduler,
 }: RunScreenProps) {
   const { t } = useTranslation("runner")
   const section = envelope.currentSectionId
@@ -187,12 +195,16 @@ export function RunScreen({
   const [saveFailedQuestionIds, setSaveFailedQuestionIds] = useState<
     Set<string>
   >(new Set())
+  const [saveState, setSaveState] = useState<SaveStateProps>({
+    state: "saved",
+  })
+  const [retryableFlushFailure, setRetryableFlushFailure] = useState(false)
 
   // Constructed once per mount, tied to this attempt's `queue` prop (opened
   // once by the route loader, not re-opened on every render) -- the lazy
   // initializer runs exactly once, on the first render, never again.
   const [controller] = useState(
-    () => new FlushController(queue, apiFlushHttp, scheduler),
+    () => new FlushController(queue, apiFlushHttp, flushScheduler),
   )
 
   // A "latest value" ref rather than a dependency the pagehide effect below
@@ -281,6 +293,22 @@ export function RunScreen({
     }
 
     setSaveFailedQuestionIds((prev) => new Set([...prev, ...questionIds]))
+  }
+
+  const applyFlushResult = (result: FlushResult): void => {
+    addSaveFailedQuestionIds(result.rejectedQuestionIds)
+    setRetryableFlushFailure(result.outcome === "retryable-failure")
+
+    if (result.saveState.status === "pending") {
+      setSaveState({
+        state: "pending",
+        pendingCount: result.saveState.pendingCount,
+      })
+
+      return
+    }
+
+    setSaveState({ state: result.saveState.status })
   }
 
   // Defect B3 fix: a reload opens the SAME queue the loader's AnswerQueue
@@ -374,7 +402,7 @@ export function RunScreen({
       .flushSection(attemptId, section.id, `/attempts/${attemptId}/responses`)
       .then((result) => {
         if (!cancelled) {
-          addSaveFailedQuestionIds(result.rejectedQuestionIds)
+          applyFlushResult(result)
         }
       })
       .catch(() => {
@@ -389,6 +417,29 @@ export function RunScreen({
     // array), so this only re-runs on an actual section change, not on
     // every keystroke-driven re-render.
   }, [queue, attemptId, controller, section])
+
+  useEffect(() => {
+    if (!section) {
+      return
+    }
+
+    const flushOnConnectionHint = (): void => {
+      void controller
+        .flushSection(attemptId, section.id, `/attempts/${attemptId}/responses`)
+        .then(applyFlushResult)
+        .catch(() => {
+          // The browser's `online` event is only a hint that the radio came
+          // back. It never clears the banner by itself: only a real flush
+          // outcome can say whether this server is reachable.
+        })
+    }
+
+    window.addEventListener("online", flushOnConnectionHint)
+
+    return () => {
+      window.removeEventListener("online", flushOnConnectionHint)
+    }
+  }, [attemptId, controller, section])
 
   // Spec §5 rule 6, "Flush at end of life": a backgrounded/closed tab must
   // not lose whatever the queue is still holding for the open section. The
@@ -482,6 +533,10 @@ export function RunScreen({
   const handleSelectChoice = (choiceId: string): void => {
     const nextChoiceIds = nextChoiceIdsFor(choiceId)
 
+    if (!retryableFlushFailure) {
+      setSaveState({ state: "saving" })
+    }
+
     setResponses((prev) => new Map(prev).set(question.id, nextChoiceIds))
     // A fresh tap is a genuine new attempt to save this answer --
     // `recordAnswer` below writes a brand-new record with
@@ -527,7 +582,7 @@ export function RunScreen({
         // successes and in-flight failures still resolve silently (see the
         // `.catch()` below), because only a settled, terminal rejection is
         // ever actionable enough to interrupt the child with.
-        addSaveFailedQuestionIds(result.rejectedQuestionIds)
+        applyFlushResult(result)
       })
       .catch(() => {
         // Deliberately not re-thrown, and deliberately not surfaced as UI
@@ -862,22 +917,24 @@ export function RunScreen({
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-900">
-      <header className="relative z-[60] flex items-center justify-between border-b border-stone-200 bg-white px-3 py-2">
+    <div className="bg-surface text-ink min-h-screen">
+      <header className="border-line bg-paper relative z-[60] flex items-center justify-between gap-3 border-b px-3 py-2">
         <button
           type="button"
           aria-label={t("menu.openLabel")}
           aria-expanded={panel === "menu"}
-          className="size-11 touch-manipulation rounded-md text-xl font-bold select-none hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+          className="hover:bg-teal-bg focus-visible:outline-teal size-11 touch-manipulation rounded-md text-xl font-bold select-none focus-visible:outline-2 focus-visible:outline-offset-2"
           onClick={() => {
             setPanel((current) => (current === "menu" ? null : "menu"))
           }}
         >
           <span aria-hidden="true">☰</span>
         </button>
-        <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">
+        <span className="bg-teal-bg text-teal rounded-full px-3 py-1 text-xs font-bold">
           {t(`runner.sectionChip.${section.type}`)}
         </span>
+        <span className="grow" />
+        <SaveState {...saveState} />
         {remainingMs !== null ? (
           <span
             aria-label={t("runner.timeRemaining")}
@@ -891,6 +948,10 @@ export function RunScreen({
           </span>
         ) : null}
       </header>
+
+      {retryableFlushFailure && saveState.state === "pending" ? (
+        <OfflineBanner pendingCount={saveState.pendingCount} />
+      ) : null}
 
       <div>{runner}</div>
 
@@ -926,12 +987,12 @@ export function RunScreen({
         </p>
       ) : null}
 
-      <nav className="relative z-[60] flex justify-end border-t border-stone-200 bg-white px-3 py-2">
+      <nav className="border-line bg-paper relative z-[60] flex justify-end border-t px-3 py-2">
         <button
           type="button"
           aria-label={t("navigator.openLabel")}
           aria-expanded={panel === "navigator"}
-          className="size-11 touch-manipulation rounded-md text-xl font-bold select-none hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+          className="hover:bg-teal-bg focus-visible:outline-teal size-11 touch-manipulation rounded-md text-xl font-bold select-none focus-visible:outline-2 focus-visible:outline-offset-2"
           onClick={() => {
             setPanel((current) =>
               current === "navigator" ? null : "navigator",

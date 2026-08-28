@@ -21,6 +21,7 @@ import {
 import "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
+import type { Scheduler } from "../lib/flushController.js"
 import {
   claimPlay,
   finishSection,
@@ -176,6 +177,40 @@ function finishWithAppliedRemainder(
   })
 }
 
+function resolveScheduledRetry(_delayMs: number): Promise<void> {
+  return Promise.resolve()
+}
+
+function questionIdsOf(items: ReadonlyArray<{ questionId: string }>): string[] {
+  return items.map((item) => item.questionId).sort()
+}
+
+function toAppliedFlushItem(item: { questionId: string }) {
+  return { questionId: item.questionId, status: "applied" as const }
+}
+
+function offlineBannerHasThreePending(): void {
+  expect(screen.getByTestId("offline-banner")).toHaveTextContent(
+    "Waiting to be sent: 3",
+  )
+}
+
+function offlineBannerIsGone(): void {
+  expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument()
+}
+
+function allVisibleRadiosAreEnabled(): boolean {
+  return screen
+    .getAllByRole("radio")
+    .every((radio) => !radio.hasAttribute("disabled"))
+}
+
+async function readingQueueIsEmpty(): Promise<void> {
+  expect(
+    await getQueue().snapshotForSection("attempt-1", "section-reading"),
+  ).toHaveLength(0)
+}
+
 /**
  * Hoisted for the same reason as `fetchWasCalled`/`positionWasWritten`
  * above -- used by the B3 reload-recovery describe block below, which is
@@ -183,6 +218,13 @@ function finishWithAppliedRemainder(
  */
 const catRadioIsChecked = (): void => {
   expect(screen.getByRole("radio", { name: "A cat" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  )
+}
+
+const cityRadioIsChecked = (): void => {
+  expect(screen.getByRole("radio", { name: "A city" })).toHaveAttribute(
     "aria-checked",
     "true",
   )
@@ -465,8 +507,19 @@ function getQueue(): AnswerQueue {
 function renderRunScreen(
   envelope: RunnerEnvelope = listeningEnvelope,
   navigate = vi.fn(),
-  now?: () => number,
+  clockOrOptions:
+    | (() => number)
+    | {
+        readonly now?: () => number
+        readonly flushScheduler?: Scheduler
+      } = {},
 ) {
+  const now =
+    typeof clockOrOptions === "function" ? clockOrOptions : clockOrOptions.now
+  const flushScheduler =
+    typeof clockOrOptions === "function"
+      ? undefined
+      : clockOrOptions.flushScheduler
   const utils = render(
     <RunScreen
       attemptId="attempt-1"
@@ -474,6 +527,7 @@ function renderRunScreen(
       queue={getQueue()}
       navigate={navigate}
       now={now}
+      flushScheduler={flushScheduler}
     />,
   )
 
@@ -1043,6 +1097,74 @@ describe("RunScreen", () => {
     })
   })
 
+  it("shows retryable queued work with reassurance and clears it after the next successful flush", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockRejectedValue(new TypeError("offline")),
+    )
+    const user = userEvent.setup()
+
+    renderRunScreen(readingEnvelope, undefined, {
+      flushScheduler: resolveScheduledRetry,
+    })
+
+    await user.click(screen.getByRole("radio", { name: "A city" }))
+
+    const banner = await screen.findByTestId("offline-banner")
+    expect(banner).toHaveTextContent("We can't reach the server right now.")
+    expect(banner).toHaveTextContent(
+      "Keep answering — your answers are saved on this iPad and will be sent as soon as the connection is back.",
+    )
+    expect(banner).toHaveTextContent("Waiting to be sent: 1")
+
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          results: [{ questionId: "q-r2", status: "applied" }],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    )
+    window.dispatchEvent(new Event("online"))
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument()
+    })
+    expect(screen.getByRole("status")).toHaveTextContent("Saved")
+  })
+
+  it("keeps answer controls enabled and records a new selection while the offline banner is showing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockRejectedValue(new TypeError("offline")),
+    )
+    const user = userEvent.setup()
+
+    renderRunScreen(readingEnvelope, undefined, {
+      flushScheduler: resolveScheduledRetry,
+    })
+
+    await user.click(screen.getByRole("radio", { name: "A city" }))
+    await screen.findByTestId("offline-banner")
+
+    const nextAnswer = screen.getByRole("radio", { name: "A forest" })
+    expect(nextAnswer).toBeEnabled()
+    await user.click(nextAnswer)
+
+    const [queued] = await waitFor(async () => {
+      const items = await getQueue().snapshotForSection(
+        "attempt-1",
+        "section-reading",
+      )
+
+      expect(items).toHaveLength(1)
+
+      return items
+    })
+    expect(queued.selectedChoiceIds).toEqual(["cr-3"])
+    expect(screen.getByTestId("offline-banner")).toBeInTheDocument()
+  })
+
   // Defect B5: a terminal per-item rejection used to reach this page and be
   // discarded -- FlushController already classified it correctly (never
   // resent, per spec §5 rule 5's "stop dead"), but nothing told the child.
@@ -1070,6 +1192,8 @@ describe("RunScreen", () => {
     expect(await screen.findByTestId("save-failed-notice")).toHaveTextContent(
       "didn't save",
     )
+    expect(screen.getByRole("status")).toHaveTextContent("Did not save")
+    expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument()
     // The selection itself is untouched -- still visibly checked.
     expect(screen.getByRole("radio", { name: "A cat" })).toHaveAttribute(
       "aria-checked",
@@ -1316,6 +1440,118 @@ describe("RunScreen", () => {
         "aria-checked",
         "false",
       )
+    })
+  })
+
+  describe("offline durability end to end", () => {
+    it("keeps three offline answers in IndexedDB, then sends one full snapshot when the connection returns", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn<typeof fetch>().mockRejectedValue(new TypeError("offline")),
+      )
+      mockSetPosition.mockResolvedValue(undefined)
+      const user = userEvent.setup()
+
+      renderRunScreen(readingEnvelope, undefined, {
+        flushScheduler: resolveScheduledRetry,
+      })
+
+      await user.click(screen.getByRole("radio", { name: "A city" }))
+      expect(await screen.findByTestId("offline-banner")).toHaveTextContent(
+        "Waiting to be sent: 1",
+      )
+
+      await user.click(screen.getByRole("button", { name: "Next" }))
+      await user.click(screen.getByRole("radio", { name: "Nine" }))
+
+      await user.click(screen.getByRole("button", { name: "Next" }))
+      await user.click(screen.getByRole("radio", { name: "A library" }))
+
+      const pending = await getQueue().snapshotForSection(
+        "attempt-1",
+        "section-reading",
+      )
+      expect(questionIdsOf(pending)).toEqual(["q-r2", "q-r3", "q-r4"])
+      await waitFor(offlineBannerHasThreePending)
+      expect(allVisibleRadiosAreEnabled()).toBe(true)
+
+      vi.mocked(fetch).mockClear()
+      vi.mocked(fetch).mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            results: pending.map(toAppliedFlushItem),
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      )
+
+      window.dispatchEvent(new Event("online"))
+
+      await waitFor(offlineBannerIsGone)
+
+      expect(fetch).toHaveBeenCalledOnce()
+      const [firstFetchCall] = vi.mocked(fetch).mock.calls
+      const [url, init] = firstFetchCall
+      const body = JSON.parse((init?.body as string | undefined) ?? "null") as {
+        responses: Array<{ questionId: string }>
+      }
+      expect(url).toBe("/api/attempts/attempt-1/responses")
+      expect(questionIdsOf(body.responses)).toEqual(["q-r2", "q-r3", "q-r4"])
+      await waitFor(readingQueueIsEmpty)
+    })
+
+    it("restores three visible answers and a pending count of three after a reload mid-outage", async () => {
+      const savedSelections = [
+        { questionId: "q-r2", selectedChoiceIds: ["cr-4"] },
+        { questionId: "q-r3", selectedChoiceIds: ["cr-5"] },
+        { questionId: "q-r4", selectedChoiceIds: ["cr-7"] },
+      ]
+
+      for (const selection of savedSelections) {
+        // eslint-disable-next-line no-await-in-loop
+        await getQueue().recordAnswer(
+          {
+            attemptId: "attempt-1",
+            sectionId: "section-reading",
+            questionId: selection.questionId,
+            selectedChoiceIds: selection.selectedChoiceIds,
+            timeSpentMs: null,
+          },
+          new Date("2026-08-27T09:00:00.000Z"),
+        )
+      }
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn<typeof fetch>().mockRejectedValue(new TypeError("offline")),
+      )
+      mockSetPosition.mockResolvedValue(undefined)
+      const user = userEvent.setup()
+
+      renderRunScreen(readingEnvelope, undefined, {
+        flushScheduler: resolveScheduledRetry,
+      })
+
+      expect(await screen.findByTestId("offline-banner")).toHaveTextContent(
+        "Waiting to be sent: 3",
+      )
+      await waitFor(cityRadioIsChecked)
+
+      await user.click(screen.getByRole("button", { name: "Next" }))
+      expect(screen.getByRole("radio", { name: "Nine" })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      )
+
+      await user.click(screen.getByRole("button", { name: "Next" }))
+      expect(screen.getByRole("radio", { name: "A library" })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      )
+
+      expect(
+        await getQueue().snapshotForSection("attempt-1", "section-reading"),
+      ).toHaveLength(3)
     })
   })
 

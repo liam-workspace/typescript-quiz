@@ -21,6 +21,18 @@ export interface FlushHttp {
 
 const DEFAULT_MAX_ATTEMPTS = 5
 
+export type SettledSaveState =
+  | { readonly status: "saved"; readonly pendingCount: 0 }
+  | { readonly status: "pending"; readonly pendingCount: number }
+  | { readonly status: "failed"; readonly pendingCount: 0 }
+
+export interface FlushResult {
+  readonly flushed: boolean
+  readonly rejectedQuestionIds: string[]
+  readonly saveState: SettledSaveState
+  readonly outcome: "success" | "retryable-failure" | "terminal-failure"
+}
+
 /**
  * Rule 2's client half (snapshot, not delta -- every item currently queued
  * for the section, every attempt) and rule 3's client half (one rejected
@@ -57,7 +69,7 @@ export class FlushController {
     sectionId: string,
     url: string,
     maxAttempts = DEFAULT_MAX_ATTEMPTS,
-  ): Promise<{ flushed: boolean; rejectedQuestionIds: string[] }> {
+  ): Promise<FlushResult> {
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       // Re-read the queue on every attempt, not just once before the loop:
       // it is the section's whole current snapshot that must ride along on
@@ -66,7 +78,12 @@ export class FlushController {
       const items = await this.queue.snapshotForSection(attemptId, sectionId)
 
       if (items.length === 0) {
-        return { flushed: true, rejectedQuestionIds: [] }
+        return {
+          flushed: true,
+          rejectedQuestionIds: [],
+          saveState: { status: "saved", pendingCount: 0 },
+          outcome: "success",
+        }
       }
 
       const body = {
@@ -91,7 +108,22 @@ export class FlushController {
           response.body.results,
         )
 
-        return { flushed: true, rejectedQuestionIds }
+        if (rejectedQuestionIds.length > 0) {
+          return {
+            flushed: true,
+            rejectedQuestionIds,
+            saveState: { status: "failed", pendingCount: 0 },
+            outcome: "terminal-failure",
+          }
+        }
+
+        return {
+          flushed: true,
+          rejectedQuestionIds,
+          // eslint-disable-next-line no-await-in-loop
+          saveState: await this.pendingStateFor(attemptId, sectionId),
+          outcome: "success",
+        }
       }
 
       const classification = classifyForRetry(
@@ -108,14 +140,37 @@ export class FlushController {
         // either (B5): the ENVELOPE was refused, not any one answer, so
         // there is nothing question-specific to report here -- the caller
         // still sees `flushed: false`.
-        return { flushed: false, rejectedQuestionIds: [] }
+        return {
+          flushed: false,
+          rejectedQuestionIds: [],
+          saveState: { status: "failed", pendingCount: 0 },
+          outcome: "terminal-failure",
+        }
       }
 
       // eslint-disable-next-line no-await-in-loop
       await this.scheduler(classification.backoffMs)
     }
 
-    return { flushed: false, rejectedQuestionIds: [] }
+    return {
+      flushed: false,
+      rejectedQuestionIds: [],
+      saveState: await this.pendingStateFor(attemptId, sectionId),
+      outcome: "retryable-failure",
+    }
+  }
+
+  private async pendingStateFor(
+    attemptId: string,
+    sectionId: string,
+  ): Promise<SettledSaveState> {
+    const pendingCount = (
+      await this.queue.snapshotForSection(attemptId, sectionId)
+    ).length
+
+    return pendingCount > 0
+      ? { status: "pending", pendingCount }
+      : { status: "saved", pendingCount: 0 }
   }
 
   /**

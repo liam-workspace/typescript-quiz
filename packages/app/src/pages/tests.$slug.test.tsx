@@ -153,6 +153,26 @@ describe("test brief page", () => {
     ).not.toBeInTheDocument()
   })
 
+  it("uses device chrome, bottom actions, and semantic section-type chips", () => {
+    render(<TestBriefScreen brief={brief} navigate={vi.fn()} />)
+
+    expect(screen.getByRole("banner")).toHaveClass("app-bar")
+    expect(screen.getByRole("main")).toHaveClass("device-main")
+    expect(screen.getByRole("contentinfo")).toHaveClass("device-footer")
+    expect(
+      within(screen.getByRole("article", { name: "Listening" })).getByText(
+        "Listening",
+        { selector: "[data-section-type]" },
+      ),
+    ).toHaveAttribute("data-section-type", "listening")
+    expect(
+      within(screen.getByRole("article", { name: "Reading" })).getByText(
+        "Reading",
+        { selector: "[data-section-type]" },
+      ),
+    ).toHaveAttribute("data-section-type", "reading")
+  })
+
   it("renders a readable 404 with a way back to the library", () => {
     render(
       <TestBriefRouteError

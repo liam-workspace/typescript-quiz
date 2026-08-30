@@ -155,6 +155,13 @@ describe("test library page", () => {
     expect(screen.getByText("You have 3 tests waiting.")).toBeInTheDocument()
   })
 
+  it("uses the device app bar and prototype-width main for the library", async () => {
+    await renderLibrary()
+
+    expect(screen.getByRole("banner")).toHaveClass("app-bar")
+    expect(screen.getByRole("main")).toHaveClass("device-main")
+  })
+
   it("keeps the catalog usable with an anonymous greeting when GET /me fails", async () => {
     vi.stubGlobal(
       "fetch",

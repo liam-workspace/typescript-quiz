@@ -1,10 +1,3 @@
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@liam-public/browser-react-ui"
 import { createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -125,83 +118,95 @@ export function SectionRulesScreen({
     outcome.status === "attemptExpired"
   ) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("sectionRules.expired.title")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p>
-            {outcome.status === "attemptExpired"
-              ? t("sectionRules.expired.attemptMessage")
-              : t("sectionRules.expired.sectionMessage")}
-          </p>
-          {outcome.status === "attemptExpired" && outcome.resultUrl ? (
-            <a href={outcome.resultUrl}>
-              {t("sectionRules.expired.viewResult")}
-            </a>
-          ) : null}
-        </CardContent>
-      </Card>
+      <div className="device-page">
+        <main className="center-main">
+          <section className="device-card max-w-xl">
+            <h1 className="screen-title">{t("sectionRules.expired.title")}</h1>
+            <p>
+              {outcome.status === "attemptExpired"
+                ? t("sectionRules.expired.attemptMessage")
+                : t("sectionRules.expired.sectionMessage")}
+            </p>
+            {outcome.status === "attemptExpired" && outcome.resultUrl ? (
+              <a
+                href={outcome.resultUrl}
+                className="device-button mt-4"
+                data-variant="secondary"
+              >
+                {t("sectionRules.expired.viewResult")}
+              </a>
+            ) : null}
+          </section>
+        </main>
+      </div>
     )
   }
 
   return (
-    <div className="bg-surface text-ink min-h-screen">
-      <header className="border-line bg-paper flex items-center justify-between border-b px-4 py-3">
-        <span className="bg-teal-bg text-teal rounded-full px-3 py-1 text-xs font-bold">
+    <div className="device-page">
+      <header className="app-bar">
+        <span
+          className={`section-chip section-chip--${sectionType}`}
+          data-section-type={sectionType}
+        >
           {t(`runner.sectionChip.${sectionType}`)}
         </span>
-        <span className="text-ink-2 text-xs font-bold">
+        <span className="grow" />
+        <span className="text-ink-2 text-[12.5px] font-bold">
           {t("sectionRules.durationBeforeStart", {
             minutes: durationMinutes,
           })}
         </span>
       </header>
-      <main className="mx-auto max-w-xl px-4 py-8">
-        <p className="text-faint mb-1 text-xs font-bold tracking-wider uppercase">
+      <main className="center-main">
+        <p className="text-faint mb-1 text-[12.5px] font-bold tracking-[0.05em] uppercase">
           {t("sectionRules.attemptEyebrow", {
             testTitle,
             number: attemptNumber,
           })}
         </p>
+        <h1 className="screen-title">{title}</h1>
+        <p className="screen-subtitle max-w-[40ch]">
+          {t("sectionRules.questionDuration", {
+            count: questionCount,
+            minutes: durationMinutes,
+          })}
+        </p>
         {finalizedPriorAttempt ? (
-          <p>
+          <p className="border-amber bg-amber/15 text-ink-2 mt-[14px] max-w-[430px] rounded-[9px] border px-[14px] py-[11px] text-left text-[13.5px] font-semibold">
             {t("sectionRules.finalizedPriorAttempt.notice")}{" "}
-            <a href={finalizedPriorAttempt.resultUrl}>
+            <a
+              href={finalizedPriorAttempt.resultUrl}
+              className="text-ink underline underline-offset-4"
+            >
               {t("sectionRules.finalizedPriorAttempt.viewLink")}
             </a>
           </p>
         ) : null}
-        <Card>
-          <CardHeader>
-            <CardTitle>{title}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-ink-2">
-              {t("sectionRules.questionDuration", {
-                count: questionCount,
-                minutes: durationMinutes,
-              })}
+        <section className="device-card mt-[16px] w-full max-w-[400px] text-left">
+          <h2 className="mb-[9px] text-sm font-extrabold">
+            {t("sectionRules.beforeYouBegin")}
+          </h2>
+          <ul className="text-ink-2 m-0 list-disc space-y-1 pl-[19px] text-sm leading-[1.75]">
+            {instructions.map((instruction) => (
+              <li key={instruction}>{instruction}</li>
+            ))}
+          </ul>
+          {outcome.status === "refused" ? (
+            <p role="alert" className="text-bad mt-3 text-sm font-semibold">
+              {refusalMessage(outcome.problem.type, t)}
             </p>
-            <p>{t("sectionRules.beforeYouBegin")}</p>
-            <ul>
-              {instructions.map((instruction) => (
-                <li key={instruction}>{instruction}</li>
-              ))}
-            </ul>
-            {outcome.status === "refused" ? (
-              <p role="alert">{refusalMessage(outcome.problem.type, t)}</p>
-            ) : null}
-          </CardContent>
-        </Card>
-        <Button
-          className="h-11 min-w-11 touch-manipulation select-none"
+          ) : null}
+        </section>
+        <button
+          type="button"
+          className="device-button mt-[18px]"
           data-testid="ready-button"
           onClick={handleReady}
           disabled={outcome.status === "entering"}
         >
           {t("sectionRules.readyButton")}
-        </Button>
+        </button>
       </main>
     </div>
   )

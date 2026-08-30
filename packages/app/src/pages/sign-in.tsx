@@ -25,32 +25,35 @@ export function SignInScreen({
   const { t } = useTranslation("runner")
 
   return (
-    <div className="bg-surface text-ink flex min-h-screen items-center justify-center px-4">
-      <div className="max-w-xs text-center">
-        <h1 className="text-ink text-[31px] font-extrabold tracking-[-0.02em]">
-          {t("library.brand")}
-        </h1>
-        <p className="text-ink-2 mt-2 mb-[18px] text-[15px] leading-relaxed">
-          {t("signIn.subtitle")}
-        </p>
-        <button
-          type="button"
-          className="border-teal bg-teal text-paper focus-visible:outline-teal inline-flex size-11 w-full touch-manipulation items-center justify-center rounded-[9px] border px-5 text-sm font-bold select-none hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-wait disabled:opacity-70"
-          disabled={starting}
-          aria-busy={starting}
-          onClick={onSignIn}
-        >
-          {t(starting ? "signIn.starting" : "signIn.button")}
-        </button>
-        {failed ? (
-          <p role="alert" className="text-bad mt-3 text-[12.5px]">
-            {t("signIn.error")}
+    <div className="device-page">
+      <main className="center-main">
+        <div className="w-full max-w-xs">
+          <h1 className="screen-title text-[31px] tracking-[-0.02em]">
+            {t("library.brand")}
+          </h1>
+          <p className="screen-subtitle mt-2 mb-[18px] text-[15px] leading-relaxed">
+            {t("signIn.subtitle")}
           </p>
-        ) : null}
-        <p className="text-faint mt-4 max-w-[38ch] text-[12.5px] leading-relaxed">
-          {t("signIn.reassurance")}
-        </p>
-      </div>
+          <button
+            type="button"
+            className="device-button"
+            data-variant="secondary"
+            disabled={starting}
+            aria-busy={starting}
+            onClick={onSignIn}
+          >
+            {t(starting ? "signIn.starting" : "signIn.button")}
+          </button>
+          {failed ? (
+            <p role="alert" className="text-bad mt-3 text-[12.5px]">
+              {t("signIn.error")}
+            </p>
+          ) : null}
+          <p className="text-faint mt-4 max-w-[38ch] text-[12.5px] leading-relaxed">
+            {t("signIn.reassurance")}
+          </p>
+        </div>
+      </main>
     </div>
   )
 }

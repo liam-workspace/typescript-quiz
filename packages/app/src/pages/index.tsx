@@ -1,4 +1,3 @@
-import { Card, CardContent } from "@liam-public/browser-react-ui"
 import { Link, createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -22,10 +21,8 @@ export async function loadLibrary(): Promise<LibraryData> {
   return { initialPage, student }
 }
 
-const primaryActionClass =
-  "inline-flex size-11 w-auto touch-manipulation items-center justify-center rounded-[9px] border border-teal bg-teal px-5 text-sm font-bold whitespace-nowrap text-paper select-none hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
-const secondaryActionClass =
-  "inline-flex size-11 w-auto touch-manipulation items-center justify-center rounded-[9px] border border-line bg-paper px-4 text-sm font-bold whitespace-nowrap text-ink select-none hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+const primaryActionClass = "device-button whitespace-nowrap"
+const secondaryActionClass = "device-button whitespace-nowrap"
 
 function CardActionLink({
   action,
@@ -68,6 +65,7 @@ function CardActionLink({
           to="/attempts/$attemptId/result"
           params={{ attemptId: action.attemptId }}
           className={secondaryActionClass}
+          data-variant="secondary"
         >
           {t("library.action.seeResult")}
         </Link>
@@ -85,9 +83,7 @@ function TestLibraryCard({ test }: { readonly test: TestCard }) {
   return (
     <article
       aria-labelledby={titleId}
-      className={`bg-paper rounded-[11px] border px-[19px] py-[17px] ${
-        highlighted ? "border-teal" : "border-line"
-      }`}
+      className={`device-card ${highlighted ? "border-teal" : "border-line"}`}
     >
       <div className="flex flex-wrap items-start gap-3.5">
         <div className="min-w-0 flex-[1_1_15rem]">
@@ -166,43 +162,39 @@ export function LibraryScreen({ initialPage, student }: LibraryScreenProps) {
   }
 
   return (
-    <div className="bg-surface text-ink min-h-screen">
-      <header className="border-line bg-paper border-b">
-        <div className="mx-auto flex min-h-14 max-w-4xl items-center gap-3 px-4 sm:px-6">
-          <span className="text-ink font-extrabold tracking-tight">
-            {t("library.brand")}
-          </span>
-          <span className="grow" />
-          {student ? (
-            <>
-              <span className="text-ink truncate text-sm font-bold">
-                {student.displayName}
-              </span>
-              <span
-                aria-hidden="true"
-                className="bg-teal text-paper grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold"
-              >
-                {student.displayName[0]}
-              </span>
-            </>
-          ) : null}
-        </div>
+    <div className="device-page">
+      <header className="app-bar">
+        <span className="app-brand">{t("library.brand")}</span>
+        <span className="grow" />
+        {student ? (
+          <>
+            <span className="truncate text-[13.5px] font-bold">
+              {student.displayName}
+            </span>
+            <span
+              aria-hidden="true"
+              className="bg-teal text-paper grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold"
+            >
+              {student.displayName[0]}
+            </span>
+          </>
+        ) : null}
       </header>
 
-      <main className="mx-auto max-w-4xl px-4 py-7 sm:px-6 sm:py-9">
-        <h1 className="text-ink text-[21px] font-extrabold tracking-[-0.015em]">
+      <main className="device-main">
+        <h1 className="screen-title">
           {student
             ? t("library.greeting.named", { name: student.displayName })
             : t("library.greeting.anonymous")}
         </h1>
-        <p className="text-ink-2 mt-1 text-sm">
+        <p className="screen-subtitle">
           {t("library.waiting", { count: tests.length })}
         </p>
 
         {tests.length === 0 ? (
           <p
             role="status"
-            className="border-line bg-paper text-ink-2 mt-5 rounded-[11px] border border-dashed px-5 py-8 text-center font-semibold"
+            className="device-card text-ink-2 mt-5 border-dashed py-8 text-center font-semibold"
           >
             {t("library.empty")}
           </p>
@@ -217,7 +209,8 @@ export function LibraryScreen({ initialPage, student }: LibraryScreenProps) {
         {nextCursor !== null ? (
           <button
             type="button"
-            className="border-line bg-paper text-ink hover:bg-surface focus-visible:outline-teal disabled:text-faint mt-[11px] size-11 w-full touch-manipulation rounded-[9px] border px-4 text-sm font-bold select-none focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-wait"
+            className="device-button mt-[11px] w-full"
+            data-variant="secondary"
             disabled={loading}
             aria-busy={loading}
             onClick={loadMore}
@@ -231,7 +224,7 @@ export function LibraryScreen({ initialPage, student }: LibraryScreenProps) {
           </p>
         ) : null}
 
-        <div className="border-line mt-5 flex flex-wrap items-center gap-3 border-t pt-5">
+        <div className="mt-[17px] flex flex-wrap items-center gap-3">
           <dl className="flex flex-1 flex-wrap gap-6">
             <div>
               <dt className="text-faint text-[11px] font-bold tracking-[0.07em] uppercase">
@@ -266,7 +259,11 @@ export function LibraryScreen({ initialPage, student }: LibraryScreenProps) {
               </dd>
             </div>
           </dl>
-          <Link to="/history" className={secondaryActionClass}>
+          <Link
+            to="/history"
+            className={secondaryActionClass}
+            data-variant="secondary"
+          >
             {t("library.allAttempts")}
           </Link>
         </div>
@@ -284,14 +281,14 @@ export function LibraryRouteError({ error }: LibraryRouteErrorProps) {
   const unauthorized = error instanceof ApiError && error.problem.status === 401
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-12">
-      <Card className="border-line bg-paper">
-        <CardContent>
+    <div className="device-page">
+      <main className="center-main">
+        <div className="device-card max-w-xl">
           <p role="alert">
             {t(unauthorized ? "library.unauthorized" : "library.error")}
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </main>
     </div>
   )
 }

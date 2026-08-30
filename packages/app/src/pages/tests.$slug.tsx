@@ -60,20 +60,14 @@ export function TestBriefScreen({ brief, navigate }: TestBriefScreenProps) {
   }
 
   return (
-    <div className="bg-surface text-ink flex min-h-screen flex-col">
-      <header className="border-line bg-paper border-b">
-        <div className="mx-auto flex min-h-14 max-w-4xl items-center px-4 sm:px-6">
-          <span className="text-ink font-extrabold tracking-tight">
-            {t("library.brand")}
-          </span>
-        </div>
+    <div className="device-page">
+      <header className="app-bar">
+        <span className="app-brand">{t("library.brand")}</span>
       </header>
 
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-7 sm:px-6 sm:py-9">
-        <h1 className="text-ink text-[21px] font-extrabold tracking-[-0.015em]">
-          {brief.title}
-        </h1>
-        <p className="text-ink-2 mt-1 text-sm">
+      <main className="device-main">
+        <h1 className="screen-title">{brief.title}</h1>
+        <p className="screen-subtitle mb-4">
           {t("brief.summary", {
             step,
             sectionCount:
@@ -96,10 +90,13 @@ export function TestBriefScreen({ brief, navigate }: TestBriefScreenProps) {
               <article
                 key={section.id}
                 aria-labelledby={titleId}
-                className="border-line bg-paper rounded-[11px] border px-[19px] py-[17px]"
+                className="device-card"
               >
                 <div className="flex flex-wrap items-center gap-x-[11px] gap-y-2">
-                  <span className="bg-teal-bg text-teal rounded-full px-3 py-1 text-xs font-bold">
+                  <span
+                    className={`section-chip section-chip--${section.type}`}
+                    data-section-type={section.type}
+                  >
                     {t(`library.section.${section.type}`)}
                   </span>
                   <h2 id={titleId} className="text-sm font-bold">
@@ -127,7 +124,7 @@ export function TestBriefScreen({ brief, navigate }: TestBriefScreenProps) {
           })}
         </div>
 
-        <p className="border-line bg-teal-bg text-ink-2 mt-[15px] rounded-[9px] border px-4 py-3 text-sm leading-relaxed">
+        <p className="border-amber bg-amber/15 text-ink-2 mt-[15px] rounded-[9px] border px-4 py-3 text-sm leading-relaxed font-semibold">
           {t("brief.saveNotice")}
         </p>
         {startFailed ? (
@@ -137,24 +134,20 @@ export function TestBriefScreen({ brief, navigate }: TestBriefScreenProps) {
         ) : null}
       </main>
 
-      <footer className="border-line bg-paper sticky bottom-0 border-t">
-        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <a
-            href="/"
-            className="border-line bg-paper text-ink hover:bg-surface focus-visible:outline-teal inline-flex size-11 w-auto touch-manipulation items-center justify-center rounded-[9px] border px-4 text-sm font-bold select-none focus-visible:outline-2 focus-visible:outline-offset-2"
-          >
-            {t("brief.back")}
-          </a>
-          <button
-            type="button"
-            className="border-teal bg-teal text-paper focus-visible:outline-teal inline-flex size-11 w-auto touch-manipulation items-center justify-center rounded-[9px] border px-5 text-sm font-bold select-none hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-wait disabled:opacity-70"
-            disabled={starting || !firstSection}
-            aria-busy={starting}
-            onClick={() => void handleStart()}
-          >
-            {t(starting ? "brief.starting" : "brief.start")}
-          </button>
-        </div>
+      <footer className="device-footer sticky bottom-0">
+        <a href="/" className="device-button" data-variant="secondary">
+          {t("brief.back")}
+        </a>
+        <span className="grow" />
+        <button
+          type="button"
+          className="device-button"
+          disabled={starting || !firstSection}
+          aria-busy={starting}
+          onClick={() => void handleStart()}
+        >
+          {t(starting ? "brief.starting" : "brief.start")}
+        </button>
       </footer>
     </div>
   )
@@ -173,20 +166,19 @@ export function TestBriefRouteError({ error }: TestBriefRouteErrorProps) {
   const notFound = error instanceof ApiError && error.problem.status === 404
 
   return (
-    <div className="bg-surface min-h-screen px-4 py-12">
-      <Card className="border-line bg-paper mx-auto max-w-xl">
-        <CardContent className="space-y-4">
-          <p role="alert">
-            {t(notFound ? "brief.unavailable" : "brief.error")}
-          </p>
-          <a
-            href="/"
-            className="text-teal focus-visible:outline-teal inline-flex size-11 w-auto touch-manipulation items-center justify-center px-4 font-bold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
-          >
-            {t("brief.backToLibrary")}
-          </a>
-        </CardContent>
-      </Card>
+    <div className="device-page">
+      <main className="center-main">
+        <Card className="device-card max-w-xl">
+          <CardContent className="space-y-4">
+            <p role="alert">
+              {t(notFound ? "brief.unavailable" : "brief.error")}
+            </p>
+            <a href="/" className="device-button" data-variant="ghost">
+              {t("brief.backToLibrary")}
+            </a>
+          </CardContent>
+        </Card>
+      </main>
     </div>
   )
 }

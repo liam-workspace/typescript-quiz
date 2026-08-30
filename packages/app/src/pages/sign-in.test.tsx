@@ -22,6 +22,17 @@ describe("SignInScreen", () => {
     ).toBeInTheDocument()
   })
 
+  it("uses the centered device sign-in hierarchy and a provider-neutral secondary button", () => {
+    render(<SignInScreen onSignIn={vi.fn()} starting={false} />)
+
+    expect(screen.getByRole("main")).toHaveClass("center-main")
+    expect(screen.getByRole("button")).toHaveClass("device-button")
+    expect(screen.getByRole("button")).toHaveAttribute(
+      "data-variant",
+      "secondary",
+    )
+  })
+
   it("renders exactly one sign-in button whose copy names no provider", () => {
     render(<SignInScreen onSignIn={vi.fn()} starting={false} />)
 

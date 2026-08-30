@@ -62,6 +62,16 @@ describe("SectionRulesScreen", () => {
     expect(screen.getByText("Practice Test 04 · Attempt 3")).toBeInTheDocument()
   })
 
+  it("uses the centered device rules layout and a semantic section chip", () => {
+    render(<SectionRulesScreen {...baseProps} navigate={vi.fn()} />)
+
+    expect(screen.getByRole("banner")).toHaveClass("app-bar")
+    expect(screen.getByRole("main")).toHaveClass("center-main")
+    expect(
+      screen.getByText("Listening", { selector: "[data-section-type]" }),
+    ).toHaveAttribute("data-section-type", "listening")
+  })
+
   it("loads the section intro from the canonical runner envelope without starting its clock", async () => {
     mockGetRunnerEnvelope.mockResolvedValue({
       id: "attempt-1",

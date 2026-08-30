@@ -196,6 +196,21 @@ describe("testDocumentSchema", () => {
       expect(parsed.sections[0].groups[0].stimulus?.imageSvg).toBe(pictogram)
     })
 
+    // Real TOEFL Primary content (a mailbox pictogram with an "M" printed
+    // on it) uses <text>, found only by running the allowlist against all
+    // 5 real fixture files -- not by guessing at the source's vocabulary
+    // up front. Pinned here so a future edit cannot silently narrow the
+    // allowlist back to where that content stops validating.
+    it("accepts a pictogram with a text label", () => {
+      const withLabel =
+        '<svg viewBox="0 0 100 100"><path d="M34 40 L34 80" fill="none" stroke="currentColor"/><text x="50" y="66" font-size="16" text-anchor="middle" fill="currentColor">M</text></svg>'
+      const parsed = testDocumentSchema.parse(docWithChoiceImage(withLabel))
+
+      expect(
+        parsed.sections[0].groups[0].questions[0].choices[0].imageSvg,
+      ).toBe(withLabel)
+    })
+
     it.each([
       ["a script tag", `${pictogram}<script>alert(1)</script>`],
       ["an onload handler", '<svg onload="alert(1)"><path d="M0 0"/></svg>'],

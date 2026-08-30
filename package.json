@@ -17,6 +17,7 @@
     "format": "prettier --check . --log-level warn",
     "format:fix": "prettier --write . --log-level warn",
     "seed": "pnpm build && dotenv -e .env -- node scripts/seed-test.ts",
+    "import:toefl-primary": "pnpm build && node scripts/import-toefl-primary.ts",
     "lint:api": "redocly lint docs/api/openapi.yaml"
   },
   "dependencies": {

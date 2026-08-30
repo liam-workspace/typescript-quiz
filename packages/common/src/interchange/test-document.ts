@@ -25,6 +25,7 @@ const SVG_ALLOWED_TAGS = new Set([
   "line",
   "polyline",
   "polygon",
+  "text",
 ])
 
 const SVG_ALLOWED_ATTRS = new Set([
@@ -53,6 +54,8 @@ const SVG_ALLOWED_ATTRS = new Set([
   "transform",
   "width",
   "height",
+  "font-size",
+  "text-anchor",
 ])
 
 const SVG_TAG_PATTERN = /<\/?([a-zA-Z][\w-]*)/gu

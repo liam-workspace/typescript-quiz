@@ -192,6 +192,9 @@ describe("test brief page", () => {
     expect(
       screen.getByRole("link", { name: "Back to test library" }),
     ).toHaveAttribute("href", "/")
+    expect(screen.getByRole("alert").closest("section")).toHaveClass(
+      "device-card",
+    )
   })
 
   it("starts once and navigates to the first section's rules with the returned attempt id", async () => {

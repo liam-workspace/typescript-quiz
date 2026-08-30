@@ -1,4 +1,3 @@
-import { Card, CardContent } from "@liam-public/browser-react-ui"
 import { createFileRoute, defaultStringifySearch } from "@tanstack/react-router"
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -168,16 +167,16 @@ export function TestBriefRouteError({ error }: TestBriefRouteErrorProps) {
   return (
     <div className="device-page">
       <main className="center-main">
-        <Card className="device-card max-w-xl">
-          <CardContent className="space-y-4">
-            <p role="alert">
-              {t(notFound ? "brief.unavailable" : "brief.error")}
-            </p>
+        <section className="device-card">
+          <p role="alert">
+            {t(notFound ? "brief.unavailable" : "brief.error")}
+          </p>
+          <p>
             <a href="/" className="device-button" data-variant="ghost">
               {t("brief.backToLibrary")}
             </a>
-          </CardContent>
-        </Card>
+          </p>
+        </section>
       </main>
     </div>
   )

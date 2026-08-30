@@ -34,7 +34,7 @@ describe("QuestionMedia", () => {
     cleanup()
   })
 
-  it("renders a passage's bodyText", () => {
+  it("renders a passage's bodyText in the passage region", () => {
     render(
       <QuestionMedia
         stimulus={passage}
@@ -43,7 +43,7 @@ describe("QuestionMedia", () => {
       />,
     )
 
-    expect(screen.getByText("Once upon a time...")).toBeInTheDocument()
+    expect(screen.getByText("Once upon a time...")).toHaveClass("passage")
   })
 
   it("renders an open image using the runner's mediaUrl verbatim", () => {
@@ -96,6 +96,7 @@ describe("QuestionMedia", () => {
 
     const button = screen.getByRole("button", { name: "Play recording" })
     expect(button).toBeEnabled()
+    expect(button).toHaveClass("play-button")
 
     await user.click(button)
 

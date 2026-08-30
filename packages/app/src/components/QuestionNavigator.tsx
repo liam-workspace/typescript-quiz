@@ -56,7 +56,7 @@ export function QuestionNavigator({
 
   return (
     <Sheet modal={false} open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex flex-col gap-3">
+      <SheetContent side="right" className="question-panel">
         <DialogTitle>
           {source.mode === "review"
             ? t("navigator.reviewTitle")
@@ -70,13 +70,17 @@ export function QuestionNavigator({
                 total: totalCount,
               })}
         </DialogDescription>
-        <div className="-mx-1 flex-1 overflow-y-auto px-1">
+        <div className="question-panel-groups">
           {groups.map((group) => (
-            <div key={group.sectionId} className="mb-4">
-              <div className="mb-2 text-[10.5px] font-extrabold tracking-wide uppercase">
+            <section key={group.sectionId} className="question-group">
+              <h3 id={`question-group-${group.sectionId}`}>
                 {t(SECTION_LABEL_KEY[group.sectionType])}
-              </div>
-              <div className="grid grid-cols-5 gap-1.5">
+              </h3>
+              <div
+                role="group"
+                aria-label={`${t(SECTION_LABEL_KEY[group.sectionType])} questions`}
+                className="question-grid"
+              >
                 {group.cells.map((cell) => (
                   <button
                     key={cell.questionId}
@@ -98,7 +102,7 @@ export function QuestionNavigator({
                   </button>
                 ))}
               </div>
-            </div>
+            </section>
           ))}
         </div>
         {/*
@@ -108,7 +112,10 @@ export function QuestionNavigator({
           meaning, which tells a colour-blind child nothing at all -- and
           the brief supplies these five strings precisely so it need not be.
         */}
-        <ul className="flex flex-wrap gap-x-4 gap-y-1.5 border-t border-stone-200 pt-2.5 text-xs text-stone-600">
+        <ul
+          aria-label={t("navigator.legend", { defaultValue: "Question status" })}
+          className="question-legend"
+        >
           {(source.mode === "review"
             ? (["correct", "incorrect", "blank"] as const)
             : (["answered", "current", "blank"] as const)
@@ -125,7 +132,7 @@ export function QuestionNavigator({
         </ul>
         {source.mode === "runner" &&
         source.sections.some((s) => s.navigation === "forward_only") ? (
-          <p className="rounded-md bg-[var(--d-surface,theme(colors.slate.100))] p-2 text-xs">
+          <p className="question-panel-note">
             {t("navigator.forwardOnlyNote")}
           </p>
         ) : null}

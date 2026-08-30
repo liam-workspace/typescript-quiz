@@ -33,6 +33,20 @@ describe("ChoiceList -- single_choice", () => {
     expect(onSelect).toHaveBeenCalledExactlyOnceWith("c-2")
   })
 
+  it("exposes the single-choice radio group as a choice stack", () => {
+    render(
+      <ChoiceList
+        choices={choices}
+        questionType="single_choice"
+        selectedIds={[]}
+        onSelect={vi.fn()}
+        locked={false}
+      />,
+    )
+
+    expect(screen.getByRole("radiogroup")).toHaveClass("choice-stack")
+  })
+
   it("renders the currently selected choice with aria-checked=true", () => {
     render(
       <ChoiceList
@@ -204,6 +218,22 @@ describe("ChoiceList -- multi_choice", () => {
 
     expect(screen.getAllByRole("checkbox")).toHaveLength(2)
     expect(screen.queryAllByRole("radio")).toHaveLength(0)
+  })
+
+  it("exposes the multi-choice controls as a choice stack", () => {
+    render(
+      <ChoiceList
+        choices={choices}
+        questionType="multi_choice"
+        selectedIds={[]}
+        onSelect={vi.fn()}
+        locked={false}
+      />,
+    )
+
+    expect(
+      screen.getByRole("group", { name: /select all that apply/i }),
+    ).toHaveClass("choice-stack")
   })
 
   it("calls onSelect with a choice's id when it is tapped", async () => {

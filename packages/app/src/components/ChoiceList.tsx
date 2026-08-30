@@ -68,7 +68,11 @@ function MultiChoiceList({
       <p className="mb-2 text-sm text-stone-600">
         {t("choices.selectAllThatApply")}
       </p>
-      <div role="group" aria-label={t("choices.selectAllThatApply")}>
+      <div
+        role="group"
+        aria-label={t("choices.selectAllThatApply")}
+        className="choice-stack"
+      >
         {choices.map((choice) => (
           <label key={choice.id} className={CHOICE_ROW_CLASS}>
             <Checkbox.Root
@@ -105,6 +109,7 @@ function SingleChoiceList({
         value={selectedIds[0] ?? null}
         onValueChange={onSelect}
         disabled={locked}
+        className="choice-stack"
       >
         {choices.map((choice) => (
           <label key={choice.id} className={CHOICE_ROW_CLASS}>

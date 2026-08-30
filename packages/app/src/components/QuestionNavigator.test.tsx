@@ -85,6 +85,20 @@ describe("QuestionNavigator", () => {
     ).toBeInTheDocument()
   })
 
+  it("groups question grids and their legend in the prototype navigator panel", () => {
+    renderNavigator(forwardOnlySource)
+
+    expect(screen.getByRole("dialog", { name: "Questions" })).toHaveClass(
+      "question-panel",
+    )
+    expect(
+      screen.getByRole("group", { name: "Listening questions" }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("list", { name: "Question status" }),
+    ).toBeInTheDocument()
+  })
+
   it("disables every cell in a forward_only section", () => {
     renderNavigator(forwardOnlySource)
     const dialog = screen.getByRole("dialog")

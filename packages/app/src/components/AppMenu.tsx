@@ -52,104 +52,104 @@ export function AppMenu({
       <SheetContent
         side="left"
         aria-describedby={undefined}
-        className="flex flex-col gap-1"
+        className="device-drawer-panel"
       >
         <DialogTitle>{t("menu.title")}</DialogTitle>
 
-        <div className="mb-2 flex items-center gap-2 border-b border-stone-200 pb-3">
-          <span
-            aria-hidden="true"
-            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-teal-700 font-bold text-white"
-          >
-            {student?.displayName[0] ?? "?"}
-          </span>
-          <span className="min-w-0">
-            <b className="block truncate text-sm text-stone-900">
-              {student?.displayName}
-            </b>
-            <span className="block truncate text-xs text-stone-500">
-              {student?.email}
+        <nav aria-label={t("menu.title")} className="device-drawer">
+          <header className="device-drawer-student">
+            <span aria-hidden="true" className="device-drawer-avatar">
+              {student?.displayName[0] ?? "?"}
             </span>
-          </span>
-        </div>
+            <span className="min-w-0">
+              <b className="block truncate text-sm text-ink">
+                {student?.displayName}
+              </b>
+              <span className="block truncate text-xs text-ink-2">
+                {student?.email}
+              </span>
+            </span>
+          </header>
 
-        <button
-          type="button"
-          className="size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-stone-800 select-none hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
-          onClick={onGoLibrary}
-        >
-          {t("menu.library")}
-        </button>
-        <button
-          type="button"
-          className="size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-stone-800 select-none hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
-          onClick={onGoHistory}
-        >
-          {t("menu.history")}
-        </button>
-
-        {inTest ? (
-          <>
-            <hr className="my-2 border-stone-200" />
+          <div
+            role="group"
+            aria-label={t("menu.primaryNavigation", {
+              defaultValue: "Main menu",
+            })}
+            className="device-drawer-actions"
+          >
             <button
               type="button"
               className="size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-stone-800 select-none hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
-              onClick={onLeaveTest}
+              onClick={onGoLibrary}
             >
-              {t("menu.leaveTest")}
+              {t("menu.library")}
             </button>
-            <p className="px-3 text-xs leading-relaxed text-stone-500">
-              {clockStarted
-                ? t("menu.leaveTestNoteRunning")
-                : t("menu.leaveTestNoteBeforeStart")}
-            </p>
-          </>
-        ) : null}
+            <button
+              type="button"
+              className="size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-stone-800 select-none hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+              onClick={onGoHistory}
+            >
+              {t("menu.history")}
+            </button>
 
-        <div className="mt-auto border-t border-stone-200 pt-3">
-          <div
-            id="app-menu-language-label"
-            className="mb-2 text-[11px] font-extrabold tracking-wide text-stone-500 uppercase"
-          >
-            {t("menu.language")}
-          </div>
-          <div
-            role="group"
-            aria-labelledby="app-menu-language-label"
-            className="flex flex-wrap gap-1.5"
-          >
-            {LANGUAGES.map((language) => {
-              const selected = selectedLanguage === language
-
-              return (
+            {inTest ? (
+              <>
+                <hr />
                 <button
-                  key={language}
                   type="button"
-                  aria-pressed={selected}
-                  className={`size-11 touch-manipulation rounded-md border text-xs font-bold uppercase select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 ${
-                    selected
-                      ? "border-teal-700 bg-teal-100 text-teal-900"
-                      : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
-                  }`}
-                  onClick={() => {
-                    void i18n.changeLanguage(language)
-                  }}
+                  className="size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-stone-800 select-none hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+                  onClick={onLeaveTest}
                 >
-                  {language}
+                  {t("menu.leaveTest")}
                 </button>
-              )
-            })}
+                <p>
+                  {clockStarted
+                    ? t("menu.leaveTestNoteRunning")
+                    : t("menu.leaveTestNoteBeforeStart")}
+                </p>
+              </>
+            ) : null}
           </div>
-          <button
-            type="button"
-            className="mt-2 size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-red-600 select-none hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-            onClick={() => {
-              onSignOut()
-            }}
-          >
-            {t("menu.signOut")}
-          </button>
-        </div>
+
+          <footer className="device-drawer-footer">
+            <div id="app-menu-language-label">{t("menu.language")}</div>
+            <div
+              role="group"
+              aria-labelledby="app-menu-language-label"
+              className="device-drawer-languages"
+            >
+              {LANGUAGES.map((language) => {
+                const selected = selectedLanguage === language
+
+                return (
+                  <button
+                    key={language}
+                    type="button"
+                    aria-pressed={selected}
+                    className={`size-11 touch-manipulation rounded-md border text-xs font-bold uppercase select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 ${
+                      selected
+                        ? "border-teal-700 bg-teal-100 text-teal-900"
+                        : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
+                    }`}
+                    onClick={() => {
+                      void i18n.changeLanguage(language)
+                    }}
+                  >
+                    {language}
+                  </button>
+                )
+              })}
+            </div>
+            <button
+              type="button"
+              className="device-drawer-sign-out size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-red-600 select-none hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              onClick={onSignOut}
+            >
+              {t("menu.signOut")}
+            </button>
+          </footer>
+        </nav>
       </SheetContent>
     </Sheet>
   )

@@ -68,6 +68,20 @@ describe("AppMenu", () => {
     expect(screen.getByRole("dialog", { name: "Menu" })).toBeInTheDocument()
   })
 
+  it("groups the student, navigation, language, and sign-out controls in the device menu", () => {
+    renderMenu()
+
+    const menu = screen.getByRole("navigation", { name: "Menu" })
+
+    expect(menu).toHaveClass("device-drawer")
+    expect(screen.getByText("Tom")).toBeInTheDocument()
+    expect(
+      screen.getByRole("group", { name: "Main menu" }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole("group", { name: "Language" })).toBeInTheDocument()
+    expect(screen.getByRole("contentinfo")).toHaveTextContent("Sign out")
+  })
+
   it("shows the signed-in student's display name", () => {
     renderMenu()
     expect(screen.getByText("Tom")).toBeInTheDocument()

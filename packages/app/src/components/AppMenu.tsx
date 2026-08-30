@@ -52,7 +52,7 @@ export function AppMenu({
       <SheetContent
         side="left"
         aria-describedby={undefined}
-        className="device-drawer-panel"
+        className="device-drawer-panel !w-[min(22rem,calc(100vw-1rem))] !max-w-[calc(100vw-1rem)] !gap-3 !p-[18px]"
       >
         <DialogTitle>{t("menu.title")}</DialogTitle>
 
@@ -73,9 +73,7 @@ export function AppMenu({
 
           <div
             role="group"
-            aria-label={t("menu.primaryNavigation", {
-              defaultValue: "Main menu",
-            })}
+            aria-label={t("menu.primaryNavigation")}
             className="device-drawer-actions"
           >
             <button

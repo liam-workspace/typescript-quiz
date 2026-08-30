@@ -2,7 +2,7 @@ import { cleanup, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import i18next from "i18next"
 import { I18nextProvider, initReactI18next } from "react-i18next"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { NavigatorSource } from "../lib/navigator-state.js"
 import { QuestionNavigator } from "./QuestionNavigator.js"
 
@@ -28,12 +28,28 @@ await i18n.use(initReactI18next).init({
           legendBlank: "Not answered",
           legendCorrect: "Correct",
           legendIncorrect: "Wrong",
+          questionGridLabel: "{{section}} questions",
+          legendLabel: "Question status",
           forwardOnlyNote:
             "This section runs forward only. The navigator shows where you are but cannot move you.",
         },
       },
     },
+    fr: {
+      runner: {
+        navigator: {
+          title: "Questions",
+          sectionListening: "Écoute",
+          questionGridLabel: "Questions d’écoute",
+          legendLabel: "État des questions",
+        },
+      },
+    },
   },
+})
+
+beforeEach(async () => {
+  await i18n.changeLanguage("en")
 })
 
 afterEach(() => {
@@ -97,6 +113,37 @@ describe("QuestionNavigator", () => {
     expect(
       screen.getByRole("list", { name: "Question status" }),
     ).toBeInTheDocument()
+  })
+
+  it("uses the responsive panel dimensions with utility precedence", () => {
+    renderNavigator(forwardOnlySource)
+
+    expect(screen.getByRole("dialog", { name: "Questions" })).toHaveClass(
+      "!w-[min(22rem,calc(100vw-1rem))]",
+      "!max-w-[calc(100vw-1rem)]",
+      "!gap-3",
+      "!p-[18px]",
+    )
+  })
+
+  it("localizes question-grid and legend labels", async () => {
+    await i18n.changeLanguage("fr")
+    renderNavigator(forwardOnlySource)
+
+    expect(
+      screen.getByRole("group", { name: "Questions d’écoute" }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("list", { name: "État des questions" }),
+    ).toBeInTheDocument()
+  })
+
+  it("uses IBM Plex Mono for numeric question cells", () => {
+    renderNavigator(forwardOnlySource)
+
+    expect(screen.getByRole("button", { name: "Question 1" })).toHaveClass(
+      "font-mono",
+    )
   })
 
   it("disables every cell in a forward_only section", () => {

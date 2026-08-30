@@ -56,7 +56,10 @@ export function QuestionNavigator({
 
   return (
     <Sheet modal={false} open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="question-panel">
+      <SheetContent
+        side="right"
+        className="question-panel !w-[min(22rem,calc(100vw-1rem))] !max-w-[calc(100vw-1rem)] !gap-3 !p-[18px]"
+      >
         <DialogTitle>
           {source.mode === "review"
             ? t("navigator.reviewTitle")
@@ -78,7 +81,9 @@ export function QuestionNavigator({
               </h3>
               <div
                 role="group"
-                aria-label={`${t(SECTION_LABEL_KEY[group.sectionType])} questions`}
+                aria-label={t("navigator.questionGridLabel", {
+                  section: t(SECTION_LABEL_KEY[group.sectionType]),
+                })}
                 className="question-grid"
               >
                 {group.cells.map((cell) => (
@@ -93,7 +98,7 @@ export function QuestionNavigator({
                       ordinal: cell.ordinal,
                     })}
                     data-status={cell.status}
-                    className="np-cell size-11 text-sm"
+                    className="np-cell size-11 font-mono text-sm"
                     onClick={() => {
                       onNavigate(group.sectionId, cell.questionId)
                     }}
@@ -113,7 +118,7 @@ export function QuestionNavigator({
           the brief supplies these five strings precisely so it need not be.
         */}
         <ul
-          aria-label={t("navigator.legend", { defaultValue: "Question status" })}
+          aria-label={t("navigator.legendLabel")}
           className="question-legend"
         >
           {(source.mode === "review"

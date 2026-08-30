@@ -36,7 +36,7 @@ export interface ChoiceListProps {
 // `.choice` is the prototype's own rule (src/index.css), not a local
 // invention: border, padding, the 44px floor and the selected state all
 // come from the design system rather than being re-derived per component.
-const CHOICE_ROW_CLASS = "choice mb-2"
+const CHOICE_ROW_CLASS = "choice"
 
 // The source pictograms are authored with `stroke="currentColor"` so they
 // pick up `.choice`'s ink/selected colour -- only true of markup rendered

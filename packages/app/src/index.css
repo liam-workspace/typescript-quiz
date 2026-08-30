@@ -45,6 +45,7 @@
  * ground.
  */
 @theme {
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --color-ink: #1c2530;
   --color-ink-2: #55636f;
   --color-faint: #8d9aa6;
@@ -91,6 +92,11 @@
   select,
   textarea {
     font: inherit;
+  }
+
+  .timer,
+  .tabular-nums {
+    font-family: var(--font-mono);
   }
 
   :focus-visible {
@@ -429,7 +435,6 @@
     gap: 9px;
     margin-top: 15px;
   }
-  .choice-stack .choice { margin-bottom: 0; }
   .audio-box {
     display: flex;
     flex-direction: column;

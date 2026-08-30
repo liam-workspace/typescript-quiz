@@ -45,6 +45,8 @@ describe("ChoiceList -- single_choice", () => {
     )
 
     expect(screen.getByRole("radiogroup")).toHaveClass("choice-stack")
+    expect(screen.getByRole("radio", { name: "A dog" }).closest("label"))
+      .not.toHaveClass("mb-2")
   })
 
   it("renders the currently selected choice with aria-checked=true", () => {

@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest"
 
 const REQUIRED_LOCALES = ["de", "en", "es", "fr", "it", "ja"]
 
+const REQUIRED_DEVICE_LABEL_KEYS = [
+  "runner:menu.primaryNavigation",
+  "runner:navigator.questionGridLabel",
+  "runner:navigator.legendLabel",
+]
+
 const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/u
 
 const modules = import.meta.glob("./*/*.json", { eager: true })
@@ -90,6 +96,18 @@ describe("locale parity", () => {
         missing: [],
         extra: [],
       })
+    }
+  })
+
+  it("translates the accessible labels introduced by the device overlays", () => {
+    const byLocale = keysByLocale()
+
+    for (const locale of REQUIRED_LOCALES) {
+      const keys = byLocale.get(locale) ?? new Set<string>()
+
+      expect([...REQUIRED_DEVICE_LABEL_KEYS].filter((key) => !keys.has(key))).toEqual(
+        [],
+      )
     }
   })
 })

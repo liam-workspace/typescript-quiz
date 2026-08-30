@@ -15,6 +15,7 @@ const menuResources = {
   "menu.leaveTestNoteRunning": "The clock keeps running while you are away.",
   "menu.language": "Language",
   "menu.signOut": "Sign out",
+  "menu.primaryNavigation": "Main menu",
   "menu.openLabel": "Open menu",
 }
 
@@ -24,7 +25,13 @@ await i18n.use(initReactI18next).init({
   fallbackLng: "en",
   resources: {
     en: { runner: menuResources },
-    fr: { runner: menuResources },
+    fr: {
+      runner: {
+        ...menuResources,
+        "menu.title": "Menu français",
+        "menu.primaryNavigation": "Navigation principale",
+      },
+    },
   },
 })
 
@@ -80,6 +87,26 @@ describe("AppMenu", () => {
     ).toBeInTheDocument()
     expect(screen.getByRole("group", { name: "Language" })).toBeInTheDocument()
     expect(screen.getByRole("contentinfo")).toHaveTextContent("Sign out")
+  })
+
+  it("uses the responsive panel dimensions with utility precedence", () => {
+    renderMenu()
+
+    expect(screen.getByRole("dialog", { name: "Menu" })).toHaveClass(
+      "!w-[min(22rem,calc(100vw-1rem))]",
+      "!max-w-[calc(100vw-1rem)]",
+      "!gap-3",
+      "!p-[18px]",
+    )
+  })
+
+  it("localizes the primary navigation label", async () => {
+    await i18n.changeLanguage("fr")
+    renderMenu()
+
+    expect(
+      screen.getByRole("group", { name: "Navigation principale" }),
+    ).toBeInTheDocument()
   })
 
   it("shows the signed-in student's display name", () => {

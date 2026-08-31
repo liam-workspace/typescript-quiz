@@ -1,4 +1,3 @@
-import { Button } from "@liam-public/browser-react-ui"
 import { useTranslation } from "react-i18next"
 import type { RunnerQuestion, StimulusWire } from "../lib/api-types.js"
 import { ChoiceList } from "./ChoiceList.js"
@@ -15,6 +14,24 @@ import { QuestionMedia } from "./QuestionMedia.js"
 export interface ReadingExpiredState {
   readonly kind: "section" | "attempt"
   readonly resultUrl: string | null
+}
+
+type QuestionPipState = "done" | "now" | "future"
+
+function questionPipState(
+  pip: QuestionPip,
+  index: number,
+  currentIndex: number,
+): QuestionPipState {
+  if (index < currentIndex) {
+    return "done"
+  }
+
+  if (pip.current) {
+    return "now"
+  }
+
+  return "future"
 }
 
 export interface ReadingRunnerProps {
@@ -45,18 +62,10 @@ export interface ReadingRunnerProps {
   readonly questionCount: number
   // Same read-only pip strip as ListeningRunner: one entry per question in
   // the CURRENT section, in section order, rendered as plain <span>s. A
-  // `free` section allows backward navigation via the Previous button
-  // below, not by tapping an earlier pip.
+  // `free` section allows backward navigation through the route-owned
+  // Previous button, not by tapping an earlier pip.
   readonly pips: readonly QuestionPip[]
-  readonly hasPrevious: boolean
-  readonly onPrevious: () => void
-  readonly hasNext: boolean
-  readonly onNext: () => void
   readonly expired: ReadingExpiredState | null
-  // Supplied by the page, because navigation is state and `components/` is
-  // stateless by policy. Present since plan 5 gave the hand-in dialog a
-  // route; before that the button was deliberately inert.
-  readonly onHandIn: () => void
 }
 
 // Purely presentational -- same discipline as ListeningRunner (components/
@@ -64,14 +73,8 @@ export interface ReadingRunnerProps {
 // useState/useEffect anywhere under components/). All state (current
 // question, in-flight responses, the expired state) lives in
 // pages/attempts.$attemptId.run.tsx. Shares ChoiceList and QuestionMedia
-// with ListeningRunner; the two things that actually differ for THIS
-// section are navigation (a `free` section gets an enabled Previous button,
-// unlike listening's forward_only) and answer-change (`locked` flows from
-// the same allowAnswerChange formula rather than a second hardcoded rule).
-// The Hand in button now navigates: plan 5 built the confirm dialog at
-// /attempts/$attemptId/hand-in, so the honest "not yet" that used to sit
-// here has been redeemed. It stays a callback rather than a link because
-// `components/` is stateless and the page owns routing.
+// with ListeningRunner. Navigation controls live in the route's single
+// semantic footer; this component only renders the current question body.
 export function ReadingRunner({
   question,
   stimulus,
@@ -84,14 +87,10 @@ export function ReadingRunner({
   saveFailed,
   questionCount,
   pips,
-  hasPrevious,
-  onPrevious,
-  hasNext,
-  onNext,
   expired,
-  onHandIn,
 }: ReadingRunnerProps) {
   const { t } = useTranslation("runner")
+  const currentPipIndex = pips.findIndex((pip) => pip.current)
 
   if (expired) {
     return (
@@ -109,32 +108,35 @@ export function ReadingRunner({
   }
 
   return (
-    <div data-testid="reading-runner">
-      <p>
-        {t("runner.questionCount", {
-          current: question.ordinal,
-          total: questionCount,
-        })}
-      </p>
-      <div>
-        {pips.map((pip) => (
-          <span
-            key={pip.questionId}
-            data-testid="question-pip"
-            aria-current={pip.current ? "step" : undefined}
-          >
-            {pip.ordinal}
-          </span>
-        ))}
+    <div data-testid="reading-runner" className="runner-question">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <p className="question-count shrink-0">
+          {t("runner.questionCount", {
+            current: question.ordinal,
+            total: questionCount,
+          })}
+        </p>
+        <div className="flex min-w-20 flex-1 flex-wrap gap-1">
+          {pips.map((pip, index) => (
+            <span
+              key={pip.questionId}
+              data-testid="question-pip"
+              data-state={questionPipState(pip, index, currentPipIndex)}
+              aria-current={pip.current ? "step" : undefined}
+              className="pip block overflow-hidden text-[0px]"
+            >
+              {pip.ordinal}
+            </span>
+          ))}
+        </div>
+        <p className="text-faint text-xs font-semibold">
+          {t("reading.passageQuestions", {
+            passageNumber: passageOrdinal,
+            first: passageFirstOrdinal,
+            last: passageLastOrdinal,
+          })}
+        </p>
       </div>
-
-      <p>
-        {t("reading.passageQuestions", {
-          passageNumber: passageOrdinal,
-          first: passageFirstOrdinal,
-          last: passageLastOrdinal,
-        })}
-      </p>
 
       {stimulus ? (
         <QuestionMedia
@@ -144,7 +146,7 @@ export function ReadingRunner({
         />
       ) : null}
 
-      <p>{question.prompt}</p>
+      <p className="question-prompt">{question.prompt}</p>
       <ChoiceList
         choices={question.choices}
         questionType={question.type}
@@ -153,35 +155,14 @@ export function ReadingRunner({
         locked={locked}
       />
       {saveFailed ? (
-        <p role="alert" data-testid="save-failed-notice">
+        <p
+          role="alert"
+          data-testid="save-failed-notice"
+          className="bg-bad-bg text-bad border-bad/30 mt-3 rounded-lg border px-3.5 py-2.5 text-sm font-semibold"
+        >
           {t("runner.saveFailed")}
         </p>
       ) : null}
-
-      <div>
-        {hasPrevious ? (
-          <Button
-            className="h-11 min-w-11 touch-manipulation select-none"
-            onClick={onPrevious}
-          >
-            {t("runner.previous")}
-          </Button>
-        ) : null}
-        {hasNext ? (
-          <Button
-            className="h-11 min-w-11 touch-manipulation select-none"
-            onClick={onNext}
-          >
-            {t("runner.next")}
-          </Button>
-        ) : null}
-        <Button
-          className="h-11 min-w-11 touch-manipulation select-none"
-          onClick={onHandIn}
-        >
-          {t("runner.handIn")}
-        </Button>
-      </div>
     </div>
   )
 }

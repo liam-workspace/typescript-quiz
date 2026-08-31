@@ -866,16 +866,7 @@ export function RunScreen({
         saveFailed={saveFailedQuestionIds.has(question.id)}
         questionCount={envelope.questionCount}
         pips={pips}
-        hasNext={Boolean(nextEntry)}
-        onNext={handleNext}
         expired={expired}
-        onHandIn={() => {
-          // Plan 5 gave hand-in a route; before that ReadingRunner's button
-          // was deliberately inert with a "not yet" title. Navigation lives
-          // here rather than in the component because `components/` is
-          // stateless by policy.
-          navigate(`/attempts/${attemptId}/hand-in`)
-        }}
       />
     )
   } else if (section.type === "reading") {
@@ -896,18 +887,7 @@ export function RunScreen({
         saveFailed={saveFailedQuestionIds.has(question.id)}
         questionCount={envelope.questionCount}
         pips={pips}
-        hasPrevious={Boolean(previousEntry)}
-        onPrevious={handlePrevious}
-        hasNext={Boolean(nextEntry)}
-        onNext={handleNext}
         expired={expired}
-        onHandIn={() => {
-          // Plan 5 gave hand-in a route; before that ReadingRunner's button
-          // was deliberately inert with a "not yet" title. Navigation lives
-          // here rather than in the component because `components/` is
-          // stateless by policy.
-          navigate(`/attempts/${attemptId}/hand-in`)
-        }}
       />
     )
   } else {
@@ -917,20 +897,23 @@ export function RunScreen({
   }
 
   return (
-    <div className="bg-surface text-ink min-h-screen">
-      <header className="border-line bg-paper relative z-[60] flex items-center justify-between gap-3 border-b px-3 py-2">
+    <div className="device-page">
+      <header className="app-bar relative z-[60]">
         <button
           type="button"
           aria-label={t("menu.openLabel")}
           aria-expanded={panel === "menu"}
-          className="hover:bg-teal-bg focus-visible:outline-teal size-11 touch-manipulation rounded-md text-xl font-bold select-none focus-visible:outline-2 focus-visible:outline-offset-2"
+          className="hover:bg-teal-bg size-11 touch-manipulation rounded-md text-xl font-bold select-none"
           onClick={() => {
             setPanel((current) => (current === "menu" ? null : "menu"))
           }}
         >
           <span aria-hidden="true">☰</span>
         </button>
-        <span className="bg-teal-bg text-teal rounded-full px-3 py-1 text-xs font-bold">
+        <span
+          className={`section-chip section-chip--${section.type}`}
+          data-section={section.type}
+        >
           {t(`runner.sectionChip.${section.type}`)}
         </span>
         <span className="grow" />
@@ -938,7 +921,7 @@ export function RunScreen({
         {remainingMs !== null ? (
           <span
             aria-label={t("runner.timeRemaining")}
-            className={`rounded-device bg-surface border-line border px-3 py-1 text-sm font-bold tabular-nums ${
+            className={`timer text-sm font-bold ${
               // Five minutes gives a child a calm, useful warning without
               // making the majority of a short practice section feel urgent.
               remainingMs < 5 * 60 * 1_000 ? "text-clay" : "text-ink-2"
@@ -949,50 +932,63 @@ export function RunScreen({
         ) : null}
       </header>
 
-      {retryableFlushFailure && saveState.state === "pending" ? (
-        <OfflineBanner pendingCount={saveState.pendingCount} />
-      ) : null}
+      <main className="device-main runner-main mx-auto w-full max-w-4xl">
+        {retryableFlushFailure && saveState.state === "pending" ? (
+          <OfflineBanner pendingCount={saveState.pendingCount} />
+        ) : null}
 
-      <div>{runner}</div>
+        {runner}
 
-      {!nextEntry ? (
-        <div className="border-line bg-paper rounded-device text-ink-2 mx-3 my-4 flex items-center justify-between gap-3 border p-3">
-          <span className="text-sm font-semibold">
-            {nextSection
-              ? t("runner.sectionComplete")
-              : t("runner.testComplete")}
-          </span>
-          <Button
-            className="bg-teal text-paper h-11 min-w-11 touch-manipulation px-4 select-none"
-            disabled={finishingSection}
-            onClick={() => {
-              if (nextSection) {
-                handleFinishSection()
-              } else {
-                navigate(`/attempts/${attemptId}/hand-in`)
-              }
-            }}
+        {!nextEntry ? (
+          <div className="device-card text-ink-2 mt-4 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm font-semibold">
+              {nextSection
+                ? t("runner.sectionComplete")
+                : t("runner.testComplete")}
+            </span>
+            <button
+              type="button"
+              className="device-button"
+              disabled={finishingSection}
+              onClick={() => {
+                if (nextSection) {
+                  handleFinishSection()
+                } else {
+                  navigate(`/attempts/${attemptId}/hand-in`)
+                }
+              }}
+            >
+              {nextSection
+                ? t("runner.continueToSection", {
+                    section: t(`runner.sectionChip.${nextSection.type}`),
+                  })
+                : t("runner.finishTest")}
+            </button>
+          </div>
+        ) : null}
+        {sectionTransitionFailed ? (
+          <p role="alert" className="text-bad mt-3 text-sm">
+            {t("runner.sectionTransitionError")}
+          </p>
+        ) : null}
+      </main>
+
+      <footer className="device-footer sticky bottom-0 z-[60] flex-wrap">
+        {section.type === "reading" && previousEntry ? (
+          <button
+            type="button"
+            className="device-button"
+            data-variant="ghost"
+            onClick={handlePrevious}
           >
-            {nextSection
-              ? t("runner.continueToSection", {
-                  section: t(`runner.sectionChip.${nextSection.type}`),
-                })
-              : t("runner.finishTest")}
-          </Button>
-        </div>
-      ) : null}
-      {sectionTransitionFailed ? (
-        <p role="alert" className="text-bad mx-3 text-sm">
-          {t("runner.sectionTransitionError")}
-        </p>
-      ) : null}
-
-      <nav className="border-line bg-paper relative z-[60] flex justify-end border-t px-3 py-2">
+            {t("runner.previous")}
+          </button>
+        ) : null}
         <button
           type="button"
           aria-label={t("navigator.openLabel")}
           aria-expanded={panel === "navigator"}
-          className="hover:bg-teal-bg focus-visible:outline-teal size-11 touch-manipulation rounded-md text-xl font-bold select-none focus-visible:outline-2 focus-visible:outline-offset-2"
+          className="nav-toggle hover:border-teal border-line bg-paper inline-flex size-11 touch-manipulation items-center justify-center gap-2 rounded-lg border text-sm font-bold select-none sm:w-auto sm:px-3"
           onClick={() => {
             setPanel((current) =>
               current === "navigator" ? null : "navigator",
@@ -1000,8 +996,30 @@ export function RunScreen({
           }}
         >
           <span aria-hidden="true">▦</span>
+          <span className="hidden sm:inline">
+            {t("navigator.progressSubtitle", {
+              answered: responses.size,
+              total: envelope.questionCount,
+            })}
+          </span>
         </button>
-      </nav>
+        <span className="grow" />
+        <button
+          type="button"
+          className="device-button"
+          data-variant="ghost"
+          onClick={() => {
+            navigate(`/attempts/${attemptId}/hand-in`)
+          }}
+        >
+          {t("runner.handIn")}
+        </button>
+        {nextEntry ? (
+          <button type="button" className="device-button" onClick={handleNext}>
+            {t("runner.next")}
+          </button>
+        ) : null}
+      </footer>
 
       <AppMenu
         open={panel === "menu"}

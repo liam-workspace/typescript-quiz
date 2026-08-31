@@ -1,4 +1,3 @@
-import { Button } from "@liam-public/browser-react-ui"
 import { useTranslation } from "react-i18next"
 import type { RunnerQuestion, StimulusWire } from "../lib/api-types.js"
 import { ChoiceList } from "./ChoiceList.js"
@@ -8,6 +7,24 @@ export interface QuestionPip {
   readonly questionId: string
   readonly ordinal: number
   readonly current: boolean
+}
+
+type QuestionPipState = "done" | "now" | "future"
+
+function questionPipState(
+  pip: QuestionPip,
+  index: number,
+  currentIndex: number,
+): QuestionPipState {
+  if (index < currentIndex) {
+    return "done"
+  }
+
+  if (pip.current) {
+    return "now"
+  }
+
+  return "future"
 }
 
 // A claimPlay 410 that outlived a section (or the whole attempt). Both are
@@ -64,13 +81,7 @@ export interface ListeningRunnerProps {
   // navigation_locked` on a backward move) does not let a tap on an earlier
   // pip jump back to it.
   readonly pips: readonly QuestionPip[]
-  readonly hasNext: boolean
-  readonly onNext: () => void
   readonly expired: ListeningExpiredState | null
-  // Supplied by the page -- navigation is state, and `components/` is
-  // stateless by policy. A child must be able to hand in from either
-  // section, not only the last one.
-  readonly onHandIn: () => void
 }
 
 // Purely presentational -- see ListeningRunner.test.tsx's doc comment for
@@ -90,12 +101,10 @@ export function ListeningRunner({
   saveFailed,
   questionCount,
   pips,
-  hasNext,
-  onNext,
-  onHandIn,
   expired,
 }: ListeningRunnerProps) {
   const { t } = useTranslation("runner")
+  const currentPipIndex = pips.findIndex((pip) => pip.current)
 
   if (expired) {
     return (
@@ -113,23 +122,27 @@ export function ListeningRunner({
   }
 
   return (
-    <div data-testid="listening-runner">
-      <p>
-        {t("runner.questionCount", {
-          current: question.ordinal,
-          total: questionCount,
-        })}
-      </p>
-      <div>
-        {pips.map((pip) => (
-          <span
-            key={pip.questionId}
-            data-testid="question-pip"
-            aria-current={pip.current ? "step" : undefined}
-          >
-            {pip.ordinal}
-          </span>
-        ))}
+    <div data-testid="listening-runner" className="runner-question">
+      <div className="mb-3 flex items-center gap-3">
+        <p className="question-count shrink-0">
+          {t("runner.questionCount", {
+            current: question.ordinal,
+            total: questionCount,
+          })}
+        </p>
+        <div className="flex flex-1 flex-wrap gap-1">
+          {pips.map((pip, index) => (
+            <span
+              key={pip.questionId}
+              data-testid="question-pip"
+              data-state={questionPipState(pip, index, currentPipIndex)}
+              aria-current={pip.current ? "step" : undefined}
+              className="pip block overflow-hidden text-[0px]"
+            >
+              {pip.ordinal}
+            </span>
+          ))}
+        </div>
       </div>
 
       {stimulus ? (
@@ -173,7 +186,7 @@ export function ListeningRunner({
         </>
       ) : null}
 
-      <p>{question.prompt}</p>
+      <p className="question-prompt">{question.prompt}</p>
       <ChoiceList
         choices={question.choices}
         questionType={question.type}
@@ -182,28 +195,14 @@ export function ListeningRunner({
         locked={locked}
       />
       {saveFailed ? (
-        <p role="alert" data-testid="save-failed-notice">
+        <p
+          role="alert"
+          data-testid="save-failed-notice"
+          className="bg-bad-bg text-bad border-bad/30 mt-3 rounded-lg border px-3.5 py-2.5 text-sm font-semibold"
+        >
           {t("runner.saveFailed")}
         </p>
       ) : null}
-
-      {/* No Previous button: this component is only ever rendered for a
-          listening section, which spec section 1.4 requires to run
-          forward_only. */}
-      {hasNext ? (
-        <Button
-          className="h-11 min-w-11 touch-manipulation select-none"
-          onClick={onNext}
-        >
-          {t("runner.next")}
-        </Button>
-      ) : null}
-      <Button
-        className="h-11 min-w-11 touch-manipulation select-none"
-        onClick={onHandIn}
-      >
-        {t("runner.handIn")}
-      </Button>
     </div>
   )
 }

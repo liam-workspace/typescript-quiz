@@ -48,7 +48,6 @@ const pips = [
 
 const baseProps = {
   question,
-  onHandIn: vi.fn(),
   stimulus: passage,
   passageOrdinal: 1,
   passageFirstOrdinal: 5,
@@ -59,10 +58,6 @@ const baseProps = {
   saveFailed: false,
   questionCount: 20,
   pips,
-  hasPrevious: true,
-  onPrevious: vi.fn(),
-  hasNext: true,
-  onNext: vi.fn(),
   expired: null,
 }
 
@@ -107,56 +102,6 @@ describe("ReadingRunner", () => {
     ).toBeInTheDocument()
   })
 
-  it("shows a Previous button, enabled, unlike the listening screen", () => {
-    render(<ReadingRunner {...baseProps} />)
-
-    expect(screen.getByRole("button", { name: "Previous" })).toBeEnabled()
-  })
-
-  it("forwards a Previous click to onPrevious, and hides Previous when hasPrevious is false", async () => {
-    const onPrevious = vi.fn()
-    const user = userEvent.setup()
-
-    render(
-      <ReadingRunner
-        {...baseProps}
-        onPrevious={onPrevious}
-        hasPrevious={true}
-      />,
-    )
-
-    await user.click(screen.getByRole("button", { name: "Previous" }))
-
-    expect(onPrevious).toHaveBeenCalledTimes(1)
-
-    cleanup()
-
-    render(<ReadingRunner {...baseProps} hasPrevious={false} />)
-
-    expect(
-      screen.queryByRole("button", { name: "Previous" }),
-    ).not.toBeInTheDocument()
-  })
-
-  it("calls onNext when Next is clicked, and hides Next when hasNext is false", async () => {
-    const onNext = vi.fn()
-    const user = userEvent.setup()
-
-    render(<ReadingRunner {...baseProps} onNext={onNext} hasNext={true} />)
-
-    await user.click(screen.getByRole("button", { name: "Next" }))
-
-    expect(onNext).toHaveBeenCalledTimes(1)
-
-    cleanup()
-
-    render(<ReadingRunner {...baseProps} hasNext={false} />)
-
-    expect(
-      screen.queryByRole("button", { name: "Next" }),
-    ).not.toBeInTheDocument()
-  })
-
   it("allows changing an already-selected choice, unlike listening", async () => {
     const onSelectChoice = vi.fn()
     const user = userEvent.setup()
@@ -194,19 +139,6 @@ describe("ReadingRunner", () => {
     )
   })
 
-  it("calls onHandIn when Hand in is tapped", async () => {
-    const onHandIn = vi.fn()
-
-    render(<ReadingRunner {...baseProps} onHandIn={onHandIn} />)
-
-    // Until plan 5 this button was deliberately disabled with a "not yet"
-    // title -- an honest placeholder rather than a silent no-op. The dialog
-    // now exists at /attempts/$attemptId/hand-in, so it navigates.
-    await userEvent.click(screen.getByRole("button", { name: "Hand in" }))
-
-    expect(onHandIn).toHaveBeenCalledTimes(1)
-  })
-
   it("renders 'Passage N · questions X–Y' from the group's question ordinals", () => {
     render(
       <ReadingRunner
@@ -230,6 +162,31 @@ describe("ReadingRunner", () => {
     for (const pip of strip) {
       expect(pip.tagName).not.toBe("BUTTON")
     }
+  })
+
+  it("uses the prototype body classes and marks prior, current, and future pips", () => {
+    render(
+      <ReadingRunner
+        {...baseProps}
+        pips={[
+          { questionId: "q-r1", ordinal: 5, current: false },
+          { questionId: "q-r2", ordinal: 6, current: true },
+          { questionId: "q-r3", ordinal: 7, current: false },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText("Question 6 of 20")).toHaveClass("question-count")
+    expect(screen.getByText("Where does the fox live?")).toHaveClass(
+      "question-prompt",
+    )
+    expect(screen.getByRole("radiogroup")).toHaveClass("choice-stack")
+    expect(
+      screen.getAllByTestId("question-pip").map((pip) => pip.dataset.state),
+    ).toEqual(["done", "now", "future"])
+    expect(
+      screen.queryByRole("button", { name: /previous|next|hand in/i }),
+    ).not.toBeInTheDocument()
   })
 
   it("renders an actionable message instead of the question when expired is set to section", () => {

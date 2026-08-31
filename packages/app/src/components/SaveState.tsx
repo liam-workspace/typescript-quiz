@@ -36,11 +36,12 @@ export function SaveState(props: SaveStateProps) {
     <span
       role="status"
       aria-live="polite"
-      className={`border-line bg-surface inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold ${colors.text}`}
+      data-state={props.state}
+      className={`save-state inline-flex items-center gap-1.5 text-xs font-bold ${colors.text}`}
     >
       <span
         aria-hidden="true"
-        className={`size-2 rounded-full ${colors.dot}`}
+        className={`size-1.5 rounded-full ${colors.dot}`}
       />
       {label}
     </span>

@@ -692,6 +692,28 @@ describe("RunScreen", () => {
     expect(screen.getByTestId("listening-runner")).toBeInTheDocument()
   })
 
+  it("renders the prototype runner shell with route-owned bottom actions", () => {
+    renderRunScreen()
+
+    expect(screen.getByRole("banner")).toHaveClass("app-bar")
+    expect(screen.getByRole("main")).toHaveClass("device-main", "runner-main")
+    expect(screen.getByRole("contentinfo")).toHaveClass("device-footer")
+    expect(
+      screen.queryByRole("button", { name: "Previous" }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Next" })).toBeEnabled()
+    expect(screen.getByRole("button", { name: "Hand in" })).toBeEnabled()
+  })
+
+  it("keeps Previous in the route-owned footer for reading", () => {
+    renderRunScreen(readingEnvelope)
+
+    expect(screen.getByRole("button", { name: "Previous" })).toBeEnabled()
+    expect(
+      screen.getByRole("button", { name: "Previous" }).closest("footer"),
+    ).toBe(screen.getByRole("contentinfo"))
+  })
+
   describe("attempt countdown", () => {
     beforeEach(() => {
       vi.useFakeTimers()
@@ -1111,6 +1133,9 @@ describe("RunScreen", () => {
     await user.click(screen.getByRole("radio", { name: "A city" }))
 
     const banner = await screen.findByTestId("offline-banner")
+    expect(banner).toHaveAttribute("role", "alert")
+    expect(banner).toHaveClass("offline-notice")
+    expect(screen.getByRole("main")).toContainElement(banner)
     expect(banner).toHaveTextContent("We can't reach the server right now.")
     expect(banner).toHaveTextContent(
       "Keep answering — your answers are saved on this iPad and will be sent as soon as the connection is back.",

@@ -10,8 +10,9 @@ export function OfflineBanner({ pendingCount }: OfflineBannerProps) {
   return (
     <section
       data-testid="offline-banner"
+      role="alert"
       aria-label={t("runner.offline.title")}
-      className="border-amber bg-surface text-ink rounded-device mx-3 mt-3 border p-4"
+      className="offline-notice mb-4 rounded-[9px] border border-[#efd9ac] bg-[#fcf4e4] px-3.5 py-2.5 text-[13.5px] font-semibold text-[#7a5a18]"
     >
       <div className="flex items-start gap-3">
         <span aria-hidden="true" className="text-amber text-lg">
@@ -24,9 +25,9 @@ export function OfflineBanner({ pendingCount }: OfflineBannerProps) {
           </p>
         </div>
       </div>
-      <div className="border-line bg-paper text-ink-2 mt-3 rounded-md border px-3 py-2 text-sm font-semibold">
+      <p className="mt-2 text-sm font-bold">
         {t("runner.saveState.pending", { count: pendingCount })}
-      </div>
+      </p>
     </section>
   )
 }

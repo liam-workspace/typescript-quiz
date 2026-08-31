@@ -21,4 +21,11 @@ describe("SaveState", () => {
     )
     expect(screen.getByRole("status")).not.toHaveTextContent("Saved")
   })
+
+  it("exposes the prototype save-state treatment and current state", () => {
+    render(<SaveState state="failed" />)
+
+    expect(screen.getByRole("status")).toHaveClass("save-state")
+    expect(screen.getByRole("status")).toHaveAttribute("data-state", "failed")
+  })
 })

@@ -42,7 +42,6 @@ const pips = [
 
 const baseProps = {
   question,
-  onHandIn: vi.fn(),
   stimulus: cappedAudio,
   selectedChoiceIds: [],
   locked: false,
@@ -55,8 +54,6 @@ const baseProps = {
   saveFailed: false,
   questionCount: 20,
   pips,
-  hasNext: true,
-  onNext: vi.fn(),
   expired: null,
 }
 
@@ -283,36 +280,6 @@ describe("ListeningRunner", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("calls onHandIn when Hand in is tapped", async () => {
-    const onHandIn = vi.fn()
-    const user = userEvent.setup()
-
-    render(<ListeningRunner {...baseProps} onHandIn={onHandIn} />)
-
-    await user.click(screen.getByRole("button", { name: "Hand in" }))
-
-    expect(onHandIn).toHaveBeenCalledTimes(1)
-  })
-
-  it("calls onNext when Next is clicked, and hides Next when hasNext is false", async () => {
-    const onNext = vi.fn()
-    const user = userEvent.setup()
-
-    render(<ListeningRunner {...baseProps} onNext={onNext} hasNext={true} />)
-
-    await user.click(screen.getByRole("button", { name: "Next" }))
-
-    expect(onNext).toHaveBeenCalledTimes(1)
-
-    cleanup()
-
-    render(<ListeningRunner {...baseProps} hasNext={false} />)
-
-    expect(
-      screen.queryByRole("button", { name: "Next" }),
-    ).not.toBeInTheDocument()
-  })
-
   it("renders the pip/progress strip from questionCount and the passed-in ordinals, read-only", () => {
     render(<ListeningRunner {...baseProps} />)
 
@@ -323,6 +290,31 @@ describe("ListeningRunner", () => {
     for (const pip of strip) {
       expect(pip.tagName).not.toBe("BUTTON")
     }
+  })
+
+  it("uses the prototype body classes and marks prior, current, and future pips", () => {
+    render(
+      <ListeningRunner
+        {...baseProps}
+        pips={[
+          { questionId: "q-0", ordinal: 2, current: false },
+          { questionId: "q-1", ordinal: 3, current: true },
+          { questionId: "q-2", ordinal: 4, current: false },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText("Question 3 of 20")).toHaveClass("question-count")
+    expect(screen.getByText("What did the boy see?")).toHaveClass(
+      "question-prompt",
+    )
+    expect(screen.getByRole("radiogroup")).toHaveClass("choice-stack")
+    expect(
+      screen.getAllByTestId("question-pip").map((pip) => pip.dataset.state),
+    ).toEqual(["done", "now", "future"])
+    expect(
+      screen.queryByRole("button", { name: /previous|next|hand in/i }),
+    ).not.toBeInTheDocument()
   })
 
   it("renders an actionable message instead of the question when expired is set to section", () => {

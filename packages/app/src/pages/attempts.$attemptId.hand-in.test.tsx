@@ -399,6 +399,95 @@ describe("HandInScreen", () => {
     }
   })
 
+  it("uses the finalized result counts when a queued answer is accepted as submit expires", async () => {
+    const queue = await AnswerQueue.open(DB_NAME)
+
+    try {
+      await queue.recordAnswer(
+        {
+          attemptId: "attempt-1",
+          sectionId: "section-1",
+          questionId: "q-9",
+          selectedChoiceIds: ["c9"],
+          timeSpentMs: 4_000,
+        },
+        NOW,
+      )
+
+      const fetchMock = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              type: "attempt_expired",
+              title: "The attempt was past its deadline and has been finalized.",
+              status: 410,
+              attempt: {
+                id: "attempt-1",
+                status: "expired",
+                submittedAt: "2026-08-27T09:30:00.000Z",
+                resultUrl: "/attempts/attempt-1/result",
+              },
+            }),
+            {
+              status: 410,
+              headers: { "content-type": "application/problem+json" },
+            },
+          ),
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              attemptId: "attempt-1",
+              test: { title: "Practice Test 04", version: 2 },
+              status: "expired",
+              submittedAt: "2026-08-27T09:30:00.000Z",
+              elapsedSeconds: 1_800,
+              score: {
+                pointsEarned: 0,
+                pointsPossible: 40,
+                percentage: 0,
+                answered: 39,
+                unanswered: 1,
+                correct: 0,
+                incorrect: 39,
+                isPersonalBest: false,
+                sections: [],
+              },
+            }),
+            {
+              status: 200,
+              headers: { "content-type": "application/json" },
+            },
+          ),
+        )
+      vi.stubGlobal("fetch", fetchMock)
+
+      const user = userEvent.setup()
+
+      render(
+        <HandInScreen
+          attemptId="attempt-1"
+          envelope={baseEnvelope}
+          queue={queue}
+          navigate={vi.fn()}
+        />,
+      )
+
+      await user.click(await screen.findByTestId("hand-in-button"))
+
+      const answered = await screen.findByText("Answered")
+      expect(answered.parentElement).toHaveTextContent("39")
+      expect(screen.getByText("Left blank").parentElement).toHaveTextContent(
+        "1",
+      )
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/attempts/attempt-1/result")
+    } finally {
+      await queue.close()
+    }
+  })
+
   it("shows a nothing-answered notice, not a crash, on a 409", async () => {
     const queue = await AnswerQueue.open(DB_NAME)
 

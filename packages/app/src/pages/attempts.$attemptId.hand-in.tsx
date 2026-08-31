@@ -10,7 +10,11 @@ import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiError } from "../lib/api-client.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
-import { getRunnerEnvelope, submitAttempt } from "../lib/attempts-api.js"
+import {
+  getAttemptResult,
+  getRunnerEnvelope,
+  submitAttempt,
+} from "../lib/attempts-api.js"
 import { redirectExpiredAttemptToResult } from "../lib/expired-attempt-redirect.js"
 import {
   buildSubmitRemainder,
@@ -40,7 +44,14 @@ type Outcome =
   | { readonly status: "idle" }
   | { readonly status: "submitting" }
   | { readonly status: "nothingAnswered" }
-  | { readonly status: "attemptExpired"; readonly resultUrl: string | null }
+  | {
+      readonly status: "attemptExpired"
+      readonly resultUrl: string | null
+      readonly summary: {
+        readonly answeredCount: number
+        readonly unansweredCount: number
+      } | null
+    }
   | { readonly status: "error" }
 
 export interface HandInScreenProps {
@@ -146,11 +157,34 @@ export function HandInScreen({
           const resultUrl = sameOriginPath.safeParse(
             error.problem.attempt.resultUrl,
           )
+          const expiredOutcome = {
+            status: "attemptExpired" as const,
+            resultUrl: resultUrl.success ? resultUrl.data : null,
+          }
 
           setOutcome({
-            status: "attemptExpired",
-            resultUrl: resultUrl.success ? resultUrl.data : null,
+            ...expiredOutcome,
+            summary: null,
           })
+
+          // A submit remainder can be applied by the same request that
+          // discovers expiry. The envelope predates that final flush, so
+          // only the finalized result can report the truthful summary.
+          getAttemptResult(attemptId)
+            .then((result) => {
+              setOutcome({
+                ...expiredOutcome,
+                summary: {
+                  answeredCount: result.score.answered,
+                  unansweredCount: result.score.unanswered,
+                },
+              })
+            })
+            .catch(() => {
+              // The expiry message and safe result link remain useful if a
+              // transient result read fails; deliberately omit counts rather
+              // than rendering the stale pre-submit envelope snapshot.
+            })
 
           return
         }
@@ -184,18 +218,22 @@ export function HandInScreen({
           <p className="screen-subtitle max-w-[40ch]">
             {t("sectionRules.expired.attemptMessage")}
           </p>
-          <section className="device-card mt-[15px] w-full max-w-[340px] text-left">
-            <div className="summary-row flex items-center justify-between gap-4 py-1 text-sm">
-              <span>{t("handIn.answered")}</span>
-              <strong className="tabular-nums">{envelope.answeredCount}</strong>
-            </div>
-            <div className="summary-row text-ink-2 flex items-center justify-between gap-4 py-1 text-sm">
-              <span>{t("timeUp.leftBlank")}</span>
-              <strong className="tabular-nums">
-                {envelope.unansweredOrdinals.length}
-              </strong>
-            </div>
-          </section>
+          {outcome.summary ? (
+            <section className="device-card mt-[15px] w-full max-w-[340px] text-left">
+              <div className="summary-row flex items-center justify-between gap-4 py-1 text-sm">
+                <span>{t("handIn.answered")}</span>
+                <strong className="tabular-nums">
+                  {outcome.summary.answeredCount}
+                </strong>
+              </div>
+              <div className="summary-row text-ink-2 flex items-center justify-between gap-4 py-1 text-sm">
+                <span>{t("timeUp.leftBlank")}</span>
+                <strong className="tabular-nums">
+                  {outcome.summary.unansweredCount}
+                </strong>
+              </div>
+            </section>
+          ) : null}
           {outcome.resultUrl ? (
             <a href={outcome.resultUrl} className="device-button mt-[18px]">
               {t("sectionRules.expired.viewResult")}

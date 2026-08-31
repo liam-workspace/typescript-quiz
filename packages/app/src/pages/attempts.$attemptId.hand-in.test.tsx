@@ -91,6 +91,40 @@ describe("HandInScreen", () => {
     vi.unstubAllGlobals()
   })
 
+  it("uses the confirmation-screen hierarchy for live answer counts", async () => {
+    const queue = await AnswerQueue.open(DB_NAME)
+
+    try {
+      render(
+        <HandInScreen
+          attemptId="attempt-1"
+          envelope={baseEnvelope}
+          queue={queue}
+          navigate={vi.fn()}
+        />,
+      )
+
+      expect(screen.getByText(baseEnvelope.testTitle).closest("header")).toHaveClass(
+        "app-bar",
+      )
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Hand in your test?" }),
+      ).toHaveClass("screen-title")
+      expect(screen.getByText(/still blank/i)).toHaveClass("notice")
+      expect(screen.getByText("Answered").parentElement).toHaveClass(
+        "summary-row",
+      )
+      expect(screen.getByText("Answered").closest("section")).toHaveClass(
+        "device-card",
+      )
+      expect(screen.getByTestId("hand-in-button").closest("footer")).toHaveClass(
+        "device-footer",
+      )
+    } finally {
+      await queue.close()
+    }
+  })
+
   // Defect B4: this test used to pin the OPPOSITE assertion --
   // `toBeDisabled()` -- as correct. That made it the smoking gun for the
   // bug the external review found: `buildSubmitRemainder` already reads the

@@ -171,19 +171,38 @@ export function HandInScreen({
   // the same condition, rather than inventing a hand-in-specific string.
   if (outcome.status === "attemptExpired") {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("sectionRules.expired.title")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p>{t("sectionRules.expired.attemptMessage")}</p>
+      <div className="device-page">
+        <header className="app-bar">
+          <span className="app-brand">{envelope.testTitle}</span>
+          <span className="grow" />
+          <span className="timer timer-low text-clay text-sm font-bold">
+            00:00
+          </span>
+        </header>
+        <main className="center-main">
+          <h1 className="screen-title">{t("sectionRules.expired.title")}</h1>
+          <p className="screen-subtitle max-w-[40ch]">
+            {t("sectionRules.expired.attemptMessage")}
+          </p>
+          <section className="device-card mt-[15px] w-full max-w-[340px] text-left">
+            <div className="summary-row flex items-center justify-between gap-4 py-1 text-sm">
+              <span>{t("handIn.answered")}</span>
+              <strong className="tabular-nums">{envelope.answeredCount}</strong>
+            </div>
+            <div className="summary-row text-ink-2 flex items-center justify-between gap-4 py-1 text-sm">
+              <span>{t("timeUp.leftBlank")}</span>
+              <strong className="tabular-nums">
+                {envelope.unansweredOrdinals.length}
+              </strong>
+            </div>
+          </section>
           {outcome.resultUrl ? (
-            <a href={outcome.resultUrl}>
+            <a href={outcome.resultUrl} className="device-button mt-[18px]">
               {t("sectionRules.expired.viewResult")}
             </a>
           ) : null}
-        </CardContent>
-      </Card>
+        </main>
+      </div>
     )
   }
 
@@ -194,61 +213,86 @@ export function HandInScreen({
   const disabled = outcome.status === "submitting"
 
   return (
-    <div>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("handIn.title")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p>{t("handIn.subtitle")}</p>
-          <div>
-            <span>{t("handIn.answered")}</span> <b>{envelope.answeredCount}</b>
+    <div className="device-page">
+      <header className="app-bar">
+        <span className="app-brand">{envelope.testTitle}</span>
+        <span className="grow" />
+        {minutesLeft !== null ? (
+          <span className="timer text-clay text-sm font-bold">
+            {String(minutesLeft).padStart(2, "0")}:00
+          </span>
+        ) : null}
+      </header>
+      <main className="center-main">
+        <h1 className="screen-title">{t("handIn.title")}</h1>
+        <p className="screen-subtitle max-w-[38ch]">{t("handIn.subtitle")}</p>
+        <section className="device-card mt-[15px] w-full max-w-[360px] text-left">
+          <div className="summary-row flex items-center justify-between gap-4 py-1 text-sm">
+            <span>{t("handIn.answered")}</span>
+            <strong className="tabular-nums">{envelope.answeredCount}</strong>
           </div>
-          <div>
-            <span>{t("handIn.notAnswered")}</span> <b>{unansweredCount}</b>
+          <div className="summary-row text-bad flex items-center justify-between gap-4 py-1 text-sm">
+            <span>{t("handIn.notAnswered")}</span>
+            <strong className="tabular-nums">{unansweredCount}</strong>
           </div>
-          {unansweredCount > 0 ? (
-            <p>
-              {t("handIn.notice.blankQuestions", {
-                count: unansweredCount,
-                list: envelope.unansweredOrdinals.join(", "),
-              })}
-              {minutesLeft !== null
-                ? ` ${t("handIn.notice.timeLeft", {
-                    count: minutesLeft,
-                    minutes: minutesLeft,
-                  })}`
-                : null}
+        </section>
+        {unansweredCount > 0 ? (
+          <p className="notice border-amber bg-amber/15 text-ink-2 mt-[14px] max-w-[400px] rounded-[9px] border px-[14px] py-[11px] text-left text-[13.5px] font-semibold">
+            {t("handIn.notice.blankQuestions", {
+              count: unansweredCount,
+              list: envelope.unansweredOrdinals.join(", "),
+            })}
+            {minutesLeft !== null
+              ? ` ${t("handIn.notice.timeLeft", {
+                  count: minutesLeft,
+                  minutes: minutesLeft,
+                })}`
+              : null}
+          </p>
+        ) : null}
+        {pendingCount !== null && pendingCount > 0 ? (
+          <p
+            role="status"
+            className="notice border-amber bg-amber/15 text-ink-2 mt-[14px] max-w-[400px] rounded-[9px] border px-[14px] py-[11px] text-left text-[13.5px] font-semibold"
+          >
+            {t("handIn.pendingSync")}
+          </p>
+        ) : null}
+        {outcome.status === "nothingAnswered" ? (
+          <div className="mt-[14px] max-w-[400px] text-left">
+            <p role="alert" className="text-bad text-sm font-semibold">
+              {t("handIn.error.nothingAnswered.title")}
             </p>
-          ) : null}
-          {pendingCount !== null && pendingCount > 0 ? (
-            <p role="status">{t("handIn.pendingSync")}</p>
-          ) : null}
-          {outcome.status === "nothingAnswered" ? (
-            <div>
-              <p role="alert">{t("handIn.error.nothingAnswered.title")}</p>
-              <p>{t("handIn.error.nothingAnswered.message")}</p>
-            </div>
-          ) : null}
-          {outcome.status === "error" ? (
-            <p role="alert">{t("sectionRules.error.generic")}</p>
-          ) : null}
-        </CardContent>
-      </Card>
-      <Button
-        className="h-11 min-w-11 touch-manipulation select-none"
-        onClick={handleKeepWorking}
-      >
-        {t("handIn.keepWorking")}
-      </Button>
-      <Button
-        className="h-11 min-w-11 touch-manipulation select-none"
-        data-testid="hand-in-button"
-        onClick={handleSubmit}
-        disabled={disabled}
-      >
-        {t("runner.handIn")}
-      </Button>
+            <p className="screen-subtitle mt-1">
+              {t("handIn.error.nothingAnswered.message")}
+            </p>
+          </div>
+        ) : null}
+        {outcome.status === "error" ? (
+          <p role="alert" className="text-bad mt-[14px] text-sm font-semibold">
+            {t("sectionRules.error.generic")}
+          </p>
+        ) : null}
+      </main>
+      <footer className="device-footer flex-wrap justify-center">
+        <button
+          type="button"
+          className="device-button"
+          data-variant="secondary"
+          onClick={handleKeepWorking}
+        >
+          {t("handIn.keepWorking")}
+        </button>
+        <button
+          type="button"
+          className="device-button"
+          data-testid="hand-in-button"
+          onClick={handleSubmit}
+          disabled={disabled}
+        >
+          {t("runner.handIn")}
+        </button>
+      </footer>
     </div>
   )
 }

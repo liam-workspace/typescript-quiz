@@ -65,6 +65,36 @@ describe("attempt time-up page", () => {
     ).toHaveAttribute("href", "/attempts/attempt-1/result?source=expiry")
   })
 
+  it("uses the time-up screen hierarchy for the finalized answer summary", () => {
+    render(
+      <TimeUpScreen
+        data={{
+          testTitle: "Practice Test 04",
+          answeredCount: 38,
+          unansweredCount: 2,
+          resultUrl: "/attempts/attempt-1/result",
+        }}
+      />,
+    )
+
+    expect(screen.getByText("Practice Test 04").closest("header")).toHaveClass(
+      "app-bar",
+    )
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Time is up" }),
+    ).toHaveClass("screen-title")
+    expect(screen.getByText("00:00")).toHaveClass("timer", "timer-low")
+    expect(screen.getByText("Answered").parentElement).toHaveClass(
+      "summary-row",
+    )
+    expect(screen.getByText("Answered").closest("section")).toHaveClass(
+      "device-card",
+    )
+    expect(screen.getByRole("link", { name: "See your result" })).toHaveClass(
+      "device-button",
+    )
+  })
+
   it("loads a direct reload from plain GET /result without a carried 410 payload", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

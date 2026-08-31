@@ -2,7 +2,7 @@ import { cleanup, render, screen, within } from "@testing-library/react"
 import { isRedirect } from "@tanstack/react-router"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import "../i18n.js"
+import i18n from "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
 import type { ReviewPayload } from "../lib/api-types.js"
 import {
@@ -159,9 +159,10 @@ function mixedReview(mediaKind: "audio" | "image"): ReviewPayload {
 }
 
 describe("attempt review page", () => {
-  afterEach(() => {
+  afterEach(async () => {
     cleanup()
     vi.unstubAllGlobals()
+    await i18n.changeLanguage("en")
   })
 
   // The screen used to derive this chip from a section's POSITION in the
@@ -188,6 +189,22 @@ describe("attempt review page", () => {
 
     expect(screen.getByText("Reading")).toBeInTheDocument()
     expect(screen.queryByText("Listening")).not.toBeInTheDocument()
+  })
+
+  it("compacts and wraps the review app bar for a long French section label", async () => {
+    await i18n.changeLanguage("fr")
+    render(<ReviewScreen review={reviewPayload} />)
+
+    expect(screen.getByRole("banner")).toHaveClass(
+      "flex-wrap",
+      "sm:flex-nowrap",
+    )
+    expect(
+      screen.getByText("Compréhension orale", {
+        selector: "[data-section-type]",
+      }),
+    ).toHaveClass("min-w-0", "max-w-full")
+    expect(screen.getByText("1 sur 3")).toHaveClass("ml-auto", "shrink-0")
   })
 
   it("uses the prototype review shell, semantic verdicts, and navigator", async () => {

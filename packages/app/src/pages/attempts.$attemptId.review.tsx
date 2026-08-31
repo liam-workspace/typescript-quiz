@@ -278,16 +278,16 @@ export function ReviewScreen({ review }: ReviewScreenProps) {
 
   return (
     <div className="device-page">
-      <header className="app-bar">
-        <h1 className="app-brand">{t("review.title")}</h1>
+      <header className="app-bar flex-wrap gap-y-1 sm:flex-nowrap">
+        <h1 className="app-brand shrink-0">{t("review.title")}</h1>
         <span
-          className={`section-chip section-chip--${sectionKey}`}
+          className={`section-chip section-chip--${sectionKey} max-w-full min-w-0`}
           data-section-type={sectionKey}
         >
           {t(`runner.sectionChip.${sectionKey}`)}
         </span>
-        <span className="grow" />
-        <span className="text-ink-2 text-sm font-bold tabular-nums">
+        <span className="hidden grow sm:block" />
+        <span className="text-ink-2 ml-auto shrink-0 text-sm font-bold tabular-nums">
           {t("review.position", {
             current: currentIndex + 1,
             total: review.items.length,

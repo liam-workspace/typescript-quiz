@@ -974,7 +974,7 @@ export function RunScreen({
       </main>
 
       <footer className="device-footer sticky bottom-0 z-[60] flex-wrap">
-        {section.type === "reading" && previousEntry ? (
+        {!expired && section.type === "reading" && previousEntry ? (
           <button
             type="button"
             className="device-button"
@@ -1004,17 +1004,19 @@ export function RunScreen({
           </span>
         </button>
         <span className="grow" />
-        <button
-          type="button"
-          className="device-button"
-          data-variant="ghost"
-          onClick={() => {
-            navigate(`/attempts/${attemptId}/hand-in`)
-          }}
-        >
-          {t("runner.handIn")}
-        </button>
-        {nextEntry ? (
+        {!expired ? (
+          <button
+            type="button"
+            className="device-button"
+            data-variant="ghost"
+            onClick={() => {
+              navigate(`/attempts/${attemptId}/hand-in`)
+            }}
+          >
+            {t("runner.handIn")}
+          </button>
+        ) : null}
+        {!expired && nextEntry ? (
           <button type="button" className="device-button" onClick={handleNext}>
             {t("runner.next")}
           </button>

@@ -1817,6 +1817,9 @@ describe("RunScreen", () => {
       expect(await screen.findByRole("alert")).toHaveTextContent(
         "This section's time ran out.",
       )
+      expect(
+        screen.queryAllByRole("button", { name: /previous|next|hand in/i }),
+      ).toHaveLength(0)
     })
 
     it("moves to time-up with the finalized attempt on a 410 attempt_expired", async () => {
@@ -1979,6 +1982,9 @@ describe("RunScreen", () => {
       expect(await screen.findByRole("alert")).toHaveTextContent(
         "This section's time ran out.",
       )
+      expect(
+        screen.queryAllByRole("button", { name: /previous|next|hand in/i }),
+      ).toHaveLength(0)
     })
   })
 })

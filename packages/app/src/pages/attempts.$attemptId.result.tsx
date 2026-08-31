@@ -1,10 +1,6 @@
-import {
-  Button,
-  Card,
-  CardContent,
-  CardFooter,
-} from "@liam-public/browser-react-ui"
+import { Card, CardContent } from "@liam-public/browser-react-ui"
 import { Link, createFileRoute, redirect } from "@tanstack/react-router"
+import type { CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiError } from "../lib/api-client.js"
 import type { AttemptResult, AttemptSectionScore } from "../lib/api-types.js"
@@ -42,16 +38,16 @@ function scorePercentage(section: AttemptSectionScore): number {
 function sectionBarColour(type: AttemptSectionScore["type"]): string {
   switch (type) {
     case "listening":
-      return "bg-teal-700"
+      return "bg-teal"
 
     case "reading":
-      return "bg-orange-700"
+      return "bg-clay"
 
     case "vocabulary":
-      return "bg-indigo-700"
+      return "bg-good"
 
     case "grammar":
-      return "bg-rose-700"
+      return "bg-amber"
   }
 }
 
@@ -66,24 +62,32 @@ export function ResultScreen({ result }: ResultScreenProps) {
     maximumFractionDigits: 2,
   }).format(score.percentage)
   const ringPercentage = Math.max(0, Math.min(100, score.percentage))
+  const ringStyle = {
+    "--score-pct": `${ringPercentage}%`,
+    background:
+      "conic-gradient(var(--color-teal) 0 var(--score-pct), var(--color-line) 0)",
+  } as CSSProperties
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-4xl items-center px-4 py-8 sm:px-8">
-      <Card className="w-full overflow-hidden border-stone-200 bg-stone-50 shadow-md">
-        <CardContent className="grid gap-8 px-6 sm:px-10 lg:grid-cols-[9rem_1fr] lg:items-center">
+    <div className="device-page">
+      <header className="app-bar">
+        <span className="app-brand">{result.test.title}</span>
+      </header>
+
+      <main className="device-main mx-auto grid w-full max-w-4xl flex-1 content-center gap-6">
+        <div className="flex flex-wrap items-center gap-6">
           <div
-            className="mx-auto grid size-32 place-items-center rounded-full sm:size-36"
-            style={{
-              background: `conic-gradient(#0f766e 0 ${ringPercentage}%, #e7e5e4 ${ringPercentage}% 100%)`,
-            }}
+            data-testid="score-ring"
+            className="score-ring mx-auto shrink-0 sm:mx-0"
+            style={ringStyle}
             aria-label={t("result.scoreLabel")}
           >
-            <div className="grid size-[6.5rem] place-items-center rounded-full bg-stone-50 text-center sm:size-[7.25rem]">
+            <div>
               <div className="leading-tight">
-                <p className="text-3xl font-extrabold tracking-tight text-stone-900 tabular-nums">
+                <p className="text-ink text-center text-2xl font-extrabold tracking-tight tabular-nums">
                   {t("result.percentage", { percentage })}
                 </p>
-                <p className="text-sm font-bold text-stone-600 tabular-nums">
+                <p className="text-ink-2 text-center text-xs font-bold tabular-nums">
                   {t("result.fraction", {
                     earned: score.pointsEarned,
                     possible: score.pointsPossible,
@@ -93,16 +97,14 @@ export function ResultScreen({ result }: ResultScreenProps) {
             </div>
           </div>
 
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight text-stone-900">
-              {t("result.headline")}
-            </h1>
+          <div className="min-w-0 flex-1 basis-64">
+            <h1 className="screen-title">{t("result.headline")}</h1>
             {score.isPersonalBest ? (
-              <p className="mt-1 font-semibold text-teal-800">
+              <p className="screen-subtitle text-teal font-semibold">
                 {t("result.personalBest")}
               </p>
             ) : null}
-            <p className="mt-3 text-sm text-stone-600">
+            <p className="text-ink-2 mt-2 text-sm">
               {t("result.summary", {
                 answered: score.answered,
                 correct: score.correct,
@@ -111,10 +113,13 @@ export function ResultScreen({ result }: ResultScreenProps) {
               })}
             </p>
 
-            <div className="mt-6 space-y-4">
+            <div className="mt-4 space-y-3">
               {score.sections.map((section) => (
-                <div key={`${section.type}-${section.title}`}>
-                  <div className="mb-1.5 flex items-center justify-between gap-4 text-sm font-bold text-stone-800">
+                <section
+                  key={`${section.type}-${section.title}`}
+                  data-section-type={section.type}
+                >
+                  <div className="text-ink mb-1 flex items-center justify-between gap-4 text-sm font-bold">
                     <span>{section.title}</span>
                     <span className="tabular-nums">
                       {t("result.fraction", {
@@ -129,46 +134,39 @@ export function ResultScreen({ result }: ResultScreenProps) {
                     aria-valuemin={0}
                     aria-valuenow={section.pointsEarned}
                     aria-valuemax={section.pointsPossible}
-                    className="h-2 overflow-hidden rounded-full bg-stone-200"
+                    className="score-bar"
                   >
                     <div
-                      className={`h-full rounded-full ${sectionBarColour(section.type)}`}
+                      className={sectionBarColour(section.type)}
                       style={{ width: `${scorePercentage(section)}%` }}
                     />
                   </div>
-                </div>
+                </section>
               ))}
             </div>
           </div>
+        </div>
 
-          <p className="text-xs leading-relaxed text-stone-500 lg:col-span-2">
-            {t("result.practiceNotice", {
-              title: result.test.title,
-              version: result.test.version,
-            })}
-          </p>
-        </CardContent>
+        <p className="text-faint text-xs leading-relaxed">
+          {t("result.practiceNotice", {
+            title: result.test.title,
+            version: result.test.version,
+          })}
+        </p>
+      </main>
 
-        <CardFooter className="flex flex-wrap justify-between gap-3 border-t border-stone-200 bg-white px-6 sm:px-10">
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="h-11 min-w-11 touch-manipulation select-none"
-          >
-            <Link to="/">{t("result.backToLibrary")}</Link>
-          </Button>
-          <Button
-            asChild
-            size="sm"
-            className="h-11 min-w-11 touch-manipulation select-none"
-          >
-            <a href={`/attempts/${result.attemptId}/review`}>
-              {t("result.reviewAnswers")}
-            </a>
-          </Button>
-        </CardFooter>
-      </Card>
+      <footer className="device-footer flex-wrap">
+        <Link className="device-button" data-variant="ghost" to="/">
+          {t("result.backToLibrary")}
+        </Link>
+        <span className="grow" />
+        <a
+          className="device-button"
+          href={`/attempts/${result.attemptId}/review`}
+        >
+          {t("result.reviewAnswers")}
+        </a>
+      </footer>
     </div>
   )
 }

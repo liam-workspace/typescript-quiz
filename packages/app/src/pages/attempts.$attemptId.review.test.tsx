@@ -190,6 +190,47 @@ describe("attempt review page", () => {
     expect(screen.queryByText("Listening")).not.toBeInTheDocument()
   })
 
+  it("uses the prototype review shell, semantic verdicts, and navigator", async () => {
+    const user = userEvent.setup()
+    render(<ReviewScreen review={reviewPayload} />)
+
+    expect(screen.getByRole("banner")).toHaveClass("app-bar")
+    expect(screen.getByRole("main")).toHaveClass("device-main")
+    expect(screen.getByRole("contentinfo")).toHaveClass("device-footer")
+    expect(
+      screen.getByText("Listening", { selector: "[data-section-type]" }),
+    ).toHaveAttribute("data-section-type", "listening")
+    expect(screen.getByText("Question 7")).toHaveClass("question-count")
+    expect(screen.getByText("Correct")).toHaveAttribute(
+      "data-verdict",
+      "correct",
+    )
+    expect(screen.getByText(/your answer/i).closest("li")).toHaveClass("choice")
+    expect(screen.getByText(/your answer/i).closest("li")).toHaveAttribute(
+      "data-verdict",
+      "correct",
+    )
+
+    const navigatorTrigger = screen.getByRole("button", {
+      name: "Jump to a question",
+    })
+    expect(navigatorTrigger).toHaveAttribute("aria-expanded", "false")
+    await user.click(navigatorTrigger)
+    expect(
+      screen.getByRole("dialog", { name: "Jump to a question" }),
+    ).toHaveClass("question-panel")
+
+    expect(screen.getByRole("link", { name: "← Back to result" })).toHaveClass(
+      "device-button",
+    )
+    expect(screen.getByRole("button", { name: "Previous" })).toHaveClass(
+      "device-button",
+    )
+    expect(screen.getByRole("button", { name: "Next" })).toHaveClass(
+      "device-button",
+    )
+  })
+
   it("shows a selected correct choice as the student's correct answer", () => {
     render(<ReviewScreen review={reviewPayload} />)
 
@@ -207,12 +248,16 @@ describe("attempt review page", () => {
     const user = userEvent.setup()
     render(<ReviewScreen review={reviewPayload} />)
 
-    await user.click(screen.getByRole("button", { name: "Question 27: Wrong" }))
+    await user.click(screen.getByRole("button", { name: "Jump to a question" }))
+    await user.click(screen.getByRole("button", { name: "Question 27" }))
 
     expect(
       screen.getByText("Why did Mia take an umbrella?"),
     ).toBeInTheDocument()
     expect(screen.getByText("Your answer · incorrect")).toBeInTheDocument()
+    expect(
+      screen.getByText("Your answer · incorrect").closest("li"),
+    ).toHaveAttribute("data-verdict", "incorrect")
     expect(screen.getByText("Correct answer")).toBeInTheDocument()
     expect(screen.queryByText("Your answer · correct")).not.toBeInTheDocument()
   })
@@ -221,9 +266,8 @@ describe("attempt review page", () => {
     const user = userEvent.setup()
     render(<ReviewScreen review={reviewPayload} />)
 
-    await user.click(
-      screen.getByRole("button", { name: "Question 12: Left blank" }),
-    )
+    await user.click(screen.getByRole("button", { name: "Jump to a question" }))
+    await user.click(screen.getByRole("button", { name: "Question 12" }))
 
     const choices = screen.getByRole("list", { name: "Answer choices" })
     expect(within(choices).getAllByRole("listitem")).toHaveLength(3)
@@ -241,9 +285,8 @@ describe("attempt review page", () => {
       "/media/audio/l07.mp3?exp=1787932800&sig=signed-review-url",
     )
 
-    await user.click(
-      screen.getByRole("button", { name: "Question 12: Left blank" }),
-    )
+    await user.click(screen.getByRole("button", { name: "Jump to a question" }))
+    await user.click(screen.getByRole("button", { name: "Question 12" }))
 
     expect(screen.queryByLabelText("Replay audio")).not.toBeInTheDocument()
     expect(screen.getByText("A day out")).toBeInTheDocument()
@@ -363,7 +406,8 @@ describe("attempt review page", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/attempts/attempt-1/review")
     expect(fetchMock.mock.calls[0]?.[1]?.method).toBeUndefined()
 
-    await user.click(screen.getByRole("button", { name: "Question 27: Wrong" }))
+    await user.click(screen.getByRole("button", { name: "Jump to a question" }))
+    await user.click(screen.getByRole("button", { name: "Question 27" }))
 
     expect(next).toBeDisabled()
     await user.click(previous)
@@ -380,9 +424,8 @@ describe("attempt review page", () => {
     expect(screen.getByText("Listening")).toBeInTheDocument()
     expect(screen.queryByText("Reading")).not.toBeInTheDocument()
 
-    await user.click(
-      screen.getByRole("button", { name: "Question 12: Left blank" }),
-    )
+    await user.click(screen.getByRole("button", { name: "Jump to a question" }))
+    await user.click(screen.getByRole("button", { name: "Question 12" }))
 
     expect(screen.getByText("Reading")).toBeInTheDocument()
     expect(screen.queryByText("Listening")).not.toBeInTheDocument()

@@ -1,12 +1,8 @@
-import {
-  Button,
-  Card,
-  CardContent,
-  CardFooter,
-} from "@liam-public/browser-react-ui"
+import { Card, CardContent } from "@liam-public/browser-react-ui"
 import { createFileRoute, redirect } from "@tanstack/react-router"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import { QuestionNavigator } from "../components/QuestionNavigator.js"
 import { ApiError } from "../lib/api-client.js"
 import type {
   ReviewChoice,
@@ -15,6 +11,7 @@ import type {
   ReviewStimulus,
 } from "../lib/api-types.js"
 import { getAttemptReview } from "../lib/attempts-api.js"
+import type { NavigatorSource } from "../lib/navigator-state.js"
 
 export async function loadReview(attemptId: string): Promise<ReviewPayload> {
   try {
@@ -37,40 +34,24 @@ export async function loadReview(attemptId: string): Promise<ReviewPayload> {
 function outcomeClasses(outcome: ReviewItem["outcome"]): string {
   switch (outcome) {
     case "correct":
-      return "border-emerald-200 bg-emerald-50 text-emerald-800"
+      return "bg-good-bg text-good"
 
     case "incorrect":
-      return "border-rose-200 bg-rose-50 text-rose-800"
+      return "bg-bad-bg text-bad"
 
     case "unanswered":
-      return "border-stone-200 bg-stone-100 text-stone-700"
+      return "bg-surface text-ink-2"
   }
 }
 
-function choiceClasses(choice: ReviewChoice): string {
-  if (choice.selected && choice.isCorrect) {
-    return "border-emerald-300 bg-emerald-50"
-  }
-
-  if (choice.selected) {
-    return "border-rose-300 bg-rose-50"
-  }
-
+function choiceVerdict(
+  choice: ReviewChoice,
+): "correct" | "incorrect" | undefined {
   if (choice.isCorrect) {
-    return "border-emerald-200 bg-white"
+    return "correct"
   }
 
-  return "border-stone-200 bg-white"
-}
-
-function choiceDotClasses(choice: ReviewChoice): string {
-  if (!choice.selected) {
-    return "border-stone-400"
-  }
-
-  return choice.isCorrect
-    ? "border-emerald-700 bg-emerald-700"
-    : "border-rose-700 bg-rose-700"
+  return choice.selected ? "incorrect" : undefined
 }
 
 /**
@@ -115,14 +96,15 @@ interface ReviewStimulusViewProps {
 
 function ReviewStimulusView({ stimulus }: ReviewStimulusViewProps) {
   const { t } = useTranslation("runner")
+  const audioUrl = audioUrlOf(stimulus)
 
   return (
-    <div className="mb-6 rounded-xl border border-stone-200 bg-stone-50 p-4">
+    <section className={`mb-6 ${audioUrl ? "audio-box" : "device-card"}`}>
       {stimulus.title ? (
-        <h2 className="font-bold text-stone-900">{stimulus.title}</h2>
+        <h2 className="text-ink font-bold">{stimulus.title}</h2>
       ) : null}
       {"bodyText" in stimulus ? (
-        <p className="mt-2 text-sm leading-6 whitespace-pre-line text-stone-700">
+        <p className="passage mt-2 w-full text-left whitespace-pre-line">
           {stimulus.bodyText}
         </p>
       ) : null}
@@ -141,15 +123,15 @@ function ReviewStimulusView({ stimulus }: ReviewStimulusViewProps) {
           alt={stimulus.title ?? t("review.imageAlt")}
         />
       ) : null}
-      {audioUrlOf(stimulus) ? (
+      {audioUrl ? (
         <audio
           className="mt-3 w-full"
-          src={audioUrlOf(stimulus)}
+          src={audioUrl}
           controls
           aria-label={t("review.replayAudio")}
         />
       ) : null}
-    </div>
+    </section>
   )
 }
 
@@ -167,9 +149,7 @@ function ReviewChoiceMarker({ choice }: { readonly choice: ReviewChoice }) {
 
     return (
       <span
-        className={`text-xs font-bold ${
-          choice.isCorrect ? "text-emerald-800" : "text-rose-800"
-        }`}
+        className={`text-xs font-bold ${choice.isCorrect ? "text-good" : "text-bad"}`}
       >
         {t(markerKey)}
       </span>
@@ -178,7 +158,7 @@ function ReviewChoiceMarker({ choice }: { readonly choice: ReviewChoice }) {
 
   if (choice.isCorrect) {
     return (
-      <span className="text-xs font-bold text-emerald-800">
+      <span className="text-good text-xs font-bold">
         {t("review.correctAnswer")}
       </span>
     )
@@ -205,15 +185,21 @@ function ReviewChoiceList({ choices }: ReviewChoiceListProps) {
   const { t } = useTranslation("runner")
 
   return (
-    <ul aria-label={t("review.answerChoices")} className="space-y-3">
+    <ul
+      aria-label={t("review.answerChoices")}
+      className="choice-stack list-none p-0"
+    >
       {choices.map((choice) => (
         <li
           key={choice.id}
-          className={`flex min-h-12 items-center gap-3 rounded-xl border px-4 py-3 text-stone-900 ${choiceClasses(choice)}`}
+          className="choice"
+          data-locked="true"
+          data-verdict={choiceVerdict(choice)}
         >
           <span
             aria-hidden="true"
-            className={`size-3 shrink-0 rounded-full border-2 ${choiceDotClasses(choice)}`}
+            className="choice-dot rounded-full"
+            data-state={choice.selected ? "checked" : "unchecked"}
           />
           {choice.imageSvg ? <ReviewChoiceImage svg={choice.imageSvg} /> : null}
           <span className="min-w-0 flex-1">{choice.label}</span>
@@ -224,6 +210,40 @@ function ReviewChoiceList({ choices }: ReviewChoiceListProps) {
   )
 }
 
+function navigatorSource(review: ReviewPayload): NavigatorSource {
+  const sections = new Map<string, NavigatorSource["sections"][number]>()
+
+  for (const item of review.items) {
+    const section = sections.get(item.sectionId)
+
+    if (section) {
+      section.questions.push({ id: item.questionId, ordinal: item.ordinal })
+    } else {
+      sections.set(item.sectionId, {
+        id: item.sectionId,
+        type: item.sectionType,
+        navigation: "free",
+        status: "closed",
+        questions: [{ id: item.questionId, ordinal: item.ordinal }],
+      })
+    }
+  }
+
+  return {
+    mode: "review",
+    currentQuestionId: null,
+    sections: [...sections.values()],
+    answeredQuestionIds: new Set(
+      review.items
+        .filter((item) => item.outcome !== "unanswered")
+        .map((item) => item.questionId),
+    ),
+    outcomeByQuestionId: new Map(
+      review.items.map((item) => [item.questionId, item.outcome]),
+    ),
+  }
+}
+
 export interface ReviewScreenProps {
   readonly review: ReviewPayload
 }
@@ -231,15 +251,16 @@ export interface ReviewScreenProps {
 export function ReviewScreen({ review }: ReviewScreenProps) {
   const { t } = useTranslation("runner")
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [navigatorOpen, setNavigatorOpen] = useState(false)
 
   if (review.items.length === 0) {
     return (
-      <div className="mx-auto max-w-xl px-4 py-12">
-        <Card>
-          <CardContent>
-            <p role="status">{t("review.empty")}</p>
-          </CardContent>
-        </Card>
+      <div className="device-page">
+        <main className="center-main">
+          <p role="status" className="device-card">
+            {t("review.empty")}
+          </p>
+        </main>
       </div>
     )
   }
@@ -253,125 +274,110 @@ export function ReviewScreen({ review }: ReviewScreenProps) {
   const outcome = t(`review.outcome.${current.outcome}`)
   const atFirst = currentIndex === 0
   const atLast = currentIndex === review.items.length - 1
+  const source = navigatorSource(review)
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-4 py-6 sm:px-8 sm:py-8">
-      <Card className="flex min-h-[calc(100vh-4rem)] flex-1 flex-col overflow-hidden border-stone-200 bg-stone-50 shadow-md">
-        <header className="flex flex-wrap items-center gap-3 border-b border-stone-200 bg-white px-5 py-4 sm:px-8">
-          <h1 className="text-lg font-extrabold tracking-tight text-stone-900">
-            {t("review.title")}
-          </h1>
+    <div className="device-page">
+      <header className="app-bar">
+        <h1 className="app-brand">{t("review.title")}</h1>
+        <span
+          className={`section-chip section-chip--${sectionKey}`}
+          data-section-type={sectionKey}
+        >
+          {t(`runner.sectionChip.${sectionKey}`)}
+        </span>
+        <span className="grow" />
+        <span className="text-ink-2 text-sm font-bold tabular-nums">
+          {t("review.position", {
+            current: currentIndex + 1,
+            total: review.items.length,
+          })}
+        </span>
+      </header>
+
+      <main className="device-main mx-auto w-full max-w-4xl">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <span className="question-count">
+            {t("review.questionLabel", { ordinal: current.ordinal })}
+          </span>
           <span
-            className={`rounded-full px-3 py-1 text-xs font-bold ${
-              sectionKey === "listening"
-                ? "bg-teal-100 text-teal-900"
-                : "bg-orange-100 text-orange-900"
-            }`}
+            className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${outcomeClasses(current.outcome)}`}
+            data-verdict={current.outcome}
           >
-            {t(`runner.sectionChip.${sectionKey}`)}
+            {outcome}
           </span>
-          <span className="ml-auto text-sm font-bold text-stone-600 tabular-nums">
-            {t("review.position", {
-              current: currentIndex + 1,
-              total: review.items.length,
-            })}
-          </span>
-        </header>
+        </div>
 
-        <CardContent className="flex-1 px-5 py-7 sm:px-8">
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="text-sm font-extrabold text-stone-600">
-              {t("review.questionLabel", { ordinal: current.ordinal })}
-            </span>
-            <span
-              className={`rounded-full border px-2.5 py-1 text-xs font-extrabold ${outcomeClasses(current.outcome)}`}
-            >
-              {outcome}
-            </span>
-          </div>
+        {current.stimulus ? (
+          <ReviewStimulusView stimulus={current.stimulus} />
+        ) : null}
 
-          {current.stimulus ? (
-            <ReviewStimulusView stimulus={current.stimulus} />
-          ) : null}
+        <p className="question-prompt mt-0">{current.prompt}</p>
+        <ReviewChoiceList choices={current.choices} />
 
-          <p className="mb-5 text-xl leading-snug font-bold text-stone-950 sm:text-2xl">
-            {current.prompt}
+        {current.outcome === "unanswered" ? (
+          <p className="text-faint mt-3 text-sm font-semibold">
+            {t("review.leftBlankNotice", { ordinal: current.ordinal })}
           </p>
-          <ReviewChoiceList choices={current.choices} />
+        ) : null}
+      </main>
 
-          {current.outcome === "unanswered" ? (
-            <p className="mt-4 text-sm font-semibold text-stone-600">
-              {t("review.leftBlankNotice", { ordinal: current.ordinal })}
-            </p>
-          ) : null}
+      <footer className="device-footer sticky bottom-0 z-10 flex-wrap">
+        <a
+          href={`/attempts/${review.attemptId}/result`}
+          className="device-button"
+          data-variant="ghost"
+        >
+          {t("review.backToResult")}
+        </a>
+        <button
+          type="button"
+          aria-expanded={navigatorOpen}
+          aria-label={t("review.jumpToQuestion")}
+          className="nav-toggle border-line bg-paper text-ink inline-flex min-h-11 touch-manipulation items-center gap-2 rounded-lg border px-3 text-sm font-bold select-none"
+          onClick={() => setNavigatorOpen((open) => !open)}
+        >
+          <span aria-hidden="true">▦</span>
+          <span>{t("review.jumpToQuestion")}</span>
+        </button>
+        <span className="grow" />
+        <button
+          type="button"
+          className="device-button"
+          data-variant="ghost"
+          disabled={atFirst}
+          onClick={() => setCurrentIndex((index) => index - 1)}
+        >
+          {t("runner.previous")}
+        </button>
+        <button
+          type="button"
+          className="device-button"
+          disabled={atLast}
+          onClick={() => setCurrentIndex((index) => index + 1)}
+        >
+          {t("runner.next")}
+        </button>
+      </footer>
 
-          <nav
-            className="mt-8 border-t border-stone-200 pt-5"
-            aria-label={t("review.jumpToQuestion")}
-          >
-            <p className="mb-3 text-xs font-extrabold tracking-wide text-stone-500 uppercase">
-              {t("review.jumpToQuestion")}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {review.items.map((item, index) => {
-                const itemOutcome = t(`review.outcome.${item.outcome}`)
+      <QuestionNavigator
+        open={navigatorOpen}
+        onOpenChange={setNavigatorOpen}
+        source={source}
+        answeredCount={source.answeredQuestionIds.size}
+        totalCount={review.items.length}
+        onNavigate={(_sectionId, questionId) => {
+          const nextIndex = review.items.findIndex(
+            (item) => item.questionId === questionId,
+          )
 
-                return (
-                  <button
-                    key={item.questionId}
-                    type="button"
-                    onClick={() => setCurrentIndex(index)}
-                    aria-current={index === currentIndex ? "step" : undefined}
-                    aria-label={t("review.jumpLabel", {
-                      ordinal: item.ordinal,
-                      outcome: itemOutcome,
-                    })}
-                    className={`grid size-11 touch-manipulation place-items-center rounded-lg border text-sm font-extrabold tabular-nums transition select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 ${
-                      index === currentIndex
-                        ? "border-stone-900 bg-stone-900 text-white"
-                        : outcomeClasses(item.outcome)
-                    }`}
-                  >
-                    {item.ordinal}
-                  </button>
-                )
-              })}
-            </div>
-          </nav>
-        </CardContent>
+          if (nextIndex >= 0) {
+            setCurrentIndex(nextIndex)
+          }
 
-        <CardFooter className="flex flex-wrap items-center gap-3 border-t border-stone-200 bg-white px-5 sm:px-8">
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="h-11 min-w-11 touch-manipulation select-none"
-          >
-            <a href={`/attempts/${review.attemptId}/result`}>
-              {t("review.backToResult")}
-            </a>
-          </Button>
-          <div className="ml-auto flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-11 min-w-11 touch-manipulation select-none"
-              disabled={atFirst}
-              onClick={() => setCurrentIndex((index) => index - 1)}
-            >
-              {t("runner.previous")}
-            </Button>
-            <Button
-              size="sm"
-              className="h-11 min-w-11 touch-manipulation select-none"
-              disabled={atLast}
-              onClick={() => setCurrentIndex((index) => index + 1)}
-            >
-              {t("runner.next")}
-            </Button>
-          </div>
-        </CardFooter>
-      </Card>
+          setNavigatorOpen(false)
+        }}
+      />
     </div>
   )
 }

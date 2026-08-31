@@ -98,6 +98,45 @@ describe("attempt result page", () => {
     ).toHaveAttribute("href", "/attempts/attempt-1/review")
   })
 
+  it("uses the prototype result shell and API-driven score treatments", () => {
+    renderResult(bestResult)
+
+    expect(screen.getByRole("banner")).toHaveClass("app-bar")
+    expect(screen.getByRole("main")).toHaveClass("device-main")
+    expect(screen.getByRole("contentinfo")).toHaveClass("device-footer")
+    expect(screen.getByRole("heading", { level: 1 })).toHaveClass(
+      "screen-title",
+    )
+
+    const scoreRing = screen.getByTestId("score-ring")
+    expect(scoreRing).toHaveClass("score-ring")
+    expect(scoreRing).toHaveStyle("--score-pct: 90%")
+
+    const listening = screen.getByText("Listening").closest("section")
+    const reading = screen.getByText("Reading").closest("section")
+    expect(listening).toHaveAttribute("data-section-type", "listening")
+    expect(reading).toHaveAttribute("data-section-type", "reading")
+    expect(screen.getByRole("progressbar", { name: "Listening" })).toHaveClass(
+      "score-bar",
+    )
+    expect(
+      screen.getByRole("progressbar", { name: "Listening" }).firstElementChild,
+    ).toHaveClass("bg-teal")
+    expect(
+      screen.getByRole("progressbar", { name: "Reading" }).firstElementChild,
+    ).toHaveClass("bg-clay")
+
+    expect(
+      screen.getByText(/not an official TOEFL Primary scaled score/i),
+    ).toHaveClass("text-faint")
+    expect(screen.getByRole("link", { name: "Back to library" })).toHaveClass(
+      "device-button",
+    )
+    expect(screen.getByRole("link", { name: "Review answers →" })).toHaveClass(
+      "device-button",
+    )
+  })
+
   it("shows a personal-best callout only when isPersonalBest is true", () => {
     renderResult(bestResult)
 

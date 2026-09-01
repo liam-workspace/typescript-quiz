@@ -45,8 +45,9 @@ describe("ChoiceList -- single_choice", () => {
     )
 
     expect(screen.getByRole("radiogroup")).toHaveClass("choice-stack")
-    expect(screen.getByRole("radio", { name: "A dog" }).closest("label"))
-      .not.toHaveClass("mb-2")
+    expect(
+      screen.getByRole("radio", { name: "A dog" }).closest("label"),
+    ).not.toHaveClass("mb-2")
   })
 
   it("renders the currently selected choice with aria-checked=true", () => {
@@ -236,6 +237,7 @@ describe("ChoiceList -- multi_choice", () => {
     expect(
       screen.getByRole("group", { name: /select all that apply/i }),
     ).toHaveClass("choice-stack")
+    expect(screen.getByText("Select all that apply.")).toHaveClass("text-ink-2")
   })
 
   it("calls onSelect with a choice's id when it is tapped", async () => {

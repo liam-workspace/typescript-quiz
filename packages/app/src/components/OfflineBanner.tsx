@@ -20,7 +20,7 @@ export function OfflineBanner({ pendingCount }: OfflineBannerProps) {
         </span>
         <div className="min-w-0">
           <p className="font-bold">{t("runner.offline.title")}</p>
-          <p className="text-ink-2 mt-1 text-sm leading-6">
+          <p className="mt-1 text-sm leading-6">
             {t("runner.offline.message")}
           </p>
         </div>

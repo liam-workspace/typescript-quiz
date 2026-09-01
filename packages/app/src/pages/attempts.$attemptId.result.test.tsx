@@ -102,7 +102,7 @@ describe("attempt result page", () => {
     renderResult(bestResult)
 
     expect(screen.getByRole("banner")).toHaveClass("app-bar")
-    expect(screen.getByRole("main")).toHaveClass("device-main")
+    expect(screen.getByRole("main")).toHaveClass("device-main", "content-start")
     expect(screen.getByRole("contentinfo")).toHaveClass("device-footer")
     expect(screen.getByRole("heading", { level: 1 })).toHaveClass(
       "screen-title",

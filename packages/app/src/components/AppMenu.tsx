@@ -52,7 +52,7 @@ export function AppMenu({
       <SheetContent
         side="left"
         aria-describedby={undefined}
-        className="device-drawer-panel !w-[min(22rem,calc(100vw-1rem))] !max-w-[calc(100vw-1rem)] !gap-3 !p-[18px]"
+        className="device-drawer-panel !z-[70] !w-[min(22rem,calc(100vw-1rem))] !max-w-[calc(100vw-1rem)] !gap-3 !p-[18px]"
       >
         <DialogTitle>{t("menu.title")}</DialogTitle>
 
@@ -62,10 +62,10 @@ export function AppMenu({
               {student?.displayName[0] ?? "?"}
             </span>
             <span className="min-w-0">
-              <b className="block truncate text-sm text-ink">
+              <b className="text-ink block truncate text-sm">
                 {student?.displayName}
               </b>
-              <span className="block truncate text-xs text-ink-2">
+              <span className="text-ink-2 block truncate text-xs">
                 {student?.email}
               </span>
             </span>
@@ -78,14 +78,14 @@ export function AppMenu({
           >
             <button
               type="button"
-              className="size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-stone-800 select-none hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+              className="size-11 w-full"
               onClick={onGoLibrary}
             >
               {t("menu.library")}
             </button>
             <button
               type="button"
-              className="size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-stone-800 select-none hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+              className="size-11 w-full"
               onClick={onGoHistory}
             >
               {t("menu.history")}
@@ -96,7 +96,7 @@ export function AppMenu({
                 <hr />
                 <button
                   type="button"
-                  className="size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-stone-800 select-none hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+                  className="size-11 w-full"
                   onClick={onLeaveTest}
                 >
                   {t("menu.leaveTest")}
@@ -125,11 +125,7 @@ export function AppMenu({
                     key={language}
                     type="button"
                     aria-pressed={selected}
-                    className={`size-11 touch-manipulation rounded-md border text-xs font-bold uppercase select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 ${
-                      selected
-                        ? "border-teal-700 bg-teal-100 text-teal-900"
-                        : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
-                    }`}
+                    className="device-language-button size-11"
                     onClick={() => {
                       void i18n.changeLanguage(language)
                     }}
@@ -141,7 +137,7 @@ export function AppMenu({
             </div>
             <button
               type="button"
-              className="device-drawer-sign-out size-11 w-full touch-manipulation rounded-md px-3 text-left text-sm font-semibold text-red-600 select-none hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              className="device-drawer-sign-out size-11 w-full"
               onClick={onSignOut}
             >
               {t("menu.signOut")}

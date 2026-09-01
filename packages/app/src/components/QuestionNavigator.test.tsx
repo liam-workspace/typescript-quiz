@@ -123,6 +123,7 @@ describe("QuestionNavigator", () => {
       "!max-w-[calc(100vw-1rem)]",
       "!gap-3",
       "!p-[18px]",
+      "!z-[70]",
     )
   })
 

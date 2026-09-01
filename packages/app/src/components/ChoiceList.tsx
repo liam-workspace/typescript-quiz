@@ -65,7 +65,7 @@ function MultiChoiceList({
 
   return (
     <div>
-      <p className="mb-2 text-sm text-stone-600">
+      <p className="text-ink-2 mb-2 text-sm">
         {t("choices.selectAllThatApply")}
       </p>
       <div

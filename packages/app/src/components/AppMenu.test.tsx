@@ -82,9 +82,7 @@ describe("AppMenu", () => {
 
     expect(menu).toHaveClass("device-drawer")
     expect(screen.getByText("Tom")).toBeInTheDocument()
-    expect(
-      screen.getByRole("group", { name: "Main menu" }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole("group", { name: "Main menu" })).toBeInTheDocument()
     expect(screen.getByRole("group", { name: "Language" })).toBeInTheDocument()
     expect(screen.getByRole("contentinfo")).toHaveTextContent("Sign out")
   })
@@ -97,6 +95,7 @@ describe("AppMenu", () => {
       "!max-w-[calc(100vw-1rem)]",
       "!gap-3",
       "!p-[18px]",
+      "!z-[70]",
     )
   })
 
@@ -161,13 +160,15 @@ describe("AppMenu", () => {
 
     expect(english).toHaveAttribute("aria-pressed", "true")
     expect(french).toHaveAttribute("aria-pressed", "false")
-    expect(english.className).not.toBe(french.className)
+    expect(english).toHaveClass("device-language-button")
+    expect(french).toHaveClass("device-language-button")
+    expect(english.className).toBe(french.className)
 
     await userEvent.click(french)
 
     expect(english).toHaveAttribute("aria-pressed", "false")
     expect(french).toHaveAttribute("aria-pressed", "true")
-    expect(english.className).not.toBe(french.className)
+    expect(english.className).toBe(french.className)
   })
 
   it("uses 44px targets for every menu action", () => {

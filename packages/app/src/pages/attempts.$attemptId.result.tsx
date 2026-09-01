@@ -74,7 +74,7 @@ export function ResultScreen({ result }: ResultScreenProps) {
         <span className="app-brand">{result.test.title}</span>
       </header>
 
-      <main className="device-main mx-auto grid w-full max-w-4xl flex-1 content-center gap-6">
+      <main className="device-main mx-auto grid w-full max-w-4xl flex-1 content-start gap-6">
         <div className="flex flex-wrap items-center gap-6">
           <div
             data-testid="score-ring"

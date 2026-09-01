@@ -1,9 +1,4 @@
-import {
-  Button,
-  Card,
-  CardContent,
-  CardFooter,
-} from "@liam-public/browser-react-ui"
+import { Card, CardContent } from "@liam-public/browser-react-ui"
 import { Link, createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -21,6 +16,10 @@ export function loadHistory(): Promise<AttemptHistoryPage> {
 
 function fraction(earned: number, possible: number): string {
   return `${earned} / ${possible}`
+}
+
+function scoreBand(percentage: number): "high" | "mid" {
+  return percentage >= 90 ? "high" : "mid"
 }
 
 function sectionTypesIn(attempts: readonly AttemptHistoryRow[]): SectionType[] {
@@ -52,7 +51,6 @@ export function HistoryScreen({ initialPage }: HistoryScreenProps) {
   const dateFormatter = new Intl.DateTimeFormat(i18n.language, {
     day: "numeric",
     month: "short",
-    year: "numeric",
   })
   const numberFormatter = new Intl.NumberFormat(i18n.language, {
     maximumFractionDigits: 2,
@@ -78,164 +76,144 @@ export function HistoryScreen({ initialPage }: HistoryScreenProps) {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-6xl items-center px-4 py-8 sm:px-8">
-      <Card className="w-full overflow-hidden border-stone-200 bg-stone-50 shadow-md">
-        <CardContent className="px-5 py-7 sm:px-8">
-          <h1 className="text-2xl font-extrabold tracking-tight text-stone-900">
-            {t("history.title")}
-          </h1>
-          <p className="mt-1 text-sm text-stone-600">{t("history.subtitle")}</p>
+    <div className="device-page">
+      <header className="app-bar">
+        <span className="app-brand">{t("history.brand")}</span>
+      </header>
 
-          {attempts.length === 0 ? (
-            <p
-              role="status"
-              className="mt-8 rounded-xl border border-dashed border-stone-300 bg-white px-5 py-8 text-center font-semibold text-stone-600"
-            >
-              {t("history.empty")}
-            </p>
-          ) : (
-            <div className="mt-6 overflow-x-auto rounded-xl border border-stone-200 bg-white">
-              <table className="w-full min-w-max border-collapse text-left text-sm">
-                <thead className="bg-stone-100 text-xs tracking-wide text-stone-600 uppercase">
-                  <tr>
-                    <th className="px-4 py-3 font-extrabold">
-                      {t("history.column.test")}
-                    </th>
-                    <th className="px-4 py-3 font-extrabold">
-                      {t("history.column.date")}
-                    </th>
-                    {sectionTypes.map((type) => (
-                      <th key={type} className="px-4 py-3 font-extrabold">
-                        {sectionTitles.get(type)}
-                      </th>
-                    ))}
-                    <th className="px-4 py-3 font-extrabold">
-                      {t("history.column.score")}
-                    </th>
-                    <th className="px-4 py-3 font-extrabold">
-                      {t("history.column.ended")}
-                    </th>
-                    <th className="px-4 py-3">
-                      <span className="sr-only">
-                        {t("history.column.action")}
-                      </span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-200">
-                  {attempts.map((attempt) => (
-                    <tr key={attempt.id} className="text-stone-800">
-                      <th
-                        scope="row"
-                        className="max-w-72 px-4 py-4 font-bold text-stone-950"
-                      >
-                        {attempt.test.title}
-                      </th>
-                      <td className="px-4 py-4 whitespace-nowrap text-stone-600">
-                        <time dateTime={attempt.submittedAt}>
-                          {dateFormatter.format(new Date(attempt.submittedAt))}
-                        </time>
-                      </td>
-                      {sectionTypes.map((type) => {
-                        const section = attempt.sections.find(
-                          (candidate) => candidate.type === type,
-                        )
+      <main className="device-main mx-auto w-full max-w-6xl">
+        <h1 id="history-title" className="screen-title">
+          {t("history.title")}
+        </h1>
+        <p className="screen-subtitle">{t("history.subtitle")}</p>
 
-                        return (
-                          <td
-                            key={type}
-                            className="px-4 py-4 whitespace-nowrap tabular-nums"
-                          >
-                            {section
-                              ? fraction(
-                                  section.pointsEarned,
-                                  section.pointsPossible,
-                                )
-                              : t("history.notAvailable")}
-                          </td>
-                        )
-                      })}
-                      <td className="px-4 py-4 whitespace-nowrap tabular-nums">
-                        <span className="font-bold">
-                          {fraction(
-                            attempt.pointsEarned,
-                            attempt.pointsPossible,
-                          )}
-                        </span>{" "}
-                        <span className="ml-1 inline-flex rounded-full bg-teal-100 px-2.5 py-1 text-xs font-extrabold text-teal-900">
-                          {t("history.percentage", {
-                            percentage: numberFormatter.format(
-                              attempt.percentage,
-                            ),
-                          })}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span
-                          className={
-                            attempt.status === "expired"
-                              ? "font-bold text-amber-700"
-                              : "text-stone-600"
-                          }
-                        >
-                          {t(`history.status.${attempt.status}`)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        <Button
-                          asChild
-                          variant="outline"
-                          size="sm"
-                          className="h-11 min-w-11 touch-manipulation select-none"
-                        >
-                          <a href={`/attempts/${attempt.id}/review`}>
-                            {t("history.review")}
-                          </a>
-                        </Button>
-                      </td>
-                    </tr>
+        {attempts.length === 0 ? (
+          <p
+            role="status"
+            className="device-card text-ink-2 mt-5 border-dashed py-8 text-center font-semibold"
+          >
+            {t("history.empty")}
+          </p>
+        ) : (
+          <div
+            role="region"
+            aria-labelledby="history-title"
+            tabIndex={0}
+            className="mt-[15px] overflow-x-auto"
+          >
+            <table className="history-table min-w-[720px]">
+              <thead>
+                <tr>
+                  <th>{t("history.column.test")}</th>
+                  <th>{t("history.column.date")}</th>
+                  {sectionTypes.map((type) => (
+                    <th key={type}>{sectionTitles.get(type)}</th>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                  <th>{t("history.column.score")}</th>
+                  <th>{t("history.column.ended")}</th>
+                  <th>
+                    <span className="sr-only">
+                      {t("history.column.action")}
+                    </span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {attempts.map((attempt) => (
+                  <tr key={attempt.id}>
+                    <th scope="row" className="text-ink max-w-72 font-bold">
+                      {attempt.test.title}
+                    </th>
+                    <td className="text-ink-2 whitespace-nowrap">
+                      <time dateTime={attempt.submittedAt}>
+                        {dateFormatter.format(new Date(attempt.submittedAt))}
+                      </time>
+                    </td>
+                    {sectionTypes.map((type) => {
+                      const section = attempt.sections.find(
+                        (candidate) => candidate.type === type,
+                      )
+
+                      return (
+                        <td key={type} className="whitespace-nowrap">
+                          {section
+                            ? fraction(
+                                section.pointsEarned,
+                                section.pointsPossible,
+                              )
+                            : t("history.notAvailable")}
+                        </td>
+                      )
+                    })}
+                    <td className="whitespace-nowrap">
+                      <span className="font-bold">
+                        {fraction(attempt.pointsEarned, attempt.pointsPossible)}
+                      </span>{" "}
+                      <span
+                        className="score-badge"
+                        data-score-band={scoreBand(attempt.percentage)}
+                      >
+                        {t("history.percentage", {
+                          percentage: numberFormatter.format(
+                            attempt.percentage,
+                          ),
+                        })}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap">
+                      <span
+                        data-ended={attempt.status}
+                        className={
+                          attempt.status === "expired"
+                            ? "text-amber text-[13px] font-bold"
+                            : "text-ink-2 text-[13px]"
+                        }
+                      >
+                        {t(`history.status.${attempt.status}`)}
+                      </span>
+                    </td>
+                    <td className="text-right">
+                      <a
+                        className="device-button px-[11px] text-[12.5px]"
+                        data-variant="ghost"
+                        href={`/attempts/${attempt.id}/review`}
+                      >
+                        {t("history.review")}
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="device-button mt-3 w-full"
+          data-variant="secondary"
+          disabled={nextCursor === null || loading}
+          aria-busy={loading}
+          onClick={loadMore}
+        >
+          {t(
+            nextCursor === null
+              ? "history.noOlderAttempts"
+              : "history.loadMore",
           )}
+        </button>
+        {loadMoreFailed ? (
+          <p role="alert" className="text-bad mt-3 text-sm font-semibold">
+            {t("history.loadMoreError")}
+          </p>
+        ) : null}
+      </main>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="mt-4 h-11 w-full touch-manipulation select-none"
-            disabled={nextCursor === null || loading}
-            aria-busy={loading}
-            onClick={loadMore}
-          >
-            {t(
-              nextCursor === null
-                ? "history.noOlderAttempts"
-                : "history.loadMore",
-            )}
-          </Button>
-          {loadMoreFailed ? (
-            <p
-              role="alert"
-              className="mt-3 text-sm font-semibold text-rose-700"
-            >
-              {t("history.loadMoreError")}
-            </p>
-          ) : null}
-        </CardContent>
-
-        <CardFooter className="border-t border-stone-200 bg-white px-5 sm:px-8">
-          <Button
-            asChild
-            variant="outline"
-            size="sm"
-            className="h-11 min-w-11 touch-manipulation select-none"
-          >
-            <Link to="/">{t("history.backToLibrary")}</Link>
-          </Button>
-        </CardFooter>
-      </Card>
+      <footer className="device-footer">
+        <Link className="device-button" data-variant="ghost" to="/">
+          {t("history.backToLibrary")}
+        </Link>
+      </footer>
     </div>
   )
 }

@@ -9,6 +9,7 @@ import type {
   ReviewItem,
   ReviewPayload,
   ReviewStimulus,
+  SectionType,
 } from "../lib/api-types.js"
 import { getAttemptReview } from "../lib/attempts-api.js"
 import type { NavigatorSource } from "../lib/navigator-state.js"
@@ -42,6 +43,42 @@ function outcomeClasses(outcome: ReviewItem["outcome"]): string {
     case "unanswered":
       return "bg-surface text-ink-2"
   }
+}
+
+const sectionTypes = new Set<SectionType>([
+  "listening",
+  "reading",
+  "vocabulary",
+  "grammar",
+])
+
+function reviewSectionType(
+  current: ReviewItem,
+  items: readonly ReviewItem[],
+): SectionType {
+  const suppliedType: unknown = current.sectionType
+
+  if (
+    typeof suppliedType === "string" &&
+    sectionTypes.has(suppliedType as SectionType)
+  ) {
+    return suppliedType as SectionType
+  }
+
+  // The deployed review endpoint predates sectionType. Its canonical
+  // listening sections contain audio (including mixed audio) while reading
+  // sections do not, so retain a useful chip until that additive field is
+  // available everywhere instead of exposing an i18n key to the learner.
+  const sectionItems = items.filter(
+    (item) => item.sectionId === current.sectionId,
+  )
+  const containsAudio = sectionItems.some(
+    (item) =>
+      item.stimulus?.type === "audio" ||
+      (item.stimulus?.type === "mixed" && item.stimulus.mediaKind === "audio"),
+  )
+
+  return containsAudio ? "listening" : "reading"
 }
 
 function choiceVerdict(
@@ -270,7 +307,7 @@ export function ReviewScreen({ review }: ReviewScreenProps) {
   // The server says which kind of section this is. It used to be guessed
   // from the section's POSITION in the item list -- right only for a
   // two-section test in the expected order, and the enum has four values.
-  const sectionKey = current.sectionType
+  const sectionKey = reviewSectionType(current, review.items)
   const outcome = t(`review.outcome.${current.outcome}`)
   const atFirst = currentIndex === 0
   const atLast = currentIndex === review.items.length - 1

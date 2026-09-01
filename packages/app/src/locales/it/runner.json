@@ -127,6 +127,7 @@
   "review.empty": "Non ci sono domande da rivedere.",
   "review.forbidden": "Non puoi rivedere questo tentativo.",
   "review.error": "Impossibile caricare la revisione. Riprova.",
+  "history.brand": "I tuoi tentativi",
   "history.title": "Cronologia dei tentativi",
   "history.subtitle": "Tutti i test che hai completato, dal più recente.",
   "history.column.test": "Test",

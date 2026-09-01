@@ -58,7 +58,7 @@ export function QuestionNavigator({
     <Sheet modal={false} open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="question-panel !w-[min(22rem,calc(100vw-1rem))] !max-w-[calc(100vw-1rem)] !gap-3 !p-[18px]"
+        className="question-panel !z-[70] !w-[min(22rem,calc(100vw-1rem))] !max-w-[calc(100vw-1rem)] !gap-3 !p-[18px]"
       >
         <DialogTitle>
           {source.mode === "review"
@@ -117,10 +117,7 @@ export function QuestionNavigator({
           meaning, which tells a colour-blind child nothing at all -- and
           the brief supplies these five strings precisely so it need not be.
         */}
-        <ul
-          aria-label={t("navigator.legendLabel")}
-          className="question-legend"
-        >
+        <ul aria-label={t("navigator.legendLabel")} className="question-legend">
           {(source.mode === "review"
             ? (["correct", "incorrect", "blank"] as const)
             : (["answered", "current", "blank"] as const)

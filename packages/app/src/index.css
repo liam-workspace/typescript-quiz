@@ -76,7 +76,12 @@
     margin: 0;
     background: var(--color-surface);
     color: var(--color-ink);
-    font-family: Nunito, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-family:
+      Nunito,
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      sans-serif;
     font-size: 15px;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
@@ -382,7 +387,9 @@
     font-weight: 700;
     touch-action: manipulation;
   }
-  .device-button:hover { filter: brightness(1.07); }
+  .device-button:hover {
+    filter: brightness(1.07);
+  }
   .device-button[data-variant="secondary"],
   .device-button[data-variant="ghost"] {
     border-color: var(--color-line);
@@ -480,7 +487,10 @@
     aspect-ratio: 1;
     place-items: center;
     border-radius: 50%;
-    background: conic-gradient(var(--color-teal) 0 var(--score, 0%), var(--color-line) 0);
+    background: conic-gradient(
+      var(--color-teal) 0 var(--score, 0%),
+      var(--color-line) 0
+    );
   }
   .score-ring > * {
     display: grid;
@@ -507,7 +517,7 @@
     border-collapse: collapse;
     font-size: 14px;
   }
-  .history-table th {
+  .history-table thead th {
     padding: 0 10px 7px 0;
     color: var(--color-faint);
     font-size: 11px;
@@ -516,14 +526,33 @@
     text-align: left;
     text-transform: uppercase;
   }
-  .history-table td {
+  .history-table tbody th,
+  .history-table tbody td {
     border-top: 1px solid var(--color-line);
     padding: 10px 10px 10px 0;
+    text-align: left;
     font-variant-numeric: tabular-nums;
   }
+  .score-badge {
+    display: inline-flex;
+    margin-left: 4px;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .score-badge[data-score-band="high"] {
+    background: var(--color-good-bg);
+    color: var(--color-good);
+  }
+  .score-badge[data-score-band="mid"] {
+    background: var(--color-teal-bg);
+    color: var(--color-teal);
+  }
 
-  /* Drawer and navigator overlays retain Radix's overlay, Escape, and focus
-   * management; these classes only supply their device-specific presentation. */
+  /* Drawer and navigator overlays retain Radix's Escape and focus management;
+   * the wide shadow supplies the prototype scrim without making the sibling
+   * runner trigger unreachable during a direct panel switch. */
   .device-drawer-panel,
   .question-panel {
     width: min(22rem, calc(100vw - 1rem));
@@ -531,6 +560,9 @@
     gap: 12px;
     padding: 18px;
     background: var(--color-paper);
+    box-shadow:
+      0 0 0 100vmax rgb(26 41 48 / 0.5),
+      0 12px 32px rgb(26 41 48 / 0.18) !important;
     color: var(--color-ink);
   }
   .device-drawer-panel [data-slot="dialog-title"],
@@ -565,7 +597,10 @@
     color: white;
     font-weight: 700;
   }
-  .device-drawer-actions { display: grid; gap: 4px; }
+  .device-drawer-actions {
+    display: grid;
+    gap: 4px;
+  }
   .device-drawer-actions button,
   .device-drawer-sign-out {
     min-height: 44px;
@@ -580,7 +615,9 @@
     text-align: left;
     touch-action: manipulation;
   }
-  .device-drawer-actions button:hover { background: var(--color-surface); }
+  .device-drawer-actions button:hover {
+    background: var(--color-surface);
+  }
   .device-drawer-actions hr {
     width: 100%;
     margin: 8px 0;
@@ -607,7 +644,11 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
-  .device-drawer-languages { display: flex; flex-wrap: wrap; gap: 6px; }
+  .device-drawer-languages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
   .device-drawer-languages button {
     width: 44px;
     height: 44px;
@@ -625,8 +666,19 @@
     background: var(--color-teal-bg);
     color: var(--color-teal);
   }
-  .device-drawer-sign-out { width: 100%; margin-top: 8px; color: var(--color-bad); }
-  .device-drawer-sign-out:hover { background: var(--color-bad-bg); }
+  .device-drawer-sign-out {
+    width: 100%;
+    margin-top: 8px;
+    background: var(--color-paper);
+    color: var(--color-bad);
+  }
+  .device-drawer-sign-out:hover {
+    background: var(--color-bad-bg);
+  }
+  body:has(.device-drawer-panel, .question-panel) .app-bar,
+  body:has(.device-drawer-panel, .question-panel) .device-footer {
+    visibility: hidden;
+  }
   .question-panel [data-slot="dialog-description"] {
     color: var(--color-ink-2);
     font-size: 14px;
@@ -636,7 +688,9 @@
     flex: 1 1 auto;
     overflow-y: auto;
   }
-  .question-group + .question-group { margin-top: 16px; }
+  .question-group + .question-group {
+    margin-top: 16px;
+  }
   .question-group h3 {
     margin: 0 0 8px;
     color: var(--color-ink);
@@ -661,7 +715,11 @@
     font-size: 12px;
     list-style: none;
   }
-  .question-legend li { display: inline-flex; align-items: center; gap: 6px; }
+  .question-legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
   .question-panel-note {
     margin: 0;
     border-radius: 7px;

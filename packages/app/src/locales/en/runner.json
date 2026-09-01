@@ -127,6 +127,7 @@
   "review.empty": "There are no questions to review.",
   "review.forbidden": "You can't review this attempt.",
   "review.error": "The review could not be loaded. Please try again.",
+  "history.brand": "Your attempts",
   "history.title": "Attempt history",
   "history.subtitle": "Every test you have finished, newest first.",
   "history.column.test": "Test",

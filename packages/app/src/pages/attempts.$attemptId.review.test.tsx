@@ -191,6 +191,26 @@ describe("attempt review page", () => {
     expect(screen.queryByText("Listening")).not.toBeInTheDocument()
   })
 
+  it("falls back to the stimulus when an older review response omits sectionType", () => {
+    const { sectionType: _sectionType, ...legacyItem } = reviewPayload.items[0]
+
+    render(
+      <ReviewScreen
+        review={{
+          attemptId: "attempt-1",
+          items: [legacyItem as ReviewPayload["items"][number]],
+        }}
+      />,
+    )
+
+    expect(
+      screen.getByText("Listening", { selector: "[data-section-type]" }),
+    ).toHaveAttribute("data-section-type", "listening")
+    expect(
+      screen.queryByText("RUNNER.SECTIONCHIP.UNDEFINED"),
+    ).not.toBeInTheDocument()
+  })
+
   it("compacts and wraps the review app bar for a long French section label", async () => {
     await i18n.changeLanguage("fr")
     render(<ReviewScreen review={reviewPayload} />)

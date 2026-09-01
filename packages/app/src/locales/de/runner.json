@@ -127,6 +127,7 @@
   "review.empty": "Es gibt keine Fragen zum Überprüfen.",
   "review.forbidden": "Du kannst diesen Versuch nicht überprüfen.",
   "review.error": "Die Überprüfung konnte nicht geladen werden. Versuche es erneut.",
+  "history.brand": "Deine Versuche",
   "history.title": "Versuchsverlauf",
   "history.subtitle": "Alle abgeschlossenen Tests, neueste zuerst.",
   "history.column.test": "Test",

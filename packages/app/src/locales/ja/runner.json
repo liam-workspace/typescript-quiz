@@ -123,6 +123,7 @@
   "review.empty": "確認できる問題はありません。",
   "review.forbidden": "この受験の解答は確認できません。",
   "review.error": "解答の確認を読み込めませんでした。もう一度お試しください。",
+  "history.brand": "あなたの受験",
   "history.title": "受験履歴",
   "history.subtitle": "完了したテストを新しい順に表示します。",
   "history.column.test": "テスト",

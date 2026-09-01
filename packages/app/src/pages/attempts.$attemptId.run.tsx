@@ -174,6 +174,9 @@ export function RunScreen({
   >({})
   const [expired, setExpired] = useState<ExpiredState | null>(null)
   const [panel, setPanel] = useState<RunnerPanel>(null)
+  const previousPanelRef = useRef<RunnerPanel>(null)
+  const menuTriggerRef = useRef<HTMLButtonElement>(null)
+  const navigatorTriggerRef = useRef<HTMLButtonElement>(null)
   const [finishingSection, setFinishingSection] = useState(false)
   const [sectionTransitionFailed, setSectionTransitionFailed] = useState(false)
   const [readRemainingMs, setReadRemainingMs] = useState<(() => number) | null>(
@@ -199,6 +202,19 @@ export function RunScreen({
     state: "saved",
   })
   const [retryableFlushFailure, setRetryableFlushFailure] = useState(false)
+
+  useEffect(() => {
+    const previousPanel = previousPanelRef.current
+    previousPanelRef.current = panel
+
+    if (panel !== null || previousPanel === null) {
+      return
+    }
+
+    const trigger =
+      previousPanel === "menu" ? menuTriggerRef : navigatorTriggerRef
+    trigger.current?.focus()
+  }, [panel])
 
   // Constructed once per mount, tied to this attempt's `queue` prop (opened
   // once by the route loader, not re-opened on every render) -- the lazy
@@ -898,8 +914,9 @@ export function RunScreen({
 
   return (
     <div className="device-page">
-      <header className="app-bar relative z-[60]">
+      <header className="app-bar relative z-[40]">
         <button
+          ref={menuTriggerRef}
           type="button"
           aria-label={t("menu.openLabel")}
           aria-expanded={panel === "menu"}
@@ -924,7 +941,7 @@ export function RunScreen({
             className={`timer text-sm font-bold ${
               // Five minutes gives a child a calm, useful warning without
               // making the majority of a short practice section feel urgent.
-              remainingMs < 5 * 60 * 1_000 ? "text-clay" : "text-ink-2"
+              remainingMs < 5 * 60 * 1_000 ? "text-amber" : "text-ink-2"
             }`}
           >
             {formatCountdown(remainingMs)}
@@ -973,7 +990,7 @@ export function RunScreen({
         ) : null}
       </main>
 
-      <footer className="device-footer sticky bottom-0 z-[60] flex-wrap">
+      <footer className="device-footer sticky bottom-0 z-[40] flex-wrap">
         {!expired && section.type === "reading" && previousEntry ? (
           <button
             type="button"
@@ -985,6 +1002,7 @@ export function RunScreen({
           </button>
         ) : null}
         <button
+          ref={navigatorTriggerRef}
           type="button"
           aria-label={t("navigator.openLabel")}
           aria-expanded={panel === "navigator"}

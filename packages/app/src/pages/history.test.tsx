@@ -126,6 +126,34 @@ describe("attempt history page", () => {
     expect(page).toEqual(firstPage)
   })
 
+  it("uses the prototype history shell and a labelled horizontal table region", () => {
+    renderHistory(firstPage)
+
+    expect(screen.getByRole("banner")).toHaveClass("app-bar")
+    expect(screen.getByText("Your attempts")).toHaveClass("app-brand")
+    expect(screen.getByRole("main")).toHaveClass("device-main")
+    expect(screen.getByRole("heading", { level: 1 })).toHaveClass(
+      "screen-title",
+    )
+    expect(
+      screen.getByText("Every test you have finished, newest first."),
+    ).toHaveClass("screen-subtitle")
+
+    const tableRegion = screen.getByRole("region", {
+      name: "Attempt history",
+    })
+    expect(tableRegion).toHaveClass("overflow-x-auto")
+    expect(within(tableRegion).getByRole("table")).toHaveClass(
+      "history-table",
+      "min-w-[720px]",
+    )
+
+    expect(screen.getByRole("contentinfo")).toHaveClass("device-footer")
+    expect(screen.getByRole("link", { name: "Back to library" })).toHaveClass(
+      "device-button",
+    )
+  })
+
   it("renders one row per finished attempt with its per-section and total scores", () => {
     renderHistory(firstPage)
 
@@ -137,11 +165,19 @@ describe("attempt history page", () => {
     expect(screen.getAllByRole("row")).toHaveLength(3)
     expect(within(submittedRow).getAllByText("18 / 20")).toHaveLength(2)
     expect(within(submittedRow).getByText("36 / 40")).toBeInTheDocument()
-    expect(within(submittedRow).getByText("90%")).toBeInTheDocument()
+    expect(within(submittedRow).getByText("90%")).toHaveClass("score-badge")
+    expect(within(submittedRow).getByText("90%")).toHaveAttribute(
+      "data-score-band",
+      "high",
+    )
     expect(within(expiredRow).getByText("16 / 20")).toBeInTheDocument()
     expect(within(expiredRow).getByText("17 / 20")).toBeInTheDocument()
     expect(within(expiredRow).getByText("33 / 40")).toBeInTheDocument()
-    expect(within(expiredRow).getByText("82.5%")).toBeInTheDocument()
+    expect(within(expiredRow).getByText("82.5%")).toHaveClass("score-badge")
+    expect(within(expiredRow).getByText("82.5%")).toHaveAttribute(
+      "data-score-band",
+      "mid",
+    )
     expect(within(submittedRow).getByRole("time")).toHaveAttribute(
       "datetime",
       "2026-08-25T08:48:34.000Z",
@@ -149,6 +185,8 @@ describe("attempt history page", () => {
     expect(
       within(submittedRow).getByRole("link", { name: "Review" }),
     ).toHaveAttribute("href", "/attempts/attempt-submitted/review")
+    expect(within(submittedRow).getByRole("time")).toHaveTextContent("Aug 25")
+    expect(within(submittedRow).getByRole("time")).not.toHaveTextContent("2026")
     expect(
       screen.queryByText("No finished attempts yet."),
     ).not.toBeInTheDocument()
@@ -158,7 +196,11 @@ describe("attempt history page", () => {
     renderHistory(firstPage)
 
     const row = screen.getByRole("row", { name: /Practice Test 03/u })
-    expect(within(row).getByText("Time ran out")).toHaveClass("text-amber-700")
+    expect(within(row).getByText("Time ran out")).toHaveClass("text-amber")
+    expect(within(row).getByText("Time ran out")).toHaveAttribute(
+      "data-ended",
+      "expired",
+    )
     expect(within(row).queryByText("Handed in")).not.toBeInTheDocument()
   })
 
@@ -166,7 +208,11 @@ describe("attempt history page", () => {
     renderHistory(firstPage)
 
     const row = screen.getByRole("row", { name: /Practice Test 04/u })
-    expect(within(row).getByText("Handed in")).toHaveClass("text-stone-600")
+    expect(within(row).getByText("Handed in")).toHaveClass("text-ink-2")
+    expect(within(row).getByText("Handed in")).toHaveAttribute(
+      "data-ended",
+      "submitted",
+    )
     expect(within(row).queryByText("Time ran out")).not.toBeInTheDocument()
   })
 
@@ -199,9 +245,12 @@ describe("attempt history page", () => {
   it("disables Load more when nextCursor is null", () => {
     renderHistory(lastPage)
 
-    expect(
-      screen.getByRole("button", { name: "No older attempts" }),
-    ).toBeDisabled()
+    const terminalPagination = screen.getByRole("button", {
+      name: "No older attempts",
+    })
+    expect(terminalPagination).toBeDisabled()
+    expect(terminalPagination).toHaveClass("device-button", "w-full")
+    expect(terminalPagination).toHaveAttribute("data-variant", "secondary")
     expect(
       screen.queryByRole("button", { name: "Load more" }),
     ).not.toBeInTheDocument()

@@ -695,9 +695,12 @@ describe("RunScreen", () => {
   it("renders the prototype runner shell with route-owned bottom actions", () => {
     renderRunScreen()
 
-    expect(screen.getByRole("banner")).toHaveClass("app-bar")
+    expect(screen.getByRole("banner")).toHaveClass("app-bar", "z-[40]")
     expect(screen.getByRole("main")).toHaveClass("device-main", "runner-main")
-    expect(screen.getByRole("contentinfo")).toHaveClass("device-footer")
+    expect(screen.getByRole("contentinfo")).toHaveClass(
+      "device-footer",
+      "z-[40]",
+    )
     expect(
       screen.queryByRole("button", { name: "Previous" }),
     ).not.toBeInTheDocument()
@@ -756,11 +759,11 @@ describe("RunScreen", () => {
 
       const timer = screen.getByLabelText("Time remaining")
       expect(timer.className).toContain("text-ink-2")
-      expect(timer.className).not.toContain("text-clay")
+      expect(timer.className).not.toContain("text-amber")
 
       advanceClock(clock, 2_000)
 
-      expect(timer.className).toContain("text-clay")
+      expect(timer.className).toContain("text-amber")
     })
 
     it("stops reading the clock after the runner unmounts", () => {
@@ -902,10 +905,21 @@ describe("RunScreen", () => {
     it("closes whichever panel is open on Escape", async () => {
       renderRunScreen()
 
-      await userEvent.click(screen.getByRole("button", { name: "Open menu" }))
+      const menuTrigger = screen.getByRole("button", { name: "Open menu" })
+      await userEvent.click(menuTrigger)
       await userEvent.keyboard("{Escape}")
 
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+      expect(menuTrigger).toHaveFocus()
+
+      const navigatorTrigger = screen.getByRole("button", {
+        name: "Open the question navigator",
+      })
+      await userEvent.click(navigatorTrigger)
+      await userEvent.keyboard("{Escape}")
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+      expect(navigatorTrigger).toHaveFocus()
     })
 
     it("uses 44px touch targets for both runner-chrome triggers", () => {
@@ -1140,6 +1154,11 @@ describe("RunScreen", () => {
     expect(banner).toHaveTextContent(
       "Keep answering — your answers are saved on this iPad and will be sent as soon as the connection is back.",
     )
+    expect(
+      screen.getByText(
+        "Keep answering — your answers are saved on this iPad and will be sent as soon as the connection is back.",
+      ),
+    ).not.toHaveClass("text-ink-2")
     expect(banner).toHaveTextContent("Waiting to be sent: 1")
 
     vi.mocked(fetch).mockResolvedValue(

@@ -127,6 +127,7 @@
   "review.empty": "No hay preguntas para revisar.",
   "review.forbidden": "No puedes revisar este intento.",
   "review.error": "No se pudo cargar la revisión. Inténtalo de nuevo.",
+  "history.brand": "Tus intentos",
   "history.title": "Historial de intentos",
   "history.subtitle": "Todos los tests que has terminado, del más reciente al más antiguo.",
   "history.column.test": "Test",

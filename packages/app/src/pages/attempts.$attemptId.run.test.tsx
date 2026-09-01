@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { isRedirect } from "@tanstack/react-router"
@@ -889,17 +890,42 @@ describe("RunScreen", () => {
     it("closes the menu and opens the navigator when its trigger is clicked while the menu is open", async () => {
       renderRunScreen()
 
-      await userEvent.click(screen.getByRole("button", { name: "Open menu" }))
-      await userEvent.click(
-        screen.getByRole("button", {
-          name: "Open the question navigator",
-        }),
+      const menuTrigger = screen.getByRole("button", { name: "Open menu" })
+      const navigatorTrigger = screen.getByRole("button", {
+        name: "Open the question navigator",
+      })
+
+      await userEvent.click(menuTrigger)
+
+      const runner = screen.getByRole("main").parentElement
+      expect(runner).toHaveAttribute("data-panel", "menu")
+      expect(within(runner as HTMLElement).getByRole("banner")).toHaveAttribute(
+        "data-panel-open",
+        "true",
       )
+      expect(
+        within(runner as HTMLElement).getByRole("contentinfo"),
+      ).toHaveAttribute("data-panel-open", "true")
+      expect(menuTrigger).toHaveClass(
+        "runner-panel-trigger",
+        "runner-menu-trigger",
+      )
+      expect(navigatorTrigger).toHaveClass(
+        "runner-panel-trigger",
+        "runner-navigator-trigger",
+      )
+      expect(menuTrigger).toBeVisible()
+      expect(navigatorTrigger).toBeVisible()
+
+      await userEvent.click(navigatorTrigger)
 
       expect(screen.getAllByRole("dialog")).toHaveLength(1)
       expect(
         screen.getByRole("dialog", { name: "Questions" }),
       ).toBeInTheDocument()
+      expect(runner).toHaveAttribute("data-panel", "navigator")
+      expect(menuTrigger).toBeVisible()
+      expect(navigatorTrigger).toBeVisible()
     })
 
     it("closes whichever panel is open on Escape", async () => {

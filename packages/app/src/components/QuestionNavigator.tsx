@@ -58,7 +58,7 @@ export function QuestionNavigator({
     <Sheet modal={false} open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="question-panel !z-[70] !w-[min(22rem,calc(100vw-1rem))] !max-w-[calc(100vw-1rem)] !gap-3 !p-[18px]"
+        className="question-panel !z-[70] !w-[min(22rem,calc(100vw-4rem))] !max-w-[calc(100vw-4rem)] !gap-3 !p-[18px]"
       >
         <DialogTitle>
           {source.mode === "review"

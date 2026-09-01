@@ -258,7 +258,7 @@ function navigatorSource(review: ReviewPayload): NavigatorSource {
     } else {
       sections.set(item.sectionId, {
         id: item.sectionId,
-        type: item.sectionType,
+        type: reviewSectionType(item, review.items),
         navigation: "free",
         status: "closed",
         questions: [{ id: item.questionId, ordinal: item.ordinal }],

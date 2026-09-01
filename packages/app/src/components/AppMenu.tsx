@@ -52,7 +52,7 @@ export function AppMenu({
       <SheetContent
         side="left"
         aria-describedby={undefined}
-        className="device-drawer-panel !z-[70] !w-[min(22rem,calc(100vw-1rem))] !max-w-[calc(100vw-1rem)] !gap-3 !p-[18px]"
+        className="device-drawer-panel !z-[70] !w-[min(22rem,calc(100vw-4rem))] !max-w-[calc(100vw-4rem)] !gap-3 !p-[18px]"
       >
         <DialogTitle>{t("menu.title")}</DialogTitle>
 

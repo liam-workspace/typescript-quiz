@@ -191,8 +191,9 @@ describe("attempt review page", () => {
     expect(screen.queryByText("Listening")).not.toBeInTheDocument()
   })
 
-  it("falls back to the stimulus when an older review response omits sectionType", () => {
+  it("normalizes an older review response without sectionType in both the chip and navigator", async () => {
     const { sectionType: _sectionType, ...legacyItem } = reviewPayload.items[0]
+    const user = userEvent.setup()
 
     render(
       <ReviewScreen
@@ -209,6 +210,20 @@ describe("attempt review page", () => {
     expect(
       screen.queryByText("RUNNER.SECTIONCHIP.UNDEFINED"),
     ).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: "Jump to a question" }))
+
+    const navigator = screen.getByRole("dialog", {
+      name: "Jump to a question",
+    })
+    expect(
+      within(navigator).getByRole("heading", {
+        level: 3,
+        name: "Listening",
+      }),
+    ).toBeInTheDocument()
+    expect(navigator).not.toHaveTextContent(/undefined/iu)
+    expect(navigator).not.toHaveTextContent(/runner\./iu)
   })
 
   it("compacts and wraps the review app bar for a long French section label", async () => {

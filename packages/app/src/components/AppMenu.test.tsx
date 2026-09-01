@@ -91,8 +91,8 @@ describe("AppMenu", () => {
     renderMenu()
 
     expect(screen.getByRole("dialog", { name: "Menu" })).toHaveClass(
-      "!w-[min(22rem,calc(100vw-1rem))]",
-      "!max-w-[calc(100vw-1rem)]",
+      "!w-[min(22rem,calc(100vw-4rem))]",
+      "!max-w-[calc(100vw-4rem)]",
       "!gap-3",
       "!p-[18px]",
       "!z-[70]",

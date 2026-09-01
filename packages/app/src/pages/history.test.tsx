@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
-import type { AttemptHistoryPage } from "../lib/api-types.js"
+import type { AttemptHistoryPage, Student } from "../lib/api-types.js"
 import { renderWithRouter } from "../test/renderWithRouter.js"
 import { HistoryRouteError, HistoryScreen, loadHistory } from "./history.js"
 
@@ -88,6 +88,14 @@ const lastPage: AttemptHistoryPage = {
   nextCursor: null,
 }
 
+const tom: Student = {
+  id: "student-1",
+  displayName: "Tom",
+  email: "tom@example.com",
+  level: "primary-step-1",
+  isAdmin: false,
+}
+
 function response(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -98,9 +106,21 @@ function response(body: unknown, status = 200): Response {
   })
 }
 
-function renderHistory(initialPage: AttemptHistoryPage) {
+type HistoryScreenWithStudentProps = React.ComponentProps<
+  typeof HistoryScreen
+> & {
+  readonly student: Student | null
+}
+
+const HistoryScreenWithStudent =
+  HistoryScreen as React.ComponentType<HistoryScreenWithStudentProps>
+
+function renderHistory(
+  initialPage: AttemptHistoryPage,
+  student: Student | null = tom,
+) {
   return renderWithRouter(
-    <HistoryScreen initialPage={initialPage} />,
+    <HistoryScreenWithStudent initialPage={initialPage} student={student} />,
     "/history",
   )
 }
@@ -111,26 +131,39 @@ describe("attempt history page", () => {
     vi.unstubAllGlobals()
   })
 
-  it("loads finished attempts with the contract's default page size", async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(response(firstPage))
+  it("loads finished attempts and the current student together", async () => {
+    const fetchMock = vi.fn<typeof fetch>((input) => {
+      if (input === "/api/attempts?status=finished&limit=20") {
+        return Promise.resolve(response(firstPage))
+      }
+
+      if (input === "/api/me") {
+        return Promise.resolve(response(tom))
+      }
+
+      return Promise.reject(new Error(`Unexpected request: ${String(input)}`))
+    })
     vi.stubGlobal("fetch", fetchMock)
 
-    const page = await loadHistory()
+    const data = await loadHistory()
 
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+    expect(fetchMock.mock.calls.map(([input]) => input)).toEqual([
       "/api/attempts?status=finished&limit=20",
-    )
-    expect(fetchMock.mock.calls[0]?.[1]?.method).toBeUndefined()
-    expect(page).toEqual(firstPage)
+      "/api/me",
+    ])
+    expect(data).toEqual({ initialPage: firstPage, student: tom })
   })
 
   it("uses the prototype history shell and a labelled horizontal table region", () => {
-    renderHistory(firstPage)
+    const { container } = renderHistory(firstPage)
 
     expect(screen.getByRole("banner")).toHaveClass("app-bar")
+    expect(screen.getByRole("button", { name: "Open menu" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    )
     expect(screen.getByText("Your attempts")).toHaveClass("app-brand")
+    expect(container.querySelector(".student-avatar")).toHaveTextContent("T")
     expect(screen.getByRole("main")).toHaveClass("device-main")
     expect(screen.getByRole("heading", { level: 1 })).toHaveClass(
       "screen-title",
@@ -152,6 +185,24 @@ describe("attempt history page", () => {
     expect(screen.getByRole("link", { name: "Back to library" })).toHaveClass(
       "device-button",
     )
+  })
+
+  it("opens an accessible student menu from the history app bar", async () => {
+    const user = userEvent.setup()
+    renderHistory(firstPage)
+
+    const trigger = screen.getByRole("button", { name: "Open menu" })
+    await user.click(trigger)
+
+    expect(trigger).toHaveAttribute("aria-expanded", "true")
+    const menu = screen.getByRole("dialog", { name: "Menu" })
+    expect(within(menu).getByText("Tom")).toBeInTheDocument()
+    expect(
+      within(menu).getByRole("button", { name: "Test library" }),
+    ).toBeInTheDocument()
+    expect(
+      within(menu).getByRole("button", { name: "Attempt history" }),
+    ).toBeInTheDocument()
   })
 
   it("renders one row per finished attempt with its per-section and total scores", () => {

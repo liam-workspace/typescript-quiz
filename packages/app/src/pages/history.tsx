@@ -1,17 +1,31 @@
 import { Card, CardContent } from "@liam-public/browser-react-ui"
-import { Link, createFileRoute } from "@tanstack/react-router"
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import { AppMenu } from "../components/AppMenu.js"
+import { signOut } from "../lib/auth.js"
 import { ApiError } from "../lib/api-client.js"
 import type {
   AttemptHistoryPage,
   AttemptHistoryRow,
   SectionType,
+  Student,
 } from "../lib/api-types.js"
 import { listAttemptHistory } from "../lib/attempts-api.js"
+import { getCurrentStudent } from "../lib/session-api.js"
 
-export function loadHistory(): Promise<AttemptHistoryPage> {
-  return listAttemptHistory()
+export interface HistoryData {
+  initialPage: AttemptHistoryPage
+  student: Student | null
+}
+
+export async function loadHistory(): Promise<HistoryData> {
+  const [initialPage, student] = await Promise.all([
+    listAttemptHistory(),
+    getCurrentStudent().catch(() => null),
+  ])
+
+  return { initialPage, student }
 }
 
 function fraction(earned: number, possible: number): string {
@@ -34,10 +48,16 @@ function sectionTypesIn(attempts: readonly AttemptHistoryRow[]): SectionType[] {
 
 export interface HistoryScreenProps {
   readonly initialPage: AttemptHistoryPage
+  readonly student?: Student | null
 }
 
-export function HistoryScreen({ initialPage }: HistoryScreenProps) {
+export function HistoryScreen({
+  initialPage,
+  student = null,
+}: HistoryScreenProps) {
   const { i18n, t } = useTranslation("runner")
+  const navigate = useNavigate()
+  const [menuOpen, setMenuOpen] = useState(false)
   const [attempts, setAttempts] = useState(initialPage.attempts)
   const [nextCursor, setNextCursor] = useState(initialPage.nextCursor)
   const [loading, setLoading] = useState(false)
@@ -75,10 +95,43 @@ export function HistoryScreen({ initialPage }: HistoryScreenProps) {
     }
   }
 
+  function goToLibrary() {
+    setMenuOpen(false)
+    void navigate({ to: "/" })
+  }
+
+  function closeHistoryMenu() {
+    setMenuOpen(false)
+  }
+
+  function handleSignOut() {
+    signOut()
+    void navigate({ to: "/sign-in" })
+  }
+
   return (
     <div className="device-page">
       <header className="app-bar">
+        <button
+          type="button"
+          aria-label={t("menu.openLabel")}
+          aria-expanded={menuOpen}
+          aria-haspopup="dialog"
+          className="hover:bg-teal-bg size-11 touch-manipulation rounded-md text-xl font-bold select-none"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <span aria-hidden="true">☰</span>
+        </button>
         <span className="app-brand">{t("history.brand")}</span>
+        <span className="grow" />
+        {student ? (
+          <span
+            aria-hidden="true"
+            className="student-avatar bg-teal text-paper grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold"
+          >
+            {student.displayName[0]}
+          </span>
+        ) : null}
       </header>
 
       <main className="device-main mx-auto w-full max-w-6xl">
@@ -214,6 +267,18 @@ export function HistoryScreen({ initialPage }: HistoryScreenProps) {
           {t("history.backToLibrary")}
         </Link>
       </footer>
+
+      <AppMenu
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        inTest={false}
+        clockStarted={false}
+        student={student ?? undefined}
+        onGoLibrary={goToLibrary}
+        onGoHistory={closeHistoryMenu}
+        onLeaveTest={goToLibrary}
+        onSignOut={handleSignOut}
+      />
     </div>
   )
 }
@@ -246,7 +311,7 @@ export const Route = createFileRoute("/history")({
 })
 
 function RouteComponent() {
-  const page = Route.useLoaderData()
+  const data = Route.useLoaderData()
 
-  return <HistoryScreen initialPage={page} />
+  return <HistoryScreen initialPage={data.initialPage} student={data.student} />
 }

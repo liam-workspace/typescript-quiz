@@ -310,7 +310,9 @@
    * phone, tablet, or desktop viewport instead of recreating the prototype's
    * fixed mockup dimensions. */
   .device-page {
-    min-height: 100dvh;
+    min-height: calc(
+      100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+    );
     display: flex;
     flex-direction: column;
     background: var(--color-paper);
@@ -555,8 +557,8 @@
    * runner trigger unreachable during a direct panel switch. */
   .device-drawer-panel,
   .question-panel {
-    width: min(22rem, calc(100vw - 1rem));
-    max-width: calc(100vw - 1rem);
+    width: min(22rem, calc(100vw - 4rem));
+    max-width: calc(100vw - 4rem);
     gap: 12px;
     padding: 18px;
     background: var(--color-paper);
@@ -675,9 +677,30 @@
   .device-drawer-sign-out:hover {
     background: var(--color-bad-bg);
   }
-  body:has(.device-drawer-panel, .question-panel) .app-bar,
-  body:has(.device-drawer-panel, .question-panel) .device-footer {
+  .runner-panel-chrome[data-panel-open="true"] {
+    pointer-events: none;
+    border-color: transparent;
+    background: transparent;
+  }
+  .runner-panel-chrome[data-panel-open="true"] > :not(.runner-panel-trigger) {
     visibility: hidden;
+  }
+  .runner-panel-chrome[data-panel-open="true"] > .runner-panel-trigger {
+    visibility: visible;
+    pointer-events: auto;
+    border-color: var(--color-line);
+    background: var(--color-paper);
+    box-shadow: 0 4px 16px rgb(26 41 48 / 0.18);
+  }
+  .runner-shell[data-panel="menu"] .runner-panel-trigger {
+    position: fixed;
+    left: min(calc(22rem + 0.5rem), calc(100vw - 3.5rem));
+  }
+  .runner-shell[data-panel="menu"] .runner-menu-trigger {
+    top: max(0.75rem, calc(env(safe-area-inset-top) + 0.75rem));
+  }
+  .runner-shell[data-panel="menu"] .runner-navigator-trigger {
+    bottom: max(0.75rem, calc(env(safe-area-inset-bottom) + 0.75rem));
   }
   .question-panel [data-slot="dialog-description"] {
     color: var(--color-ink-2);

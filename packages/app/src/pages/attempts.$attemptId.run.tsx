@@ -913,14 +913,17 @@ export function RunScreen({
   }
 
   return (
-    <div className="device-page">
-      <header className="app-bar relative z-[40]">
+    <div className="device-page runner-shell" data-panel={panel ?? undefined}>
+      <header
+        className={`app-bar runner-panel-chrome relative ${panel === null ? "z-[40]" : "z-[80]"}`}
+        data-panel-open={panel === null ? undefined : "true"}
+      >
         <button
           ref={menuTriggerRef}
           type="button"
           aria-label={t("menu.openLabel")}
           aria-expanded={panel === "menu"}
-          className="hover:bg-teal-bg size-11 touch-manipulation rounded-md text-xl font-bold select-none"
+          className="runner-panel-trigger runner-menu-trigger hover:bg-teal-bg size-11 touch-manipulation rounded-md text-xl font-bold select-none"
           onClick={() => {
             setPanel((current) => (current === "menu" ? null : "menu"))
           }}
@@ -990,7 +993,10 @@ export function RunScreen({
         ) : null}
       </main>
 
-      <footer className="device-footer sticky bottom-0 z-[40] flex-wrap">
+      <footer
+        className={`device-footer runner-panel-chrome sticky bottom-0 flex-wrap ${panel === null ? "z-[40]" : "z-[80]"}`}
+        data-panel-open={panel === null ? undefined : "true"}
+      >
         {!expired && section.type === "reading" && previousEntry ? (
           <button
             type="button"
@@ -1006,7 +1012,7 @@ export function RunScreen({
           type="button"
           aria-label={t("navigator.openLabel")}
           aria-expanded={panel === "navigator"}
-          className="nav-toggle hover:border-teal border-line bg-paper inline-flex size-11 touch-manipulation items-center justify-center gap-2 rounded-lg border text-sm font-bold select-none sm:w-auto sm:px-3"
+          className="nav-toggle runner-panel-trigger runner-navigator-trigger hover:border-teal border-line bg-paper inline-flex size-11 touch-manipulation items-center justify-center gap-2 rounded-lg border text-sm font-bold select-none sm:w-auto sm:px-3"
           onClick={() => {
             setPanel((current) =>
               current === "navigator" ? null : "navigator",

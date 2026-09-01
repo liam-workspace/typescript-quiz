@@ -220,11 +220,11 @@ describe("POST /attempts/:id/stimuli/:stimulusId/play", () => {
     expect(body.playsUsed).toBe(1)
     expect(body.playsRemaining).toBe(0)
     expect(Number.isNaN(Date.parse(body.urlExpiresAt))).toBe(false)
-    expect(body.mediaUrl).toContain("/media/claim.mp3")
+    expect(body.mediaUrl).toContain("/api/media/claim.mp3")
     expect(body.mediaUrl).toContain("sig=")
 
     await request(a.http.getHttpServer() as App)
-      .get(`/api${body.mediaUrl}`)
+      .get(body.mediaUrl)
       .buffer(true)
       .expect((mediaRes) => {
         // No file was ever written to mediaRoot for this filename -- the

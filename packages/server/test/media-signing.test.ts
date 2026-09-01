@@ -8,14 +8,14 @@ const SECRET = "test-signing-secret"
 const NOW = new Date("2026-08-27T10:00:00.000Z")
 const EXPIRES_AT = new Date("2026-08-27T10:05:00.000Z")
 
-/** Splits a signed `/media/<filename>?exp=..&sig=..` URL into its parts. */
+/** Splits a signed `/api/media/<filename>?exp=..&sig=..` URL into its parts. */
 function parseSignedUrl(url: string): {
   filename: string
   exp: string | undefined
   sig: string | undefined
 } {
   const parsed = new URL(url, "http://media.test")
-  const filename = parsed.pathname.replace(/^\/media\//, "")
+  const filename = parsed.pathname.replace(/^\/api\/media\//, "")
 
   return {
     filename,

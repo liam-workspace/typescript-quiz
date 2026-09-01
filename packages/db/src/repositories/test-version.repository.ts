@@ -192,7 +192,7 @@ function buildStimulus(r: RunnerRow, stimulusId: string): RunnerStimulus {
     // POST /play, which counts plays. Uncapped media is safe to hand over
     // directly because there is no cap left to defeat.
     ...(maxPlays === null && r.st_filename
-      ? { mediaUrl: `/media/${r.st_filename}` }
+      ? { mediaUrl: `/api/media/${r.st_filename}` }
       : {}),
     ...(r.st_image_svg ? { imageSvg: r.st_image_svg } : {}),
     ...(r.st_type === "mixed"

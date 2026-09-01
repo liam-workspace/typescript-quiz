@@ -143,7 +143,7 @@ describe("GET /media/:filename", () => {
     )
 
     await request(a.http.getHttpServer() as App)
-      .get(`/api${expiredUrl}`)
+      .get(expiredUrl)
       .expect(403)
   })
 
@@ -164,7 +164,7 @@ describe("GET /media/:filename", () => {
     )
 
     const res = await request(a.http.getHttpServer() as App)
-      .get(`/api${validUrl}`)
+      .get(validUrl)
       .buffer(true)
       .expect(200)
 

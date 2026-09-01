@@ -185,7 +185,7 @@ describe("projections", () => {
         .find(idEquals(groupId))?.stimulus
 
       expect(stimulus).toBeDefined()
-      expect(stimulus?.mediaUrl).toBe("/media/l07.mp3")
+      expect(stimulus?.mediaUrl).toBe("/api/media/l07.mp3")
     })
   }, 120_000)
 
@@ -370,7 +370,7 @@ describe("projections", () => {
       const stimulus = sections.flatMap(groupsOf).map(stimulusOf).find(Boolean)
 
       expect(stimulus?.maxPlays).toBeNull()
-      expect(stimulus?.mediaUrl).toBe("/media/m01.png")
+      expect(stimulus?.mediaUrl).toBe("/api/media/m01.png")
     })
   }, 120_000)
 

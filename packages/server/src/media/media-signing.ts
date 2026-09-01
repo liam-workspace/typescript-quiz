@@ -27,7 +27,7 @@ export function signMediaUrl(
   const exp = String(expiresAt.getTime())
   const sig = computeSignature(filename, exp, secret)
 
-  return `/media/${filename}?exp=${exp}&sig=${sig}`
+  return `/api/media/${filename}?exp=${exp}&sig=${sig}`
 }
 
 /**

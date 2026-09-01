@@ -203,6 +203,13 @@ describe("attempt history page", () => {
     expect(
       within(menu).getByRole("button", { name: "Attempt history" }),
     ).toBeInTheDocument()
+
+    await user.keyboard("{Escape}")
+
+    expect(
+      screen.queryByRole("dialog", { name: "Menu" }),
+    ).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
   })
 
   it("renders one row per finished attempt with its per-section and total scores", () => {

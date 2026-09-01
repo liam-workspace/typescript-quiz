@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@liam-public/browser-react-ui"
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { AppMenu } from "../components/AppMenu.js"
 import { signOut } from "../lib/auth.js"
@@ -58,6 +58,8 @@ export function HistoryScreen({
   const { i18n, t } = useTranslation("runner")
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
+  const previousMenuOpenRef = useRef(false)
+  const menuTriggerRef = useRef<HTMLButtonElement>(null)
   const [attempts, setAttempts] = useState(initialPage.attempts)
   const [nextCursor, setNextCursor] = useState(initialPage.nextCursor)
   const [loading, setLoading] = useState(false)
@@ -75,6 +77,15 @@ export function HistoryScreen({
   const numberFormatter = new Intl.NumberFormat(i18n.language, {
     maximumFractionDigits: 2,
   })
+
+  useEffect(() => {
+    const wasOpen = previousMenuOpenRef.current
+    previousMenuOpenRef.current = menuOpen
+
+    if (wasOpen && !menuOpen) {
+      menuTriggerRef.current?.focus()
+    }
+  }, [menuOpen])
 
   async function loadMore() {
     if (nextCursor === null || loading) {
@@ -113,6 +124,7 @@ export function HistoryScreen({
     <div className="device-page">
       <header className="app-bar">
         <button
+          ref={menuTriggerRef}
           type="button"
           aria-label={t("menu.openLabel")}
           aria-expanded={menuOpen}

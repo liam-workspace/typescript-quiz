@@ -914,10 +914,7 @@ export function RunScreen({
 
   return (
     <div className="device-page runner-shell" data-panel={panel ?? undefined}>
-      <header
-        className={`app-bar runner-panel-chrome relative ${panel === null ? "z-[40]" : "z-[80]"}`}
-        data-panel-open={panel === null ? undefined : "true"}
-      >
+      <header className="app-bar relative z-[40]">
         <button
           ref={menuTriggerRef}
           type="button"
@@ -993,10 +990,7 @@ export function RunScreen({
         ) : null}
       </main>
 
-      <footer
-        className={`device-footer runner-panel-chrome sticky bottom-0 flex-wrap ${panel === null ? "z-[40]" : "z-[80]"}`}
-        data-panel-open={panel === null ? undefined : "true"}
-      >
+      <footer className="device-footer sticky bottom-0 z-[40] flex-wrap">
         {!expired && section.type === "reading" && previousEntry ? (
           <button
             type="button"
@@ -1076,6 +1070,8 @@ export function RunScreen({
         onLeaveTest={() => {
           navigate("/")
         }}
+        onOpenNavigator={() => setPanel("navigator")}
+        returnFocusRef={menuTriggerRef}
         onSignOut={() => {
           navigate("/")
         }}
@@ -1092,6 +1088,8 @@ export function RunScreen({
         source={navigatorSource}
         answeredCount={responses.size}
         totalCount={envelope.questionCount}
+        onOpenMenu={() => setPanel("menu")}
+        returnFocusRef={navigatorTriggerRef}
         onNavigate={handleNavigatorNavigate}
       />
     </div>

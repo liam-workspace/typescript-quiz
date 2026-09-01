@@ -191,7 +191,7 @@ describe("attempt review page", () => {
     expect(screen.queryByText("Listening")).not.toBeInTheDocument()
   })
 
-  it("normalizes an older review response without sectionType in both the chip and navigator", async () => {
+  it("uses a neutral section for a legacy review response with no reliable type", async () => {
     const { sectionType: _sectionType, ...legacyItem } = reviewPayload.items[0]
     const user = userEvent.setup()
 
@@ -205,8 +205,8 @@ describe("attempt review page", () => {
     )
 
     expect(
-      screen.getByText("Listening", { selector: "[data-section-type]" }),
-    ).toHaveAttribute("data-section-type", "listening")
+      screen.getByText("Other", { selector: "[data-section-type]" }),
+    ).toHaveAttribute("data-section-type", "other")
     expect(
       screen.queryByText("RUNNER.SECTIONCHIP.UNDEFINED"),
     ).not.toBeInTheDocument()
@@ -219,11 +219,75 @@ describe("attempt review page", () => {
     expect(
       within(navigator).getByRole("heading", {
         level: 3,
-        name: "Listening",
+        name: "Other",
       }),
     ).toBeInTheDocument()
     expect(navigator).not.toHaveTextContent(/undefined/iu)
     expect(navigator).not.toHaveTextContent(/runner\./iu)
+  })
+
+  it("uses a known sibling type for a legacy item in the same section", async () => {
+    const { sectionType: _sectionType, ...legacyItem } = reviewPayload.items[2]
+    const user = userEvent.setup()
+
+    render(
+      <ReviewScreen
+        review={{
+          attemptId: "attempt-1",
+          items: [
+            legacyItem as ReviewPayload["items"][number],
+            {
+              ...reviewPayload.items[2],
+              questionId: "question-28",
+              ordinal: 28,
+              sectionType: "grammar",
+            },
+          ],
+        }}
+      />,
+    )
+
+    expect(
+      screen.getByText("Grammar", { selector: "[data-section-type]" }),
+    ).toHaveAttribute("data-section-type", "grammar")
+
+    await user.click(screen.getByRole("button", { name: "Jump to a question" }))
+    expect(
+      within(screen.getByRole("dialog")).getByRole("heading", {
+        level: 3,
+        name: "Grammar",
+      }),
+    ).toBeInTheDocument()
+  })
+
+  it("renders the vocabulary type from the review contract", () => {
+    render(
+      <ReviewScreen
+        review={{
+          attemptId: "attempt-1",
+          items: [{ ...reviewPayload.items[2], sectionType: "vocabulary" }],
+        }}
+      />,
+    )
+
+    expect(
+      screen.getByText("Vocabulary", { selector: "[data-section-type]" }),
+    ).toHaveAttribute("data-section-type", "vocabulary")
+  })
+
+  it("renders the grammar type from the review contract", () => {
+    render(
+      <ReviewScreen
+        review={{
+          attemptId: "attempt-1",
+          items: [{ ...reviewPayload.items[2], sectionType: "grammar" }],
+        }}
+      />,
+    )
+
+    expect(
+      screen.getByText("Grammar", { selector: "[data-section-type]" }),
+    ).toHaveAttribute("data-section-type", "grammar")
   })
 
   it("compacts and wraps the review app bar for a long French section label", async () => {
@@ -271,6 +335,16 @@ describe("attempt review page", () => {
     expect(
       screen.getByRole("dialog", { name: "Jump to a question" }),
     ).toHaveClass("question-panel")
+    expect(screen.queryByRole("main")).not.toBeInTheDocument()
+
+    await user.keyboard("{Escape}")
+    expect(navigatorTrigger).toHaveFocus()
+
+    await user.click(navigatorTrigger)
+    await user.click(
+      screen.getByRole("button", { name: "Close the question navigator" }),
+    )
+    expect(navigatorTrigger).toHaveFocus()
 
     expect(screen.getByRole("link", { name: "← Back to result" })).toHaveClass(
       "device-button",

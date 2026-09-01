@@ -290,6 +290,7 @@ export function HistoryScreen({
         onGoHistory={closeHistoryMenu}
         onLeaveTest={goToLibrary}
         onSignOut={handleSignOut}
+        returnFocusRef={menuTriggerRef}
       />
     </div>
   )

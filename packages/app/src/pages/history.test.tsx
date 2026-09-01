@@ -203,6 +203,7 @@ describe("attempt history page", () => {
     expect(
       within(menu).getByRole("button", { name: "Attempt history" }),
     ).toBeInTheDocument()
+    expect(screen.queryByRole("main")).not.toBeInTheDocument()
 
     await user.keyboard("{Escape}")
 

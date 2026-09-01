@@ -132,6 +132,12 @@
  * state is a defect, and both have already been exactly that.
  */
 @layer components {
+  .app-shell {
+    min-height: calc(
+      100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+    );
+  }
+
   /* An answer option. Its selected state is the single most important
    * visual signal in the app: a child taps and must see it took. */
   .choice {
@@ -352,6 +358,21 @@
     background: var(--color-clay-bg);
     color: var(--color-clay);
   }
+  .section-chip[data-section="vocabulary"],
+  .section-chip--vocabulary {
+    background: var(--color-teal-bg);
+    color: var(--color-teal);
+  }
+  .section-chip[data-section="grammar"],
+  .section-chip--grammar {
+    background: var(--color-clay-bg);
+    color: var(--color-clay);
+  }
+  .section-chip[data-section="other"],
+  .section-chip--other {
+    background: var(--color-surface);
+    color: var(--color-ink-2);
+  }
   .device-main {
     flex: 1 1 auto;
     padding: 22px clamp(16px, 5vw, 26px);
@@ -552,19 +573,44 @@
     color: var(--color-teal);
   }
 
-  /* Drawer and navigator overlays retain Radix's Escape and focus management;
-   * the wide shadow supplies the prototype scrim without making the sibling
-   * runner trigger unreachable during a direct panel switch. */
+  /* Drawer and navigator overlays are genuine modal Radix dialogs. The
+   * overlay supplies the scrim/pointer boundary, while padding keeps sheet
+   * content and its close control clear of notches in every orientation. */
+  .device-sheet-content {
+    width: min(
+      22rem,
+      calc(
+        100vw - 4rem - env(safe-area-inset-left) - env(safe-area-inset-right)
+      )
+    );
+    max-width: calc(
+      100vw - 4rem - env(safe-area-inset-left) - env(safe-area-inset-right)
+    );
+    gap: 12px;
+    padding-top: calc(18px + env(safe-area-inset-top));
+    padding-bottom: calc(18px + env(safe-area-inset-bottom));
+    background: var(--color-paper);
+  }
+  .device-sheet-content[data-side="left"] {
+    padding-right: 18px;
+    padding-left: calc(18px + env(safe-area-inset-left));
+  }
+  .device-sheet-content[data-side="right"] {
+    padding-right: calc(18px + env(safe-area-inset-right));
+    padding-left: 18px;
+  }
+  .device-sheet-close {
+    top: calc(12px + env(safe-area-inset-top));
+  }
+  .device-sheet-content[data-side="left"] .device-sheet-close {
+    right: 12px;
+  }
+  .device-sheet-content[data-side="right"] .device-sheet-close {
+    right: calc(12px + env(safe-area-inset-right));
+  }
   .device-drawer-panel,
   .question-panel {
-    width: min(22rem, calc(100vw - 4rem));
-    max-width: calc(100vw - 4rem);
-    gap: 12px;
-    padding: 18px;
-    background: var(--color-paper);
-    box-shadow:
-      0 0 0 100vmax rgb(26 41 48 / 0.5),
-      0 12px 32px rgb(26 41 48 / 0.18) !important;
+    box-shadow: 0 12px 32px rgb(26 41 48 / 0.18);
     color: var(--color-ink);
   }
   .device-drawer-panel [data-slot="dialog-title"],
@@ -677,31 +723,6 @@
   .device-drawer-sign-out:hover {
     background: var(--color-bad-bg);
   }
-  .runner-panel-chrome[data-panel-open="true"] {
-    pointer-events: none;
-    border-color: transparent;
-    background: transparent;
-  }
-  .runner-panel-chrome[data-panel-open="true"] > :not(.runner-panel-trigger) {
-    visibility: hidden;
-  }
-  .runner-panel-chrome[data-panel-open="true"] > .runner-panel-trigger {
-    visibility: visible;
-    pointer-events: auto;
-    border-color: var(--color-line);
-    background: var(--color-paper);
-    box-shadow: 0 4px 16px rgb(26 41 48 / 0.18);
-  }
-  .runner-shell[data-panel="menu"] .runner-panel-trigger {
-    position: fixed;
-    left: min(calc(22rem + 0.5rem), calc(100vw - 3.5rem));
-  }
-  .runner-shell[data-panel="menu"] .runner-menu-trigger {
-    top: max(0.75rem, calc(env(safe-area-inset-top) + 0.75rem));
-  }
-  .runner-shell[data-panel="menu"] .runner-navigator-trigger {
-    bottom: max(0.75rem, calc(env(safe-area-inset-bottom) + 0.75rem));
-  }
   .question-panel [data-slot="dialog-description"] {
     color: var(--color-ink-2);
     font-size: 14px;
@@ -724,7 +745,6 @@
   }
   .question-grid {
     display: grid;
-    grid-template-columns: repeat(5, minmax(44px, 1fr));
     gap: 6px;
   }
   .question-legend {

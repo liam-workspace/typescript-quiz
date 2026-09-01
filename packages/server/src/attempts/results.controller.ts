@@ -57,6 +57,7 @@ interface ReviewItemView {
   questionId: string
   ordinal: number
   sectionId: string
+  sectionType: ReviewItem["sectionType"]
   prompt: string
   outcome: "correct" | "incorrect" | "unanswered"
   stimulus?: ReviewStimulus
@@ -73,6 +74,7 @@ function toReviewItemView(item: ReviewItem): ReviewItemView {
     questionId: item.questionId,
     ordinal: item.ordinal,
     sectionId: item.sectionId,
+    sectionType: item.sectionType,
     prompt: item.prompt,
     outcome: item.outcome,
     ...(item.stimulus ? { stimulus: { ...item.stimulus } } : {}),

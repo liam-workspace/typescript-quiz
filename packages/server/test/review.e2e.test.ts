@@ -138,6 +138,7 @@ describe("GET /api/attempts/:id/review", () => {
           questionId: fixture.appliedQuestionId,
           ordinal: 1,
           sectionId: fixture.sectionId,
+          sectionType: "reading",
           prompt: "Applied?",
           outcome: "correct",
           choices: [
@@ -159,6 +160,7 @@ describe("GET /api/attempts/:id/review", () => {
           questionId: fixture.staleQuestionId,
           ordinal: 2,
           sectionId: fixture.sectionId,
+          sectionType: "reading",
           prompt: "Stale?",
           outcome: "unanswered",
           choices: [
@@ -208,7 +210,10 @@ describe("GET /api/attempts/:id/review", () => {
     expect(response.status).toBe(200)
     expect(response.body).toMatchObject({
       attemptId: fixture.attemptId,
-      items: [{ outcome: "unanswered" }, { outcome: "unanswered" }],
+      items: [
+        { sectionType: "reading", outcome: "unanswered" },
+        { sectionType: "reading", outcome: "unanswered" },
+      ],
     })
     expect(rows).toEqual([{ status: "expired", submitted_at: deadline }])
   })

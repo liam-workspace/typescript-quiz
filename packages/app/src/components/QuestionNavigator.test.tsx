@@ -32,6 +32,8 @@ await i18n.use(initReactI18next).init({
           legendLabel: "Question status",
           forwardOnlyNote:
             "This section runs forward only. The navigator shows where you are but cannot move you.",
+          openLabel: "Open the question navigator",
+          closeLabel: "Close the question navigator",
         },
       },
     },
@@ -42,6 +44,7 @@ await i18n.use(initReactI18next).init({
           sectionListening: "Écoute",
           questionGridLabel: "Questions d’écoute",
           legendLabel: "État des questions",
+          closeLabel: "Fermer le navigateur de questions",
         },
       },
     },
@@ -119,11 +122,12 @@ describe("QuestionNavigator", () => {
     renderNavigator(forwardOnlySource)
 
     expect(screen.getByRole("dialog", { name: "Questions" })).toHaveClass(
-      "!w-[min(22rem,calc(100vw-4rem))]",
-      "!max-w-[calc(100vw-4rem)]",
-      "!gap-3",
-      "!p-[18px]",
-      "!z-[70]",
+      "device-sheet-content",
+      "question-panel",
+    )
+    expect(screen.getByRole("dialog", { name: "Questions" })).toHaveAttribute(
+      "data-side",
+      "right",
     )
   })
 
@@ -139,11 +143,37 @@ describe("QuestionNavigator", () => {
     ).toBeInTheDocument()
   })
 
+  it("localizes the sheet close control", async () => {
+    await i18n.changeLanguage("fr")
+    renderNavigator(forwardOnlySource)
+
+    expect(
+      screen.getByRole("button", {
+        name: "Fermer le navigateur de questions",
+      }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: "Close" }),
+    ).not.toBeInTheDocument()
+  })
+
   it("uses IBM Plex Mono for numeric question cells", () => {
     renderNavigator(forwardOnlySource)
 
     expect(screen.getByRole("button", { name: "Question 1" })).toHaveClass(
       "font-mono",
+    )
+  })
+
+  it("uses an auto-fitting grid that retains 44px cells at 320px", () => {
+    renderNavigator(forwardOnlySource)
+
+    const grid = screen.getByRole("group", { name: "Listening questions" })
+    expect(grid).toHaveStyle({
+      gridTemplateColumns: "repeat(auto-fit, minmax(44px, 1fr))",
+    })
+    expect(screen.getByRole("button", { name: "Question 1" })).toHaveClass(
+      "size-11",
     )
   })
 

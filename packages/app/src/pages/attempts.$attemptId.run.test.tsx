@@ -887,45 +887,60 @@ describe("RunScreen", () => {
       expect(screen.getByRole("dialog", { name: "Menu" })).toBeInTheDocument()
     })
 
-    it("closes the menu and opens the navigator when its trigger is clicked while the menu is open", async () => {
+    it("switches directly between modal panels using controls inside the active sheet", async () => {
       renderRunScreen()
 
       const menuTrigger = screen.getByRole("button", { name: "Open menu" })
-      const navigatorTrigger = screen.getByRole("button", {
-        name: "Open the question navigator",
-      })
+      const runner = screen.getByRole("main").parentElement
 
       await userEvent.click(menuTrigger)
 
-      const runner = screen.getByRole("main").parentElement
       expect(runner).toHaveAttribute("data-panel", "menu")
-      expect(within(runner as HTMLElement).getByRole("banner")).toHaveAttribute(
-        "data-panel-open",
-        "true",
-      )
-      expect(
-        within(runner as HTMLElement).getByRole("contentinfo"),
-      ).toHaveAttribute("data-panel-open", "true")
       expect(menuTrigger).toHaveClass(
         "runner-panel-trigger",
         "runner-menu-trigger",
       )
-      expect(navigatorTrigger).toHaveClass(
-        "runner-panel-trigger",
-        "runner-navigator-trigger",
-      )
-      expect(menuTrigger).toBeVisible()
-      expect(navigatorTrigger).toBeVisible()
 
-      await userEvent.click(navigatorTrigger)
+      await userEvent.click(
+        within(screen.getByRole("dialog", { name: "Menu" })).getByRole(
+          "button",
+          { name: "Open the question navigator" },
+        ),
+      )
 
       expect(screen.getAllByRole("dialog")).toHaveLength(1)
       expect(
         screen.getByRole("dialog", { name: "Questions" }),
       ).toBeInTheDocument()
       expect(runner).toHaveAttribute("data-panel", "navigator")
-      expect(menuTrigger).toBeVisible()
-      expect(navigatorTrigger).toBeVisible()
+
+      await userEvent.click(
+        within(screen.getByRole("dialog", { name: "Questions" })).getByRole(
+          "button",
+          { name: "Open menu" },
+        ),
+      )
+
+      expect(screen.getAllByRole("dialog")).toHaveLength(1)
+      expect(screen.getByRole("dialog", { name: "Menu" })).toBeInTheDocument()
+      expect(runner).toHaveAttribute("data-panel", "menu")
+    })
+
+    it("makes the runner landmarks inaccessible while a modal panel is open", async () => {
+      renderRunScreen()
+      const runner = screen.getByRole("main").parentElement as HTMLElement
+      const runnerFooter = runner.querySelector("footer")
+
+      await userEvent.click(screen.getByRole("button", { name: "Open menu" }))
+
+      expect(screen.queryByRole("main")).not.toBeInTheDocument()
+      expect(runnerFooter).toHaveAttribute("aria-hidden", "true")
+      expect(
+        screen.queryByRole("button", { name: "Play recording" }),
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole("button", { name: "Hand in" }),
+      ).not.toBeInTheDocument()
     })
 
     it("closes whichever panel is open on Escape", async () => {

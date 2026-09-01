@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import i18next from "i18next"
 import { I18nextProvider, initReactI18next } from "react-i18next"
@@ -17,6 +17,8 @@ const menuResources = {
   "menu.signOut": "Sign out",
   "menu.primaryNavigation": "Main menu",
   "menu.openLabel": "Open menu",
+  "menu.closeLabel": "Close menu",
+  "navigator.openLabel": "Open the question navigator",
 }
 
 const i18n = i18next.createInstance()
@@ -30,6 +32,7 @@ await i18n.use(initReactI18next).init({
         ...menuResources,
         "menu.title": "Menu français",
         "menu.primaryNavigation": "Navigation principale",
+        "menu.closeLabel": "Fermer le panneau",
       },
     },
   },
@@ -46,6 +49,7 @@ afterEach(() => {
 
 function renderMenu(props: Partial<Parameters<typeof AppMenu>[0]> = {}) {
   const handlers = {
+    onBackgroundAction: vi.fn(),
     onGoLibrary: vi.fn(),
     onGoHistory: vi.fn(),
     onLeaveTest: vi.fn(),
@@ -54,6 +58,9 @@ function renderMenu(props: Partial<Parameters<typeof AppMenu>[0]> = {}) {
 
   render(
     <I18nextProvider i18n={i18n}>
+      <button type="button" onClick={handlers.onBackgroundAction}>
+        Background action
+      </button>
       <AppMenu
         open
         onOpenChange={vi.fn()}
@@ -91,11 +98,12 @@ describe("AppMenu", () => {
     renderMenu()
 
     expect(screen.getByRole("dialog", { name: "Menu" })).toHaveClass(
-      "!w-[min(22rem,calc(100vw-4rem))]",
-      "!max-w-[calc(100vw-4rem)]",
-      "!gap-3",
-      "!p-[18px]",
-      "!z-[70]",
+      "device-sheet-content",
+      "device-drawer-panel",
+    )
+    expect(screen.getByRole("dialog", { name: "Menu" })).toHaveAttribute(
+      "data-side",
+      "left",
     )
   })
 
@@ -106,6 +114,50 @@ describe("AppMenu", () => {
     expect(
       screen.getByRole("group", { name: "Navigation principale" }),
     ).toBeInTheDocument()
+  })
+
+  it("localizes the sheet close control", async () => {
+    await i18n.changeLanguage("fr")
+    renderMenu()
+
+    expect(
+      screen.getByRole("button", { name: "Fermer le panneau" }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: "Close" }),
+    ).not.toBeInTheDocument()
+  })
+
+  it("makes the rest of the page inert while the modal menu is open", async () => {
+    const user = userEvent.setup()
+    const handlers = renderMenu()
+    const backgroundAction = screen.getByRole("button", {
+      name: "Background action",
+      hidden: true,
+    })
+
+    expect(
+      screen.queryByRole("button", { name: "Background action" }),
+    ).not.toBeInTheDocument()
+    expect(document.body).toHaveStyle({ pointerEvents: "none" })
+    await expect(user.click(backgroundAction)).rejects.toThrow(
+      /pointer-events/u,
+    )
+    expect(handlers.onBackgroundAction).not.toHaveBeenCalled()
+  })
+
+  it("contains reverse-Tab navigation inside the open menu", async () => {
+    const user = userEvent.setup()
+    renderMenu()
+    const dialog = screen.getByRole("dialog", { name: "Menu" })
+    const firstAction = within(dialog).getByRole("button", {
+      name: "Test library",
+    })
+
+    firstAction.focus()
+    await user.keyboard("{Shift>}{Tab}{/Shift}")
+
+    expect(dialog).toContainElement(document.activeElement as HTMLElement)
   })
 
   it("shows the signed-in student's display name", () => {

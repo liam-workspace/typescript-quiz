@@ -1,4 +1,9 @@
-export type SectionKind = "listening" | "reading" | "vocabulary" | "grammar"
+export type SectionKind =
+  | "listening"
+  | "reading"
+  | "vocabulary"
+  | "grammar"
+  | "other"
 
 export type NavigationMode = "free" | "forward_only"
 

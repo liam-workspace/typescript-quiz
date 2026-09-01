@@ -1,6 +1,7 @@
-import { DialogTitle, Sheet, SheetContent } from "@liam-public/browser-react-ui"
-import type { JSX } from "react"
+import { DialogTitle } from "@liam-public/browser-react-ui"
+import { useRef, type JSX, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
+import { DeviceSheet } from "./DeviceSheet.js"
 
 /** The fields `GET /me` returns that this menu actually shows. */
 export interface MenuStudent {
@@ -29,6 +30,8 @@ export interface AppMenuProps {
   onGoLibrary: () => void
   onGoHistory: () => void
   onLeaveTest: () => void
+  onOpenNavigator?: () => void
+  returnFocusRef?: RefObject<HTMLElement | null>
 }
 
 const LANGUAGES = ["en", "fr", "de", "es", "it", "ja"] as const
@@ -43,108 +46,127 @@ export function AppMenu({
   onGoLibrary,
   onGoHistory,
   onLeaveTest,
+  onOpenNavigator,
+  returnFocusRef,
 }: AppMenuProps): JSX.Element {
   const { t, i18n } = useTranslation("runner")
   const [selectedLanguage] = (i18n.resolvedLanguage ?? i18n.language).split("-")
+  const switchingPanelRef = useRef(false)
 
   return (
-    <Sheet modal={false} open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="left"
-        aria-describedby={undefined}
-        className="device-drawer-panel !z-[70] !w-[min(22rem,calc(100vw-4rem))] !max-w-[calc(100vw-4rem)] !gap-3 !p-[18px]"
-      >
-        <DialogTitle>{t("menu.title")}</DialogTitle>
+    <DeviceSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      closeLabel={t("menu.closeLabel")}
+      side="left"
+      ariaDescribedBy={undefined}
+      returnFocusRef={returnFocusRef}
+      suppressReturnFocusRef={switchingPanelRef}
+      className="device-drawer-panel"
+    >
+      <DialogTitle>{t("menu.title")}</DialogTitle>
 
-        <nav aria-label={t("menu.title")} className="device-drawer">
-          <header className="device-drawer-student">
-            <span aria-hidden="true" className="device-drawer-avatar">
-              {student?.displayName[0] ?? "?"}
+      <nav aria-label={t("menu.title")} className="device-drawer">
+        <header className="device-drawer-student">
+          <span aria-hidden="true" className="device-drawer-avatar">
+            {student?.displayName[0] ?? "?"}
+          </span>
+          <span className="min-w-0">
+            <b className="text-ink block truncate text-sm">
+              {student?.displayName}
+            </b>
+            <span className="text-ink-2 block truncate text-xs">
+              {student?.email}
             </span>
-            <span className="min-w-0">
-              <b className="text-ink block truncate text-sm">
-                {student?.displayName}
-              </b>
-              <span className="text-ink-2 block truncate text-xs">
-                {student?.email}
-              </span>
-            </span>
-          </header>
+          </span>
+        </header>
 
+        <div
+          role="group"
+          aria-label={t("menu.primaryNavigation")}
+          className="device-drawer-actions"
+        >
+          <button
+            type="button"
+            className="size-11 w-full"
+            onClick={onGoLibrary}
+          >
+            {t("menu.library")}
+          </button>
+          <button
+            type="button"
+            className="size-11 w-full"
+            onClick={onGoHistory}
+          >
+            {t("menu.history")}
+          </button>
+
+          {onOpenNavigator ? (
+            <button
+              type="button"
+              className="size-11 w-full"
+              onClick={() => {
+                switchingPanelRef.current = true
+                onOpenNavigator()
+              }}
+            >
+              {t("navigator.openLabel")}
+            </button>
+          ) : null}
+
+          {inTest ? (
+            <>
+              <hr />
+              <button
+                type="button"
+                className="size-11 w-full"
+                onClick={onLeaveTest}
+              >
+                {t("menu.leaveTest")}
+              </button>
+              <p>
+                {clockStarted
+                  ? t("menu.leaveTestNoteRunning")
+                  : t("menu.leaveTestNoteBeforeStart")}
+              </p>
+            </>
+          ) : null}
+        </div>
+
+        <footer className="device-drawer-footer">
+          <div id="app-menu-language-label">{t("menu.language")}</div>
           <div
             role="group"
-            aria-label={t("menu.primaryNavigation")}
-            className="device-drawer-actions"
+            aria-labelledby="app-menu-language-label"
+            className="device-drawer-languages"
           >
-            <button
-              type="button"
-              className="size-11 w-full"
-              onClick={onGoLibrary}
-            >
-              {t("menu.library")}
-            </button>
-            <button
-              type="button"
-              className="size-11 w-full"
-              onClick={onGoHistory}
-            >
-              {t("menu.history")}
-            </button>
+            {LANGUAGES.map((language) => {
+              const selected = selectedLanguage === language
 
-            {inTest ? (
-              <>
-                <hr />
+              return (
                 <button
+                  key={language}
                   type="button"
-                  className="size-11 w-full"
-                  onClick={onLeaveTest}
+                  aria-pressed={selected}
+                  className="device-language-button size-11"
+                  onClick={() => {
+                    void i18n.changeLanguage(language)
+                  }}
                 >
-                  {t("menu.leaveTest")}
+                  {language}
                 </button>
-                <p>
-                  {clockStarted
-                    ? t("menu.leaveTestNoteRunning")
-                    : t("menu.leaveTestNoteBeforeStart")}
-                </p>
-              </>
-            ) : null}
+              )
+            })}
           </div>
-
-          <footer className="device-drawer-footer">
-            <div id="app-menu-language-label">{t("menu.language")}</div>
-            <div
-              role="group"
-              aria-labelledby="app-menu-language-label"
-              className="device-drawer-languages"
-            >
-              {LANGUAGES.map((language) => {
-                const selected = selectedLanguage === language
-
-                return (
-                  <button
-                    key={language}
-                    type="button"
-                    aria-pressed={selected}
-                    className="device-language-button size-11"
-                    onClick={() => {
-                      void i18n.changeLanguage(language)
-                    }}
-                  >
-                    {language}
-                  </button>
-                )
-              })}
-            </div>
-            <button
-              type="button"
-              className="device-drawer-sign-out size-11 w-full"
-              onClick={onSignOut}
-            >
-              {t("menu.signOut")}
-            </button>
-          </footer>
-        </nav>
-      </SheetContent>
-    </Sheet>
+          <button
+            type="button"
+            className="device-drawer-sign-out size-11 w-full"
+            onClick={onSignOut}
+          >
+            {t("menu.signOut")}
+          </button>
+        </footer>
+      </nav>
+    </DeviceSheet>
   )
 }

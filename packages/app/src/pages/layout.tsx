@@ -6,11 +6,7 @@ export interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  return (
-    <div className="min-h-screen">
-      <main>{children}</main>
-    </div>
-  )
+  return <div className="app-shell">{children}</div>
 }
 
 export function AppLayout() {

@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@liam-public/browser-react-ui"
 import { createFileRoute, redirect } from "@tanstack/react-router"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { QuestionNavigator } from "../components/QuestionNavigator.js"
 import { ApiError } from "../lib/api-client.js"
@@ -52,33 +52,39 @@ const sectionTypes = new Set<SectionType>([
   "grammar",
 ])
 
+type ReviewSectionKind = SectionType | "other"
+
+function validSectionType(value: unknown): value is SectionType {
+  return typeof value === "string" && sectionTypes.has(value as SectionType)
+}
+
 function reviewSectionType(
   current: ReviewItem,
   items: readonly ReviewItem[],
-): SectionType {
+): ReviewSectionKind {
   const suppliedType: unknown = current.sectionType
 
-  if (
-    typeof suppliedType === "string" &&
-    sectionTypes.has(suppliedType as SectionType)
-  ) {
-    return suppliedType as SectionType
+  if (validSectionType(suppliedType)) {
+    return suppliedType
   }
 
-  // The deployed review endpoint predates sectionType. Its canonical
-  // listening sections contain audio (including mixed audio) while reading
-  // sections do not, so retain a useful chip until that additive field is
-  // available everywhere instead of exposing an i18n key to the learner.
-  const sectionItems = items.filter(
-    (item) => item.sectionId === current.sectionId,
-  )
-  const containsAudio = sectionItems.some(
+  // A rolling deployment can briefly mix legacy and current cached items.
+  // A valid sibling is reliable because sectionId defines the section; media
+  // is not reliable because vocabulary/grammar can contain audio or text too.
+  const siblingType: unknown = items.find(
     (item) =>
-      item.stimulus?.type === "audio" ||
-      (item.stimulus?.type === "mixed" && item.stimulus.mediaKind === "audio"),
-  )
+      item.sectionId === current.sectionId &&
+      validSectionType(item.sectionType),
+  )?.sectionType
 
-  return containsAudio ? "listening" : "reading"
+  if (validSectionType(siblingType)) {
+    return siblingType
+  }
+
+  // Truly legacy payloads carry no type at all. Keep that compatibility
+  // optional and honest with a neutral label instead of guessing reading for
+  // every non-audio question (which mislabels vocabulary and grammar).
+  return "other"
 }
 
 function choiceVerdict(
@@ -289,6 +295,7 @@ export function ReviewScreen({ review }: ReviewScreenProps) {
   const { t } = useTranslation("runner")
   const [currentIndex, setCurrentIndex] = useState(0)
   const [navigatorOpen, setNavigatorOpen] = useState(false)
+  const navigatorTriggerRef = useRef<HTMLButtonElement>(null)
 
   if (review.items.length === 0) {
     return (
@@ -368,6 +375,7 @@ export function ReviewScreen({ review }: ReviewScreenProps) {
           {t("review.backToResult")}
         </a>
         <button
+          ref={navigatorTriggerRef}
           type="button"
           aria-expanded={navigatorOpen}
           aria-label={t("review.jumpToQuestion")}
@@ -403,6 +411,7 @@ export function ReviewScreen({ review }: ReviewScreenProps) {
         source={source}
         answeredCount={source.answeredQuestionIds.size}
         totalCount={review.items.length}
+        returnFocusRef={navigatorTriggerRef}
         onNavigate={(_sectionId, questionId) => {
           const nextIndex = review.items.findIndex(
             (item) => item.questionId === questionId,

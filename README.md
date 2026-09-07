@@ -115,11 +115,6 @@ pnpm start
 
 ## 📚 Documentation
 
-- [Configuration](docs/configuration.md): manager password, via the `config` folder.
-- [Quiz](docs/quiz.md): creating and structuring quizzes.
-- [Branding](docs/branding.md): optional custom theming.
-- [Reverse Proxy](docs/reverse-proxy.md): running behind Traefik, Nginx, Caddy, or another reverse proxy.
-
 Full index in [docs/](docs/README.md).
 
 ## 🎮 How to Play

@@ -36,6 +36,7 @@ export interface TestApp {
     sub: string
     email: string
     isAdmin?: boolean
+    rolesByApp?: Record<string, string[]>
   }): Promise<string>
   close(): Promise<void>
 }
@@ -43,7 +44,6 @@ export interface TestApp {
 export async function createTestApp(
   options: {
     now?: Date
-    allowedEmails?: string
     // Wraps REQUEST_POOL in `createFaultInjectingPool` (see that helper's
     // doc comment) -- used only by response-write-db-error.e2e.test.ts to
     // simulate a database error `response.repository.ts`'s
@@ -55,9 +55,11 @@ export async function createTestApp(
 ): Promise<TestApp> {
   process.env.DATABASE_URL = inject("postgresConnectionUri")
   process.env.JWKS_URL = JWKS_URL
-  // `isEmailAllowed` rejects everything when the allowlist is empty, which is
-  // the right production default but would 403 every test.
-  process.env.ALLOWED_EMAILS = options.allowedEmails ?? "*@example.com"
+  // ACCESS_APP_ID / ACCESS_ROLE are left unset: their defaults (`quiz-web`
+  // / `student`) match `token.ts`'s `DEFAULT_ROLES_BY_APP`, so a `mint()`
+  // call with no `rolesByApp` override already carries the grant sign-in
+  // requires. A test exercises the refusal path by overriding `rolesByApp`
+  // on `mint()`, not by touching server config.
   // `required(env, "MEDIA_SIGNING_SECRET")` has no default -- every test from
   // here on fails to boot without this set before AppModule compiles.
   process.env.MEDIA_SIGNING_SECRET = "test-media-signing-secret"

@@ -1,0 +1,1849 @@
+{
+  "title": "TOEFL Primary® Step 2 — Đề luyện tập (Practice 1)",
+  "slug": "step2-20260817-s1",
+  "level": "primary-step-2",
+  "durationSeconds": 3600,
+  "sections": [
+    {
+      "title": "Listening",
+      "type": "listening",
+      "durationSeconds": 1800,
+      "navigation": "forward_only",
+      "allowAnswerChange": false,
+      "playback": {
+        "maxPlays": 1,
+        "allowPause": false,
+        "allowSeek": false
+      },
+      "instructions": [
+        "Listen to each short conversation. Then choose the correct answer.",
+        "Listen to the conversation. Then answer the questions.",
+        "Listen to the announcement or the short talk. Then answer the questions.",
+        "Listen to the class lesson. Then answer the questions."
+      ],
+      "groups": [
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a02.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2A-19",
+              "prompt": "What is the teacher mainly telling the boy?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a03.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2A-04",
+              "prompt": "How does the girl feel?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a04.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2A-09",
+              "prompt": "Why does the girl speak to the boy?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a05.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2A-15",
+              "prompt": "Why is the girl talking to her teacher?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a06.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2A-11",
+              "prompt": "What will the girl do next?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a07.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2A-12",
+              "prompt": "What do we learn about the girl?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a08.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2A-02",
+              "prompt": "Why does the boy talk to his mother?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a09.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2A-01",
+              "prompt": "What will the girl do after school today?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a11.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2B-04q1",
+              "prompt": "What is the boy's problem at the beginning?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L2B-04q2",
+              "prompt": "When does the basketball club meet?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L2B-04q3",
+              "prompt": "Why can't the boy join the swimming club?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L2B-04q4",
+              "prompt": "Why does the teacher talk about trainers?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a12.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2B-08q1",
+              "prompt": "Why are the girl and her father shopping today?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "L2B-08q2",
+              "prompt": "Which shoes does the girl decide to buy?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "L2B-08q3",
+              "prompt": "Why does the father agree to buy the yellow raincoat?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "L2B-08q4",
+              "prompt": "What will the girl probably do about her bag?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a13.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2B-07q1",
+              "prompt": "What are the two classmates mainly talking about?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L2B-07q2",
+              "prompt": "What will the girl bring on garden day?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a15.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2C-01q1",
+              "prompt": "What is the announcement mainly about?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L2C-01q2",
+              "prompt": "What time will the library open from next Monday?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L2C-01q3",
+              "prompt": "Why should students bring their library card?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a16.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2C-07q1",
+              "prompt": "Why is the woman making this announcement?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L2C-07q2",
+              "prompt": "Where must the students line up?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "L2C-07q3",
+              "prompt": "Why does the woman tell students to bring a comb?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a17.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2C-04q1",
+              "prompt": "Why is the guide speaking to the group?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L2C-04q2",
+              "prompt": "Where will the group go after they see the elephants?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a18.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2D-05q1",
+              "prompt": "What is the lesson mainly about?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "L2D-05q2",
+              "prompt": "Which thing does the magnet pull?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L2D-05q3",
+              "prompt": "What are the 'poles' of a magnet?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "L2D-05q4",
+              "prompt": "What will happen if a student puts two same poles together?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a19.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2D-06q1",
+              "prompt": "What is the teacher mainly talking about?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L2D-06q2",
+              "prompt": "How long does the moon need to go around the Earth one time?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L2D-06q3",
+              "prompt": "What are 'craters'?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L2D-06q4",
+              "prompt": "Why can we see the moon at night?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step2-20260817-s1-a20.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L2D-01q1",
+              "prompt": "What is the lesson mainly about?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L2D-01q2",
+              "prompt": "Why do bees fly to flowers?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Reading",
+      "type": "reading",
+      "durationSeconds": 1800,
+      "navigation": "free",
+      "allowAnswerChange": true,
+      "playback": null,
+      "instructions": [
+        "Choose the best word or phrase to complete the sentence.",
+        "Read the notice, the message or the schedule. Then answer the questions.",
+        "Read the story. Then answer the questions.",
+        "Read the passage. Then answer the questions."
+      ],
+      "groups": [
+        {
+          "questions": [
+            {
+              "questionKey": "R2A-02",
+              "prompt": "This blue bag is ______ than my old one, so I can carry all my books in it.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "R2A-06",
+              "prompt": "You ______ wear a helmet when you ride your bike here. It is the rule.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2A-12",
+              "prompt": "I wanted to play outside, ______ it was too cold, so I stayed in my room.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "R2A-16",
+              "prompt": "My mum makes the ______ carrot cake in the world, and she always gives me a big piece.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2A-03",
+              "prompt": "We usually meet our friends ______ Saturday morning at the park near my house.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "R2A-11",
+              "prompt": "My cousins live in a small town, and we visit ______ every summer.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2A-13",
+              "prompt": "The museum is quite ______ from our school, so our class went there by bus.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2A-17",
+              "prompt": "Our cat is hiding ______ the sofa, and we can only see its long tail.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "Big Book Sale",
+            "bodyText": "Library Notice: Our old books need new homes! Come to the book sale in the library on Friday afternoon. Every story book costs one dollar. Every picture book costs fifty cents. Bring a bag for your books. All the money will buy new computers for the library. Sorry, we cannot take money on Thursday."
+          },
+          "questions": [
+            {
+              "questionKey": "R2B-02q1",
+              "prompt": "Why did the library write this notice?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2B-02q2",
+              "prompt": "How much does one picture book cost?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2B-02q3",
+              "prompt": "What will happen to the money from the sale?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "After-School Clubs",
+            "bodyText": "After-School Clubs (4:00 - 5:00)\nMonday: Art Club - Room 12\nTuesday: Chess Club - Library\nWednesday: no clubs\nThursday: Science Club - Room 8\nFriday: Music Club - Big Hall\nPlease put your name on the list before Monday."
+          },
+          "questions": [
+            {
+              "questionKey": "R2B-05q1",
+              "prompt": "Where does the Chess Club meet?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "R2B-05q2",
+              "prompt": "A student can only stay late on Wednesday. Which club can she join?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2B-05q3",
+              "prompt": "What time do the clubs finish?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "A Note on the Kitchen Table",
+            "bodyText": "Hi Nora,\nI am at the doctor with Grandma, so I will be home at six. There is rice and chicken soup in the fridge. Please warm it up for you and Danny. Do your homework first, then you can watch TV. Do not open the door for anyone. Call me if the soup is finished.\nLove, Mum"
+          },
+          "questions": [
+            {
+              "questionKey": "R2B-03q1",
+              "prompt": "Why did Mum write this note?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "R2B-03q2",
+              "prompt": "What must Nora do before she watches TV?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "The Race Around the Lake",
+            "bodyText": "Every summer, the children in Blue Park have a bike race around the lake. This year, Mimi wanted to win. She cleaned her bike and checked the tyres on Friday. On Saturday, twelve children waited at the start line. When the whistle blew, Mimi rode fast, and soon she was second. Near the big tree, she heard a shout behind her. A small boy named Sam had fallen off his bike. His knee was bleeding and his chain was off. Mimi looked at the finish line, and then she stopped. She helped Sam stand up and put his chain back on. They rode the last part together and came in last. Mimi did not get the cup, but the park guard gave her a bright red badge for helping. Her mum put the badge on the wall at home. Mimi says she will race again next summer."
+          },
+          "questions": [
+            {
+              "questionKey": "R2C-06q1",
+              "prompt": "What is the story mainly about?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2C-06q2",
+              "prompt": "Why did Mimi stop near the big tree?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2C-06q3",
+              "prompt": "What did Mimi get after the race?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2C-06q4",
+              "prompt": "In the story, what does 'came in last' mean?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "Rosa's First Pancakes",
+            "bodyText": "Rosa wanted to make pancakes for her dad's birthday. She was ten, and she had never cooked alone before. On Sunday morning, she read her grandma's recipe card twice. First she mixed flour, milk and one egg in a big bowl. Then she poured a little butter into the hot pan. Her first pancake was black on one side and wet in the middle. Rosa nearly gave up. She sat down and looked at the pan for a minute. Then she remembered the words on the card: 'Cook on low heat.' She turned the heat down and tried again. The next pancake was round and golden. Rosa made six more and put strawberries on top. When her dad came into the kitchen, he smelled something sweet. He ate three pancakes and asked for the recipe. Rosa smiled and told him her secret: be patient with the heat."
+          },
+          "questions": [
+            {
+              "questionKey": "R2C-03q1",
+              "prompt": "What is the story mainly about?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2C-03q2",
+              "prompt": "What did Rosa do just before she cooked her second pancake?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "R2C-03q3",
+              "prompt": "How did Rosa's dad feel about the pancakes?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2C-03q4",
+              "prompt": "In the story, what does 'gave up' mean?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "The Heavy Bags",
+            "bodyText": "Mr Paulo lived next door to Nate. He was old and walked slowly with a stick. Every Tuesday he went to the market and came home with two heavy bags. One Tuesday, Nate looked out of the window and saw Mr Paulo stop on the path. The bags were on the ground, and Mr Paulo was holding his back. Nate ran outside without his shoes. He carried both bags into Mr Paulo's kitchen and put the milk in the fridge. Mr Paulo wanted to give him some money, but Nate shook his head. 'I only live next door,' he said. After that day, Nate went to the market with Mr Paulo every Tuesday. They talked about football and old buses on the way. In May, Mr Paulo gave Nate a small wooden boat. He made the boat himself. Nate keeps it on his desk, next to his books."
+          },
+          "questions": [
+            {
+              "questionKey": "R2C-05q1",
+              "prompt": "What is the story mainly about?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2C-05q2",
+              "prompt": "What did Mr Paulo give Nate in May?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "Life in a Hot, Dry Place",
+            "bodyText": "A camel can walk in the desert for days without a drink. How does it do this? First, a camel has a big lump on its back called a hump. The hump is not full of water. It is full of fat, and fat is stored food. When a camel cannot find plants to eat, its body uses the fat in the hump. Second, a camel can drink a lot of water very quickly. A thirsty camel drinks more than one hundred litres in about ten minutes. Third, a camel's body loses very little water, because it does not sweat much. A camel also has thick eyelashes and can close its nose. These keep the sand out when the wind is strong. Its wide feet do not sink into the soft sand. Camels help people too. In some countries, they carry heavy bags and give milk to families. The desert is hard, but the camel is ready for it."
+          },
+          "questions": [
+            {
+              "questionKey": "R2D-01q1",
+              "prompt": "What is the passage mainly about?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2D-01q2",
+              "prompt": "What is inside a camel's hump?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2D-01q3",
+              "prompt": "In the passage, what does 'hump' mean?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "R2D-01q4",
+              "prompt": "Why is it useful for a camel to close its nose?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "Colours in the Sky",
+            "bodyText": "After the rain, you sometimes see a big arc of colours in the sky. This is a rainbow. Sunlight looks white, but it is really a mix of many colours. When sunlight goes into a drop of rain, the light bends. Each colour bends a different amount, so the colours spread out. Then the light hits the back of the drop and turns back to us. We say the light reflects, and reflect means to turn back, like a ball off a wall. Millions of drops do this at the same time, so we see red, orange, yellow, green, blue and violet. To find a rainbow, stand with the sun behind you and look at the rain in front of you. Rainbows are easiest to see in the morning or late afternoon. You can also make a small rainbow at home. Spray water in the garden on a sunny day and keep your back to the sun."
+          },
+          "questions": [
+            {
+              "questionKey": "R2D-02q1",
+              "prompt": "What is the passage mainly about?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2D-02q2",
+              "prompt": "Where should the sun be when you look for a rainbow?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "R2D-02q3",
+              "prompt": "In the passage, what does 'reflect' mean?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2D-02q4",
+              "prompt": "Why do we see many different colours in a rainbow?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "The Plant That Grows Fastest",
+            "bodyText": "Bamboo looks like a tree, but it is really a kind of grass. It is the fastest-growing plant on Earth. Some kinds of bamboo can grow ninety centimetres in one day. That is too slow for your eyes to see, but if you measure a young plant in the morning and again at night, the number will change. Bamboo grows in warm, wet places in Asia, Africa and South America. It has a hollow stem, and hollow means empty in the middle, like a straw. This makes bamboo light but very strong. People cut bamboo and build houses, bridges, chairs, baskets and even bicycles with it. Cooks put young bamboo shoots in soup, and pandas eat bamboo leaves all day. Bamboo is also good for the land. When you cut a bamboo stem, the roots stay alive and send up a new stem. So one bamboo field can give people wood again and again."
+          },
+          "questions": [
+            {
+              "questionKey": "R2D-04q1",
+              "prompt": "What is the passage mainly about?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R2D-04q2",
+              "prompt": "How much can some kinds of bamboo grow in one day?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                },
+                {
+                  "label": "D",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

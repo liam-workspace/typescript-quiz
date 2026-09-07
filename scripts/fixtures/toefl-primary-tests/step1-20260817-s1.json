@@ -1,0 +1,1896 @@
+{
+  "title": "TOEFL Primary® Step 1 — Đề luyện tập (Practice 1)",
+  "slug": "step1-20260817-s1",
+  "level": "primary-step-1",
+  "durationSeconds": 3600,
+  "sections": [
+    {
+      "title": "Listening",
+      "type": "listening",
+      "durationSeconds": 1800,
+      "navigation": "forward_only",
+      "allowAnswerChange": false,
+      "playback": {
+        "maxPlays": 2,
+        "allowPause": false,
+        "allowSeek": false
+      },
+      "instructions": [
+        "Listen and choose the correct picture. You will hear each one two times.",
+        "Listen to the short conversation. Then choose the correct answer.",
+        "Listen to the teacher. Then choose the correct picture.",
+        "Listen to the story. Then answer the questions."
+      ],
+      "groups": [
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a02.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1A-20",
+              "prompt": "Listen and choose the correct picture. You will hear each one two times.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M50 40 L50 76\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 46 C30 26 16 42 26 56 C32 64 44 62 50 54 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 46 C70 26 84 42 74 56 C68 64 56 62 50 54 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 40 L44 28 M50 40 L56 28\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M22 56 C34 38 62 38 74 56 C62 74 34 74 22 56 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M74 56 L88 44 L88 68 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"36\" cy=\"52\" r=\"3\" fill=\"currentColor\" stroke=\"none\"/></svg>"
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M20 62 C24 44 42 36 58 40 L70 34 L68 46 C78 52 78 66 66 72 C52 80 28 76 20 62 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M78 42 L92 48 L78 52\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"70\" cy=\"46\" r=\"2.6\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M40 56 C48 48 60 52 58 62\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M24 72 L18 84 M36 76 L32 88\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a03.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1A-14",
+              "prompt": "Listen and choose the correct picture. You will hear each one two times.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M20 44 L50 28 L80 44 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"20\" y=\"46\" width=\"60\" height=\"8\" rx=\"3\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"20\" y=\"58\" width=\"60\" height=\"8\" rx=\"3\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M20 70 L80 70 L80 74 C80 78 76 80 72 80 L28 80 C24 80 20 78 20 74 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M20 52 C20 36 36 28 50 28 C64 28 80 36 80 52 L80 74 C80 78 76 80 72 80 L28 80 C24 80 20 78 20 74 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M32 40 L38 34 M46 36 L52 30 M60 38 L66 32\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><rect x=\"24\" y=\"52\" width=\"52\" height=\"26\" rx=\"3\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M24 62 C34 56 42 68 52 62 C62 56 70 68 76 62\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 52 L50 40\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><ellipse cx=\"50\" cy=\"35\" rx=\"4\" ry=\"6\" fill=\"currentColor\" stroke=\"none\"/></svg>"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a04.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1A-10",
+              "prompt": "Listen and choose the correct picture. You will hear each one two times.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><circle cx=\"30\" cy=\"76\" r=\"9\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"60\" cy=\"76\" r=\"9\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M34 68 L74 20 M56 68 L20 20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><rect x=\"14\" y=\"42\" width=\"72\" height=\"20\" rx=\"2\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M26 42 L26 52 M38 42 L38 52 M50 42 L50 52 M62 42 L62 52 M74 42 L74 52\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M26 78 L32 60 L70 22 L80 32 L42 70 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M26 78 L42 70 M32 60 L42 70 M64 28 L74 38\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a05.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1A-09",
+              "prompt": "Listen and choose the correct picture. You will hear each one two times.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><circle cx=\"50\" cy=\"50\" r=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 14 L50 24 M50 76 L50 86 M14 50 L24 50 M76 50 L86 50 M24 24 L31 31 M69 69 L76 76 M76 24 L69 31 M31 69 L24 76\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M50 14 L60 40 L88 42 L66 60 L74 86 L50 70 L26 86 L34 60 L12 42 L40 40 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M28 68 C16 68 14 52 26 50 C26 34 48 30 54 42 C68 36 82 48 76 60 C86 62 84 68 76 68 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a06.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1A-15",
+              "prompt": "Listen and choose the correct picture. You will hear each one two times.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M26 78 L32 60 L70 22 L80 32 L42 70 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M26 78 L42 70 M32 60 L42 70 M64 28 L74 38\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M26 44 L74 44 L78 82 L22 82 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M38 44 C38 28 62 28 62 44\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><circle cx=\"32\" cy=\"50\" r=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M46 50 L84 50\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M70 50 L70 62 M80 50 L80 60\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a07.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1A-05",
+              "prompt": "Listen and choose the correct picture. You will hear each one two times.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><circle cx=\"50\" cy=\"50\" r=\"42\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"50.0\" cy=\"14.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"68.0\" cy=\"18.8\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"81.2\" cy=\"32.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"86.0\" cy=\"50.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"81.2\" cy=\"68.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"68.0\" cy=\"81.2\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"50.0\" cy=\"86.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"32.0\" cy=\"81.2\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"18.8\" cy=\"68.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.0\" cy=\"50.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"18.8\" cy=\"32.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"32.0\" cy=\"18.8\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M50 50 L70.0 50.0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 50 L50.0 20.0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\"/><circle cx=\"50\" cy=\"50\" r=\"3\" fill=\"currentColor\" stroke=\"none\"/></svg>"
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><rect x=\"34\" y=\"16\" width=\"32\" height=\"68\" rx=\"6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"40\" y=\"26\" width=\"20\" height=\"42\" rx=\"2\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"50\" cy=\"76\" r=\"3\" fill=\"currentColor\" stroke=\"none\"/></svg>"
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><rect x=\"16\" y=\"24\" width=\"68\" height=\"42\" rx=\"4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M44 66 L44 76 M56 66 L56 76 M32 78 L68 78\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a08.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1A-24",
+              "prompt": "Listen and choose the correct picture. You will hear each one two times.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M16 56 L84 56 L84 74 L16 74 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M16 56 L16 36 M84 56 L84 44\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"24\" y=\"44\" width=\"22\" height=\"12\" rx=\"3\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M20 74 L20 82 M80 74 L80 82\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M32 48 L68 48 L68 56 L32 56 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M32 48 L32 18 M36 22 L64 22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M34 56 L34 84 M66 56 L66 84\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M14 42 L86 42 L86 50 L14 50 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M24 50 L24 84 M76 50 L76 84\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a09.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1A-22",
+              "prompt": "Listen and choose the correct picture. You will hear each one two times.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M28 68 C16 68 14 52 26 50 C26 34 48 30 54 42 C68 36 82 48 76 60 C86 62 84 68 76 68 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M32 74 L28 86 M50 74 L46 86 M68 74 L64 86\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M14 40 C34 30 54 46 74 36 M14 56 C38 46 58 62 82 52 M22 72 C40 64 56 76 74 68\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M28 68 C16 68 14 52 26 50 C26 34 48 30 54 42 C68 36 82 48 76 60 C86 62 84 68 76 68 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M30 80 L38 80 M34 76 L34 84 M50 80 L58 80 M54 76 L54 84 M68 80 L76 80 M72 76 L72 84\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a10.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1A-18",
+              "prompt": "Listen and choose the correct picture. You will hear each one two times.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 300 200\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><g transform=\"translate(0,0)\"><path d=\"M50 30 C30 30 22 46 26 62 C30 78 42 86 50 86 C58 86 70 78 74 62 C78 46 66 30 50 30 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 30 L50 18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 22 C58 14 68 16 70 20 C64 28 54 28 50 22 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><g transform=\"translate(100,0)\"><path d=\"M50 30 C30 30 22 46 26 62 C30 78 42 86 50 86 C58 86 70 78 74 62 C78 46 66 30 50 30 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 30 L50 18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 22 C58 14 68 16 70 20 C64 28 54 28 50 22 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><g transform=\"translate(200,0)\"><path d=\"M50 30 C30 30 22 46 26 62 C30 78 42 86 50 86 C58 86 70 78 74 62 C78 46 66 30 50 30 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 30 L50 18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 22 C58 14 68 16 70 20 C64 28 54 28 50 22 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><g transform=\"translate(0,100)\"><path d=\"M50 30 C30 30 22 46 26 62 C30 78 42 86 50 86 C58 86 70 78 74 62 C78 46 66 30 50 30 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 30 L50 18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 22 C58 14 68 16 70 20 C64 28 54 28 50 22 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><g transform=\"translate(100,100)\"><path d=\"M50 30 C30 30 22 46 26 62 C30 78 42 86 50 86 C58 86 70 78 74 62 C78 46 66 30 50 30 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 30 L50 18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 22 C58 14 68 16 70 20 C64 28 54 28 50 22 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g></svg>"
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 200 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><g transform=\"translate(0,0)\"><path d=\"M22 34 C24 62 44 80 74 76 C80 74 82 68 78 66 C52 68 36 52 34 32 C32 28 24 28 22 34 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><g transform=\"translate(100,0)\"><path d=\"M22 34 C24 62 44 80 74 76 C80 74 82 68 78 66 C52 68 36 52 34 32 C32 28 24 28 22 34 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g></svg>"
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true,
+                  "imageSvg": "<svg viewBox=\"0 0 300 200\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><g transform=\"translate(0,0)\"><path d=\"M22 34 C24 62 44 80 74 76 C80 74 82 68 78 66 C52 68 36 52 34 32 C32 28 24 28 22 34 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><g transform=\"translate(100,0)\"><path d=\"M22 34 C24 62 44 80 74 76 C80 74 82 68 78 66 C52 68 36 52 34 32 C32 28 24 28 22 34 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><g transform=\"translate(200,0)\"><path d=\"M22 34 C24 62 44 80 74 76 C80 74 82 68 78 66 C52 68 36 52 34 32 C32 28 24 28 22 34 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><g transform=\"translate(0,100)\"><path d=\"M22 34 C24 62 44 80 74 76 C80 74 82 68 78 66 C52 68 36 52 34 32 C32 28 24 28 22 34 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g><g transform=\"translate(100,100)\"><path d=\"M22 34 C24 62 44 80 74 76 C80 74 82 68 78 66 C52 68 36 52 34 32 C32 28 24 28 22 34 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></g></svg>"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a11.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1A-02",
+              "prompt": "Listen and choose the correct picture. You will hear each one two times.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M20 62 C24 44 42 36 58 40 L70 34 L68 46 C78 52 78 66 66 72 C52 80 28 76 20 62 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M78 42 L92 48 L78 52\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"70\" cy=\"46\" r=\"2.6\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M40 56 C48 48 60 52 58 62\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M24 72 L18 84 M36 76 L32 88\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M50 40 L50 76\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 46 C30 26 16 42 26 56 C32 64 44 62 50 54 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 46 C70 26 84 42 74 56 C68 64 56 62 50 54 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 40 L44 28 M50 40 L56 28\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M22 56 C34 38 62 38 74 56 C62 74 34 74 22 56 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M74 56 L88 44 L88 68 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"36\" cy=\"52\" r=\"3\" fill=\"currentColor\" stroke=\"none\"/></svg>"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a13.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1B-14",
+              "prompt": "What is on the table?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a14.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1B-04",
+              "prompt": "What is the girl's problem?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a15.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1B-19",
+              "prompt": "Where does the boy sit?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a16.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1B-06",
+              "prompt": "What time does the boy get up?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a17.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1B-22",
+              "prompt": "How many people are in the girl's family?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a18.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1B-09",
+              "prompt": "Where is Tom now?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a19.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1B-12",
+              "prompt": "What colour is the boy's cat?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a20.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1B-20",
+              "prompt": "What does the boy want to do?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a21.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1B-15",
+              "prompt": "What time is the music lesson?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a22.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1B-24",
+              "prompt": "When is the girl's birthday?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a24.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1C-05",
+              "prompt": "Listen to the teacher. Then choose the correct picture.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><circle cx=\"50\" cy=\"50\" r=\"42\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"50.0\" cy=\"14.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"68.0\" cy=\"18.8\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"81.2\" cy=\"32.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"86.0\" cy=\"50.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"81.2\" cy=\"68.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"68.0\" cy=\"81.2\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"50.0\" cy=\"86.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"32.0\" cy=\"81.2\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"18.8\" cy=\"68.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.0\" cy=\"50.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"18.8\" cy=\"32.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"32.0\" cy=\"18.8\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M50 50 L44.8 69.3\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 50 L50.0 80.0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\"/><circle cx=\"50\" cy=\"50\" r=\"3\" fill=\"currentColor\" stroke=\"none\"/></svg>"
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><circle cx=\"50\" cy=\"50\" r=\"42\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"50.0\" cy=\"14.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"68.0\" cy=\"18.8\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"81.2\" cy=\"32.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"86.0\" cy=\"50.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"81.2\" cy=\"68.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"68.0\" cy=\"81.2\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"50.0\" cy=\"86.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"32.0\" cy=\"81.2\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"18.8\" cy=\"68.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.0\" cy=\"50.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"18.8\" cy=\"32.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"32.0\" cy=\"18.8\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M50 50 L40.0 67.3\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 50 L50.0 20.0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\"/><circle cx=\"50\" cy=\"50\" r=\"3\" fill=\"currentColor\" stroke=\"none\"/></svg>"
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><circle cx=\"50\" cy=\"50\" r=\"42\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"50.0\" cy=\"14.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"68.0\" cy=\"18.8\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"81.2\" cy=\"32.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"86.0\" cy=\"50.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"81.2\" cy=\"68.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"68.0\" cy=\"81.2\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"50.0\" cy=\"86.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"32.0\" cy=\"81.2\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"18.8\" cy=\"68.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.0\" cy=\"50.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"18.8\" cy=\"32.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"32.0\" cy=\"18.8\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M50 50 L50.0 70.0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 50 L50.0 20.0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\"/><circle cx=\"50\" cy=\"50\" r=\"3\" fill=\"currentColor\" stroke=\"none\"/></svg>"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a25.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1C-12",
+              "prompt": "Listen to the teacher. Then choose the correct picture.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M20 52 C20 36 36 28 50 28 C64 28 80 36 80 52 L80 74 C80 78 76 80 72 80 L28 80 C24 80 20 78 20 74 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M32 40 L38 34 M46 36 L52 30 M60 38 L66 32\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M34 40 L34 80 L66 80 L66 40 L58 24 L42 24 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M34 40 L66 40\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><text x=\"50\" y=\"66\" font-size=\"16\" text-anchor=\"middle\" fill=\"currentColor\" stroke=\"none\">M</text></svg>"
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><ellipse cx=\"50\" cy=\"56\" rx=\"22\" ry=\"28\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a26.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1C-03",
+              "prompt": "Listen to the teacher. Then choose the correct picture.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M50 30 C30 30 22 46 26 62 C30 78 42 86 50 86 C58 86 70 78 74 62 C78 46 66 30 50 30 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 30 L50 18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 22 C58 14 68 16 70 20 C64 28 54 28 50 22 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M22 34 C24 62 44 80 74 76 C80 74 82 68 78 66 C52 68 36 52 34 32 C32 28 24 28 22 34 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M38 40 L50 88 L62 40 C58 36 42 36 38 40 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M44 52 L56 56 M46 64 L58 68\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\"/><path d=\"M50 38 C40 30 36 20 44 16 C50 14 52 26 50 38 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 38 C60 30 64 20 56 16 C50 14 48 26 50 38 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a27.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1C-16",
+              "prompt": "Listen to the teacher. Then choose the correct picture.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><circle cx=\"50\" cy=\"50\" r=\"42\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"50.0\" cy=\"14.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"68.0\" cy=\"18.8\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"81.2\" cy=\"32.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"86.0\" cy=\"50.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"81.2\" cy=\"68.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"68.0\" cy=\"81.2\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"50.0\" cy=\"86.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"32.0\" cy=\"81.2\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"18.8\" cy=\"68.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.0\" cy=\"50.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"18.8\" cy=\"32.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"32.0\" cy=\"18.8\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M50 50 L69.3 55.2\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 50 L50.0 80.0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\"/><circle cx=\"50\" cy=\"50\" r=\"3\" fill=\"currentColor\" stroke=\"none\"/></svg>"
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><circle cx=\"50\" cy=\"50\" r=\"42\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"50.0\" cy=\"14.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"68.0\" cy=\"18.8\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"81.2\" cy=\"32.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"86.0\" cy=\"50.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"81.2\" cy=\"68.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"68.0\" cy=\"81.2\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"50.0\" cy=\"86.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"32.0\" cy=\"81.2\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"18.8\" cy=\"68.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.0\" cy=\"50.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"18.8\" cy=\"32.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"32.0\" cy=\"18.8\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M50 50 L67.3 40.0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 50 L50.0 20.0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\"/><circle cx=\"50\" cy=\"50\" r=\"3\" fill=\"currentColor\" stroke=\"none\"/></svg>"
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><circle cx=\"50\" cy=\"50\" r=\"42\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"50.0\" cy=\"14.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"68.0\" cy=\"18.8\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"81.2\" cy=\"32.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"86.0\" cy=\"50.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"81.2\" cy=\"68.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"68.0\" cy=\"81.2\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"50.0\" cy=\"86.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"32.0\" cy=\"81.2\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"18.8\" cy=\"68.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"14.0\" cy=\"50.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"18.8\" cy=\"32.0\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"32.0\" cy=\"18.8\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M50 50 L69.3 44.8\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 50 L50.0 80.0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\"/><circle cx=\"50\" cy=\"50\" r=\"3\" fill=\"currentColor\" stroke=\"none\"/></svg>"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a28.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1C-04",
+              "prompt": "Listen to the teacher. Then choose the correct picture.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M26 78 L32 60 L70 22 L80 32 L42 70 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M26 78 L42 70 M32 60 L42 70 M64 28 L74 38\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><rect x=\"14\" y=\"42\" width=\"72\" height=\"20\" rx=\"2\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M26 42 L26 52 M38 42 L38 52 M50 42 L50 52 M62 42 L62 52 M74 42 L74 52\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><circle cx=\"30\" cy=\"76\" r=\"9\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"60\" cy=\"76\" r=\"9\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M34 68 L74 20 M56 68 L20 20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "mediaFilename": "step1-20260817-s1-a29.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1C-09",
+              "prompt": "Listen to the teacher. Then choose the correct picture.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><circle cx=\"50\" cy=\"52\" r=\"28\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M22 52 C36 40 64 40 78 52 M22 52 C36 64 64 64 78 52 M50 24 L50 80\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M50 16 L78 46 L50 82 L22 46 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 16 L50 82 M22 46 L78 46\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 82 C56 88 44 92 50 98\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true,
+                  "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M12 54 C12 30 88 30 88 54 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 54 L50 80 C50 86 40 86 40 78\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "title": "The Big Snow",
+            "mediaFilename": "step1-20260817-s1-a31.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1D-08q1",
+              "prompt": "When did it snow?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "L1D-08q2",
+              "prompt": "What did Ella and Max make?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "L1D-08q3",
+              "prompt": "What was the snow man's nose?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L1D-08q4",
+              "prompt": "What did the children's mother bring them?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "title": "Where Is Snow?",
+            "mediaFilename": "step1-20260817-s1-a32.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1D-02q1",
+              "prompt": "Who is Snow?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L1D-02q2",
+              "prompt": "Where was Snow in the end?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "L1D-02q3",
+              "prompt": "How many baby cats were there?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L1D-02q4",
+              "prompt": "How did Mia feel at the end of the story?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "title": "Where Is My Shoe?",
+            "mediaFilename": "step1-20260817-s1-a33.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "L1D-07q1",
+              "prompt": "What did Nico look for?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "L1D-07q2",
+              "prompt": "Who had the shoe?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Reading",
+      "type": "reading",
+      "durationSeconds": 1800,
+      "navigation": "free",
+      "allowAnswerChange": true,
+      "playback": null,
+      "instructions": [
+        "Choose the word that matches the picture.",
+        "Choose the best word to complete the sentence.",
+        "Read the sign or the short note. Then answer the question.",
+        "Read the story. Then answer the questions."
+      ],
+      "groups": [
+        {
+          "stimulus": {
+            "type": "image",
+            "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><circle cx=\"32\" cy=\"50\" r=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M46 50 L84 50\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M70 50 L70 62 M80 50 L80 60\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+          },
+          "questions": [
+            {
+              "questionKey": "R1A-21",
+              "prompt": "Choose the word that matches the picture.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "image",
+            "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M14 70 L14 54 L34 54 L46 62 L74 62 C84 62 88 68 88 74 L14 74 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M20 60 L28 60\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+          },
+          "questions": [
+            {
+              "questionKey": "R1A-06",
+              "prompt": "Choose the word that matches the picture.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "image",
+            "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M42 18 L58 18 L58 32 L64 42 L64 80 C64 83 62 84 58 84 L42 84 C38 84 36 83 36 80 L36 42 L42 32 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M36 52 L64 52\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+          },
+          "questions": [
+            {
+              "questionKey": "R1A-16",
+              "prompt": "Choose the word that matches the picture.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "image",
+            "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><circle cx=\"50\" cy=\"56\" r=\"24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M32 38 L28 20 L44 30 M68 38 L72 20 L56 30\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"42\" cy=\"52\" r=\"3\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"58\" cy=\"52\" r=\"3\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M50 60 L46 65 M50 60 L54 65 M22 58 L36 60 M78 58 L64 60\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+          },
+          "questions": [
+            {
+              "questionKey": "R1A-03",
+              "prompt": "Choose the word that matches the picture.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "image",
+            "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><circle cx=\"50\" cy=\"56\" r=\"23\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M30 40 C20 40 18 58 28 64 M70 40 C80 40 82 58 72 64\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"42\" cy=\"52\" r=\"3\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"58\" cy=\"52\" r=\"3\" fill=\"currentColor\" stroke=\"none\"/><ellipse cx=\"50\" cy=\"64\" rx=\"6\" ry=\"4\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M50 68 L50 74\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+          },
+          "questions": [
+            {
+              "questionKey": "R1A-18",
+              "prompt": "Choose the word that matches the picture.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "image",
+            "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M50 30 C40 24 26 24 18 28 L18 74 C26 70 40 70 50 76 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 30 C60 24 74 24 82 28 L82 74 C74 70 60 70 50 76 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+          },
+          "questions": [
+            {
+              "questionKey": "R1A-19",
+              "prompt": "Choose the word that matches the picture.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "image",
+            "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M18 50 L50 22 L82 50\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M26 48 L26 82 L74 82 L74 48\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"42\" y=\"60\" width=\"16\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+          },
+          "questions": [
+            {
+              "questionKey": "R1A-09",
+              "prompt": "Choose the word that matches the picture.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "image",
+            "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M38 40 L50 88 L62 40 C58 36 42 36 38 40 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M44 52 L56 56 M46 64 L58 68\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\"/><path d=\"M50 38 C40 30 36 20 44 16 C50 14 52 26 50 38 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M50 38 C60 30 64 20 56 16 C50 14 48 26 50 38 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+          },
+          "questions": [
+            {
+              "questionKey": "R1A-17",
+              "prompt": "Choose the word that matches the picture.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "image",
+            "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M34 40 L34 80 L66 80 L66 40 L58 24 L42 24 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M34 40 L66 40\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><text x=\"50\" y=\"66\" font-size=\"16\" text-anchor=\"middle\" fill=\"currentColor\" stroke=\"none\">M</text></svg>"
+          },
+          "questions": [
+            {
+              "questionKey": "R1A-07",
+              "prompt": "Choose the word that matches the picture.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "image",
+            "imageSvg": "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-hidden=\"true\"><path d=\"M18 34 L60 34 L60 68 L18 68 Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M60 44 L82 44 L82 68 L60 68\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><rect x=\"26\" y=\"42\" width=\"24\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M30 26 L30 34 M26 22 L34 22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"30\" cy=\"74\" r=\"6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"52\" cy=\"74\" r=\"6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"74\" cy=\"74\" r=\"6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+          },
+          "questions": [
+            {
+              "questionKey": "R1A-12",
+              "prompt": "Choose the word that matches the picture.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "questions": [
+            {
+              "questionKey": "R1B-04",
+              "prompt": "Look! The baby ___ sleeping.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "R1B-06",
+              "prompt": "My brother can ___ the guitar very well.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R1B-17",
+              "prompt": "The children ___ playing in the garden.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "R1B-11",
+              "prompt": "This is my mother. ___ name is Mai.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R1B-22",
+              "prompt": "Please close the ___. It is cold in here.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R1B-21",
+              "prompt": "A ___ has got four legs and it says woof.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "R1B-15",
+              "prompt": "My dad ___ TV in the evening.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "R1B-05",
+              "prompt": "___ is your favourite colour?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "R1B-24",
+              "prompt": "I go to bed ___ half past eight.",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R1B-18",
+              "prompt": "Where ___ my shoes?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "City Swimming Pool",
+            "bodyText": "CITY POOL. Children under seven must come with an adult. The small pool is warm. The big pool is cold. Please put your shoes in the green box. The pool closes at six o'clock."
+          },
+          "questions": [
+            {
+              "questionKey": "R1C-03q1",
+              "prompt": "Which pool is warm?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R1C-03q2",
+              "prompt": "Where do you put your shoes?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R1C-03q3",
+              "prompt": "Ana is six years old. What does she need?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "School Bus",
+            "bodyText": "SCHOOL BUS. The bus comes at half past seven every morning. Wait behind the yellow line. Do not eat on the bus. Please talk quietly. There is no bus on Sunday."
+          },
+          "questions": [
+            {
+              "questionKey": "R1C-05q1",
+              "prompt": "What time does the bus come?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R1C-05q2",
+              "prompt": "Where must the children wait?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "R1C-05q3",
+              "prompt": "On which day is there no bus?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "Nora's New Bicycle",
+            "bodyText": "Nora was seven years old. Her old bicycle was very small, and her legs were too long for it. On her birthday her father gave her a big blue bicycle. Nora was happy, but she could not ride it. She fell down two times. Then her brother Tim helped her every day, and she went slowly down the road. On Sunday Nora went all the way to the park on her new bicycle. 'Look at me!' she said. Now the small bicycle is Tim's bicycle."
+          },
+          "questions": [
+            {
+              "questionKey": "R1D-03q1",
+              "prompt": "Why was Nora's old bicycle a problem?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R1D-03q2",
+              "prompt": "Who helped Nora with the new bicycle?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R1D-03q3",
+              "prompt": "When did Nora go to the park on her bicycle?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R1D-03q4",
+              "prompt": "Who has the small bicycle now?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "A Day in the Snow",
+            "bodyText": "On Friday morning there was a lot of snow in the town. There was no school, so Ben and his sister Ida put on hats and boots. They made two snow men in the garden. The snow men had carrots for noses. Then the children were very cold, so they went inside. Their father made hot milk for them. In the afternoon the sun came out. At five o'clock the snow men were very small. Ben took a photo of them."
+          },
+          "questions": [
+            {
+              "questionKey": "R1D-06q1",
+              "prompt": "Why was there no school on Friday?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R1D-06q2",
+              "prompt": "How many snow men did the children make?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R1D-06q3",
+              "prompt": "What did the father make for the children?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            },
+            {
+              "questionKey": "R1D-06q4",
+              "prompt": "Why were the snow men very small at five o'clock?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": true
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "Max and the Big Egg",
+            "bodyText": "Max lives on a small farm with his family. One morning he went to see the hens. Under a tree he found a very big white egg. It was warm. Max put the egg in a box in the kitchen, next to the window. Two days later the egg opened. A little duck came out. Max was very happy. He called the duck Ben. Now Ben is not in a box. He walks after Max all day, like a small dog."
+          },
+          "questions": [
+            {
+              "questionKey": "R1D-02q1",
+              "prompt": "Where did Max find the egg?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": true
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "R1D-02q2",
+              "prompt": "What did Max do with the egg?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "A",
+                  "isCorrect": false
+                },
+                {
+                  "label": "B",
+                  "isCorrect": false
+                },
+                {
+                  "label": "C",
+                  "isCorrect": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -29,11 +29,11 @@ interface AttachOptions {
  * `MEDIA_ROOT` and `MEDIA_MAX_BYTES` are read fresh by `loadServerConfig()`
  * wherever it is called (AdminModule's `MulterModule.registerAsync` factory,
  * AdminService.uploadMedia), never cached at import time -- see
- * session.service.ts's `allowedEmail` for the same pattern with
- * `ALLOWED_EMAILS`. Setting them before `createTestApp()` compiles the
- * module is enough; no harness change is needed. `MEDIA_MAX_BYTES` is kept
- * small (1KB) so the oversized-file test does not need a slow multi-MB
- * upload.
+ * session.service.ts's `authorizedEmail` for the same pattern with
+ * `accessAppId` / `accessRole`. Setting them before `createTestApp()`
+ * compiles the module is enough; no harness change is needed.
+ * `MEDIA_MAX_BYTES` is kept small (1KB) so the oversized-file test does not
+ * need a slow multi-MB upload.
  */
 describe("POST /admin/media", () => {
   let app: TestApp | undefined = undefined

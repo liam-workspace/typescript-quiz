@@ -23,8 +23,8 @@ services:
     # iPad reaches this over the home wifi, so loopback would make the app
     # unusable for the one device it exists to serve. What protects it is not
     # the bind address but JWKS verification on every route plus the
-    # ALLOWED_EMAILS allowlist -- an unauthenticated request gets 401 and an
-    # unlisted account gets 403 before any handler runs.
+    # issuer-granted role check -- an unauthenticated request gets 401 and an
+    # account without the role gets 403 before any handler runs.
     ports:
       - "3000:3000"
     environment:
@@ -38,9 +38,13 @@ services:
       # symptom (401 on a valid sign-in) looks nothing like a wrong URL.
       # Dev uses https://auth-dev.icovn.me/jwks.
       JWKS_URL: ${JWKS_URL:-https://auth.icovn.me/jwks}
-      # Comma-separated allowlist checked at sign-in; leaving it unset
-      # rejects every sign-in, so set it in the environment or a .env file.
-      ALLOWED_EMAILS: ${ALLOWED_EMAILS:-}
+      # Which client_id's role grant (issuer `rolesByApp` claim) controls
+      # sign-in, and the role name required under it. Both have defaults
+      # matching the grant already live at the issuer, so neither needs
+      # setting for a normal run -- override only to point at a different
+      # app id or role.
+      ACCESS_APP_ID: ${ACCESS_APP_ID:-quiz-web}
+      ACCESS_ROLE: ${ACCESS_ROLE:-student}
       # Required by config.ts (`required(env, ...)`), so its absence is not a
       # degraded mode -- the process throws on boot. No default: a signing
       # secret with a fallback is the secret the deployment actually ships

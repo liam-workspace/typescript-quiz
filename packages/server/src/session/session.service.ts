@@ -1,7 +1,4 @@
-import {
-  isEmailAllowed,
-  type JwtClaims,
-} from "@liam-workspace/node-auth-server"
+import type { JwtClaims } from "@liam-workspace/node-auth-server"
 import type { PgPool } from "@liam-public/node-postgres"
 import { HttpStatus, Inject, Injectable } from "@nestjs/common"
 import {
@@ -56,17 +53,32 @@ export class SessionService {
   constructor(@Inject(REQUEST_POOL) private readonly pool: PgPool) {}
 
   /**
-   * The allowlist is the whole access model: without it any valid Google
-   * token from any account provisions a student. Checked before the write,
-   * so a refused email leaves no row behind.
+   * The role grant is the whole access model: without it any valid token
+   * from any account provisions a student. Checked before the write, so a
+   * refused caller leaves no row behind.
+   *
+   * The grant lives in `claims.rolesByApp[accessAppId]`, NOT `claims.roles`
+   * -- the issuer emits `roles` as a map keyed by client_id
+   * (`Record<string, string[]>`), and `@liam-workspace/node-auth-server`
+   * only populates the flat `claims.roles` array when the claim itself is
+   * an array. For our tokens it is a map, so `claims.roles` is always
+   * empty; reading it here would 403 every caller.
+   *
+   * Fails closed on every edge: no email, no `rolesByApp` entry for
+   * `accessAppId`, an empty array, or the array missing `accessRole` --
+   * all refuse. The predecessor of this check (a comma-separated email
+   * allowlist) had the same edge and the same rule: an unset or empty
+   * grant rejects every sign-in, it never admits one.
    */
-  private allowedEmail(claims: JwtClaims): string {
-    const { email } = claims
+  private authorizedEmail(claims: JwtClaims): string {
+    const { email, rolesByApp } = claims
+    const { accessAppId, accessRole } = loadServerConfig()
+    const grantedRoles = rolesByApp?.[accessAppId] ?? []
 
-    if (!email || !isEmailAllowed(email, loadServerConfig().allowedEmails)) {
+    if (!email || !grantedRoles.includes(accessRole)) {
       throw new ProblemException({
-        type: "email_not_allowed",
-        title: "This email is not permitted to sign in.",
+        type: "role_not_granted",
+        title: "This account does not hold the role required to sign in.",
         status: HttpStatus.FORBIDDEN,
       })
     }
@@ -78,7 +90,7 @@ export class SessionService {
     claims: JwtClaims,
     subjectClaim: string,
   ): Promise<{ student: StudentRow; created: boolean }> {
-    const email = this.allowedEmail(claims)
+    const email = this.authorizedEmail(claims)
 
     return upsertStudentBySubject(this.pool, {
       subjectClaim,

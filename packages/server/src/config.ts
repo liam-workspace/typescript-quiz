@@ -1,6 +1,5 @@
 import {
   nodeEnvironment,
-  parseCsvEnv,
   parseIntegerEnv,
   type Environment,
 } from "@liam-public/node-config"
@@ -11,7 +10,8 @@ export interface ServerConfig {
   jwksUrl: string
   mediaRoot: string
   mediaMaxBytes: number
-  allowedEmails: string[]
+  accessAppId: string
+  accessRole: string
   mediaSigningSecret: string
   requestBodyMaxBytes: number
   spaRoot: string | null
@@ -36,7 +36,13 @@ export function loadServerConfig(
     jwksUrl: required(env, "JWKS_URL"),
     mediaRoot: env.MEDIA_ROOT ?? "/media",
     mediaMaxBytes: parseIntegerEnv(env, "MEDIA_MAX_BYTES", 20 * 1024 * 1024),
-    allowedEmails: [...parseCsvEnv(env, "ALLOWED_EMAILS")],
+    // Non-secret: which client_id's grant in the issuer's `rolesByApp`
+    // claim controls sign-in. Defaults to this app's own client id at
+    // auth.icovn.me.
+    accessAppId: env.ACCESS_APP_ID ?? "quiz-web",
+    // Non-secret: the role a user must hold under `accessAppId` to sign in.
+    // Defaults to the role already granted there today.
+    accessRole: env.ACCESS_ROLE ?? "student",
     // No default: a default signing secret is the secret every deployment
     // would actually ship with, which makes signed URLs forgeable by anyone
     // who has read the source.

@@ -74,11 +74,12 @@ describe("POST /session and GET /me", () => {
     expect(body(second).id).toBe(body(first).id)
   })
 
-  it("POST /session refuses an email outside the allowlist", async () => {
+  it("POST /session refuses a token with no grant for the required role", async () => {
     const a = ready()
     const token = await a.mint({
       sub: `${SUB}-outsider`,
       email: "stranger@elsewhere.org",
+      rolesByApp: {},
     })
 
     await request(a.http.getHttpServer() as App)

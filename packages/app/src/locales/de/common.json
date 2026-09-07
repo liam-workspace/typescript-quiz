@@ -1,0 +1,13 @@
+{
+  "cancel": "Abbrechen",
+  "confirm": "Bestätigen",
+  "language": {
+    "de": "Deutsch - Deutsch",
+    "en": "English - Englisch",
+    "es": "Español - Spanisch",
+    "fr": "Français - Französisch",
+    "it": "Italiano - Italienisch",
+    "ja": "日本語 - Japanisch"
+  },
+  "loading": "Laden..."
+}

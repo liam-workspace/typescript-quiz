@@ -1,7 +1,87 @@
 services:
-  razzia:
-    image: ralex91/razzia:latest
+  # Serves the REST API, /media, and the built SPA (fallback-served from the
+  # same process; see SPA_ROOT and main.ts). Boot ordering against postgres
+  # is handled by `waitForDatabase` in the application itself — `depends_on`
+  # only waits for the container to start, not for postgres to accept
+  # connections.
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      secrets:
+        - node_auth_token
+      # The SPA's auth config is baked at BUILD time -- Vite inlines
+      # `import.meta.env.VITE_*` and never reads it from the container's
+      # environment. Supplying these under `environment:` below would look
+      # right and do nothing. Public values only (issuer, public client id,
+      # redirect URI); the dev token is never passed here.
+      args:
+        VITE_AUTH_ISSUER: ${VITE_AUTH_ISSUER:?set it, e.g. https://auth-dev.icovn.me}
+        VITE_AUTH_CLIENT_ID: ${VITE_AUTH_CLIENT_ID:?set it, e.g. local-dev}
+        VITE_AUTH_REDIRECT_URI: ${VITE_AUTH_REDIRECT_URI:?must match a redirect URI registered with the issuer, exactly}
+    # Bound to all interfaces ON PURPOSE, unlike postgres below: the child's
+    # iPad reaches this over the home wifi, so loopback would make the app
+    # unusable for the one device it exists to serve. What protects it is not
+    # the bind address but JWKS verification on every route plus the
+    # ALLOWED_EMAILS allowlist -- an unauthenticated request gets 401 and an
+    # unlisted account gets 403 before any handler runs.
     ports:
       - "3000:3000"
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://pp:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/pp
+      # Verified against the issuer's own discovery document, not guessed:
+      # https://auth.icovn.me/.well-known/openid-configuration reports
+      # `jwks_uri: https://auth.icovn.me/jwks`. The previous default pointed
+      # at /.well-known/jwks.json, which 404s on BOTH issuers -- a stack
+      # brought up without overriding it would reject every token, and the
+      # symptom (401 on a valid sign-in) looks nothing like a wrong URL.
+      # Dev uses https://auth-dev.icovn.me/jwks.
+      JWKS_URL: ${JWKS_URL:-https://auth.icovn.me/jwks}
+      # Comma-separated allowlist checked at sign-in; leaving it unset
+      # rejects every sign-in, so set it in the environment or a .env file.
+      ALLOWED_EMAILS: ${ALLOWED_EMAILS:-}
+      # Required by config.ts (`required(env, ...)`), so its absence is not a
+      # degraded mode -- the process throws on boot. No default: a signing
+      # secret with a fallback is the secret the deployment actually ships
+      # with, and it is what stops a media URL being forgeable.
+      MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET:?set MEDIA_SIGNING_SECRET}
+      MEDIA_ROOT: /media
+      MEDIA_MAX_BYTES: ${MEDIA_MAX_BYTES:-20971520}
     volumes:
-      - ./config:/app/config
+      - pp-media:/media
+    depends_on:
+      - postgres
+
+  # Local development only. Bound to loopback (127.0.0.1) so this database is
+  # never reachable from the LAN or shared wifi — it holds a child's test
+  # answers and scores. The host port is shifted to 5433 (off Postgres'
+  # default 5432) so this stack cannot collide with, or silently connect to,
+  # some other postgres already running on the machine.
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pp
+      # No default. A weak fallback like `pp` is the password this actually
+      # ships with, because nobody overrides a value that already works -- and
+      # this database holds a child's answers and scores. Compose fails fast
+      # with the message below instead.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: pp
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pp-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pp -d pp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pp-postgres:
+  pp-media:
+
+secrets:
+  node_auth_token:
+    environment: NODE_AUTH_TOKEN

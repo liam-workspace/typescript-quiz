@@ -1,0 +1,42 @@
+{
+  "name": "@pp/db",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./scoring": {
+      "types": "./dist/scoring.d.ts",
+      "default": "./dist/scoring.js"
+    },
+    "./admin": {
+      "types": "./dist/admin.d.ts",
+      "default": "./dist/admin.js"
+    }
+  },
+  "files": [
+    "dist",
+    "migrations"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@liam-public/node-config": "^0.1.0",
+    "@liam-public/node-postgres": "^0.3.1",
+    "@pp/common": "workspace:*",
+    "node-pg-migrate": "^7.9.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "^11.0.0",
+    "@types/node": "^26.0.1",
+    "@types/pg": "^8.11.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.0"
+  }
+}

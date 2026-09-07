@@ -1,0 +1,263 @@
+# ER input document — generated from docs/db/schema.sql, which is the source
+# of truth and has been executed against PostgreSQL 16.
+#
+# Attributes here are the identifying/structural columns; the SQL carries the
+# full column list, every CHECK, every index and the immutability triggers.
+#
+# `failed_write` is deliberately ABSENT. It has no foreign keys by design —
+# its job is holding request bodies that failed validation, including ones
+# naming an attempt that does not exist. Drawing an edge to it would assert a
+# referential link the schema intentionally does not have.
+title: Primary Practice data model (content fully normalized, versions immutable)
+entities:
+  - name: STUDENT
+    attributes:
+      - { name: id, type: uuid, key: PK }
+      - { name: subject_claim, type: text, key: UK }
+      - { name: email, type: text }
+      - { name: display_name, type: text }
+      - { name: level, type: student_level }
+  - name: MEDIA_ASSET
+    attributes:
+      - { name: id, type: uuid, key: PK }
+      - { name: kind, type: media_kind }
+      - { name: filename, type: text, key: UK }
+      - { name: mime_type, type: text }
+      - { name: byte_size, type: bigint }
+      - { name: checksum, type: text }
+  - name: TEST
+    attributes:
+      - { name: id, type: uuid, key: PK }
+      - { name: slug, type: text, key: UK }
+      - { name: current_version_id, type: uuid, key: FK }
+  - name: TEST_VERSION
+    attributes:
+      - { name: id, type: uuid, key: PK }
+      - { name: test_id, type: uuid, key: FK }
+      - { name: version, type: int, key: UK }
+      - { name: title, type: text }
+      - { name: level, type: student_level }
+      - { name: duration_seconds, type: int }
+      - { name: published_at, type: timestamptz }
+  - name: TEST_SECTION
+    attributes:
+      - { name: id, type: uuid, key: PK }
+      - { name: test_version_id, type: uuid, key: FK }
+      - { name: ordinal, type: int }
+      - { name: title, type: text }
+      - { name: type, type: section_type }
+      - { name: duration_seconds, type: int }
+      - { name: navigation, type: nav_mode }
+      - { name: allow_answer_change, type: boolean }
+      - { name: default_max_plays, type: int }
+      - { name: default_allow_pause, type: boolean }
+      - { name: default_allow_seek, type: boolean }
+  - name: SECTION_INSTRUCTION
+    attributes:
+      - { name: test_section_id, type: uuid, key: PK }
+      - { name: ordinal, type: int, key: PK }
+      - { name: text, type: text }
+  - name: STIMULUS
+    attributes:
+      - { name: id, type: uuid, key: PK }
+      - { name: test_version_id, type: uuid, key: FK }
+      - { name: media_asset_id, type: uuid, key: FK }
+      - { name: type, type: stimulus_type }
+      - { name: title, type: text }
+      - { name: body_text, type: text }
+      - { name: max_plays, type: int }
+      - { name: allow_pause, type: boolean }
+      - { name: allow_seek, type: boolean }
+  - name: QUESTION_GROUP
+    attributes:
+      - { name: id, type: uuid, key: PK }
+      - { name: test_version_id, type: uuid, key: FK }
+      - { name: test_section_id, type: uuid, key: FK }
+      - { name: stimulus_id, type: uuid, key: FK }
+      - { name: ordinal, type: int }
+  - name: QUESTION
+    attributes:
+      - { name: id, type: uuid, key: PK }
+      - { name: test_version_id, type: uuid, key: FK }
+      - { name: question_group_id, type: uuid, key: FK }
+      - { name: question_key, type: text, key: UK }
+      - { name: ordinal, type: int }
+      - { name: prompt, type: text }
+      - { name: type, type: question_type }
+      - { name: points, type: int }
+  - name: CHOICE
+    attributes:
+      - { name: id, type: uuid, key: PK }
+      - { name: question_id, type: uuid, key: FK }
+      - { name: ordinal, type: int }
+      - { name: label, type: text }
+      - { name: is_correct, type: boolean }
+  - name: QUESTION_TAG
+    attributes:
+      - { name: question_id, type: uuid, key: PK }
+      - { name: ordinal, type: int, key: PK }
+      - { name: tag, type: text }
+  - name: ATTEMPT
+    attributes:
+      - { name: id, type: uuid, key: PK }
+      - { name: student_id, type: uuid, key: FK }
+      - { name: test_version_id, type: uuid, key: FK }
+      - { name: status, type: attempt_status }
+      - { name: created_at, type: timestamptz }
+      - { name: started_at, type: timestamptz }
+      - { name: expires_at, type: timestamptz }
+      - { name: submitted_at, type: timestamptz }
+      - { name: current_section_id, type: uuid, key: FK }
+      - { name: current_question_id, type: uuid, key: FK }
+      - { name: points_earned, type: int }
+      - { name: points_possible, type: int }
+      - { name: percentage, type: numeric }
+      - { name: question_count, type: int }
+  - name: ATTEMPT_SECTION
+    attributes:
+      - { name: attempt_id, type: uuid, key: PK }
+      - { name: test_section_id, type: uuid, key: PK }
+      - { name: entered_at, type: timestamptz }
+      - { name: expires_at, type: timestamptz }
+      - { name: completed_at, type: timestamptz }
+      - { name: points_earned, type: int }
+      - { name: points_possible, type: int }
+  - name: RESPONSE
+    attributes:
+      - { name: attempt_id, type: uuid, key: PK }
+      - { name: question_id, type: uuid, key: PK }
+      - { name: test_version_id, type: uuid, key: FK }
+      - { name: client_instance_id, type: text }
+      - { name: client_seq, type: bigint }
+      - { name: answered_at, type: timestamptz }
+      - { name: time_spent_ms, type: int }
+  - name: RESPONSE_CLIENT_CURSOR
+    attributes:
+      - { name: attempt_id, type: uuid, key: PK }
+      - { name: question_id, type: uuid, key: PK }
+      - { name: client_instance_id, type: text, key: PK }
+      - { name: last_seq, type: bigint }
+  - name: RESPONSE_CHOICE
+    attributes:
+      - { name: attempt_id, type: uuid, key: PK }
+      - { name: question_id, type: uuid, key: PK }
+      - { name: choice_id, type: uuid, key: PK }
+  - name: STIMULUS_PLAY
+    attributes:
+      - { name: attempt_id, type: uuid, key: PK }
+      - { name: stimulus_id, type: uuid, key: PK }
+      - { name: test_version_id, type: uuid, key: FK }
+      - { name: play_count, type: int }
+      - { name: last_played_at, type: timestamptz }
+relations:
+  - { from: STUDENT, to: ATTEMPT, cardinality: "one-to-many", label: takes }
+  - {
+      from: TEST,
+      to: TEST_VERSION,
+      cardinality: "one-to-many",
+      label: "has version",
+    }
+  - {
+      from: TEST_VERSION,
+      to: TEST_SECTION,
+      cardinality: "one-to-many",
+      label: contains,
+    }
+  - {
+      from: TEST_VERSION,
+      to: STIMULUS,
+      cardinality: "one-to-many",
+      label: owns,
+    }
+  - {
+      from: TEST_SECTION,
+      to: SECTION_INSTRUCTION,
+      cardinality: "one-to-many",
+      label: "instructs with",
+    }
+  - {
+      from: TEST_SECTION,
+      to: QUESTION_GROUP,
+      cardinality: "one-to-many",
+      label: contains,
+    }
+  - {
+      from: STIMULUS,
+      to: QUESTION_GROUP,
+      cardinality: "one-to-many",
+      label: introduces,
+    }
+  - {
+      from: MEDIA_ASSET,
+      to: STIMULUS,
+      cardinality: "one-to-many",
+      label: "played by",
+    }
+  - {
+      from: QUESTION_GROUP,
+      to: QUESTION,
+      cardinality: "one-to-many",
+      label: contains,
+    }
+  - { from: QUESTION, to: CHOICE, cardinality: "one-to-many", label: offers }
+  - {
+      from: QUESTION,
+      to: QUESTION_TAG,
+      cardinality: "one-to-many",
+      label: "tagged with",
+    }
+  - {
+      from: TEST_VERSION,
+      to: ATTEMPT,
+      cardinality: "one-to-many",
+      label: "pinned by",
+    }
+  - {
+      from: ATTEMPT,
+      to: ATTEMPT_SECTION,
+      cardinality: "one-to-many",
+      label: times,
+    }
+  - {
+      from: TEST_SECTION,
+      to: ATTEMPT_SECTION,
+      cardinality: "one-to-many",
+      label: "timed in",
+    }
+  - { from: ATTEMPT, to: RESPONSE, cardinality: "one-to-many", label: records }
+  - {
+      from: QUESTION,
+      to: RESPONSE,
+      cardinality: "one-to-many",
+      label: "answered by",
+    }
+  - {
+      from: RESPONSE,
+      to: RESPONSE_CHOICE,
+      cardinality: "one-to-many",
+      label: selects,
+    }
+  - {
+      from: CHOICE,
+      to: RESPONSE_CHOICE,
+      cardinality: "one-to-many",
+      label: "selected as",
+    }
+  - {
+      from: RESPONSE,
+      to: RESPONSE_CLIENT_CURSOR,
+      cardinality: "one-to-many",
+      label: "seq per device",
+    }
+  - {
+      from: ATTEMPT,
+      to: STIMULUS_PLAY,
+      cardinality: "one-to-many",
+      label: counts,
+    }
+  - {
+      from: STIMULUS,
+      to: STIMULUS_PLAY,
+      cardinality: "one-to-many",
+      label: "counted in",
+    }

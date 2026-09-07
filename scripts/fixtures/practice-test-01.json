@@ -1,0 +1,621 @@
+{
+  "title": "TOEFL Primary — Practice Test 01",
+  "slug": "practice-test-01",
+  "level": "primary-step-1",
+  "durationSeconds": 3000,
+  "sections": [
+    {
+      "title": "Listening",
+      "type": "listening",
+      "durationSeconds": 1500,
+      "navigation": "forward_only",
+      "allowAnswerChange": false,
+      "playback": { "maxPlays": 2, "allowPause": false, "allowSeek": false },
+      "instructions": [
+        "Put on your headphones and get ready to listen.",
+        "You will hear each recording. Listen carefully, then answer the questions.",
+        "You may play each recording up to two times."
+      ],
+      "groups": [
+        {
+          "stimulus": {
+            "type": "audio",
+            "title": "School Lunch Announcement",
+            "bodyText": "Attention, students! Today's lunch menu has changed. Instead of soup, the cafeteria will serve pizza and a fresh salad, because the kitchen ran out of tomatoes for the soup. Lunch will start at twelve o'clock, a little later than the usual time of half past eleven. Please line up quietly at the cafeteria door. Thank you!",
+            "mediaFilename": "silence.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "l1_1",
+              "prompt": "What will the cafeteria serve today?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Pizza and salad", "isCorrect": true },
+                { "label": "Soup and bread", "isCorrect": false },
+                { "label": "Pasta and juice", "isCorrect": false },
+                { "label": "Rice and chicken", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "l1_2",
+              "prompt": "Why did the lunch menu change?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "The kitchen ran out of tomatoes",
+                  "isCorrect": true
+                },
+                { "label": "The cooks were sick", "isCorrect": false },
+                { "label": "The students asked for pizza", "isCorrect": false },
+                { "label": "The oven broke", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "l1_3",
+              "prompt": "What time will lunch start today?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Twelve o'clock", "isCorrect": true },
+                { "label": "Half past eleven", "isCorrect": false },
+                { "label": "One o'clock", "isCorrect": false },
+                { "label": "Eleven o'clock", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "l1_4",
+              "prompt": "What should students do at the cafeteria door?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Line up quietly", "isCorrect": true },
+                { "label": "Run inside", "isCorrect": false },
+                { "label": "Wait outside", "isCorrect": false },
+                { "label": "Sit down", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "l1_5",
+              "prompt": "Is lunch starting earlier or later than usual?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Later", "isCorrect": true },
+                { "label": "Earlier", "isCorrect": false },
+                { "label": "At the same time", "isCorrect": false },
+                { "label": "It is cancelled", "isCorrect": false }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "title": "Weekend Soccer Plans",
+            "bodyText": "Ben: Hi Sara, are you playing soccer this weekend? Sara: Yes! We have a game on Saturday morning at Green Park. Ben: What time does it start? Sara: It starts at nine o'clock, so we need to arrive by half past eight. Ben: Don't forget to bring a water bottle, it might be hot. Sara: Good idea! Our coach, Mr. Rivera, also said we should wear our blue team shirts.",
+            "mediaFilename": "silence.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "l2_1",
+              "prompt": "When is the soccer game?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Saturday morning", "isCorrect": true },
+                { "label": "Sunday morning", "isCorrect": false },
+                { "label": "Friday afternoon", "isCorrect": false },
+                { "label": "Saturday evening", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "l2_2",
+              "prompt": "Where is the game?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Green Park", "isCorrect": true },
+                { "label": "Central Park", "isCorrect": false },
+                { "label": "The school field", "isCorrect": false },
+                { "label": "River Park", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "l2_3",
+              "prompt": "What time should the players arrive?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Half past eight", "isCorrect": true },
+                { "label": "Nine o'clock", "isCorrect": false },
+                { "label": "Eight o'clock", "isCorrect": false },
+                { "label": "Ten o'clock", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "l2_4",
+              "prompt": "What does Ben remind Sara to bring?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "A water bottle", "isCorrect": true },
+                { "label": "A snack", "isCorrect": false },
+                { "label": "An umbrella", "isCorrect": false },
+                { "label": "A jacket", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "l2_5",
+              "prompt": "Who is the coach?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Mr. Rivera", "isCorrect": true },
+                { "label": "Mr. Ben", "isCorrect": false },
+                { "label": "Mr. Green", "isCorrect": false },
+                { "label": "Mr. Park", "isCorrect": false }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "title": "This Week's Weather",
+            "bodyText": "Good morning! Here is this week's weather. Monday will be sunny and warm, a perfect day for the playground. Tuesday will be rainy, so remember to bring your umbrella to school. Wednesday and Thursday will be cloudy but dry. On the weekend, it will get much colder, so wear a warm coat if you go outside. Have a great week!",
+            "mediaFilename": "silence.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "l3_1",
+              "prompt": "What will the weather be like on Monday?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Sunny and warm", "isCorrect": true },
+                { "label": "Rainy", "isCorrect": false },
+                { "label": "Cold and windy", "isCorrect": false },
+                { "label": "Snowy", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "l3_2",
+              "prompt": "What should students bring on Tuesday?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "An umbrella", "isCorrect": true },
+                { "label": "Sunglasses", "isCorrect": false },
+                { "label": "A warm coat", "isCorrect": false },
+                { "label": "A swimsuit", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "l3_3",
+              "prompt": "What will Wednesday and Thursday be like?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Cloudy but dry", "isCorrect": true },
+                { "label": "Sunny and hot", "isCorrect": false },
+                { "label": "Rainy all day", "isCorrect": false },
+                { "label": "Very cold", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "l3_4",
+              "prompt": "What will the weekend weather be like?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Much colder", "isCorrect": true },
+                { "label": "Much hotter", "isCorrect": false },
+                { "label": "The same as Monday", "isCorrect": false },
+                { "label": "Rainy", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "l3_5",
+              "prompt": "What should people wear on the weekend if they go outside?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "A warm coat", "isCorrect": true },
+                { "label": "A raincoat", "isCorrect": false },
+                { "label": "A swimsuit", "isCorrect": false },
+                { "label": "Sunglasses", "isCorrect": false }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "audio",
+            "title": "Jack's Birthday Party",
+            "bodyText": "Jack: Mom, when is my birthday party? Mom: Your party is this Saturday at three o'clock, right here at our house. Jack: Can my friends bring gifts? Mom: Of course, but the most important thing is that they come and have fun. Jack: What kind of cake are we having? Mom: I already ordered your favorite, a chocolate cake with strawberries on top.",
+            "mediaFilename": "silence.mp3"
+          },
+          "questions": [
+            {
+              "questionKey": "l4_1",
+              "prompt": "When is Jack's birthday party?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Saturday at three o'clock", "isCorrect": true },
+                { "label": "Sunday at three o'clock", "isCorrect": false },
+                { "label": "Saturday at noon", "isCorrect": false },
+                { "label": "Friday evening", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "l4_2",
+              "prompt": "Where will the party be?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "At their house", "isCorrect": true },
+                { "label": "At a restaurant", "isCorrect": false },
+                { "label": "At the park", "isCorrect": false },
+                { "label": "At school", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "l4_3",
+              "prompt": "What does Mom say is most important?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "That friends come and have fun",
+                  "isCorrect": true
+                },
+                {
+                  "label": "That friends bring expensive gifts",
+                  "isCorrect": false
+                },
+                { "label": "That the house is clean", "isCorrect": false },
+                { "label": "That it doesn't rain", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "l4_4",
+              "prompt": "What kind of cake will they have?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "Chocolate cake with strawberries",
+                  "isCorrect": true
+                },
+                { "label": "Vanilla cake", "isCorrect": false },
+                { "label": "Ice cream cake", "isCorrect": false },
+                { "label": "Fruit cake", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "l4_5",
+              "prompt": "Who is Jack talking to?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "His mom", "isCorrect": true },
+                { "label": "His dad", "isCorrect": false },
+                { "label": "His teacher", "isCorrect": false },
+                { "label": "His friend", "isCorrect": false }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Reading",
+      "type": "reading",
+      "durationSeconds": 1500,
+      "navigation": "free",
+      "allowAnswerChange": true,
+      "playback": null,
+      "instructions": [
+        "Read each passage carefully.",
+        "Answer the questions about what you read.",
+        "You may go back and change your answers in this section."
+      ],
+      "groups": [
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "Lily's New Puppy",
+            "bodyText": "Lily got a new puppy for her birthday. The puppy is small and brown, and Lily named him Max. Max likes to run in the garden and chase his red ball. Every morning, Lily gives Max his food and fresh water. In the afternoon, she takes him for a walk in the park near her house. At night, Max sleeps in a soft basket next to Lily's bed. Lily loves Max very much, and she says he is her best friend."
+          },
+          "questions": [
+            {
+              "questionKey": "r1_1",
+              "prompt": "What color is Max?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Brown", "isCorrect": true },
+                { "label": "Black", "isCorrect": false },
+                { "label": "White", "isCorrect": false },
+                { "label": "Grey", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "r1_2",
+              "prompt": "What does Lily give Max every morning?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Food and fresh water", "isCorrect": true },
+                { "label": "A red ball", "isCorrect": false },
+                { "label": "A walk", "isCorrect": false },
+                { "label": "A bath", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "r1_3",
+              "prompt": "Where does Max sleep at night?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "In a soft basket next to Lily's bed",
+                  "isCorrect": true
+                },
+                { "label": "In the garden", "isCorrect": false },
+                { "label": "In the car", "isCorrect": false },
+                { "label": "Outside", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "r1_4",
+              "prompt": "What does Max like to chase?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "A red ball", "isCorrect": true },
+                { "label": "A cat", "isCorrect": false },
+                { "label": "A bird", "isCorrect": false },
+                { "label": "A bike", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "r1_5",
+              "prompt": "How does Lily feel about Max?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "She loves him", "isCorrect": true },
+                { "label": "She is afraid of him", "isCorrect": false },
+                { "label": "She is bored of him", "isCorrect": false },
+                { "label": "She wants a different pet", "isCorrect": false }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "The School Garden",
+            "bodyText": "Ms. Carter's class has a garden behind the school. Every Tuesday, the students go outside to take care of it. They planted carrots, tomatoes, and sunflowers in the spring. The children water the plants and pull out the weeds. Tom likes the sunflowers best because they grow very tall. Mia checks the tomatoes every week to see if they are red and ready to pick. In the fall, the class will share the vegetables they grew. Everyone is excited to taste the food from their own garden."
+          },
+          "questions": [
+            {
+              "questionKey": "r2_1",
+              "prompt": "Who takes care of the garden?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "The students", "isCorrect": true },
+                { "label": "The principal", "isCorrect": false },
+                { "label": "Tom's parents", "isCorrect": false },
+                { "label": "Gardeners", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "r2_2",
+              "prompt": "When do the students work in the garden?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Every Tuesday", "isCorrect": true },
+                { "label": "Every Monday", "isCorrect": false },
+                { "label": "Every weekend", "isCorrect": false },
+                { "label": "Every day", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "r2_3",
+              "prompt": "Which of these did the class NOT plant?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Potatoes", "isCorrect": true },
+                { "label": "Carrots", "isCorrect": false },
+                { "label": "Tomatoes", "isCorrect": false },
+                { "label": "Sunflowers", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "r2_4",
+              "prompt": "Why does Tom like the sunflowers best?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Because they grow very tall", "isCorrect": true },
+                { "label": "Because they are red", "isCorrect": false },
+                { "label": "Because they taste sweet", "isCorrect": false },
+                {
+                  "label": "Because they are easy to plant",
+                  "isCorrect": false
+                }
+              ]
+            },
+            {
+              "questionKey": "r2_5",
+              "prompt": "What does Mia check every week?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "The tomatoes", "isCorrect": true },
+                { "label": "The sunflowers", "isCorrect": false },
+                { "label": "The carrots", "isCorrect": false },
+                { "label": "The weeds", "isCorrect": false }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "A Rainy Saturday",
+            "bodyText": "It rained all day on Saturday, so Tom and his sister Ana stayed inside. First, they baked chocolate chip cookies with their mom in the kitchen. The kitchen smelled sweet while the cookies baked in the oven. After that, Tom and Ana played a board game at the table. Ana won the game two times, and Tom won once. In the evening, they watched a movie together and ate the warm cookies. Even though it rained outside, it was a fun day for everyone."
+          },
+          "questions": [
+            {
+              "questionKey": "r3_1",
+              "prompt": "Why did Tom and Ana stay inside?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Because it rained all day", "isCorrect": true },
+                { "label": "Because they were sick", "isCorrect": false },
+                { "label": "Because it was too hot", "isCorrect": false },
+                { "label": "Because school was closed", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "r3_2",
+              "prompt": "What did they bake?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Chocolate chip cookies", "isCorrect": true },
+                { "label": "A birthday cake", "isCorrect": false },
+                { "label": "Bread", "isCorrect": false },
+                { "label": "Pizza", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "r3_3",
+              "prompt": "Who won the board game more times?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Ana", "isCorrect": true },
+                { "label": "Tom", "isCorrect": false },
+                { "label": "Their mom", "isCorrect": false },
+                { "label": "No one", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "r3_4",
+              "prompt": "What did they do in the evening?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "Watched a movie and ate cookies",
+                  "isCorrect": true
+                },
+                { "label": "Went for a walk", "isCorrect": false },
+                { "label": "Went to bed early", "isCorrect": false },
+                { "label": "Played outside", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "r3_5",
+              "prompt": "How did the kitchen smell while the cookies baked?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Sweet", "isCorrect": true },
+                { "label": "Smoky", "isCorrect": false },
+                { "label": "Sour", "isCorrect": false },
+                { "label": "Like rain", "isCorrect": false }
+              ]
+            }
+          ]
+        },
+        {
+          "stimulus": {
+            "type": "passage",
+            "title": "The Zoo Trip",
+            "bodyText": "Last Friday, Class 3B went on a trip to the city zoo. First, the students visited the elephants and watched them spray water with their trunks. Next, they walked to see the monkeys, which were jumping and swinging between trees. At noon, the class ate lunch at the picnic tables near the lake. Before going home, the teacher let the students choose one animal to draw in their notebooks. Most of the class drew the elephants, but a few students drew the monkeys instead."
+          },
+          "questions": [
+            {
+              "questionKey": "r4_1",
+              "prompt": "Which class went on the trip?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Class 3B", "isCorrect": true },
+                { "label": "Class 2A", "isCorrect": false },
+                { "label": "Class 4C", "isCorrect": false },
+                { "label": "Class 1B", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "r4_2",
+              "prompt": "What were the elephants doing?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "Spraying water with their trunks",
+                  "isCorrect": true
+                },
+                { "label": "Eating leaves", "isCorrect": false },
+                { "label": "Sleeping", "isCorrect": false },
+                { "label": "Running", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "r4_3",
+              "prompt": "Where did the class eat lunch?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                {
+                  "label": "At the picnic tables near the lake",
+                  "isCorrect": true
+                },
+                { "label": "In the classroom", "isCorrect": false },
+                { "label": "At a restaurant", "isCorrect": false },
+                { "label": "On the bus", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "r4_4",
+              "prompt": "What did the teacher let the students do before going home?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "Choose one animal to draw", "isCorrect": true },
+                { "label": "Buy a souvenir", "isCorrect": false },
+                { "label": "Feed the animals", "isCorrect": false },
+                { "label": "Ride a train", "isCorrect": false }
+              ]
+            },
+            {
+              "questionKey": "r4_5",
+              "prompt": "Which animal did most of the class draw?",
+              "type": "single_choice",
+              "points": 1,
+              "choices": [
+                { "label": "The elephants", "isCorrect": true },
+                { "label": "The monkeys", "isCorrect": false },
+                { "label": "The lions", "isCorrect": false },
+                { "label": "The giraffes", "isCorrect": false }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

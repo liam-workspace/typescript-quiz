@@ -1,0 +1,775 @@
+@import "tailwindcss";
+
+/*
+ * Tailwind v4's automatic content scan does not look inside node_modules,
+ * so utility classes that appear ONLY inside @liam-public/browser-react-ui's
+ * pre-built dist JS (e.g. Sheet's `fixed`/`inset-y-0`/`w-72`/`z-50` and
+ * Button's `bg-primary`/`h-9` variants) were never generated into this
+ * app's CSS -- verified against the compiled output while checking
+ * QuestionNavigator/AppMenu's SheetContent for task 7's device-emulation
+ * pass: the Sheet rendered with `position: static` (the `.fixed` class
+ * happened to exist only by accident, via the word "fixed" inside an
+ * unrelated code comment) and sat wherever it fell in normal document
+ * flow instead of pinned to a viewport edge, so its clip/overflow
+ * behaviour was never actually testable. This makes the kit's classes a
+ * scan source without changing which classes render -- a strict
+ * completion of, not a redesign of, the app's existing Tailwind output.
+ */
+@source "../node_modules/@liam-public/browser-react-ui/dist";
+
+/*
+ * THE DEVICE PALETTE — ported verbatim from docs/prototype/index.html.
+ *
+ * The prototype is this product's design authority and always was, but
+ * nothing had ever ported it: it defines fifteen `--d-*` tokens and about
+ * thirty component classes, and this stylesheet defined none of them. Every
+ * screen therefore re-derived its own look from raw Tailwind utilities, and
+ * the parts no plan described in prose came out with no styling at all --
+ * ChoiceList rendered Radix's RadioGroup with no className, so a child
+ * could tap an answer and see nothing change, and QuestionNavigator gave
+ * all five cell states one identical grey.
+ *
+ * Those read as separate bugs. They were one: with no shared token to be
+ * missing, "unstyled" and "styled differently" are indistinguishable to
+ * every gate this project has.
+ *
+ * Registering them under `@theme` makes them real Tailwind colours, so
+ * `bg-paper`, `border-line`, `text-ink-2` and friends work in JSX exactly
+ * like any built-in — screens consume the system instead of guessing at it.
+ *
+ * DELIBERATELY LIGHT-ONLY, and this is a choice rather than an omission.
+ * The prototype's own dark block themes its API-documentation chrome
+ * (`--bg`, `--panel`, `--get`, `--post`), never the device screens: those
+ * render on fixed white paper. One child, one iPad, one committed look, so
+ * every colour below is painted explicitly and the page holds on any host
+ * ground.
+ */
+@theme {
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-ink: #1c2530;
+  --color-ink-2: #55636f;
+  --color-faint: #8d9aa6;
+  --color-paper: #ffffff;
+  --color-surface: #f4f7f9;
+  --color-line: #dfe6ec;
+  --color-teal: #0f6e78;
+  --color-teal-bg: #e4f1f2;
+  --color-clay: #a8622f;
+  --color-clay-bg: #f8ede4;
+  --color-good: #2e9e5b;
+  --color-good-bg: #e6f4eb;
+  --color-bad: #c4453f;
+  --color-bad-bg: #faeae9;
+  --color-amber: #e8a33d;
+
+  --radius-device: 10px;
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-family:
+      Nunito,
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  .timer,
+  .tabular-nums {
+    font-family: var(--font-mono);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-teal);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+/*
+ * The prototype's component rules, for the pieces whose exact look is part
+ * of the product rather than incidental. Everything else stays plain
+ * Tailwind in the component -- this is a shared vocabulary, not a framework.
+ *
+ * `.choice` and `.np-cell` earn a class each because their STATES carry
+ * meaning a child reads: which answer is mine, which question is still
+ * blank, which one I got wrong. A state rendered identically to another
+ * state is a defect, and both have already been exactly that.
+ */
+@layer components {
+  .app-shell {
+    min-height: calc(
+      100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+    );
+  }
+
+  /* An answer option. Its selected state is the single most important
+   * visual signal in the app: a child taps and must see it took. */
+  .choice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 44px; /* HIG minimum; the kit's own controls stop at 40px */
+    background: var(--color-paper);
+    border: 1.5px solid var(--color-line);
+    border-radius: var(--radius-device);
+    padding: 12px 15px;
+    font: inherit;
+    font-size: 15px;
+    text-align: left;
+    cursor: pointer;
+    color: var(--color-ink);
+    touch-action: manipulation;
+  }
+  .choice:hover {
+    border-color: var(--color-teal);
+  }
+  .choice:has([data-state="checked"]) {
+    border-color: var(--color-teal);
+    background: var(--color-teal-bg);
+    font-weight: 700;
+  }
+  .choice[data-locked="true"] {
+    cursor: not-allowed;
+    opacity: 0.92;
+  }
+  .choice[data-locked="true"]:hover {
+    border-color: var(--color-line);
+  }
+  /* Review only: the attempt is finished, so correctness may be shown. */
+  .choice[data-verdict="correct"] {
+    border-color: var(--color-good);
+    background: var(--color-good-bg);
+  }
+  .choice[data-verdict="incorrect"] {
+    border-color: var(--color-bad);
+    background: var(--color-bad-bg);
+  }
+
+  /* The radio/checkbox mark inside a `.choice`. */
+  .choice-dot {
+    width: 19px;
+    height: 19px;
+    flex: none;
+    border: 2px solid var(--color-line);
+    display: grid;
+    place-items: center;
+    background: var(--color-paper);
+  }
+  .choice-dot[data-state="checked"] {
+    border-color: var(--color-teal);
+    background: var(--color-teal);
+  }
+
+  /* A picture choice's pictogram. `stroke="currentColor"` inside the SVG
+   * picks up `.choice`'s ink colour (and the review verdict tint) simply
+   * by inheriting `color` -- no per-state override needed here. */
+  .choice-image {
+    flex: none;
+    width: 40px;
+    height: 40px;
+  }
+  .choice-image svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* A read_word_picture stimulus's pictogram -- same inline-SVG mechanism
+   * as .choice-image, one level up (above the question, not per-choice). */
+  .stimulus-image {
+    display: block;
+    max-height: 240px;
+    width: auto;
+  }
+  .stimulus-image svg {
+    display: block;
+    height: 100%;
+    width: auto;
+  }
+
+  /* A navigator cell. Five states, five looks -- see the note above. */
+  .np-cell {
+    display: grid;
+    place-items: center;
+    font: inherit;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    border-radius: 7px;
+    border: 1.5px solid var(--color-line);
+    background: var(--color-paper);
+    color: var(--color-ink-2);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .np-cell:hover:not(:disabled) {
+    border-color: var(--color-teal);
+  }
+  .np-cell:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  .np-cell[data-status="answered"] {
+    background: var(--color-teal-bg);
+    border-color: var(--color-teal);
+    color: var(--color-teal);
+  }
+  .np-cell[data-status="current"] {
+    background: var(--color-amber);
+    border-color: var(--color-amber);
+    color: #4a3208;
+  }
+  .np-cell[data-status="correct"] {
+    background: var(--color-good-bg);
+    border-color: var(--color-good);
+    color: var(--color-good);
+  }
+  .np-cell[data-status="incorrect"] {
+    background: var(--color-bad-bg);
+    border-color: var(--color-bad);
+    color: var(--color-bad);
+  }
+  .np-cell[data-status="blank"] {
+    background: var(--color-surface);
+    border-style: dashed;
+  }
+
+  /* The navigator's legend swatch: the same five states at glyph size. */
+  .np-key {
+    width: 11px;
+    height: 11px;
+    border-radius: 3px;
+    border: 1.5px solid var(--color-line);
+  }
+  .np-key[data-status="answered"] {
+    background: var(--color-teal-bg);
+    border-color: var(--color-teal);
+  }
+  .np-key[data-status="current"] {
+    background: var(--color-amber);
+    border-color: var(--color-amber);
+  }
+  .np-key[data-status="blank"] {
+    background: var(--color-surface);
+    border-style: dashed;
+  }
+  .np-key[data-status="correct"] {
+    background: var(--color-good-bg);
+    border-color: var(--color-good);
+  }
+  .np-key[data-status="incorrect"] {
+    background: var(--color-bad-bg);
+    border-color: var(--color-bad);
+  }
+
+  /* Progress pips along the runner chrome. */
+  .pip {
+    width: 19px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--color-line);
+  }
+  .pip[data-state="done"] {
+    background: var(--color-teal);
+  }
+  .pip[data-state="now"] {
+    background: var(--color-amber);
+  }
+
+  /* The shared screen vocabulary is deliberately responsive: pages fill a
+   * phone, tablet, or desktop viewport instead of recreating the prototype's
+   * fixed mockup dimensions. */
+  .device-page {
+    min-height: calc(
+      100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+    );
+    display: flex;
+    flex-direction: column;
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+  .app-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px clamp(16px, 4vw, 26px);
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-paper);
+  }
+  .app-brand {
+    font-size: 14.5px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+  .section-chip {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .section-chip[data-section="listening"],
+  .section-chip--listening {
+    background: var(--color-teal-bg);
+    color: var(--color-teal);
+  }
+  .section-chip[data-section="reading"],
+  .section-chip--reading {
+    background: var(--color-clay-bg);
+    color: var(--color-clay);
+  }
+  .section-chip[data-section="vocabulary"],
+  .section-chip--vocabulary {
+    background: var(--color-teal-bg);
+    color: var(--color-teal);
+  }
+  .section-chip[data-section="grammar"],
+  .section-chip--grammar {
+    background: var(--color-clay-bg);
+    color: var(--color-clay);
+  }
+  .section-chip[data-section="other"],
+  .section-chip--other {
+    background: var(--color-surface);
+    color: var(--color-ink-2);
+  }
+  .device-main {
+    flex: 1 1 auto;
+    padding: 22px clamp(16px, 5vw, 26px);
+  }
+  .center-main {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 30px clamp(16px, 5vw, 26px);
+    text-align: center;
+  }
+  .device-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px clamp(16px, 5vw, 26px);
+    border-top: 1px solid var(--color-line);
+    background: var(--color-paper);
+  }
+  .device-button {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    padding: 10px 20px;
+    background: var(--color-teal);
+    color: white;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 700;
+    touch-action: manipulation;
+  }
+  .device-button:hover {
+    filter: brightness(1.07);
+  }
+  .device-button[data-variant="secondary"],
+  .device-button[data-variant="ghost"] {
+    border-color: var(--color-line);
+    background: var(--color-paper);
+    color: var(--color-ink);
+  }
+  .device-button[data-variant="secondary"]:hover,
+  .device-button[data-variant="ghost"]:hover {
+    background: var(--color-surface);
+    filter: none;
+  }
+  .device-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  .device-card {
+    border: 1px solid var(--color-line);
+    border-radius: 11px;
+    padding: 17px 19px;
+    background: var(--color-paper);
+  }
+  .screen-title {
+    margin: 0 0 4px;
+    font-size: clamp(1.25rem, 3vw, 1.3125rem);
+    font-weight: 800;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+  .screen-subtitle {
+    margin: 0;
+    color: var(--color-ink-2);
+    font-size: 14px;
+  }
+  .question-count {
+    color: var(--color-faint);
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .question-prompt {
+    margin: 15px 0 0;
+    font-size: 16.5px;
+    font-weight: 700;
+    text-wrap: balance;
+  }
+  .choice-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    margin-top: 15px;
+  }
+  .audio-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid color-mix(in srgb, var(--color-teal) 22%, transparent);
+    border-radius: 12px;
+    padding: 20px;
+    background: var(--color-teal-bg);
+  }
+  .play-button {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    border-radius: 999px;
+    padding: 10px 24px;
+    background: var(--color-teal);
+    color: white;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 700;
+    touch-action: manipulation;
+  }
+  .play-button:disabled {
+    cursor: not-allowed;
+    background: var(--color-faint);
+  }
+  .passage {
+    max-height: min(35dvh, 21rem);
+    overflow-y: auto;
+    border-left: 3px solid var(--color-clay);
+    border-radius: 0 9px 9px 0;
+    padding: 14px 17px;
+    background: var(--color-clay-bg);
+    font-size: 14px;
+    line-height: 1.65;
+  }
+  .score-ring {
+    display: grid;
+    width: 118px;
+    aspect-ratio: 1;
+    place-items: center;
+    border-radius: 50%;
+    background: conic-gradient(
+      var(--color-teal) 0 var(--score, 0%),
+      var(--color-line) 0
+    );
+  }
+  .score-ring > * {
+    display: grid;
+    width: 81%;
+    aspect-ratio: 1;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--color-paper);
+  }
+  .score-bar {
+    height: 7px;
+    overflow: hidden;
+    border-radius: 4px;
+    background: var(--color-line);
+  }
+  .score-bar > * {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-teal);
+  }
+  .history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  .history-table thead th {
+    padding: 0 10px 7px 0;
+    color: var(--color-faint);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-align: left;
+    text-transform: uppercase;
+  }
+  .history-table tbody th,
+  .history-table tbody td {
+    border-top: 1px solid var(--color-line);
+    padding: 10px 10px 10px 0;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+  }
+  .score-badge {
+    display: inline-flex;
+    margin-left: 4px;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .score-badge[data-score-band="high"] {
+    background: var(--color-good-bg);
+    color: var(--color-good);
+  }
+  .score-badge[data-score-band="mid"] {
+    background: var(--color-teal-bg);
+    color: var(--color-teal);
+  }
+
+  /* Drawer and navigator overlays are genuine modal Radix dialogs. The
+   * overlay supplies the scrim/pointer boundary, while padding keeps sheet
+   * content and its close control clear of notches in every orientation. */
+  .device-sheet-content {
+    width: min(
+      22rem,
+      calc(
+        100vw - 4rem - env(safe-area-inset-left) - env(safe-area-inset-right)
+      )
+    );
+    max-width: calc(
+      100vw - 4rem - env(safe-area-inset-left) - env(safe-area-inset-right)
+    );
+    gap: 12px;
+    padding-top: calc(18px + env(safe-area-inset-top));
+    padding-bottom: calc(18px + env(safe-area-inset-bottom));
+    background: var(--color-paper);
+  }
+  .device-sheet-content[data-side="left"] {
+    padding-right: 18px;
+    padding-left: calc(18px + env(safe-area-inset-left));
+  }
+  .device-sheet-content[data-side="right"] {
+    padding-right: calc(18px + env(safe-area-inset-right));
+    padding-left: 18px;
+  }
+  .device-sheet-close {
+    top: calc(12px + env(safe-area-inset-top));
+  }
+  .device-sheet-content[data-side="left"] .device-sheet-close {
+    right: 12px;
+  }
+  .device-sheet-content[data-side="right"] .device-sheet-close {
+    right: calc(12px + env(safe-area-inset-right));
+  }
+  .device-drawer-panel,
+  .question-panel {
+    box-shadow: 0 12px 32px rgb(26 41 48 / 0.18);
+    color: var(--color-ink);
+  }
+  .device-drawer-panel [data-slot="dialog-title"],
+  .question-panel [data-slot="dialog-title"] {
+    padding-right: 32px;
+    color: var(--color-ink);
+    font-size: 18px;
+    font-weight: 800;
+  }
+  .device-drawer {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .device-drawer-student {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--color-line);
+    padding-bottom: 14px;
+  }
+  .device-drawer-avatar {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    flex: none;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--color-teal);
+    color: white;
+    font-weight: 700;
+  }
+  .device-drawer-actions {
+    display: grid;
+    gap: 4px;
+  }
+  .device-drawer-actions button,
+  .device-drawer-sign-out {
+    min-height: 44px;
+    border: 0;
+    border-radius: 8px;
+    padding: 0 12px;
+    background: transparent;
+    color: var(--color-ink);
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 700;
+    text-align: left;
+    touch-action: manipulation;
+  }
+  .device-drawer-actions button:hover {
+    background: var(--color-surface);
+  }
+  .device-drawer-actions hr {
+    width: 100%;
+    margin: 8px 0;
+    border: 0;
+    border-top: 1px solid var(--color-line);
+  }
+  .device-drawer-actions p {
+    margin: 0;
+    padding: 0 12px;
+    color: var(--color-ink-2);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .device-drawer-footer {
+    margin-top: auto;
+    border-top: 1px solid var(--color-line);
+    padding-top: 14px;
+  }
+  .device-drawer-footer > :first-child {
+    margin-bottom: 8px;
+    color: var(--color-faint);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .device-drawer-languages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .device-drawer-languages button {
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--color-line);
+    border-radius: 8px;
+    background: var(--color-paper);
+    color: var(--color-ink-2);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .device-drawer-languages button[aria-pressed="true"] {
+    border-color: var(--color-teal);
+    background: var(--color-teal-bg);
+    color: var(--color-teal);
+  }
+  .device-drawer-sign-out {
+    width: 100%;
+    margin-top: 8px;
+    background: var(--color-paper);
+    color: var(--color-bad);
+  }
+  .device-drawer-sign-out:hover {
+    background: var(--color-bad-bg);
+  }
+  .question-panel [data-slot="dialog-description"] {
+    color: var(--color-ink-2);
+    font-size: 14px;
+  }
+  .question-panel-groups {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+  }
+  .question-group + .question-group {
+    margin-top: 16px;
+  }
+  .question-group h3 {
+    margin: 0 0 8px;
+    color: var(--color-ink);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .question-grid {
+    display: grid;
+    gap: 6px;
+  }
+  .question-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin: 0;
+    border-top: 1px solid var(--color-line);
+    padding: 12px 0 0;
+    color: var(--color-ink-2);
+    font-size: 12px;
+    list-style: none;
+  }
+  .question-legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .question-panel-note {
+    margin: 0;
+    border-radius: 7px;
+    padding: 8px 10px;
+    background: var(--color-surface);
+    color: var(--color-ink-2);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+}

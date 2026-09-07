@@ -3,11 +3,6 @@
     "noEmit": true,
     "noErrorTruncation": true,
     "esModuleInterop": true,
-    "paths": {
-      "@razzia/common/*": ["./packages/common/src/*"],
-      "@razzia/socket/*": ["./packages/socket/src/*"],
-      "@razzia/web/*": ["./packages/web/src/*"]
-    },
     "strict": true,
     "strictNullChecks": true
   }

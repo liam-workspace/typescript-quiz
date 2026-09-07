@@ -1,12 +1,32 @@
 {
-  "name": "@razzia/common",
+  "name": "@pp/common",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./scoring": {
+      "types": "./dist/scoring.d.ts",
+      "default": "./dist/scoring.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run"
+  },
   "dependencies": {
-    "socket.io": "^4.8.3",
+    "@liam-workspace/platform": "^0.1.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.0"
   }
 }

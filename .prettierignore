@@ -5,3 +5,8 @@
 **/route.gen.ts
 pnpm-lock.yaml
 
+# Memory tool scratch — managed by the remember agent, not source
+.remember
+
+# Superpowers scratch workspace — git-ignored execution artifacts
+.superpowers

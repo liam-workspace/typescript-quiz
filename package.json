@@ -1,26 +1,44 @@
 {
-  "name": "razzia",
-  "version": "3.1.0",
+  "name": "quiz",
+  "version": "4.0.0",
   "type": "module",
   "scripts": {
     "dev": "dotenv -e .env -- pnpm -r --parallel dev",
-    "dev:web": "dotenv -e .env -- pnpm --filter web dev",
-    "dev:socket": "dotenv -e .env -- pnpm --filter socket dev",
-    "build": "pnpm -r run build",
+    "build": "pnpm --filter @pp/common build && pnpm --filter @pp/db build && pnpm --filter @pp/server build && pnpm --filter @pp/app build",
     "start": "pnpm -r --parallel run start",
     "clean": "pnpm -r exec rm -rf dist node_modules",
-    "lint": "oxlint",
-    "lint:fix": "oxlint --fix",
+    "typecheck": "pnpm build && pnpm --filter @pp/common exec tsc --noEmit && pnpm --filter @pp/db exec tsc --noEmit && pnpm --filter @pp/server exec tsc --noEmit && pnpm --filter @pp/app typecheck && tsc -p scripts/tsconfig.json",
+    "test": "pnpm build && pnpm --filter @pp/common test && pnpm --filter @pp/db test && pnpm --filter @pp/server test && pnpm --filter @pp/app test",
+    "test:db": "pnpm --filter @pp/db test",
+    "lint": "pnpm build && oxlint && pnpm lint:frontend && pnpm lint:i18n && redocly lint docs/api/openapi.yaml",
+    "lint:fix": "pnpm build && oxlint --fix",
+    "lint:frontend": "frontend-lint packages/app/src",
+    "lint:i18n": "i18n-lint packages/app/src",
     "format": "prettier --check . --log-level warn",
-    "format:fix": "prettier --write . --log-level warn"
+    "format:fix": "prettier --write . --log-level warn",
+    "seed": "pnpm build && dotenv -e .env -- node scripts/seed-test.ts",
+    "import:toefl-primary": "pnpm build && node scripts/import-toefl-primary.ts",
+    "lint:api": "redocly lint docs/api/openapi.yaml"
+  },
+  "dependencies": {
+    "@liam-public/node-postgres": "^0.3.1",
+    "@pp/common": "workspace:*",
+    "@pp/db": "workspace:*",
+    "pg": "^8.13.0"
   },
   "devDependencies": {
+    "@liam-public/node-frontend-lint": "^0.4.0",
+    "@liam-public/node-i18n-lint": "^0.2.0",
+    "@redocly/cli": "^2.46.2",
     "@stylistic/eslint-plugin": "latest",
+    "@types/node": "^26.0.1",
+    "@types/pg": "^8.11.0",
     "dotenv-cli": "^11.0.0",
     "oxlint": "latest",
     "oxlint-tsgolint": "^0.23.0",
     "prettier": "^3.8.5",
     "prettier-plugin-tailwindcss": "^0.8.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.0"
   }
 }

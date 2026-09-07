@@ -6,6 +6,15 @@ export default defineConfig({
     builtin: true,
     node: true,
   },
+  // Type-aware oxlint descends into node_modules/ and dist/ unless told not
+  // to (verified: removing every ignorePattern does not restore a default
+  // skip). Linting emitted JS is pointless -- diagnostics land on generated
+  // code nobody edits -- and on packages/server it is fatal: walking the
+  // NestJS dependency graph balloons tsgolint to ~40GB and the OS SIGKILLs
+  // it, making the gate nondeterministic. Ignoring both holds the whole-repo
+  // run at 0.09GB. tsc checks the same program in 1s using 0.19GB, so this
+  // is a linter pathology, not a defect in the code being linted.
+  ignorePatterns: ["**/dist/**", "**/node_modules/**"],
   jsPlugins: ["@stylistic/eslint-plugin"],
   options: {
     typeAware: true,
@@ -14,10 +23,38 @@ export default defineConfig({
   plugins: ["typescript"],
   overrides: [
     {
-      files: ["packages/web/**/*.{ts,tsx}"],
+      files: ["packages/app/**/*.{ts,tsx}"],
       plugins: ["react"],
+    },
+    {
+      // NestJS is decorator- and class-driven, so several of the repo's
+      // default rules fire on idiomatic framework code rather than on
+      // defects. `oxlint --fix` cannot help with any of these.
+      //
+      // Measured on this task's code (overrides removed, `oxlint
+      // packages/server`), three of the five actually fire today:
+      //   eslint/new-cap                     4x  -- widest: every
+      //     `@Injectable()`/`@Module()` is a call to an uppercase-named
+      //     function, so it lands on essentially every line of boilerplate
+      //   typescript/no-extraneous-class     2x  -- AppModule/HealthModule
+      //     are decorator-only classes with no members, which is the whole
+      //     point of a Nest module
+      //   eslint/class-methods-use-this      1x  -- a controller handler
+      //     that returns a constant does not touch `this`
+      // The remaining two are ANTICIPATORY, not yet observed:
+      //   eslint/max-params, eslint/max-classes-per-file
+      // They are kept because Nest constructor injection routinely exceeds
+      // the parameter limit once services arrive (Task 3 onward), and
+      // settling the whole set here keeps the first commit of real server
+      // code from doubling as a lint negotiation. Revisit if still unfired
+      // when the server is feature-complete.
+      files: ["packages/server/**/*.ts"],
       rules: {
-        "react/jsx-key": "off",
+        "typescript/no-extraneous-class": "off",
+        "eslint/max-params": "off",
+        "eslint/class-methods-use-this": "off",
+        "eslint/max-classes-per-file": "off",
+        "eslint/new-cap": "off",
       },
     },
   ],

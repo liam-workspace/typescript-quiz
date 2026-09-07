@@ -1,0 +1,146 @@
+import { type DbConfig, loadDbConfig } from "./config.js"
+import { createJobPool, createRequestPool } from "./pool.js"
+import {
+  enterSection,
+  finishSection,
+  finalizeAttempt,
+  finalizeExpiredAttempt,
+  loadOwnedAttempt,
+  loadRunningOwnedAttempt,
+  setPosition,
+  startOrResumeAttempt,
+  submitAttempt,
+  TestNotFoundError,
+  type AttemptRow,
+  type AttemptScoreRow,
+  type FinalizedAttemptRow,
+  type FinishSectionOutcome,
+  type SectionEntryRow,
+  type StartResult,
+  type SubmitOutcome,
+} from "./repositories/attempt.repository.js"
+import {
+  listAttemptHistory,
+  loadAttemptResult,
+  type AttemptHistoryRow,
+  type AttemptResultOutcome,
+  type ListAttemptHistoryResult,
+} from "./repositories/attempt-result.repository.js"
+import { AttemptNotInProgressError } from "./repositories/attempt-not-in-progress.error.js"
+import { SectionExpiredError } from "./repositories/section-expired.error.js"
+import {
+  InvalidCursorError,
+  listPublishedTests,
+  loadSectionBrief,
+  loadTestBrief,
+  type ListPublishedTestsResult,
+  type SectionBriefRow,
+  type StudentSummary,
+  type TestBriefRow,
+  type TestCardRow,
+} from "./repositories/catalog.repository.js"
+import {
+  insertFailedWrite,
+  type FailedWriteRow,
+} from "./repositories/failed-write.repository.js"
+import {
+  claimPlay,
+  isFilenameCapped,
+  type PlayClaimResult,
+} from "./repositories/media-play.repository.js"
+import {
+  applyResponse,
+  loadResponse,
+  writeResponse,
+  type ResponseWriteInput,
+  type WriteOutcome,
+} from "./repositories/response.repository.js"
+import {
+  loadQuestionSectionInfo,
+  type QuestionSectionInfo,
+} from "./repositories/section-lookup.repository.js"
+import {
+  loadRunnerEnvelope,
+  type RunnerEnvelopeRow,
+} from "./repositories/runner.repository.js"
+import { loadForRunner } from "./repositories/test-version.repository.js"
+import {
+  findStudentBySubject,
+  upsertStudentBySubject,
+  type StudentRow,
+} from "./repositories/student.repository.js"
+
+export { migrateToLatest } from "./migrate.js"
+
+export type { DbConfig }
+
+export type { StudentRow }
+
+export type {
+  ListPublishedTestsResult,
+  SectionBriefRow,
+  StudentSummary,
+  TestBriefRow,
+  TestCardRow,
+}
+
+export type {
+  AttemptRow,
+  AttemptScoreRow,
+  FinalizedAttemptRow,
+  FinishSectionOutcome,
+  SectionEntryRow,
+  StartResult,
+  SubmitOutcome,
+}
+
+export type {
+  AttemptHistoryRow,
+  AttemptResultOutcome,
+  ListAttemptHistoryResult,
+}
+
+export type { RunnerEnvelopeRow }
+
+export type { PlayClaimResult }
+
+export type { FailedWriteRow }
+
+export type { ResponseWriteInput, WriteOutcome }
+
+export type { QuestionSectionInfo }
+
+export {
+  loadDbConfig,
+  createJobPool,
+  createRequestPool,
+  loadForRunner,
+  loadRunnerEnvelope,
+  upsertStudentBySubject,
+  findStudentBySubject,
+  listPublishedTests,
+  loadTestBrief,
+  loadSectionBrief,
+  InvalidCursorError,
+  loadOwnedAttempt,
+  listAttemptHistory,
+  loadAttemptResult,
+  finalizeAttempt,
+  finalizeExpiredAttempt,
+  loadRunningOwnedAttempt,
+  AttemptNotInProgressError,
+  SectionExpiredError,
+  setPosition,
+  startOrResumeAttempt,
+  submitAttempt,
+  enterSection,
+  finishSection,
+  TestNotFoundError,
+  claimPlay,
+  isFilenameCapped,
+  insertFailedWrite,
+  loadResponse,
+  writeResponse,
+  applyResponse,
+  loadQuestionSectionInfo,
+}

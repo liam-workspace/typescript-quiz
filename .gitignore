@@ -6,8 +6,5 @@
 .secrets
 release.json
 web2
+.playwright-mcp/
 .worktrees/
-
-# Transcoded from the source .m4a files by scripts/import-toefl-primary.ts --
-# real binary weight, trivially regenerable, not source.
-/scripts/fixtures/toefl-primary-media/

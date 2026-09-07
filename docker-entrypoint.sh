@@ -27,8 +27,14 @@ substitute() {
     echo "FATAL: $var_name is not set; the SPA would ship the literal __${var_name}__" >&2
     exit 1
   fi
+  # Escape what is special on sed's REPLACEMENT side under a `|` delimiter:
+  # a backslash, the delimiter itself, and `&` — which means "the whole match",
+  # so an unescaped `&` in a value SILENTLY re-inserts the placeholder text and
+  # exits 0. A redirect URI carrying a query string (`?a=1&b=2`) is the realistic
+  # case, and the emptiness guard above cannot see it.
+  esc=$(printf '%s' "$value" | sed 's/[\\&|]/\\&/g')
   find "$SPA_DIR" -type f \( -name '*.js' -o -name '*.html' \) \
-    -exec sed -i "s|__${var_name}__|${value}|g" {} +
+    -exec sed -i "s|__${var_name}__|${esc}|g" {} +
 }
 
 substitute VITE_AUTH_ISSUER

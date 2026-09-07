@@ -53,9 +53,9 @@ COPY packages/app ./packages/app
 # unnecessary: `dev-auth.ts` gates on `import.meta.env.DEV`, which Vite
 # replaces with the literal `false` here, so the branch that would read it
 # is dead code in this image.
-ARG VITE_AUTH_ISSUER
-ARG VITE_AUTH_CLIENT_ID
-ARG VITE_AUTH_REDIRECT_URI
+ARG VITE_AUTH_ISSUER=__VITE_AUTH_ISSUER__
+ARG VITE_AUTH_CLIENT_ID=__VITE_AUTH_CLIENT_ID__
+ARG VITE_AUTH_REDIRECT_URI=__VITE_AUTH_REDIRECT_URI__
 ENV VITE_AUTH_ISSUER=$VITE_AUTH_ISSUER \
     VITE_AUTH_CLIENT_ID=$VITE_AUTH_CLIENT_ID \
     VITE_AUTH_REDIRECT_URI=$VITE_AUTH_REDIRECT_URI
@@ -109,6 +109,9 @@ ENV SPA_ROOT=/app/public
 # the image's directory, ownership included, so creating it as `node` here is
 # what makes it writable after the drop below -- otherwise the volume arrives
 # owned by root and every upload fails.
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
 RUN mkdir -p /media && chown -R node:node /media /app
 
 # Drop root. The `node` images ship an unprivileged `node` user (uid 1000);
@@ -125,3 +128,4 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=5 \
   CMD node -e "fetch('http://127.0.0.1:3000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "packages/server/dist/main.js"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

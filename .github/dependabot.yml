@@ -6,7 +6,7 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
-    target-branch: "dev"
+    target-branch: "develop"
     open-pull-requests-limit: 10
 
   - package-ecosystem: "docker"
@@ -15,7 +15,7 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
-    target-branch: "dev"
+    target-branch: "develop"
     open-pull-requests-limit: 10
 
   - package-ecosystem: "github-actions"
@@ -24,5 +24,5 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
-    target-branch: "dev"
+    target-branch: "develop"
     open-pull-requests-limit: 10

@@ -108,7 +108,9 @@ which defines a `build` script, so it fails outright:
 ```
 
 which leaves `COPY --from=builder /app/packages/web/dist` with nothing to copy.
-`docker-release.yml` builds this on every published release.
+`docker-release.yml` built this on every published release at the time this
+was written; that workflow has since been removed (the app repo is
+dispatch-only — the build now happens in the deploy plane).
 
 **Ruling: accepted, not fixed here.** Repairing the Dockerfile means deciding
 `socket`/`web`'s fate, which a named later plan owns, and the repository has no

@@ -1,4 +1,4 @@
-import type { PgPool, PgQueryable } from "@liam-public/node-postgres"
+import type { PgPool, PgQueryable } from "@liam-workspace/node-postgres"
 import { Inject, Injectable, HttpStatus } from "@nestjs/common"
 import type { Clock } from "@pp/common"
 import {

@@ -26,8 +26,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@liam-public/node-config": "^0.1.0",
-    "@liam-public/node-postgres": "^0.3.1",
+    "@liam-workspace/node-config": "^0.1.0",
+    "@liam-workspace/node-postgres": "^0.3.1",
     "@pp/common": "workspace:*",
     "node-pg-migrate": "^7.9.0",
     "pg": "^8.13.0"

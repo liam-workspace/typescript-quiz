@@ -2,7 +2,7 @@ import {
   withTransaction,
   type PgPool,
   type PgQueryable,
-} from "@liam-public/node-postgres"
+} from "@liam-workspace/node-postgres"
 import { canAcceptAnswerChange } from "@pp/common"
 import { AttemptNotInProgressError } from "./attempt-not-in-progress.error.js"
 

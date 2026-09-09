@@ -4,7 +4,7 @@ import {
   type ArgumentsHost,
   type ExceptionFilter,
 } from "@nestjs/common"
-import type { PgPool } from "@liam-public/node-postgres"
+import type { PgPool } from "@liam-workspace/node-postgres"
 import type { Clock } from "@pp/common"
 import { insertFailedWrite } from "@pp/db"
 import { REQUEST_POOL, CLOCK } from "../database/tokens.js"

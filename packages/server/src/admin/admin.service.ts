@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto"
 import { mkdir, writeFile } from "node:fs/promises"
 import { resolve, sep } from "node:path"
-import { withTransaction, type PgPool } from "@liam-public/node-postgres"
+import { withTransaction, type PgPool } from "@liam-workspace/node-postgres"
 import { HttpStatus, Inject, Injectable } from "@nestjs/common"
 import { testDocumentSchema, type Clock, type TestDocument } from "@pp/common"
 import {

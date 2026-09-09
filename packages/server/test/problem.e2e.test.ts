@@ -7,7 +7,7 @@ import {
   type INestApplication,
 } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
-import { AllExceptionsFilter } from "@liam-public/node-nest-common"
+import { AllExceptionsFilter } from "@liam-workspace/node-nest-common"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { ProblemException } from "../src/attempts/problem.exception.js"
 import { ProblemExceptionFilter } from "../src/attempts/problem.filter.js"

@@ -1,4 +1,4 @@
-import type { PgQueryable } from "@liam-public/node-postgres"
+import type { PgQueryable } from "@liam-workspace/node-postgres"
 import { HttpStatus } from "@nestjs/common"
 import { insertFailedWrite } from "@pp/db"
 import { ProblemException } from "../attempts/problem.exception.js"

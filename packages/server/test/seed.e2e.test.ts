@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { PgPool } from "@liam-public/node-postgres"
+import type { PgPool } from "@liam-workspace/node-postgres"
 import request from "supertest"
 import type { App } from "supertest/types.js"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"

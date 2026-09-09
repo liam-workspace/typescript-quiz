@@ -1,4 +1,4 @@
-import { runMigrations } from "@liam-public/node-postgres"
+import { runMigrations } from "@liam-workspace/node-postgres"
 import { fileURLToPath } from "node:url"
 import { dirname, resolve } from "node:path"
 

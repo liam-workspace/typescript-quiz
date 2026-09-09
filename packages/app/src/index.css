@@ -2,7 +2,7 @@
 
 /*
  * Tailwind v4's automatic content scan does not look inside node_modules,
- * so utility classes that appear ONLY inside @liam-public/browser-react-ui's
+ * so utility classes that appear ONLY inside @liam-workspace/browser-react-ui's
  * pre-built dist JS (e.g. Sheet's `fixed`/`inset-y-0`/`w-72`/`z-50` and
  * Button's `bg-primary`/`h-9` variants) were never generated into this
  * app's CSS -- verified against the compiled output while checking
@@ -15,7 +15,7 @@
  * scan source without changing which classes render -- a strict
  * completion of, not a redesign of, the app's existing Tailwind output.
  */
-@source "../node_modules/@liam-public/browser-react-ui/dist";
+@source "../node_modules/@liam-workspace/browser-react-ui/dist";
 
 /*
  * THE DEVICE PALETTE — ported verbatim from docs/prototype/index.html.

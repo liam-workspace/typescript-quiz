@@ -1,4 +1,4 @@
-import { withTransaction } from "@liam-public/node-postgres"
+import { withTransaction } from "@liam-workspace/node-postgres"
 import type { TestDocument } from "@pp/common"
 import type pg from "pg"
 

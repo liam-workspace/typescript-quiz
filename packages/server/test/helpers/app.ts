@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs"
 import type { ExceptionFilter, INestApplication } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
-import { AllExceptionsFilter } from "@liam-public/node-nest-common"
+import { AllExceptionsFilter } from "@liam-workspace/node-nest-common"
 import { createJwksVerifier } from "@liam-workspace/node-auth-server"
 import { createFixedClock } from "@pp/common"
 import { createRequestPool, loadDbConfig, migrateToLatest } from "@pp/db"

@@ -4,21 +4,21 @@
 
 **Goal:** Make the app genuinely usable by one child on one iPad, unsupervised, in any of six languages, deployed as a two-service Docker stack — the collapsible question navigator and app menu, a real (gated, not decorative) i18n sweep across all six locales, iPad-specific touch/safe-area/orientation polish, and the production deploy that serves the built SPA alongside the API.
 
-**Architecture:** `packages/app` (Vite + React 19, `@liam-public/browser-react-ui`) gains two `sheet`-based panels — the question navigator (right) and the app menu (left) — sharing one open-panel state so only one is ever open, exactly as the prototype's `closePanels()`/`openPanel()` pair enforces by hand. `packages/server` gains a global `/api` prefix (required by the OpenAPI contract's `servers: [{url: /api}]`, never actually wired by plan 2) so it can serve the built SPA at `/` and the REST API at `/api` from the same origin and the same Docker image.
+**Architecture:** `packages/app` (Vite + React 19, `@liam-workspace/browser-react-ui`) gains two `sheet`-based panels — the question navigator (right) and the app menu (left) — sharing one open-panel state so only one is ever open, exactly as the prototype's `closePanels()`/`openPanel()` pair enforces by hand. `packages/server` gains a global `/api` prefix (required by the OpenAPI contract's `servers: [{url: /api}]`, never actually wired by plan 2) so it can serve the built SPA at `/` and the REST API at `/api` from the same origin and the same Docker image.
 
-**Tech Stack:** React 19 · Vite · TypeScript 6 (ESM, `nodenext`) · Tailwind v4 + Radix (`@liam-public/browser-react-ui`) · `i18next` / `react-i18next` · Vitest 4 · `@testing-library/react` · `@liam-public/node-i18n-lint` · NestJS 11 · Docker
+**Tech Stack:** React 19 · Vite · TypeScript 6 (ESM, `nodenext`) · Tailwind v4 + Radix (`@liam-workspace/browser-react-ui`) · `i18next` / `react-i18next` · Vitest 4 · `@testing-library/react` · `@liam-workspace/node-i18n-lint` · NestJS 11 · Docker
 
 **Spec:** `docs/superpowers/specs/2026-08-25-toefl-primary-fork-design.md` (phase 6 of §8: "Navigator, menu, i18n sweep, iPad polish, Docker deploy")
 
-**What this plan assumes exists.** Plans 1–5 have already run: `@pp/common`, `@pp/db`, `@pp/server` (session, catalog, attempts, durable writes, submit/grade/result/review/history, admin import/publish/export, media, seed) and `packages/app` (Vite + React 19, `@liam-public/browser-react-ui` components, the listening and reading screens, `packages/web`/`packages/socket` deleted). **None of that code exists in this repository yet** — at the time this plan was written, `packages/app` does not exist and `pnpm-workspace.yaml` still lists only `common`/`db`/`server`. Every path this plan names under `packages/app` is therefore a prediction grounded in the spec (§2's harvest list: `vite.config.ts`, tsconfigs, the TanStack router plugin, `i18n.ts`, `QuestionMedia.tsx`, `branding.ts`) and in Vite/`react-i18next` convention, not a file this plan's author read. **Before Task 1, grep for the actual file** (e.g. `find packages/app/src -iname "i18n.ts"`) and if a name or shape differs from what a step assumes, use the real one and say so in your report — the props/types contracts below (grounded in `docs/api/openapi.yaml`, which is real) are what must not drift; the exact host file for a CSS rule or the exact name of a shared layout component is not.
+**What this plan assumes exists.** Plans 1–5 have already run: `@pp/common`, `@pp/db`, `@pp/server` (session, catalog, attempts, durable writes, submit/grade/result/review/history, admin import/publish/export, media, seed) and `packages/app` (Vite + React 19, `@liam-workspace/browser-react-ui` components, the listening and reading screens, `packages/web`/`packages/socket` deleted). **None of that code exists in this repository yet** — at the time this plan was written, `packages/app` does not exist and `pnpm-workspace.yaml` still lists only `common`/`db`/`server`. Every path this plan names under `packages/app` is therefore a prediction grounded in the spec (§2's harvest list: `vite.config.ts`, tsconfigs, the TanStack router plugin, `i18n.ts`, `QuestionMedia.tsx`, `branding.ts`) and in Vite/`react-i18next` convention, not a file this plan's author read. **Before Task 1, grep for the actual file** (e.g. `find packages/app/src -iname "i18n.ts"`) and if a name or shape differs from what a step assumes, use the real one and say so in your report — the props/types contracts below (grounded in `docs/api/openapi.yaml`, which is real) are what must not drift; the exact host file for a CSS rule or the exact name of a shared layout component is not.
 
 ## Global Constraints
 
 - **`pnpm lint`, `pnpm format`, `pnpm typecheck`, `pnpm test` all exit 0 at the end of every task.** Never `git add -A`, never a commit command, in any step.
 - **`node-i18n-lint` scans `.tsx`/`.jsx` only** (never `.test.tsx`), and flags exactly three shapes: JSX text, a string literal on a `USER_FACING_ATTRS` attribute (`placeholder`, `title`, `alt`, `aria-label`, `aria-placeholder`, `aria-description`, `label`), and a bare string literal in a JSX expression (`{'Save'}`). It filters out empty strings, punctuation-only strings, URLs, ≤2-char identifiers and CSS-selector-shaped strings via `isTranslatable`. **It does not check that a translation key exists in all six locale files** — a key present only in `en.json` still passes it, because i18next's `fallbackLng: "en"` silently serves the English string in every other locale. Task 5 adds a second gate for exactly that gap.
-- **The `sheet` primitive is `Sheet`, `SheetTrigger`, `SheetClose`, `SheetContent` from `@liam-public/browser-react-ui`** (verified in the installed package's `src/sheet.tsx`). `SheetContent` renders through the same underlying `radix-ui` `Dialog.Content` that `DialogTitle`/`DialogDescription` (also exported from the same package's barrel, via `dialog.tsx`) attach to — so a `<DialogTitle>` placed inside `<SheetContent>` satisfies Radix's accessibility requirement even though `sheet.tsx` exports no `SheetTitle` of its own. Every `SheetContent` in this plan carries a `DialogTitle`; skipping it is not a style choice, it is the thing that stops Radix's dev-console warning ("`DialogContent` requires a `DialogTitle`") and, more importantly, stops a screen reader from announcing an unlabelled dialog.
+- **The `sheet` primitive is `Sheet`, `SheetTrigger`, `SheetClose`, `SheetContent` from `@liam-workspace/browser-react-ui`** (verified in the installed package's `src/sheet.tsx`). `SheetContent` renders through the same underlying `radix-ui` `Dialog.Content` that `DialogTitle`/`DialogDescription` (also exported from the same package's barrel, via `dialog.tsx`) attach to — so a `<DialogTitle>` placed inside `<SheetContent>` satisfies Radix's accessibility requirement even though `sheet.tsx` exports no `SheetTitle` of its own. Every `SheetContent` in this plan carries a `DialogTitle`; skipping it is not a style choice, it is the thing that stops Radix's dev-console warning ("`DialogContent` requires a `DialogTitle`") and, more importantly, stops a screen reader from announcing an unlabelled dialog.
 - **Touch targets.** `browser-react-ui`'s largest icon-button size token is `icon-lg` at `size-10` (40px) — verified in the installed package's `button.tsx` `cva` config. Apple's Human Interface Guidelines minimum is 44×44pt. Tailwind's spacing scale is 4px per unit, so `size-11` = 44px exactly — every interactive element this plan creates for the runner chrome uses `size-11` explicitly rather than the kit's default sizes, which are all one step short.
-- **`/api` is not decorative.** `docs/api/openapi.yaml` declares `servers: [{ url: /api }]` and `cmsPwaOptions`'s `runtimeCaching` (from `@liam-public/vite-preset-pwa`, already adopted) matches `url.pathname.startsWith('/api')` for its `NetworkFirst` cache rule. Nothing in plan 2's thirteen tasks calls `app.setGlobalPrefix`. Task 8 adds it — until then every earlier plan's e2e tests hit bare paths (`/session`, `/tests`, …) and keep passing, because supertest talks to the Nest app directly and never sees a reverse proxy or a `servers:` block. Confirm this is still true when you start Task 8 (`grep -rn "setGlobalPrefix" packages/server/src`) before assuming the prefix is missing.
+- **`/api` is not decorative.** `docs/api/openapi.yaml` declares `servers: [{ url: /api }]` and `cmsPwaOptions`'s `runtimeCaching` (from `@liam-workspace/vite-preset-pwa`, already adopted) matches `url.pathname.startsWith('/api')` for its `NetworkFirst` cache rule. Nothing in plan 2's thirteen tasks calls `app.setGlobalPrefix`. Task 8 adds it — until then every earlier plan's e2e tests hit bare paths (`/session`, `/tests`, …) and keep passing, because supertest talks to the Nest app directly and never sees a reverse proxy or a `servers:` block. Confirm this is still true when you start Task 8 (`grep -rn "setGlobalPrefix" packages/server/src`) before assuming the prefix is missing.
 - **pnpm does not hoist transitive dependencies.** `@nestjs/platform-express` depends on `express`, but `packages/server`'s own `node_modules` does not get an `express` entry from that alone under pnpm's strict linking — importing it directly (Task 8 does) requires declaring it explicitly.
 
 ## File Structure
@@ -304,7 +304,7 @@ The prototype's `NAV` object (`docs/prototype/index.html`, lines 3118–3167) al
 
 **Interfaces:**
 
-- Consumes: `buildNavigatorGroups`, `NavigatorSource` (Task 1); `Sheet`, `SheetContent`, `DialogTitle`, `DialogDescription` from `@liam-public/browser-react-ui`; `useTranslation` from `react-i18next` against a new `runner` namespace.
+- Consumes: `buildNavigatorGroups`, `NavigatorSource` (Task 1); `Sheet`, `SheetContent`, `DialogTitle`, `DialogDescription` from `@liam-workspace/browser-react-ui`; `useTranslation` from `react-i18next` against a new `runner` namespace.
 - Produces:
 
   ```ts
@@ -476,7 +476,7 @@ The prototype's `NAV` object (`docs/prototype/index.html`, lines 3118–3167) al
     DialogTitle,
     Sheet,
     SheetContent,
-  } from "@liam-public/browser-react-ui"
+  } from "@liam-workspace/browser-react-ui"
   import { useTranslation } from "react-i18next"
   import {
     buildNavigatorGroups,
@@ -599,7 +599,7 @@ Matches the prototype's `#drawer` (`docs/prototype/index.html`, lines 2409–246
 
 **Interfaces:**
 
-- Consumes: `useAuth` from `@liam-public/browser-react-auth` — verified signature `useAuth<User>(): { user: User | undefined; signOut(): Promise<void>; … }` (installed package's `auth-context.tsx`). Plan 3 is assumed to have instantiated `AuthProvider<Student>`, so `user` is typed `Student | undefined`; if plan 3 named the generic differently, adjust the import but keep the shape.
+- Consumes: `useAuth` from `@liam-workspace/browser-react-auth` — verified signature `useAuth<User>(): { user: User | undefined; signOut(): Promise<void>; … }` (installed package's `auth-context.tsx`). Plan 3 is assumed to have instantiated `AuthProvider<Student>`, so `user` is typed `Student | undefined`; if plan 3 named the generic differently, adjust the import but keep the shape.
 - Produces:
 
   ```ts
@@ -615,7 +615,7 @@ Matches the prototype's `#drawer` (`docs/prototype/index.html`, lines 2409–246
   export function AppMenu(props: AppMenuProps): JSX.Element
   ```
 
-**Test seam.** Same `I18nextProvider` pattern as Task 2. `useAuth` is substituted with `vi.mock("@liam-public/browser-react-auth", () => ({ useAuth: () => ({ user: { displayName: "Tom", email: "tom@example.com", level: "primary-step-1" }, signOut: vi.fn() }) }))` — a module mock, not a provider wrapper, because `AuthProvider` needs a real `BrowserAuthClient` this test has no reason to construct.
+**Test seam.** Same `I18nextProvider` pattern as Task 2. `useAuth` is substituted with `vi.mock("@liam-workspace/browser-react-auth", () => ({ useAuth: () => ({ user: { displayName: "Tom", email: "tom@example.com", level: "primary-step-1" }, signOut: vi.fn() }) }))` — a module mock, not a provider wrapper, because `AuthProvider` needs a real `BrowserAuthClient` this test has no reason to construct.
 
 - [ ] **Step 1: Write the failing tests — six cases**
 
@@ -630,7 +630,7 @@ Matches the prototype's `#drawer` (`docs/prototype/index.html`, lines 2409–246
   import { AppMenu } from "./AppMenu.js"
 
   const signOut = vi.fn()
-  vi.mock("@liam-public/browser-react-auth", () => ({
+  vi.mock("@liam-workspace/browser-react-auth", () => ({
     useAuth: () => ({
       user: {
         displayName: "Tom",
@@ -759,8 +759,8 @@ Matches the prototype's `#drawer` (`docs/prototype/index.html`, lines 2409–246
     DialogTitle,
     Sheet,
     SheetContent,
-  } from "@liam-public/browser-react-ui"
-  import { useAuth } from "@liam-public/browser-react-auth"
+  } from "@liam-workspace/browser-react-ui"
+  import { useAuth } from "@liam-workspace/browser-react-auth"
   import i18next from "i18next"
   import { useTranslation } from "react-i18next"
   import type { Student } from "@pp/common"

@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Finish the attempt-runner surface — the canonical `GET /attempts/{id}` envelope, section entry, media play, and position — then stand up `packages/app` (Vite + React 19, components from `@liam-public/browser-react-ui`) and build the section-rules, listening and reading screens against the real API. Delete `packages/socket` and `packages/web` once `app` runs in their place.
+**Goal:** Finish the attempt-runner surface — the canonical `GET /attempts/{id}` envelope, section entry, media play, and position — then stand up `packages/app` (Vite + React 19, components from `@liam-workspace/browser-react-ui`) and build the section-rules, listening and reading screens against the real API. Delete `packages/socket` and `packages/web` once `app` runs in their place.
 
 **Architecture:** Four new routes join plan 2's eight on `packages/server`, all behind `JwksGuard`, all reading/writing through `@pp/db` repositories on `REQUEST_POOL`. `packages/app` is a new workspace member: TanStack Router file-based routing, Tailwind v4, i18n across six locales, talking to the server over plain `fetch` with a bearer token.
 
 **Tech Stack (server, unchanged from plan 2):** NestJS 11 · Node 24 · TypeScript 6 (ESM, `nodenext`) · PostgreSQL 16 · Vitest 4 · supertest · testcontainers
 
-**Tech Stack (app, new):** Vite 8 · React 19 · TypeScript 6 · `@tanstack/react-router` `^1.170.32` + `@tanstack/router-plugin` `^1.168.35` · Tailwind v4 (`@tailwindcss/vite` `^4.3.3`) · `@liam-public/browser-react-ui` `^0.1.0` · `radix-ui` `^1.6.7` (the kit's own primitive layer, used directly where the kit has no matching component) · `i18next`/`react-i18next` (harvested pattern) · Vitest 4 + `@testing-library/react` `^16.3.2` + `@testing-library/jest-dom` `^7.0.1` + `@testing-library/user-event` `^14.6.6` + `jsdom` `^30.0.1`
+**Tech Stack (app, new):** Vite 8 · React 19 · TypeScript 6 · `@tanstack/react-router` `^1.170.32` + `@tanstack/router-plugin` `^1.168.35` · Tailwind v4 (`@tailwindcss/vite` `^4.3.3`) · `@liam-workspace/browser-react-ui` `^0.1.0` · `radix-ui` `^1.6.7` (the kit's own primitive layer, used directly where the kit has no matching component) · `i18next`/`react-i18next` (harvested pattern) · Vitest 4 + `@testing-library/react` `^16.3.2` + `@testing-library/jest-dom` `^7.0.1` + `@testing-library/user-event` `^14.6.6` + `jsdom` `^30.0.1`
 
 **Spec:** `docs/superpowers/specs/2026-08-25-toefl-primary-fork-design.md` (phase 3 of §8)
 
@@ -28,11 +28,11 @@ Section-level closing (`attempt_section.completed_at`) is **not** built here. Re
 
 ## Decision 3 (flagged for ruling): no sign-in screen, no OIDC yet
 
-`docs/architecture/library-adoption.md` files `@liam-workspace/auth-client`, `@liam-public/browser-react-auth`, `@liam-public/browser-webauthn` and `@liam-public/auth-fetch` under "client (plans 4–5)" — but this plan is the one the spec's own build order (§8) calls "phase 3," and phase 3's scope is explicitly "the listening and reading screens," not the sign-in screen (prototype screen 1 of 12). Building real OIDC + PKCE + passkey here would mean building a whole screen and flow this plan was not asked for. `packages/app` therefore ships a **dev-only bearer seam** — `src/lib/dev-auth.ts` reads `VITE_DEV_BEARER_TOKEN` from the Vite env and is the only source of a token until the sign-in screen's plan replaces it. This is a scope call, not a technical necessity; the two documents disagree about which plan owns these packages, and Task 6 records the seam precisely so it is easy to delete when that plan lands.
+`docs/architecture/library-adoption.md` files `@liam-workspace/auth-client`, `@liam-workspace/browser-react-auth`, `@liam-workspace/browser-webauthn` and `@liam-workspace/auth-fetch` under "client (plans 4–5)" — but this plan is the one the spec's own build order (§8) calls "phase 3," and phase 3's scope is explicitly "the listening and reading screens," not the sign-in screen (prototype screen 1 of 12). Building real OIDC + PKCE + passkey here would mean building a whole screen and flow this plan was not asked for. `packages/app` therefore ships a **dev-only bearer seam** — `src/lib/dev-auth.ts` reads `VITE_DEV_BEARER_TOKEN` from the Vite env and is the only source of a token until the sign-in screen's plan replaces it. This is a scope call, not a technical necessity; the two documents disagree about which plan owns these packages, and Task 6 records the seam precisely so it is easy to delete when that plan lands.
 
 ## Decision 4: frontend test tooling
 
-Nothing in the spec or `library-adoption.md` names a frontend test runner. `@liam-public/browser-react-ui` itself is built and tested with `vitest run --environment jsdom` + `@testing-library/react` (verified: `packages/public/react/browser-react-ui/package.json` in `typescript-libraries`) — this plan adopts the same pair for `packages/app`, plus `@testing-library/jest-dom` for matchers and `@testing-library/user-event` for interaction. No MSW: `library-adoption.md` names no HTTP-mocking library, so component tests stub `globalThis.fetch` directly with `vi.fn()`. Full browser e2e (Playwright, per the `node-browser-automation` decline note) is out of scope for this plan.
+Nothing in the spec or `library-adoption.md` names a frontend test runner. `@liam-workspace/browser-react-ui` itself is built and tested with `vitest run --environment jsdom` + `@testing-library/react` (verified: `packages/public/react/browser-react-ui/package.json` in `typescript-libraries`) — this plan adopts the same pair for `packages/app`, plus `@testing-library/jest-dom` for matchers and `@testing-library/user-event` for interaction. No MSW: `library-adoption.md` names no HTTP-mocking library, so component tests stub `globalThis.fetch` directly with `vi.fn()`. Full browser e2e (Playwright, per the `node-browser-automation` decline note) is out of scope for this plan.
 
 ## Global Constraints
 
@@ -864,7 +864,7 @@ This is the prerequisite every other task in this plan calls. Read Decision 2 be
       "start": "vite preview"
     },
     "dependencies": {
-      "@liam-public/browser-react-ui": "^0.1.0",
+      "@liam-workspace/browser-react-ui": "^0.1.0",
       "@pp/common": "workspace:*",
       "@tailwindcss/vite": "^4.3.3",
       "@tanstack/react-router": "^1.170.32",
@@ -1220,7 +1220,7 @@ Minimal by design: prototype screen 4 of 12, and the only piece of it this plan 
 
 - [ ] **Step 2: Implement**
 
-  Uses `<Button>` and `<Card>` from `@liam-public/browser-react-ui` for the instructions card and the ready action; the `data-testid="ready-button"` attribute so later e2e work (out of this plan's scope) has a stable hook.
+  Uses `<Button>` and `<Card>` from `@liam-workspace/browser-react-ui` for the instructions card and the ready action; the `data-testid="ready-button"` attribute so later e2e work (out of this plan's scope) has a stable hook.
 
 - [ ] **Step 3: Gates**
 

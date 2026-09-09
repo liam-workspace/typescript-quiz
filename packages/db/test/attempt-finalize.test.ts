@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { withTransaction, type PgQueryable } from "@liam-public/node-postgres"
+import { withTransaction, type PgQueryable } from "@liam-workspace/node-postgres"
 import type pg from "pg"
 import { describe, expect, it } from "vitest"
 // The transaction-scoped finalizer is deliberately reached only via this

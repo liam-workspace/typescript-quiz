@@ -1,4 +1,4 @@
-import { createPool, waitForDatabase } from "@liam-public/node-postgres"
+import { createPool, waitForDatabase } from "@liam-workspace/node-postgres"
 import type pg from "pg"
 import { inject } from "vitest"
 import { migrateToLatest } from "../../src/migrate.js"

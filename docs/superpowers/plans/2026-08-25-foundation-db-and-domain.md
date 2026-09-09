@@ -6,7 +6,7 @@
 
 **Architecture:** A pnpm workspace gains two new packages. `@pp/common` holds domain types and the Zod validators for the import/export document; it has no runtime dependencies beyond `zod`. `@pp/db` holds `node-pg-migrate` migrations transcribed from the reviewed `docs/db/schema.sql`, plus repositories that own every SQL statement — no SQL leaves this package. Tests run against a throwaway PostgreSQL 16 via testcontainers, so constraint tests exercise real triggers and real composite foreign keys rather than mocks.
 
-**Tech Stack:** Node 24, pnpm 10.16, TypeScript 6, PostgreSQL 16, `@liam-public/node-postgres` (pooling, transactions, `runMigrations`), `@liam-workspace/platform` (`Clock`, `Result`, domain errors), `@liam-public/node-config`, `node-pg-migrate`, Zod 4, Vitest 4, `@testcontainers/postgresql`, oxlint, prettier.
+**Tech Stack:** Node 24, pnpm 10.16, TypeScript 6, PostgreSQL 16, `@liam-workspace/node-postgres` (pooling, transactions, `runMigrations`), `@liam-workspace/platform` (`Clock`, `Result`, domain errors), `@liam-workspace/node-config`, `node-pg-migrate`, Zod 4, Vitest 4, `@testcontainers/postgresql`, oxlint, prettier.
 
 **Spec:** `docs/superpowers/specs/2026-08-25-toefl-primary-fork-design.md`
 **Library adoption map:** `docs/architecture/library-adoption.md` — a verdict on all 47 packages in `~/projects/typescript-libraries`. Consult it before adding any dependency; six are declined on grounds that adopting them would make this design worse.
@@ -37,7 +37,7 @@ see `docs/architecture/plan-2-preconditions.md` for the full inherited list.
 - `failed_write.raw_body` is **`text`, never `jsonb`**, and the table has **no foreign keys**. Its job is holding bodies that failed to parse.
 - Ordering is **`(client_instance_id, client_seq)`**, never `answered_at`. `answered_at` is display text with no authority.
 - **Reach for `~/projects/typescript-libraries` before writing infrastructure.** If a utility exists there, use it; if you decline one, record the reason in `docs/architecture/library-adoption.md`. Hand-rolling a pool, a logger, an env parser or a clock is a plan violation.
-- **`@liam-public/*` resolves from npmjs.org; `@liam-workspace/*` from npm.pkg.github.com** and needs `NODE_AUTH_TOKEN` — the variable `.npmrc` reads, and the one `actions/setup-node` sets. Both scopes must be in `.npmrc` before install resolves (Task 1).
+- **`@liam-workspace/*` resolves from npmjs.org; `@liam-workspace/*` from npm.pkg.github.com** and needs `NODE_AUTH_TOKEN` — the variable `.npmrc` reads, and the one `actions/setup-node` sets. Both scopes must be in `.npmrc` before install resolves (Task 1).
 - **Never call `new Date()` or `Date.now()` in service code.** Take a `Clock` from `@liam-workspace/platform`. Expiry is the core of this app and `createFixedClock` is what makes it testable without sleeping.
 - Commit after every task with a `feat:` / `test:` / `chore:` message.
 - `pnpm lint` and `pnpm format` must pass before each commit.
@@ -60,8 +60,8 @@ see `docs/architecture/plan-2-preconditions.md` for the full inherited list.
 | `packages/db/migrations/1002_attempts.cjs`                | attempt, sections, responses, cursor, plays                                                           |
 | `packages/db/migrations/1003_durability_and_triggers.cjs` | `failed_write`, immutability triggers, `publication_violation`                                        |
 | `.npmrc`                                                  | both registries; `NODE_AUTH_TOKEN` for the `@liam-workspace` scope                                    |
-| `packages/db/src/pool.ts`                                 | `createRequestPool` / `createJobPool` over `@liam-public/node-postgres`, with named `applicationName` |
-| `packages/db/src/config.ts`                               | `loadDbConfig()` over `@liam-public/node-config`                                                      |
+| `packages/db/src/pool.ts`                                 | `createRequestPool` / `createJobPool` over `@liam-workspace/node-postgres`, with named `applicationName` |
+| `packages/db/src/config.ts`                               | `loadDbConfig()` over `@liam-workspace/node-config`                                                      |
 | `packages/common/src/domain/clock.ts`                     | re-exports `Clock` / `systemClock` / `createFixedClock` so no package imports `platform` twice        |
 | `packages/db/src/migrate.ts`                              | `migrateToLatest(databaseUrl)`                                                                        |
 | `packages/db/src/repositories/test-version.repository.ts` | `loadForRunner` / `loadForScoring` — the two deliberately separate projections                        |
@@ -120,8 +120,8 @@ see `docs/architecture/plan-2-preconditions.md` for the full inherited list.
     "test": "vitest run"
   },
   "dependencies": {
-    "@liam-public/node-config": "^0.2.0",
-    "@liam-public/node-postgres": "^0.3.1",
+    "@liam-workspace/node-config": "^0.2.0",
+    "@liam-workspace/node-postgres": "^0.3.1",
     "@liam-workspace/platform": "^0.1.0",
     "@pp/common": "workspace:*",
     "node-pg-migrate": "^7.9.0",
@@ -137,7 +137,7 @@ see `docs/architecture/plan-2-preconditions.md` for the full inherited list.
 }
 ```
 
-> `@liam-public/node-postgres` is depended on directly. An umbrella
+> `@liam-workspace/node-postgres` is depended on directly. An umbrella
 > re-export package was tried first during Task 2 and REVERSED: it is marked
 > deprecated on the registry, and its newest published version pinned
 > `node-postgres` to an exact older release whose `CreatePoolOptions` predated
@@ -206,7 +206,6 @@ Add to root `package.json` scripts:
 Create `.npmrc` at the repo root:
 
 ```
-@liam-public:registry=https://registry.npmjs.org/
 @liam-workspace:registry=https://npm.pkg.github.com/
 //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
 ```
@@ -223,7 +222,7 @@ export NODE_AUTH_TOKEN=<a classic PAT with read:packages>
 ```bash
 pnpm install
 pnpm -r exec tsc --noEmit
-node -e "import('@liam-public/node-postgres').then(m => console.log(Object.keys(m).sort().join(' ')))"
+node -e "import('@liam-workspace/node-postgres').then(m => console.log(Object.keys(m).sort().join(' ')))"
 ```
 
 Expected: install succeeds, no type errors, and the last command prints a list
@@ -278,7 +277,7 @@ Expected: FAIL — cannot resolve `./helpers/database.js`.
 `packages/db/test/helpers/database.ts`:
 
 ```ts
-import { createPool, waitForDatabase } from "@liam-public/node-postgres"
+import { createPool, waitForDatabase } from "@liam-workspace/node-postgres"
 import {
   PostgreSqlContainer,
   type StartedPostgreSqlContainer,
@@ -487,7 +486,7 @@ exports.down = (pgm) => {
 `packages/db/src/migrate.ts`:
 
 ```ts
-import { runMigrations } from "@liam-public/node-postgres"
+import { runMigrations } from "@liam-workspace/node-postgres"
 import { fileURLToPath } from "node:url"
 import { dirname, resolve } from "node:path"
 
@@ -1679,7 +1678,7 @@ git commit -m "feat(common): exam domain types and the JSON interchange schema"
 
 **Interfaces:**
 
-- Consumes: `TestDocument`, `testDocumentSchema` from Task 8; `withTransaction` from `@liam-public/node-postgres`.
+- Consumes: `TestDocument`, `testDocumentSchema` from Task 8; `withTransaction` from `@liam-workspace/node-postgres`.
 - Produces:
   - `importTestDocument(pool, doc: TestDocument): Promise<{ testId: string; versionId: string; version: number }>`
   - `exportTestDocument(pool, versionId: string): Promise<TestDocument>`
@@ -1809,7 +1808,7 @@ Expected: FAIL — cannot resolve `test-import.repository.js`.
 `packages/db/src/repositories/test-import.repository.ts`:
 
 ```ts
-import { withTransaction } from "@liam-public/node-postgres"
+import { withTransaction } from "@liam-workspace/node-postgres"
 import type { TestDocument } from "@pp/common"
 import type pg from "pg"
 
@@ -2543,7 +2542,7 @@ import {
   nodeEnvironment,
   parseIntegerEnv,
   type Environment,
-} from "@liam-public/node-config"
+} from "@liam-workspace/node-config"
 
 export interface DbConfig {
   databaseUrl: string
@@ -2571,7 +2570,7 @@ export function loadDbConfig(env: Environment = nodeEnvironment()): DbConfig {
 `packages/db/src/pool.ts`:
 
 ```ts
-import { createPool } from "@liam-public/node-postgres"
+import { createPool } from "@liam-workspace/node-postgres"
 import type pg from "pg"
 import type { DbConfig } from "./config.js"
 
@@ -2654,7 +2653,7 @@ Expected: PASS — all four.
 - [ ] **Step 8: Add the lint gates**
 
 ```bash
-pnpm add -Dw @liam-public/node-frontend-lint @liam-public/node-i18n-lint
+pnpm add -Dw @liam-workspace/node-frontend-lint @liam-workspace/node-i18n-lint
 ```
 
 Add to root `package.json` scripts (they have nothing to audit until plan 5,

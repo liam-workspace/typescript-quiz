@@ -1,4 +1,4 @@
-import type { PgPool } from "@liam-public/node-postgres"
+import type { PgPool } from "@liam-workspace/node-postgres"
 import type { Clock } from "@pp/common"
 import {
   AttemptNotInProgressError,

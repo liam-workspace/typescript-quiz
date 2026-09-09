@@ -6,7 +6,7 @@
 
 **Architecture:** `packages/server` is a NestJS REST API. It verifies bearer tokens against `auth.icovn.me`'s JWKS (no user table, no password — identity is a verified `sub`, admin is a claim), gates boot on `waitForDatabase`, runs migrations at startup, and holds two pools: the request path (`pp:api`, 5s timeouts) and a longer-timeout pool (`pp:jobs`) for import, seed and export. Controllers stay thin; every database access goes through a repository in `@pp/db`.
 
-**Tech Stack:** NestJS 11 · Node 24 · TypeScript 6 (ESM, `nodenext`) · PostgreSQL 16 · `@liam-workspace/node-auth-server` · `@liam-public/node-nest-common` · `@liam-public/node-postgres` · Vitest 4 · supertest · testcontainers
+**Tech Stack:** NestJS 11 · Node 24 · TypeScript 6 (ESM, `nodenext`) · PostgreSQL 16 · `@liam-workspace/node-auth-server` · `@liam-workspace/node-nest-common` · `@liam-workspace/node-postgres` · Vitest 4 · supertest · testcontainers
 
 **Spec:** `docs/superpowers/specs/2026-08-25-toefl-primary-fork-design.md` (phase 2 of §8)
 
@@ -17,15 +17,15 @@
 - **Node 24, TypeScript 6, ESM.** Every package is `"type": "module"`. `verbatimModuleSyntax` is on: type-only imports MUST use `import type`.
 - **`moduleResolution: "nodenext"`** in `packages/server`, and in `common`/`db` after Task 1. Relative specifiers therefore carry a `.js` extension and TypeScript now checks them.
 - **No `new Date()` and no `Date.now()`** anywhere in `packages/{common,db,server}/src`. Time comes from an injected `Clock` (`@liam-workspace/platform`, re-exported by `@pp/common`). Server-authoritative expiry is untestable without it. Verify with: `grep -rn "new Date()\|Date\.now()" packages/{common,db,server}/src`
-- **Registries.** `@liam-public/*` from npmjs; `@liam-workspace/*` from npm.pkg.github.com via `NODE_AUTH_TOKEN` (already in `.npmrc`). Pin these EXACT published versions, verified against the registry on 2026-08-26 — do not guess and do not carry forward the adoption map's older numbers:
+- **Registries.** `@liam-workspace/*` from npmjs; `@liam-workspace/*` from npm.pkg.github.com via `NODE_AUTH_TOKEN` (already in `.npmrc`). Pin these EXACT published versions, verified against the registry on 2026-08-26 — do not guess and do not carry forward the adoption map's older numbers:
   - `@liam-workspace/node-auth-server` `^0.5.1` ← the adoption map says `^0.1.0`; that is stale
-  - `@liam-public/node-nest-common` `^0.1.1`
-  - `@liam-public/node-nest-observability` `^0.1.1`
-  - `@liam-public/node-logger` `^0.1.0`
-  - `@liam-public/node-config` `^0.1.0`
-  - `@liam-public/node-postgres` `^0.3.1`
+  - `@liam-workspace/node-nest-common` `^0.1.1`
+  - `@liam-workspace/node-nest-observability` `^0.1.1`
+  - `@liam-workspace/node-logger` `^0.1.0`
+  - `@liam-workspace/node-config` `^0.1.0`
+  - `@liam-workspace/node-postgres` `^0.3.1`
   - `@liam-workspace/platform` `^0.1.0`
-- **Never add a dependency without checking `docs/architecture/library-adoption.md` first.** Six packages are declined there with reasons; `@liam-public/node-nest-cache` (Redis) and `@liam-public/node-drizzle-postgres` are both out of scope for v1.
+- **Never add a dependency without checking `docs/architecture/library-adoption.md` first.** Six packages are declined there with reasons; `@liam-workspace/node-nest-cache` (Redis) and `@liam-workspace/node-drizzle-postgres` are both out of scope for v1.
 - **All four gates pass before every commit:** `pnpm lint`, `pnpm format`, `pnpm typecheck`, `pnpm test`. `typecheck` is `pnpm build && pnpm -r exec tsc --noEmit` — the build is a PREREQUISITE, not a convenience: after Task 1 the packages typecheck against each other's `dist/*.d.ts`, which does not exist on a clean checkout until something builds it. Task 1 adds the script. Run `pnpm test` only from the repo root and never concurrently with another test process — the db suite shares one Testcontainers `globalSetup`.
 - **`docs/api/openapi.yaml` is the contract.** A response shape that disagrees with it is a defect in the code, not in the spec, unless this plan says otherwise in so many words. `redocly lint docs/api/openapi.yaml` must stay clean if you touch it.
 - **`docs/db/schema.sql` is the schema authority** and `packages/db/migrations/*.cjs` are its transcription; they are currently byte-identical over the ranges named in each migration's header. Change one, change the other, and preserve `schema.sql`'s line count or re-anchor every header pointer.
@@ -47,7 +47,7 @@
 | `packages/db/src/repositories/media.repository.ts`   | Task 11: `recordMediaAsset`                                                             |
 | `packages/server/src/main.ts`                        | Task 2: bootstrap — `waitForDatabase`, `runMigrations`, then listen                     |
 | `packages/server/src/app.module.ts`                  | Task 2: root module                                                                     |
-| `packages/server/src/config.ts`                      | Task 2: env parsing via `@liam-public/node-config`                                      |
+| `packages/server/src/config.ts`                      | Task 2: env parsing via `@liam-workspace/node-config`                                      |
 | `packages/server/src/health/*`                       | Task 2: `GET /health`                                                                   |
 | `packages/server/src/database/*`                     | Task 3: pool providers (`pp:api`, `pp:jobs`), `Clock` provider                          |
 | `packages/server/src/auth/*`                         | Task 4: `JwksGuard`, `AdminGuard`, `@CurrentStudent()`                                  |
@@ -291,10 +291,10 @@ Append to the existing `overrides` array in `oxlint.config.ts`:
     "test": "vitest run"
   },
   "dependencies": {
-    "@liam-public/node-config": "^0.1.0",
-    "@liam-public/node-logger": "^0.1.0",
-    "@liam-public/node-nest-common": "^0.1.1",
-    "@liam-public/node-postgres": "^0.3.1",
+    "@liam-workspace/node-config": "^0.1.0",
+    "@liam-workspace/node-logger": "^0.1.0",
+    "@liam-workspace/node-nest-common": "^0.1.1",
+    "@liam-workspace/node-postgres": "^0.3.1",
     "@liam-workspace/node-auth-server": "^0.5.1",
     "@liam-workspace/platform": "^0.1.0",
     "@nestjs/common": "^11.0.0",
@@ -414,7 +414,7 @@ Expected: FAIL — `Cannot find module '../src/health/health.module.js'`.
 `packages/server/src/config.ts`:
 
 ```ts
-import { parseCsvEnv, parseIntegerEnv } from "@liam-public/node-config"
+import { parseCsvEnv, parseIntegerEnv } from "@liam-workspace/node-config"
 
 export interface ServerConfig {
   port: number
@@ -447,7 +447,7 @@ export function loadServerConfig(
 }
 ```
 
-Check `@liam-public/node-config`'s published signatures before writing this — if `parseIntegerEnv`/`parseCsvEnv` take `(env, key, fallback)` rather than `(value, fallback)`, follow the library, and say so in your report.
+Check `@liam-workspace/node-config`'s published signatures before writing this — if `parseIntegerEnv`/`parseCsvEnv` take `(env, key, fallback)` rather than `(value, fallback)`, follow the library, and say so in your report.
 
 `packages/server/src/health/health.controller.ts`:
 
@@ -488,7 +488,7 @@ export class AppModule {}
 ```ts
 import "reflect-metadata"
 import { NestFactory } from "@nestjs/core"
-import { AllExceptionsFilter } from "@liam-public/node-nest-common"
+import { AllExceptionsFilter } from "@liam-workspace/node-nest-common"
 import { AppModule } from "./app.module.js"
 import { loadServerConfig } from "./config.js"
 
@@ -590,7 +590,7 @@ in your environment, say so and stop — do not report a gate you did not run.
 `packages/server/test/database.e2e.test.ts`:
 
 ```ts
-import type { PgPool } from "@liam-public/node-postgres"
+import type { PgPool } from "@liam-workspace/node-postgres"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { createTestApp, type TestApp } from "./helpers/app.js"
 import { JOB_POOL, REQUEST_POOL } from "../src/database/tokens.js"
@@ -717,7 +717,7 @@ Import it in `AppModule`.
 In `packages/server/src/main.ts`, before `NestFactory.create`:
 
 ```ts
-import { waitForDatabase } from "@liam-public/node-postgres"
+import { waitForDatabase } from "@liam-workspace/node-postgres"
 import { migrateToLatest } from "@pp/db"
 
 await waitForDatabase(config.databaseUrl, { retries: 30, delayMs: 1000 })

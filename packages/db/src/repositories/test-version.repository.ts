@@ -10,7 +10,7 @@ import {
   type RunnerStimulus,
 } from "@pp/common"
 import type { ScoringQuestion } from "@pp/common/scoring"
-import type { PgQueryable } from "@liam-public/node-postgres"
+import type { PgQueryable } from "@liam-workspace/node-postgres"
 
 interface RunnerRow {
   s_id: string

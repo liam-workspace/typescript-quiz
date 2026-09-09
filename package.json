@@ -23,14 +23,14 @@
     "lint:api": "redocly lint docs/api/openapi.yaml"
   },
   "dependencies": {
-    "@liam-public/node-postgres": "^0.3.1",
+    "@liam-workspace/node-postgres": "^0.3.1",
     "@pp/common": "workspace:*",
     "@pp/db": "workspace:*",
     "pg": "^8.13.0"
   },
   "devDependencies": {
-    "@liam-public/node-frontend-lint": "^0.4.0",
-    "@liam-public/node-i18n-lint": "^0.2.0",
+    "@liam-workspace/node-frontend-lint": "^0.4.0",
+    "@liam-workspace/node-i18n-lint": "^0.2.0",
     "@redocly/cli": "^2.46.2",
     "@stylistic/eslint-plugin": "latest",
     "@types/node": "^26.0.1",

@@ -6,7 +6,7 @@ import {
   type RunnerSection,
   type RunnerSectionState,
 } from "@pp/common"
-import type { PgQueryable } from "@liam-public/node-postgres"
+import type { PgQueryable } from "@liam-workspace/node-postgres"
 import { loadForRunner } from "./test-version.repository.js"
 
 interface RunnerSectionIntro {

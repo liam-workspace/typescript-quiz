@@ -1,4 +1,4 @@
-import { Card, CardContent } from "@liam-public/browser-react-ui"
+import { Card, CardContent } from "@liam-workspace/browser-react-ui"
 import { createFileRoute, redirect } from "@tanstack/react-router"
 import { useTranslation } from "react-i18next"
 import { z } from "zod"

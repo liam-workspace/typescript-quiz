@@ -1,4 +1,4 @@
-import type { PgQueryable } from "@liam-public/node-postgres"
+import type { PgQueryable } from "@liam-workspace/node-postgres"
 import { HttpStatus } from "@nestjs/common"
 import { canSetPosition, isPastDeadline } from "@pp/common"
 import type { AttemptRow } from "@pp/db"

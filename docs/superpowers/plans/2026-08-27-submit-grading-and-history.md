@@ -6,7 +6,7 @@
 
 **Architecture:** `packages/common/src/grading.ts` and `src/rules.ts` are pure — no `pg`, no `Date.now()`, unit-tested in isolation. `packages/db/src/repositories/attempt.repository.ts` (write side: finalize, submit) and the new `attempt-result.repository.ts` (read side: result, review, history) are the only things that touch Postgres for this phase, and both funnel every answer-key read through `loadForScoring` from `@pp/db/scoring` — never through `@pp/db`'s default barrel. `packages/server/src/attempts/*` exposes four routes behind `JwksGuard`, each resolving `AttemptId → studentId` ownership before doing anything else. `packages/app/src/pages/attempts/$attemptId/*` and `src/pages/history/` render the three read screens plus the hand-in dialog.
 
-**Tech Stack:** NestJS 11 · Node 24 · TypeScript 6 (ESM, `nodenext`) · PostgreSQL 16 · `@liam-public/node-postgres` · `@liam-workspace/platform` (`Clock`) · Vitest 4 · supertest · testcontainers · React 19 + Vite · `@liam-public/browser-react-ui` · TanStack Router
+**Tech Stack:** NestJS 11 · Node 24 · TypeScript 6 (ESM, `nodenext`) · PostgreSQL 16 · `@liam-workspace/node-postgres` · `@liam-workspace/platform` (`Clock`) · Vitest 4 · supertest · testcontainers · React 19 + Vite · `@liam-workspace/browser-react-ui` · TanStack Router
 
 **Spec:** `docs/superpowers/specs/2026-08-25-toefl-primary-fork-design.md` (phase 5 of §8)
 
@@ -23,7 +23,7 @@
 - **All four gates pass before every commit:** `pnpm lint`, `pnpm format`, `pnpm typecheck`, `pnpm test`.
 - **Never write `git add -A` or a commit command into a step.** Leave work uncommitted; the reviewer stages by explicit path.
 - **Never add a dependency without checking `docs/architecture/library-adoption.md` first.**
-- **Verify library and internal-package APIs against the installed code, never from memory or from this plan's prose** — quote what you find, the way plan 2 quoted `node-auth-server`'s real `verify()` behaviour. `@liam-public/browser-react-ui` is not yet installed anywhere in this repository as of this plan's authoring (`packages/app` does not exist yet); confirm its real export names against `node_modules/@liam-public/browser-react-ui/dist/*.d.ts` once plan 3/4 have added it, rather than trusting the component names in the library-adoption doc's prose.
+- **Verify library and internal-package APIs against the installed code, never from memory or from this plan's prose** — quote what you find, the way plan 2 quoted `node-auth-server`'s real `verify()` behaviour. `@liam-workspace/browser-react-ui` is not yet installed anywhere in this repository as of this plan's authoring (`packages/app` does not exist yet); confirm its real export names against `node_modules/@liam-workspace/browser-react-ui/dist/*.d.ts` once plan 3/4 have added it, rather than trusting the component names in the library-adoption doc's prose.
 
 ## File Structure
 
@@ -49,7 +49,7 @@
 
 ### Task 1: `application/problem+json` bodies that actually match `Problem`
 
-`AllExceptionsFilter` (`@liam-public/node-nest-common`, already wired in `main.ts` and every e2e harness) renders `response.status(status).json({ error, message, statusCode, ...exceptionResponse })` with content-type `application/json`. Nothing in this repository has exercised it against the `Problem` schema yet — no earlier task asserted an error body's exact shape. This phase is where that stops being true: `AttemptExpiredProblem` requires a nested `attempt` object, `SectionOrAttemptExpired` is a `oneOf` on two closed (`additionalProperties: false`) shapes, and `PayloadCaptured` requires `capturedAs`. None of those survive being merged with `{error, message, statusCode}` under `application/json`. This task adds a narrow, controller-scoped exception path that renders the contract exactly; it does not touch `AllExceptionsFilter` itself, which stays the default for everything this plan does not own.
+`AllExceptionsFilter` (`@liam-workspace/node-nest-common`, already wired in `main.ts` and every e2e harness) renders `response.status(status).json({ error, message, statusCode, ...exceptionResponse })` with content-type `application/json`. Nothing in this repository has exercised it against the `Problem` schema yet — no earlier task asserted an error body's exact shape. This phase is where that stops being true: `AttemptExpiredProblem` requires a nested `attempt` object, `SectionOrAttemptExpired` is a `oneOf` on two closed (`additionalProperties: false`) shapes, and `PayloadCaptured` requires `capturedAs`. None of those survive being merged with `{error, message, statusCode}` under `application/json`. This task adds a narrow, controller-scoped exception path that renders the contract exactly; it does not touch `AllExceptionsFilter` itself, which stays the default for everything this plan does not own.
 
 **Files:**
 
@@ -601,7 +601,7 @@ Two gaps discovered while designing Task 5, both verified against the real code 
 
 - [ ] **Step 4: Retype and extend the query**
 
-  In `packages/db/src/repositories/test-version.repository.ts`, change both `loadForRunner` and `loadForScoring`'s first parameter from `pool: pg.Pool` to `db: PgQueryable` (add `import type { PgQueryable } from "@liam-public/node-postgres"`; every internal `pool.query` call becomes `db.query`). Extend `ScoringRow` and the query in `loadForScoring`:
+  In `packages/db/src/repositories/test-version.repository.ts`, change both `loadForRunner` and `loadForScoring`'s first parameter from `pool: pg.Pool` to `db: PgQueryable` (add `import type { PgQueryable } from "@liam-workspace/node-postgres"`; every internal `pool.query` call becomes `db.query`). Extend `ScoringRow` and the query in `loadForScoring`:
 
   ```ts
   interface ScoringRow {
@@ -666,7 +666,7 @@ Two entry points are produced: `finalizeAttempt` (opens its own transaction — 
 
 **Interfaces:**
 
-- Consumes: `gradeAttempt` (Task 2), `isPastDeadline` (Task 3), `loadForScoring` (Task 4), `withTransaction`, `type PgPool`, `type PgQueryable` from `@liam-public/node-postgres`.
+- Consumes: `gradeAttempt` (Task 2), `isPastDeadline` (Task 3), `loadForScoring` (Task 4), `withTransaction`, `type PgPool`, `type PgQueryable` from `@liam-workspace/node-postgres`.
 - Produces:
 
   ```ts
@@ -1178,7 +1178,7 @@ The one place `choice.isCorrect` reaches a student (spec §4). `loadReview` sele
 
 ### Task 10: React — the hand-in dialog and submit
 
-This plan assumes `packages/app` (scaffolded by plan 3, wired to the runner endpoints by plans 3–4) already exists with a TanStack Router file-based tree under `src/pages/` (matching the convention harvested from `packages/web/src/pages/**` — `$param.tsx` for dynamic segments), an authenticated fetch client via `@liam-public/auth-fetch`, and a local answer queue exposing SOME drain-remainder call (plan 4). **Confirm the actual shape of both against what plan 3/4 produced before writing this task's code — the interfaces below are this plan's best-supported assumption, not a verified fact, because neither package exists in this repository as of this plan's authoring.**
+This plan assumes `packages/app` (scaffolded by plan 3, wired to the runner endpoints by plans 3–4) already exists with a TanStack Router file-based tree under `src/pages/` (matching the convention harvested from `packages/web/src/pages/**` — `$param.tsx` for dynamic segments), an authenticated fetch client via `@liam-workspace/auth-fetch`, and a local answer queue exposing SOME drain-remainder call (plan 4). **Confirm the actual shape of both against what plan 3/4 produced before writing this task's code — the interfaces below are this plan's best-supported assumption, not a verified fact, because neither package exists in this repository as of this plan's authoring.**
 
 **Files:**
 

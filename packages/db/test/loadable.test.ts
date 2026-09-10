@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
-import { createPool, waitForDatabase } from "@liam-public/node-postgres"
+import { createPool, waitForDatabase } from "@liam-workspace/node-postgres"
 import { describe, expect, inject, it } from "vitest"
 
 const run = promisify(execFile)

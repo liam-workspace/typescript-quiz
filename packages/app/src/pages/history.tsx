@@ -1,4 +1,4 @@
-import { Card, CardContent } from "@liam-public/browser-react-ui"
+import { Card, CardContent } from "@liam-workspace/browser-react-ui"
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"

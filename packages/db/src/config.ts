@@ -2,7 +2,7 @@ import {
   nodeEnvironment,
   parseIntegerEnv,
   type Environment,
-} from "@liam-public/node-config"
+} from "@liam-workspace/node-config"
 
 export interface DbConfig {
   databaseUrl: string

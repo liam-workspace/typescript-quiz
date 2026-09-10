@@ -14,7 +14,7 @@ import {
   withTransaction,
   type PgPool,
   type PgQueryable,
-} from "@liam-public/node-postgres"
+} from "@liam-workspace/node-postgres"
 import type pg from "pg"
 import { loadForScoring } from "../scoring.js"
 import { SectionExpiredError } from "./section-expired.error.js"

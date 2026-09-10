@@ -1,6 +1,6 @@
 import { createReadStream, existsSync } from "node:fs"
 import { extname, resolve, sep } from "node:path"
-import type { PgPool } from "@liam-public/node-postgres"
+import type { PgPool } from "@liam-workspace/node-postgres"
 import {
   Controller,
   Get,

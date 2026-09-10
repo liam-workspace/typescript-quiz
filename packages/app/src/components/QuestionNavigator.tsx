@@ -1,4 +1,4 @@
-import { DialogDescription, DialogTitle } from "@liam-public/browser-react-ui"
+import { DialogDescription, DialogTitle } from "@liam-workspace/browser-react-ui"
 import { useRef, type JSX, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
 import {

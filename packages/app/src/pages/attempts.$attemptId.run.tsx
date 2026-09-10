@@ -4,7 +4,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-} from "@liam-public/browser-react-ui"
+} from "@liam-workspace/browser-react-ui"
 import { createFileRoute } from "@tanstack/react-router"
 import { useEffect, useRef, useState, type JSX } from "react"
 import { useTranslation } from "react-i18next"

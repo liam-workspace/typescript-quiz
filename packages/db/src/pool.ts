@@ -1,4 +1,4 @@
-import { createPool } from "@liam-public/node-postgres"
+import { createPool } from "@liam-workspace/node-postgres"
 import type pg from "pg"
 import type { DbConfig } from "./config.js"
 

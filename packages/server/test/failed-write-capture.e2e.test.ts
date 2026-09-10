@@ -6,7 +6,7 @@ import {
   type INestApplication,
 } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
-import { AllExceptionsFilter } from "@liam-public/node-nest-common"
+import { AllExceptionsFilter } from "@liam-workspace/node-nest-common"
 import { z } from "zod"
 import { afterAll, beforeAll, describe, expect, inject, it } from "vitest"
 import { createFixedClock } from "@pp/common"
@@ -16,7 +16,7 @@ import { ZodBodyValidationPipe } from "../src/validation/zod-body-validation.pip
 import { REQUEST_POOL, CLOCK } from "../src/database/tokens.js"
 import { DatabaseModule } from "../src/database/database.module.js"
 import { migrateToLatest } from "@pp/db"
-import type { PgPool } from "@liam-public/node-postgres"
+import type { PgPool } from "@liam-workspace/node-postgres"
 
 const NOW = new Date("2026-08-27T10:00:00.000Z")
 const MAX_BYTES = 64

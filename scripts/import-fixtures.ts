@@ -24,7 +24,7 @@ import { createHash } from "node:crypto"
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
-import { waitForDatabase } from "@liam-public/node-postgres"
+import { waitForDatabase } from "@liam-workspace/node-postgres"
 import { testDocumentSchema, type TestDocument } from "@pp/common"
 import {
   importTestDocument,

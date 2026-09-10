@@ -165,7 +165,7 @@ Every later task in this plan writes to this table before returning an error. Bu
   `packages/db/src/repositories/failed-write.repository.ts`:
 
   ```ts
-  import type { PgQueryable } from "@liam-public/node-postgres"
+  import type { PgQueryable } from "@liam-workspace/node-postgres"
 
   export interface FailedWriteRow {
     id: string
@@ -583,7 +583,7 @@ This is the load-bearing fix for the 413 case spec §5 rule 4 calls out as matte
     )
   ```
 
-  (`node_modules/@nestjs/common/utils/select-exception-filter-metadata.util.js` under the installed `@nestjs+common@11.2.1` package.) It is `Array.prototype.find` over the filters **in the order passed to `useGlobalFilters`**, and a filter with `@Catch()` (no arguments) has an empty `exceptionMetatypes` array, which matches **unconditionally**. `AllExceptionsFilter` from `@liam-public/node-nest-common` is declared `@Catch()`. So if `AllExceptionsFilter` is registered before `FailedWriteCaptureFilter`, it wins every exception, including the ones this task's filter exists to catch — `FailedWriteCaptureFilter` must be registered **first** in the array.
+  (`node_modules/@nestjs/common/utils/select-exception-filter-metadata.util.js` under the installed `@nestjs+common@11.2.1` package.) It is `Array.prototype.find` over the filters **in the order passed to `useGlobalFilters`**, and a filter with `@Catch()` (no arguments) has an empty `exceptionMetatypes` array, which matches **unconditionally**. `AllExceptionsFilter` from `@liam-workspace/node-nest-common` is declared `@Catch()`. So if `AllExceptionsFilter` is registered before `FailedWriteCaptureFilter`, it wins every exception, including the ones this task's filter exists to catch — `FailedWriteCaptureFilter` must be registered **first** in the array.
 
 - [ ] **Step 2: Write the failing pipe/filter test against a probe route**
 
@@ -593,7 +593,7 @@ This is the load-bearing fix for the 413 case spec §5 rule 4 calls out as matte
   import { Body, Controller, Module, Post } from "@nestjs/common"
   import { Test } from "@nestjs/testing"
   import type { INestApplication } from "@nestjs/common"
-  import { AllExceptionsFilter } from "@liam-public/node-nest-common"
+  import { AllExceptionsFilter } from "@liam-workspace/node-nest-common"
   import { z } from "zod"
   import { afterAll, beforeAll, describe, expect, it } from "vitest"
   import { createFixedClock } from "@pp/common"
@@ -604,7 +604,7 @@ This is the load-bearing fix for the 413 case spec §5 rule 4 calls out as matte
   import { DatabaseModule } from "../src/database/database.module.js"
   import { inject } from "vitest"
   import { migrateToLatest } from "@pp/db"
-  import type { PgPool } from "@liam-public/node-postgres"
+  import type { PgPool } from "@liam-workspace/node-postgres"
 
   const NOW = new Date("2026-08-27T10:00:00.000Z")
   const MAX_BYTES = 64
@@ -817,7 +817,7 @@ This is the load-bearing fix for the 413 case spec §5 rule 4 calls out as matte
   ```ts
   import type { ArgumentsHost, ExceptionFilter } from "@nestjs/common"
   import { Catch, Inject } from "@nestjs/common"
-  import type { PgPool } from "@liam-public/node-postgres"
+  import type { PgPool } from "@liam-workspace/node-postgres"
   import type { Clock } from "@pp/common"
   import { insertFailedWrite } from "@pp/db"
   import type { Response } from "express"
@@ -954,7 +954,7 @@ Spec §5 Ordering: writes ordered by `(clientInstanceId, seq)`, never `answeredA
 
 **Interfaces:**
 
-- Consumes: `withTransaction` (`@liam-public/node-postgres`); the `Fixture` returned by `packages/db/test/helpers/fixtures.ts`'s `seedPublishedTest` (`q1` in the listening section, `allowAnswerChange: false`; `q2` in reading, `allowAnswerChange: true`; `choiceIds = [c1(q1,correct), c2(q1), c3(q2,correct), c4(q2)]`).
+- Consumes: `withTransaction` (`@liam-workspace/node-postgres`); the `Fixture` returned by `packages/db/test/helpers/fixtures.ts`'s `seedPublishedTest` (`q1` in the listening section, `allowAnswerChange: false`; `q2` in reading, `allowAnswerChange: true`; `choiceIds = [c1(q1,correct), c2(q1), c3(q2,correct), c4(q2)]`).
 - Produces:
 
   ```ts
@@ -1307,8 +1307,8 @@ Spec §5 Ordering: writes ordered by `(clientInstanceId, seq)`, never `answeredA
   `packages/db/src/repositories/response.repository.ts`:
 
   ```ts
-  import { withTransaction } from "@liam-public/node-postgres"
-  import type { PgPool, PgQueryable } from "@liam-public/node-postgres"
+  import { withTransaction } from "@liam-workspace/node-postgres"
+  import type { PgPool, PgQueryable } from "@liam-workspace/node-postgres"
 
   export type WriteOutcome =
     | { kind: "applied" }
@@ -1584,7 +1584,7 @@ Note on paths: `packages/server/src/main.ts` and `test/helpers/app.ts` now call 
   `packages/server/src/responses/response-write.service.ts`:
 
   ```ts
-  import type { PgPool } from "@liam-public/node-postgres"
+  import type { PgPool } from "@liam-workspace/node-postgres"
   import {
     ForbiddenException,
     Inject,
@@ -1641,7 +1641,7 @@ Note on paths: `packages/server/src/main.ts` and `test/helpers/app.ts` now call 
 
   ```ts
   import { randomUUID } from "node:crypto"
-  import type { PgPool } from "@liam-public/node-postgres"
+  import type { PgPool } from "@liam-workspace/node-postgres"
   import { afterAll, beforeAll, describe, expect, it } from "vitest"
   import { createTestApp, type TestApp } from "./helpers/app.js"
   import { REQUEST_POOL } from "../src/database/tokens.js"
@@ -1863,7 +1863,7 @@ Note on paths: `packages/server/src/main.ts` and `test/helpers/app.ts` now call 
 
   ```ts
   import type { JwtClaims } from "@liam-workspace/node-auth-server"
-  import type { PgPool } from "@liam-public/node-postgres"
+  import type { PgPool } from "@liam-workspace/node-postgres"
   import type { Clock } from "@pp/common"
   import {
     Body,
@@ -2102,7 +2102,7 @@ This task builds the helpers Task 5's controller already imports (`section-rules
   Implement `packages/db/src/repositories/section-lookup.repository.ts`:
 
   ```ts
-  import type { PgQueryable } from "@liam-public/node-postgres"
+  import type { PgQueryable } from "@liam-workspace/node-postgres"
 
   export interface QuestionSectionInfo {
     sectionId: string
@@ -2152,7 +2152,7 @@ This task builds the helpers Task 5's controller already imports (`section-rules
   `packages/server/src/responses/section-rules.ts`:
 
   ```ts
-  import type { PgPool } from "@liam-public/node-postgres"
+  import type { PgPool } from "@liam-workspace/node-postgres"
   import { GoneException } from "@nestjs/common"
   import { loadQuestionSectionInfo } from "@pp/db"
 
@@ -2238,7 +2238,7 @@ This task builds the helpers Task 5's controller already imports (`section-rules
   `packages/server/src/responses/capture.ts`:
 
   ```ts
-  import type { PgPool } from "@liam-public/node-postgres"
+  import type { PgPool } from "@liam-workspace/node-postgres"
   import { ConflictException } from "@nestjs/common"
   import type { Clock } from "@pp/common"
   import { insertFailedWrite } from "@pp/db"
@@ -2288,7 +2288,7 @@ This task builds the helpers Task 5's controller already imports (`section-rules
   `packages/server/test/response-snapshot.e2e.test.ts`. Reuses the same `seedAttempt` helper style as Task 5's test (copy it, or factor it into `test/helpers/write-fixture.ts` and import from both — factoring it is the better choice since both files need an identical fixture; do that and delete the duplicate from `single-response.e2e.test.ts`).
 
   ```ts
-  import type { PgPool } from "@liam-public/node-postgres"
+  import type { PgPool } from "@liam-workspace/node-postgres"
   import request from "supertest"
   import { afterAll, beforeAll, describe, expect, it } from "vitest"
   import { createTestApp, type TestApp } from "./helpers/app.js"
@@ -2437,7 +2437,7 @@ This task builds the helpers Task 5's controller already imports (`section-rules
 
   ```ts
   import type { JwtClaims } from "@liam-workspace/node-auth-server"
-  import type { PgPool } from "@liam-public/node-postgres"
+  import type { PgPool } from "@liam-workspace/node-postgres"
   import type { Clock } from "@pp/common"
   import {
     Body,

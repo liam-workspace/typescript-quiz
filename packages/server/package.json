@@ -9,11 +9,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@liam-public/node-config": "^0.1.0",
-    "@liam-public/node-logger": "^0.1.0",
-    "@liam-public/node-nest-common": "^0.1.1",
-    "@liam-public/node-postgres": "^0.3.1",
-    "@liam-workspace/node-auth-server": "^0.5.1",
+    "@liam-workspace/node-auth-server": "^0.5.2",
+    "@liam-workspace/node-config": "^0.1.0",
+    "@liam-workspace/node-logger": "^0.1.0",
+    "@liam-workspace/node-nest-common": "^0.1.1",
+    "@liam-workspace/node-postgres": "^0.4.0",
     "@liam-workspace/platform": "^0.1.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",

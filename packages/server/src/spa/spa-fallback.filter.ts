@@ -5,7 +5,7 @@ import {
   type ArgumentsHost,
   type ExceptionFilter,
 } from "@nestjs/common"
-import { AllExceptionsFilter } from "@liam-public/node-nest-common"
+import { AllExceptionsFilter } from "@liam-workspace/node-nest-common"
 import type { Request, Response } from "express"
 
 /**

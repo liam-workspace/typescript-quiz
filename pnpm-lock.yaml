@@ -8,9 +8,9 @@ importers:
 
   .:
     dependencies:
-      '@liam-public/node-postgres':
-        specifier: ^0.3.1
-        version: 0.3.1(@types/pg@8.23.1)
+      '@liam-workspace/node-postgres':
+        specifier: ^0.4.0
+        version: 0.4.0(@types/pg@8.23.1)
       '@pp/common':
         specifier: workspace:*
         version: link:packages/common
@@ -21,10 +21,10 @@ importers:
         specifier: ^8.13.0
         version: 8.23.0
     devDependencies:
-      '@liam-public/node-frontend-lint':
+      '@liam-workspace/node-frontend-lint':
         specifier: ^0.4.0
         version: 0.4.0(typescript@6.0.3)
-      '@liam-public/node-i18n-lint':
+      '@liam-workspace/node-i18n-lint':
         specifier: ^0.2.0
         version: 0.2.0(typescript@6.0.3)
       '@redocly/cli':
@@ -63,12 +63,12 @@ importers:
 
   packages/app:
     dependencies:
-      '@liam-public/browser-react-ui':
+      '@liam-workspace/auth-client':
+        specifier: ^0.2.0
+        version: 0.2.0
+      '@liam-workspace/browser-react-ui':
         specifier: ^0.1.0
         version: 0.1.0(@types/react-dom@19.2.3(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@liam-workspace/auth-client':
-        specifier: ^0.1.1
-        version: 0.1.1
       '@pp/common':
         specifier: workspace:*
         version: link:../common
@@ -155,12 +155,12 @@ importers:
 
   packages/db:
     dependencies:
-      '@liam-public/node-config':
+      '@liam-workspace/node-config':
         specifier: ^0.1.0
         version: 0.1.0
-      '@liam-public/node-postgres':
-        specifier: ^0.3.1
-        version: 0.3.1(@types/pg@8.23.1)
+      '@liam-workspace/node-postgres':
+        specifier: ^0.4.0
+        version: 0.4.0(@types/pg@8.23.1)
       '@pp/common':
         specifier: workspace:*
         version: link:../common
@@ -189,21 +189,21 @@ importers:
 
   packages/server:
     dependencies:
-      '@liam-public/node-config':
+      '@liam-workspace/node-auth-server':
+        specifier: ^0.5.2
+        version: 0.5.2
+      '@liam-workspace/node-config':
         specifier: ^0.1.0
         version: 0.1.0
-      '@liam-public/node-logger':
+      '@liam-workspace/node-logger':
         specifier: ^0.1.0
         version: 0.1.0
-      '@liam-public/node-nest-common':
+      '@liam-workspace/node-nest-common':
         specifier: ^0.1.1
         version: 0.1.1(@nestjs/common@11.2.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
-      '@liam-public/node-postgres':
-        specifier: ^0.3.1
-        version: 0.3.1(@types/pg@8.23.1)
-      '@liam-workspace/node-auth-server':
-        specifier: ^0.5.1
-        version: 0.5.1
+      '@liam-workspace/node-postgres':
+        specifier: ^0.4.0
+        version: 0.4.0(@types/pg@8.23.1)
       '@liam-workspace/platform':
         specifier: ^0.1.0
         version: 0.1.0
@@ -393,6 +393,12 @@ packages:
     resolution: {integrity: sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA==}
     engines: {node: '>=20.19.0'}
 
+  '@eslint-community/eslint-utils@4.10.1':
+    resolution: {integrity: sha512-cuadcxVFE8sDK6iWJbs8Sn0av2Nrh2QSGQhVlBW9AaAHqHwjWsZHT8LJ4hFGPh7ASBV2deFdM7H/DPjulmh8rg==}
+    engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
+    peerDependencies:
+      eslint: ^6.0.0 || ^7.0.0 || >=8.0.0
+
   '@eslint-community/eslint-utils@4.9.1':
     resolution: {integrity: sha512-phrYmNiYppR7znFEdqgfWHXR6NCkZEK7hwWDHZUjit/2/U0r6XvkDl0SYnoM51Hq7FhCGdLDT6zxCCOY1hexsQ==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
@@ -517,47 +523,47 @@ packages:
   '@levischuck/tiny-cbor@0.2.11':
     resolution: {integrity: sha512-llBRm4dT4Z89aRsm6u2oEZ8tfwL/2l6BwpZ7JcyieouniDECM5AqNgr/y08zalEIvW3RSK4upYyybDcmjXqAow==}
 
-  '@liam-public/browser-react-ui@0.1.0':
-    resolution: {integrity: sha512-ZEw5JafkdoOze97HhUZ7GyyKPZZeY1mW2CyXvshSb+a0TFQ3gWF5IHokrjLwPdtT3IN9bXD1pwftEafgvzMhHg==}
+  '@liam-workspace/auth-client@0.2.0':
+    resolution: {integrity: sha512-wPfLYN1DS1+R0PKx0frmE6OUySmJw7wnXVks+fCkilR8IH0Azo0OmNM7XN5y/r7uawMEHQxaEe8lSAltU/7BUg==, tarball: https://npm.pkg.github.com/download/@liam-workspace/auth-client/0.2.0/8ae41e506052a3963d211e60c41a9a3aafbf101e}
+
+  '@liam-workspace/browser-react-ui@0.1.0':
+    resolution: {integrity: sha512-7m/pwndwArKtcHu3AqEfRXJDzL6ZC8LJ04JrI5m3qheg91+e5S0XXvjXiLTctFNQENoTSGlE069Yi4I+uhkIhQ==, tarball: https://npm.pkg.github.com/download/@liam-workspace/browser-react-ui/0.1.0/fb9323b6d7062f754cafcd50b49e76c9be696a20}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
 
-  '@liam-public/node-config@0.1.0':
-    resolution: {integrity: sha512-eW17e/X9p0d7Ni2E+NlG1cS2TCG7Yprm+PsJ0iDR07HVwL1OB9/z30qIE6wTDLLqQmSxekv++NxmwqpftJl5RQ==}
+  '@liam-workspace/node-auth-server@0.5.2':
+    resolution: {integrity: sha512-sCWZ5ekJDNl1k8sVw+ey+TM+OyG/RRRLAE/V0hFDoQqzWurKAPuQ9ZtsGaJxSEP1D2C+nsQQKtTqN1lduxP5Fw==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-auth-server/0.5.2/38f9d0ce998ffc1d151ca71a5cc18b3d8f53f1e5}
 
-  '@liam-public/node-frontend-lint@0.4.0':
-    resolution: {integrity: sha512-3tQpNRVR5cyrfwqGmih79yHNhMNk6bH4tM7U/T322gt3ZRbCG8uSENATKfMw6skXKekvbzWVfnXcMxoI4tnUxg==}
+  '@liam-workspace/node-config@0.1.0':
+    resolution: {integrity: sha512-ULuIu7TpFIpGwlArqbe0k1h6QshiXTrW0cEc6q7OWjFYaoMPGxqfeLuR2Ql6Bc3KZupw7B2UdIy+BZ6PHeJl2g==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-config/0.1.0/86e17fbad5c1e48ef95083da9995c9b5c23258d7}
+
+  '@liam-workspace/node-frontend-lint@0.4.0':
+    resolution: {integrity: sha512-xC3Ar6Guerpba5XDNx1Fhyq0CWdZR4T5TydRAS6fHZNW1yeKqIg5FvOGHUiRB+wNbNnTSu229iUrpBJ29kPQpw==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-frontend-lint/0.4.0/e738aff41f020507457bd66d01ee6a5c0decbdf9}
     hasBin: true
     peerDependencies:
       typescript: '>=5.0.0'
 
-  '@liam-public/node-i18n-lint@0.2.0':
-    resolution: {integrity: sha512-aae0Pf2pdu8GbWVhHG50vSVu+IoDRHLnn7U56IkGPEcWmMIYHUw4AnYUURvsJy2CU/rxkutF6PlNp4v/2VE1Zg==}
+  '@liam-workspace/node-i18n-lint@0.2.0':
+    resolution: {integrity: sha512-RAl/C7WhZL4T7GDFAxrBnwSjWT+fOX3TKcAzK0Q5ZuO4FRKFxrGKOuE6hASJ0wuTFtP5WPRIyJWesBvjLXagyQ==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-i18n-lint/0.2.0/da6c8107b2bd40205ecc16492e170b0e3378002d}
     hasBin: true
     peerDependencies:
       typescript: '>=5.0.0'
 
-  '@liam-public/node-logger@0.1.0':
-    resolution: {integrity: sha512-WrcO4OMWfrdSYSsv0TPOfHE9ySuhAvZxt2Nlp0p5JRNj61JDA4kLjwEug10WmPYGZDwD6n24AD66bNBZaGCWEg==}
+  '@liam-workspace/node-logger@0.1.0':
+    resolution: {integrity: sha512-lUrPfwgP0rw/Mj3K6mda9fE8yujQDgI8MTrkZ/3wKs1spP/yjAvVxc6Jba9MpW+6lAD/CaTvq3Ph8CibiXcoag==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-logger/0.1.0/8bff07954bcc3f4e201bbc9371f142230c92f924}
 
-  '@liam-public/node-nest-common@0.1.1':
-    resolution: {integrity: sha512-9gFZ3UBMjt6ydwY81YTh3UifYplQYUv17EVjkAiz3pBIdb2hl/BKA5eFRIhhD/UZ6UKQWJU1G1KM9Qy6NhjivQ==}
+  '@liam-workspace/node-nest-common@0.1.1':
+    resolution: {integrity: sha512-MZZKcOkLrCO9BOaeplTi21Lo6ZK+dnVdHxwQ4ejOyBs+Y/k6kwvVXi89fIWqiayoJExUN2iPNLE1atn0s8aXZg==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-nest-common/0.1.1/19fa59d9dbf4c1fbcf74d049188e9ea007925908}
     peerDependencies:
       '@nestjs/common': ^11.0.0
       rxjs: ^7.8.1
 
-  '@liam-public/node-postgres@0.3.1':
-    resolution: {integrity: sha512-M6m8VgdG8FW9/u4t7V6MUO3panoe1BnWNKqDUa2hYMF864w+dgvNEnkNzIwtpNow8lrobDPv9oRZyl2YxFQKgg==}
+  '@liam-workspace/node-postgres@0.4.0':
+    resolution: {integrity: sha512-wFhQB2cimcZOI36I9ic93dYtNFszpwAr1ES7ZrcoKNx+Gqp+hcscPXK1qkFDL2OA2Fb/mFNROHNdJr1YbqFFsg==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-postgres/0.4.0/458d4b168065a364a28d23cec5d03cd31478aef5}
 
-  '@liam-public/node-webauthn@0.1.1':
-    resolution: {integrity: sha512-GdMeEW3muXN/+ub5o6Bdoa9Yhv4Ia+cVU3Wx/LLsPHljAnJXDaqeaOLuf8DbFS2CBhYPIx3cOeP7AqiTaY9vvw==}
-
-  '@liam-workspace/auth-client@0.1.1':
-    resolution: {integrity: sha512-B2N5fnnaDEUBgXCYr+/wGhaIw0DxR0J6O3EBSGLSH7T6SbxzfozNBsPeylsrEwuxdsFQDeCUpZgnVwzfmtl+LQ==, tarball: https://npm.pkg.github.com/download/@liam-workspace/auth-client/0.1.1/59d837cc0c220c2557ef0bf50e86405f37e7b32c}
-
-  '@liam-workspace/node-auth-server@0.5.1':
-    resolution: {integrity: sha512-c78LNcTLLQeW3XV4Pvid6S4I1v+oif1Q0itDHgZ1YEoQyh18kCcKf+lo9fCyXdIxclgR4m963IyZgdxP09uwfQ==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-auth-server/0.5.1/a57226121801f3a0851b0926b3528fddc808bbb3}
+  '@liam-workspace/node-webauthn@0.1.1':
+    resolution: {integrity: sha512-IwjUlZJFl2zzoz8e0XCPdbaqW0ySYqkN+56+8l1el5gLByaeahdOuhdFIKNp9a2w722wMf9IjRyIuMOCdEocnA==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-webauthn/0.1.1/f0b33b7b5125060d726a2b67d3eb1dade1fc8068}
 
   '@liam-workspace/platform@0.1.0':
     resolution: {integrity: sha512-dd6Pb8BzxgNBjmVkTBtO5TlcvcsfqgYlVfnNSiX76u/o8nJd5Sht/gEydsqxOrisTf6trDTDGQjVcNxd2eoNZA==, tarball: https://npm.pkg.github.com/download/@liam-workspace/platform/0.1.0/9a6edfe775c4f250460eb6ea41baae8e6f3d12b6}
@@ -778,38 +784,49 @@ packages:
   '@paralleldrive/cuid2@2.3.1':
     resolution: {integrity: sha512-XO7cAxhnTZl0Yggq6jOgjiOHhbgcO4NqFqwSmQpjK3b6TEE6Uj/jfSk6wzYyemh3+I0sHirKSetjQwn5cZktFw==}
 
-  '@peculiar/asn1-android@2.9.3':
-    resolution: {integrity: sha512-hiRJvr5ydif9fbTA7czZw1OfgzYDhu5gXNzhDfS3wSXzWYoSS/BHY+Wu2c36CNbn3mI6FoVLf0yHvQy0D4rZWw==}
+  '@peculiar/asn1-android@2.9.4':
+    resolution: {integrity: sha512-SYHm4SoWSI0nRCoos6jpGusIqhPH9bbGBqv7ohlZ+H6BunrDzzQPk2ePgDuEUzV82OdvbLgtW4twUDwhU9P3YQ==}
+    engines: {node: '>=14'}
 
-  '@peculiar/asn1-cms@2.9.3':
-    resolution: {integrity: sha512-N3POfw5RA7efAliAATiudtmvKQqukVEOzrMQuqQY/us2EPKczMy2WiecLt1SX6s3b0OwcFaPUXGF6uIYlBUTbg==}
+  '@peculiar/asn1-cms@2.9.4':
+    resolution: {integrity: sha512-cben7oxmQsUGZqotus7yt0srYdncOT6RNWcTQ77T2RFOXejYVYkXadrfePdRcrVpO9K95IRLKKglG2k38jKXuw==}
+    engines: {node: '>=14'}
 
-  '@peculiar/asn1-csr@2.9.3':
-    resolution: {integrity: sha512-E9zYmC5mk7eiDKqQAOsZGrJ7mUCIDC0031s4Nsl7dj1Za5EBKcHVqY+1vD/a4xbk480PGqvi455W2b4FeHRJ8Q==}
+  '@peculiar/asn1-csr@2.9.4':
+    resolution: {integrity: sha512-xd4YN4vpRjkDAQWVfZZkeu12IEND7DOpkqaHSIHxZl1uggUNa9Ju0QxY2jHvDAS9pP0zhRBytg8ifsnGo3V0jw==}
+    engines: {node: '>=14'}
 
-  '@peculiar/asn1-ecc@2.9.3':
-    resolution: {integrity: sha512-4xmeZiZ46VI2qGbiZPzdv6p9IhMtjWdbwZf3VCgN8OAVcued60ej5Ki2FF94srVH4Ot/h45Co7T5C/fpQXP4rA==}
+  '@peculiar/asn1-ecc@2.9.4':
+    resolution: {integrity: sha512-JJXefFshRAuVAjWQo/39bkg1ywc1VaiO44S8RRC+Ykvf/u2KDmYffoDb0ZBPCR5uJy4AGKQhl8mX+Q8ShcWaXQ==}
+    engines: {node: '>=14'}
 
-  '@peculiar/asn1-pfx@2.9.3':
-    resolution: {integrity: sha512-Nzwoj+fRr1XB9CQuc4AanUuvQ3OIXAY+ngZIYP+eZUqd+Sonj+ZHTnrg+egQuUJ64/iMi9HFPN04MokGrFTK0w==}
+  '@peculiar/asn1-pfx@2.9.4':
+    resolution: {integrity: sha512-khuGzHTzNzk4GDlIBEILyIs6Lce0yn0ZBdoI9v93kmNncfZRhD+AQ5ODFqdhvoE8cMJF/JMTQ8yA+t1D14kqCw==}
+    engines: {node: '>=14'}
 
-  '@peculiar/asn1-pkcs8@2.9.3':
-    resolution: {integrity: sha512-ecGZpkY6Lq5bSgTFU+LS74WjawzDgjWHcjFMVNPH/1C0j53Xi9dmLcPMdmZyk8gdsd2RKeV1fP9EbLB6W6zZ1g==}
+  '@peculiar/asn1-pkcs8@2.9.4':
+    resolution: {integrity: sha512-duRdotlUx9eDZe6QrQpQKl61RbWykCHBCkKayP8V8XdEFwlKHZ8qGGDMyS6Pye7OX7nLFttTTpRkJeet78ckwQ==}
+    engines: {node: '>=14'}
 
-  '@peculiar/asn1-pkcs9@2.9.3':
-    resolution: {integrity: sha512-yjWVrQEmPp2y9lWjLLE28BRHbt7wYdwWvwXjFgNuekP9mDD/ofz31muVI8qOg2as7XZs1bZIZGPPnJ/0osTClQ==}
+  '@peculiar/asn1-pkcs9@2.9.4':
+    resolution: {integrity: sha512-kaL4cNxBpdQE2dKlyZBqz4ygCrwffO+8wfoxTEqM1Z8RadvCeELBRzcv0dzM8aY9azHMwODO5nxU65zXmhToOQ==}
+    engines: {node: '>=14'}
 
-  '@peculiar/asn1-rsa@2.9.3':
-    resolution: {integrity: sha512-t7m3e9p/Gf9YoMM+hLsHUqB+NhOlifiOkENAIG4RV2BFWVGTATVzbXoR8L0EgNWpiriPaeIjBCS5B9PTtkaxQw==}
+  '@peculiar/asn1-rsa@2.9.4':
+    resolution: {integrity: sha512-pZ96eD1PptovcWQ/GSmuNFXd/7EQJNlKfDaNCyE2rx3W0v6QFelkzquVqRSRyyDXXCYD69ZXJDzZ8GhIiQzKoA==}
+    engines: {node: '>=14'}
 
-  '@peculiar/asn1-schema@2.9.3':
-    resolution: {integrity: sha512-SOux4+jikCnOwoJvpBp/grOqzFmJPnNSwe3sAg1Bn93YdmCiDtvolZifJIhiRq0UWMTnLRPj9/ZCMAc2W9VsMQ==}
+  '@peculiar/asn1-schema@2.9.4':
+    resolution: {integrity: sha512-GjzePcT9Iw8NzeOPf73iNS9xM+TBhd/FilAfP+RQGkTMQJTVWtytN3JHJACCjf/ABNau5S7mS3g+DcuxmRgYEg==}
+    engines: {node: '>=14'}
 
-  '@peculiar/asn1-x509-attr@2.9.3':
-    resolution: {integrity: sha512-v5Oa6p7hCT3ONqYHQyTFQYcycD06eMhHbr0m7evpvPQSpWJIq8GgbdnvA9bVGTUlOx6KOeDrX7Z0W4s/yboNTg==}
+  '@peculiar/asn1-x509-attr@2.9.4':
+    resolution: {integrity: sha512-ehQXbpQaQYycgu8OrvigwSPTFfVRcu0ECNYCWw+yzBp02Lw5paRqzzhUpfOgO2K38+WfFZuEz/0RPtam5g0OMg==}
+    engines: {node: '>=14'}
 
-  '@peculiar/asn1-x509@2.9.3':
-    resolution: {integrity: sha512-HE+ejy9dX9JP3yLL6CGYoWym4Cted1lGXH7DxsbNDGiq8KabwVR7mzYidwsyNZ/m0hNWjiS+dzSwrsgMB/OIaQ==}
+  '@peculiar/asn1-x509@2.9.4':
+    resolution: {integrity: sha512-CxhBo/RdEbMMob7T31ZdQjGuoyRFLVwrDzTn25bihzBasRg9kRm/0IxIPvhgQtcK/9dNcO1XQL2fuPugwELL0Q==}
+    engines: {node: '>=14'}
 
   '@peculiar/utils@2.0.3':
     resolution: {integrity: sha512-+oL3HPFRIZ1St2K50lWCXiioIgSoxzz7R1J3uF6neO2yl1sgmpgY6XXJH4BdpoDkMWznQTeYF6oWNDZLCdQ4eQ==}
@@ -1646,8 +1663,8 @@ packages:
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
 
-  '@simplewebauthn/server@13.3.2':
-    resolution: {integrity: sha512-KEDhfcGP1PAKRVSDjA3npTQFqS2b/srm+ipoNBNHdkzrHAlaRQUTE+a5f4ywsx6thxAw1NU2rYcLEY1949RGbQ==}
+  '@simplewebauthn/server@13.3.3':
+    resolution: {integrity: sha512-LelX/lcy5cjc15A86i/aNxHhB5eU7dd20QsbP0VLAf9e38+SLlsnqCCyecx3xqfGofhmX05h1J9fKRYWxw+luA==}
     engines: {node: '>=20.0.0'}
 
   '@standard-schema/spec@1.1.0':
@@ -2015,6 +2032,11 @@ packages:
     engines: {node: '>=0.4.0'}
     hasBin: true
 
+  acorn@8.18.0:
+    resolution: {integrity: sha512-lGq+9yr1/GuAWaVYIHRjvvySG5/4VfKIvC8EWxStPdcDh/Ka7FG3twP6v4d5BkravUilhIAsG4Qj83t02LWUPQ==}
+    engines: {node: '>=0.4.0'}
+    hasBin: true
+
   ajv@6.15.0:
     resolution: {integrity: sha512-fgFx7Hfoq60ytK2c7DhnF8jIvzYgOMxfugjLOSMHjLIPgenqa7S7oaagATUq99mV6IYvN2tRmC0wnTYX6iPbMw==}
 
@@ -2177,6 +2199,10 @@ packages:
   brace-expansion@5.0.6:
     resolution: {integrity: sha512-kLpxurY4Z4r9sgMsyG0Z9uzsBlgiU/EFKhj/h91/8yHu0edo7XuixOIH3VcJ8kkxs6/jPzoI6U9Vj3WqbMQ94g==}
     engines: {node: 18 || 20 || >=22}
+
+  brace-expansion@5.0.9:
+    resolution: {integrity: sha512-ScQ4IuvIEF1TMlP7Zt+vjJ//9zlPb2SDcxWxM3bk8s6t6GGdJ7KO1dCcTidOPJKePW30LE/2cT7wCyPho9/Wxg==}
+    engines: {node: 20 || >=22}
 
   browserslist@4.28.8:
     resolution: {integrity: sha512-V2NpofLblG64mfOtSgDhOJESZEGogzDMBv/q+W6oc4LXWP/q75eOXoOaaOu1EOadB9U4Bwx/e0yzbvwKH8zalA==}
@@ -2606,8 +2632,8 @@ packages:
     resolution: {integrity: sha512-f7ccFPK3SXFHpx15UIGyRJ/FJQctuKZ0zVuN3frBo4HnK3cay9VEW0R6yPYFHC0AgqhukPzKjq22t5DmAyqGyw==}
     engines: {node: '>=16'}
 
-  flatted@3.4.2:
-    resolution: {integrity: sha512-PjDse7RzhcPkIJwy5t7KPWQSZ9cAbzQXcafsetQoD7sOJRQlGikNbx7yZp2OotDnJyrDcbyRq3Ttb18iYOqkxA==}
+  flatted@3.4.4:
+    resolution: {integrity: sha512-5+ybhBZANEJxaH3X5evAFatUxLfEHSr7n6kYJ+1Qd0mUqr4eu9gIf6GDbWHf8RJijHrjjO8G+la14SlL2SeS1Q==}
 
   foreground-child@3.3.1:
     resolution: {integrity: sha512-gIXjKqtFuWEgzFRJA9WCQeSJLZDjgJUOMCMzxtvFq/37KojM1BFGufqsCy0r4qSQmYLsZYMeyRqzIWOMup03sw==}
@@ -3088,6 +3114,10 @@ packages:
 
   minimatch@10.2.5:
     resolution: {integrity: sha512-MULkVLfKGYDFYejP07QOurDLLQpcjk7Fw+7jXS2R2czRQzR56yHRveU5NDJEOviH+hETZKSkIk5c+T23GjFUMg==}
+    engines: {node: 18 || 20 || >=22}
+
+  minimatch@10.2.6:
+    resolution: {integrity: sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A==}
     engines: {node: 18 || 20 || >=22}
 
   minimatch@5.1.9:
@@ -4301,6 +4331,11 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.0': {}
 
+  '@eslint-community/eslint-utils@4.10.1(eslint@10.3.0(jiti@2.7.0))':
+    dependencies:
+      eslint: 10.3.0(jiti@2.7.0)
+      eslint-visitor-keys: 3.4.3
+
   '@eslint-community/eslint-utils@4.9.1(eslint@10.3.0(jiti@2.7.0))':
     dependencies:
       eslint: 10.3.0(jiti@2.7.0)
@@ -4312,7 +4347,7 @@ snapshots:
     dependencies:
       '@eslint/object-schema': 3.0.5
       debug: 4.4.3
-      minimatch: 10.2.5
+      minimatch: 10.2.6
     transitivePeerDependencies:
       - supports-color
 
@@ -4429,7 +4464,9 @@ snapshots:
 
   '@levischuck/tiny-cbor@0.2.11': {}
 
-  '@liam-public/browser-react-ui@0.1.0(@types/react-dom@19.2.3(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@liam-workspace/auth-client@0.2.0': {}
+
+  '@liam-workspace/browser-react-ui@0.1.0(@types/react-dom@19.2.3(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       class-variance-authority: 0.7.1
       clsx: 2.1.1
@@ -4442,28 +4479,33 @@ snapshots:
       - '@types/react'
       - '@types/react-dom'
 
-  '@liam-public/node-config@0.1.0': {}
+  '@liam-workspace/node-auth-server@0.5.2':
+    dependencies:
+      '@liam-workspace/node-webauthn': 0.1.1
+      jose: 6.2.9
 
-  '@liam-public/node-frontend-lint@0.4.0(typescript@6.0.3)':
+  '@liam-workspace/node-config@0.1.0': {}
+
+  '@liam-workspace/node-frontend-lint@0.4.0(typescript@6.0.3)':
     dependencies:
       typescript: 6.0.3
 
-  '@liam-public/node-i18n-lint@0.2.0(typescript@6.0.3)':
+  '@liam-workspace/node-i18n-lint@0.2.0(typescript@6.0.3)':
     dependencies:
       typescript: 6.0.3
 
-  '@liam-public/node-logger@0.1.0':
+  '@liam-workspace/node-logger@0.1.0':
     dependencies:
       pino: 10.3.1
       pino-pretty: 13.1.3
       pino-socket: 7.4.0
 
-  '@liam-public/node-nest-common@0.1.1(@nestjs/common@11.2.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)':
+  '@liam-workspace/node-nest-common@0.1.1(@nestjs/common@11.2.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)':
     dependencies:
       '@nestjs/common': 11.2.1(reflect-metadata@0.2.2)(rxjs@7.8.2)
       rxjs: 7.8.2
 
-  '@liam-public/node-postgres@0.3.1(@types/pg@8.23.1)':
+  '@liam-workspace/node-postgres@0.4.0(@types/pg@8.23.1)':
     dependencies:
       node-pg-migrate: 8.0.4(@types/pg@8.23.1)(pg@8.23.0)
       pg: 8.23.0
@@ -4471,16 +4513,9 @@ snapshots:
       - '@types/pg'
       - pg-native
 
-  '@liam-public/node-webauthn@0.1.1':
+  '@liam-workspace/node-webauthn@0.1.1':
     dependencies:
-      '@simplewebauthn/server': 13.3.2
-
-  '@liam-workspace/auth-client@0.1.1': {}
-
-  '@liam-workspace/node-auth-server@0.5.1':
-    dependencies:
-      '@liam-public/node-webauthn': 0.1.1
-      jose: 6.2.9
+      '@simplewebauthn/server': 13.3.3
 
   '@liam-workspace/platform@0.1.0': {}
 
@@ -4614,84 +4649,84 @@ snapshots:
     dependencies:
       '@noble/hashes': 1.8.0
 
-  '@peculiar/asn1-android@2.9.3':
+  '@peculiar/asn1-android@2.9.4':
     dependencies:
-      '@peculiar/asn1-schema': 2.9.3
+      '@peculiar/asn1-schema': 2.9.4
       asn1js: 3.0.10
       tslib: 2.8.1
 
-  '@peculiar/asn1-cms@2.9.3':
+  '@peculiar/asn1-cms@2.9.4':
     dependencies:
-      '@peculiar/asn1-schema': 2.9.3
-      '@peculiar/asn1-x509': 2.9.3
-      '@peculiar/asn1-x509-attr': 2.9.3
+      '@peculiar/asn1-schema': 2.9.4
+      '@peculiar/asn1-x509': 2.9.4
+      '@peculiar/asn1-x509-attr': 2.9.4
       asn1js: 3.0.10
       tslib: 2.8.1
 
-  '@peculiar/asn1-csr@2.9.3':
+  '@peculiar/asn1-csr@2.9.4':
     dependencies:
-      '@peculiar/asn1-schema': 2.9.3
-      '@peculiar/asn1-x509': 2.9.3
+      '@peculiar/asn1-schema': 2.9.4
+      '@peculiar/asn1-x509': 2.9.4
       asn1js: 3.0.10
       tslib: 2.8.1
 
-  '@peculiar/asn1-ecc@2.9.3':
+  '@peculiar/asn1-ecc@2.9.4':
     dependencies:
-      '@peculiar/asn1-schema': 2.9.3
-      '@peculiar/asn1-x509': 2.9.3
+      '@peculiar/asn1-schema': 2.9.4
+      '@peculiar/asn1-x509': 2.9.4
       asn1js: 3.0.10
       tslib: 2.8.1
 
-  '@peculiar/asn1-pfx@2.9.3':
+  '@peculiar/asn1-pfx@2.9.4':
     dependencies:
-      '@peculiar/asn1-cms': 2.9.3
-      '@peculiar/asn1-pkcs8': 2.9.3
-      '@peculiar/asn1-rsa': 2.9.3
-      '@peculiar/asn1-schema': 2.9.3
+      '@peculiar/asn1-cms': 2.9.4
+      '@peculiar/asn1-pkcs8': 2.9.4
+      '@peculiar/asn1-rsa': 2.9.4
+      '@peculiar/asn1-schema': 2.9.4
       asn1js: 3.0.10
       tslib: 2.8.1
 
-  '@peculiar/asn1-pkcs8@2.9.3':
+  '@peculiar/asn1-pkcs8@2.9.4':
     dependencies:
-      '@peculiar/asn1-schema': 2.9.3
-      '@peculiar/asn1-x509': 2.9.3
+      '@peculiar/asn1-schema': 2.9.4
+      '@peculiar/asn1-x509': 2.9.4
       asn1js: 3.0.10
       tslib: 2.8.1
 
-  '@peculiar/asn1-pkcs9@2.9.3':
+  '@peculiar/asn1-pkcs9@2.9.4':
     dependencies:
-      '@peculiar/asn1-cms': 2.9.3
-      '@peculiar/asn1-pfx': 2.9.3
-      '@peculiar/asn1-pkcs8': 2.9.3
-      '@peculiar/asn1-schema': 2.9.3
-      '@peculiar/asn1-x509': 2.9.3
-      '@peculiar/asn1-x509-attr': 2.9.3
+      '@peculiar/asn1-cms': 2.9.4
+      '@peculiar/asn1-pfx': 2.9.4
+      '@peculiar/asn1-pkcs8': 2.9.4
+      '@peculiar/asn1-schema': 2.9.4
+      '@peculiar/asn1-x509': 2.9.4
+      '@peculiar/asn1-x509-attr': 2.9.4
       asn1js: 3.0.10
       tslib: 2.8.1
 
-  '@peculiar/asn1-rsa@2.9.3':
+  '@peculiar/asn1-rsa@2.9.4':
     dependencies:
-      '@peculiar/asn1-schema': 2.9.3
-      '@peculiar/asn1-x509': 2.9.3
+      '@peculiar/asn1-schema': 2.9.4
+      '@peculiar/asn1-x509': 2.9.4
       asn1js: 3.0.10
       tslib: 2.8.1
 
-  '@peculiar/asn1-schema@2.9.3':
+  '@peculiar/asn1-schema@2.9.4':
     dependencies:
       '@peculiar/utils': 2.0.3
       asn1js: 3.0.10
       tslib: 2.8.1
 
-  '@peculiar/asn1-x509-attr@2.9.3':
+  '@peculiar/asn1-x509-attr@2.9.4':
     dependencies:
-      '@peculiar/asn1-schema': 2.9.3
-      '@peculiar/asn1-x509': 2.9.3
+      '@peculiar/asn1-schema': 2.9.4
+      '@peculiar/asn1-x509': 2.9.4
       asn1js: 3.0.10
       tslib: 2.8.1
 
-  '@peculiar/asn1-x509@2.9.3':
+  '@peculiar/asn1-x509@2.9.4':
     dependencies:
-      '@peculiar/asn1-schema': 2.9.3
+      '@peculiar/asn1-schema': 2.9.4
       '@peculiar/utils': 2.0.3
       asn1js: 3.0.10
       tslib: 2.8.1
@@ -4702,13 +4737,13 @@ snapshots:
 
   '@peculiar/x509@1.14.3':
     dependencies:
-      '@peculiar/asn1-cms': 2.9.3
-      '@peculiar/asn1-csr': 2.9.3
-      '@peculiar/asn1-ecc': 2.9.3
-      '@peculiar/asn1-pkcs9': 2.9.3
-      '@peculiar/asn1-rsa': 2.9.3
-      '@peculiar/asn1-schema': 2.9.3
-      '@peculiar/asn1-x509': 2.9.3
+      '@peculiar/asn1-cms': 2.9.4
+      '@peculiar/asn1-csr': 2.9.4
+      '@peculiar/asn1-ecc': 2.9.4
+      '@peculiar/asn1-pkcs9': 2.9.4
+      '@peculiar/asn1-rsa': 2.9.4
+      '@peculiar/asn1-schema': 2.9.4
+      '@peculiar/asn1-x509': 2.9.4
       pvtsutils: 1.3.6
       reflect-metadata: 0.2.2
       tslib: 2.8.1
@@ -5535,15 +5570,15 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.1': {}
 
-  '@simplewebauthn/server@13.3.2':
+  '@simplewebauthn/server@13.3.3':
     dependencies:
       '@hexagon/base64': 1.1.28
       '@levischuck/tiny-cbor': 0.2.11
-      '@peculiar/asn1-android': 2.9.3
-      '@peculiar/asn1-ecc': 2.9.3
-      '@peculiar/asn1-rsa': 2.9.3
-      '@peculiar/asn1-schema': 2.9.3
-      '@peculiar/asn1-x509': 2.9.3
+      '@peculiar/asn1-android': 2.9.4
+      '@peculiar/asn1-ecc': 2.9.4
+      '@peculiar/asn1-rsa': 2.9.4
+      '@peculiar/asn1-schema': 2.9.4
+      '@peculiar/asn1-x509': 2.9.4
       '@peculiar/x509': 1.14.3
 
   '@standard-schema/spec@1.1.0': {}
@@ -5937,7 +5972,13 @@ snapshots:
     dependencies:
       acorn: 8.17.0
 
+  acorn-jsx@5.3.2(acorn@8.18.0):
+    dependencies:
+      acorn: 8.18.0
+
   acorn@8.17.0: {}
+
+  acorn@8.18.0: {}
 
   ajv@6.15.0:
     dependencies:
@@ -6103,6 +6144,10 @@ snapshots:
       balanced-match: 1.0.2
 
   brace-expansion@5.0.6:
+    dependencies:
+      balanced-match: 4.0.4
+
+  brace-expansion@5.0.9:
     dependencies:
       balanced-match: 4.0.4
 
@@ -6396,7 +6441,7 @@ snapshots:
 
   eslint@10.3.0(jiti@2.7.0):
     dependencies:
-      '@eslint-community/eslint-utils': 4.9.1(eslint@10.3.0(jiti@2.7.0))
+      '@eslint-community/eslint-utils': 4.10.1(eslint@10.3.0(jiti@2.7.0))
       '@eslint-community/regexpp': 4.12.2
       '@eslint/config-array': 0.23.5
       '@eslint/config-helpers': 0.5.5
@@ -6423,7 +6468,7 @@ snapshots:
       imurmurhash: 0.1.4
       is-glob: 4.0.3
       json-stable-stringify-without-jsonify: 1.0.1
-      minimatch: 10.2.5
+      minimatch: 10.2.6
       natural-compare: 1.4.0
       optionator: 0.9.4
     optionalDependencies:
@@ -6439,8 +6484,8 @@ snapshots:
 
   espree@11.2.0:
     dependencies:
-      acorn: 8.17.0
-      acorn-jsx: 5.3.2(acorn@8.17.0)
+      acorn: 8.18.0
+      acorn-jsx: 5.3.2(acorn@8.18.0)
       eslint-visitor-keys: 5.0.1
 
   esquery@1.7.0:
@@ -6555,10 +6600,10 @@ snapshots:
 
   flat-cache@4.0.1:
     dependencies:
-      flatted: 3.4.2
+      flatted: 3.4.4
       keyv: 4.5.4
 
-  flatted@3.4.2: {}
+  flatted@3.4.4: {}
 
   foreground-child@3.3.1:
     dependencies:
@@ -6951,6 +6996,10 @@ snapshots:
   minimatch@10.2.5:
     dependencies:
       brace-expansion: 5.0.6
+
+  minimatch@10.2.6:
+    dependencies:
+      brace-expansion: 5.0.9
 
   minimatch@5.1.9:
     dependencies:

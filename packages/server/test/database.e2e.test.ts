@@ -1,4 +1,4 @@
-import type { PgPool } from "@liam-public/node-postgres"
+import type { PgPool } from "@liam-workspace/node-postgres"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { createTestApp, type TestApp } from "./helpers/app.js"
 import { JOB_POOL, REQUEST_POOL } from "../src/database/tokens.js"

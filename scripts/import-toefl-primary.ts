@@ -22,7 +22,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { promisify } from "node:util"
-import { waitForDatabase } from "@liam-public/node-postgres"
+import { waitForDatabase } from "@liam-workspace/node-postgres"
 import {
   importTestDocument,
   publishDraftVersion,

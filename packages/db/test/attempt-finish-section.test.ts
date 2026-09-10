@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import type { PgQueryable } from "@liam-public/node-postgres"
+import type { PgQueryable } from "@liam-workspace/node-postgres"
 import type pg from "pg"
 import { describe, expect, it, vi } from "vitest"
 import {

@@ -1,4 +1,4 @@
-import type { PgPool } from "@liam-public/node-postgres"
+import type { PgPool } from "@liam-workspace/node-postgres"
 
 /**
  * Wraps a real `PgPool` so any query whose SQL text matches `shouldFail`
@@ -16,7 +16,7 @@ import type { PgPool } from "@liam-public/node-postgres"
  * `this.connect()`, so wrapping via `Object.create`/prototype delegation
  * would hijack every query through this pool, not just the one this test
  * means to poison. Interception happens at the single seam
- * `withTransaction` (`@liam-public/node-postgres`) and `pg.Pool.query`
+ * `withTransaction` (`@liam-workspace/node-postgres`) and `pg.Pool.query`
  * actually use: `.connect()` returns a client, and every query -- explicit
  * or the implicit one behind `pool.query()` -- ultimately runs as
  * `client.query()`.

@@ -81,12 +81,12 @@ per-section history, live multiplayer, SCORM, LTI, Redis, cloud object storage.
 ```
 packages/
 ├── common/   domain types + Zod validators for the JSON interchange format
-├── db/       migrations + repositories  (@liam-public/node-postgres)
+├── db/       migrations + repositories  (@liam-workspace/node-postgres)
 ├── server/   NestJS REST API + JWKS verification and passkey ceremony
 └── app/      Vite + React 19 SPA
 ```
 
-`packages/app` takes its **components from `@liam-public/browser-react-ui`**,
+`packages/app` takes its **components from `@liam-workspace/browser-react-ui`**,
 not from Razzia. Both are Tailwind v4 + Radix, so the kit is the same stack
 already tested and maintained elsewhere — and its `sheet` primitive is exactly
 the collapsible drawer the prototype draws by hand. Copying Razzia's
@@ -112,20 +112,20 @@ dependency.
 
 | Concern                                          | Package                                                                    |
 | ------------------------------------------------ | -------------------------------------------------------------------------- |
-| Pooling, transactions, migrations                | `@liam-public/node-postgres`                                               |
+| Pooling, transactions, migrations                | `@liam-workspace/node-postgres`                                               |
 | `Clock`, `Result`, domain errors                 | `@liam-workspace/platform`                                                 |
-| Environment parsing                              | `@liam-public/node-config`                                                 |
+| Environment parsing                              | `@liam-workspace/node-config`                                                 |
 | Browser OIDC + PKCE                              | `@liam-workspace/auth-client`                                              |
-| React session binding                            | `@liam-public/browser-react-auth`                                          |
-| Bearer + transparent refresh on 401              | `@liam-public/auth-fetch`                                                  |
+| React session binding                            | `@liam-workspace/browser-react-auth`                                          |
+| Bearer + transparent refresh on 401              | `@liam-workspace/auth-fetch`                                                  |
 | Server token verification, passkey ceremony      | `@liam-workspace/node-auth-server`                                         |
-| Passkeys                                         | `@liam-public/node-webauthn`, `@liam-public/browser-webauthn`              |
-| NestJS filters, interceptors, observability      | `@liam-public/node-nest-common`, `@liam-public/node-nest-observability`    |
-| Tailwind v4 + Radix component kit                | `@liam-public/browser-react-ui`                                            |
-| Offline app-shell and API caching                | `@liam-public/vite-preset-pwa`                                             |
-| Browser → backend `traceparent`, Web Vitals      | `@liam-public/browser-telemetry`                                           |
+| Passkeys                                         | `@liam-workspace/node-webauthn`, `@liam-workspace/browser-webauthn`              |
+| NestJS filters, interceptors, observability      | `@liam-workspace/node-nest-common`, `@liam-workspace/node-nest-observability`    |
+| Tailwind v4 + Radix component kit                | `@liam-workspace/browser-react-ui`                                            |
+| Offline app-shell and API caching                | `@liam-workspace/vite-preset-pwa`                                             |
+| Browser → backend `traceparent`, Web Vitals      | `@liam-workspace/browser-telemetry`                                           |
 | Error boundary, error reporting, browser logging | `browser-react-error-boundary`, `browser-error-reporter`, `browser-logger` |
-| Locale text and formatting                       | `@liam-public/i18n`, `@liam-public/text`                                   |
+| Locale text and formatting                       | `@liam-workspace/i18n`, `@liam-workspace/text`                                   |
 | Frontend and i18n lint gates                     | `node-frontend-lint`, `node-i18n-lint`                                     |
 
 There are no `users`, `sessions` or `password` tables to build. Identity is a

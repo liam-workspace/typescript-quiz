@@ -1,4 +1,4 @@
-import type { PgQueryable } from "@liam-public/node-postgres"
+import type { PgQueryable } from "@liam-workspace/node-postgres"
 
 export interface StudentRow {
   id: string

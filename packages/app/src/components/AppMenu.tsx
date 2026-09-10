@@ -1,4 +1,4 @@
-import { DialogTitle } from "@liam-public/browser-react-ui"
+import { DialogTitle } from "@liam-workspace/browser-react-ui"
 import { useRef, type JSX, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
 import { DeviceSheet } from "./DeviceSheet.js"
@@ -16,7 +16,7 @@ export interface AppMenuProps {
   clockStarted: boolean
   /**
    * Passed in, not read from an auth context. The brief reaches for
-   * `useAuth()` from @liam-public/browser-react-auth on the stated
+   * `useAuth()` from @liam-workspace/browser-react-auth on the stated
    * ASSUMPTION that plan 3 mounted an AuthProvider. It did not: nothing in
    * this app mounts one, and `useAuth` throws "useAuth must be used within
    * an AuthProvider" when none is present -- so that version crashed the

@@ -34,7 +34,7 @@ Four workspace packages, built in this order:
 | Package           | What it is                                                            |
 | ----------------- | ---------------------------------------------------------------------- |
 | `packages/common` | Domain types and Zod validators for the test JSON interchange format |
-| `packages/db`     | Migrations and repositories (`@liam-public/node-postgres`)           |
+| `packages/db`     | Migrations and repositories (`@liam-workspace/node-postgres`)           |
 | `packages/server` | NestJS REST API — JWKS verification, grading, media signing          |
 | `packages/app`    | The React 19 + Vite single-page app                                  |
 

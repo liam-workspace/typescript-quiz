@@ -12,7 +12,7 @@ import {
   type SectionScore,
 } from "@pp/common"
 import type { ScoringQuestion } from "@pp/common/scoring"
-import type { PgPool, PgQueryable } from "@liam-public/node-postgres"
+import type { PgPool, PgQueryable } from "@liam-workspace/node-postgres"
 import { InvalidCursorError } from "./catalog.repository.js"
 import { loadForScoring } from "./test-version.repository.js"
 

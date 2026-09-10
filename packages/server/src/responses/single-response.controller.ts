@@ -1,4 +1,4 @@
-import type { PgPool } from "@liam-public/node-postgres"
+import type { PgPool } from "@liam-workspace/node-postgres"
 import type { JwtClaims } from "@liam-workspace/node-auth-server"
 import {
   AttemptNotInProgressError,

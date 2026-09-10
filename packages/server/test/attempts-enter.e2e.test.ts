@@ -1,4 +1,4 @@
-import type { PgPool } from "@liam-public/node-postgres"
+import type { PgPool } from "@liam-workspace/node-postgres"
 import { testDocumentSchema, type TestDocument } from "@pp/common"
 import { randomUUID } from "node:crypto"
 import request from "supertest"

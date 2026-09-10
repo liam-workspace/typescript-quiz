@@ -8,9 +8,9 @@ importers:
 
   .:
     dependencies:
-      '@liam-public/node-postgres':
-        specifier: ^0.3.1
-        version: 0.3.1(@types/pg@8.23.1)
+      '@liam-workspace/node-postgres':
+        specifier: ^0.4.0
+        version: 0.4.0(@types/pg@8.23.1)
       '@pp/common':
         specifier: workspace:*
         version: link:packages/common
@@ -21,10 +21,10 @@ importers:
         specifier: ^8.13.0
         version: 8.23.0
     devDependencies:
-      '@liam-public/node-frontend-lint':
+      '@liam-workspace/node-frontend-lint':
         specifier: ^0.4.0
         version: 0.4.0(typescript@6.0.3)
-      '@liam-public/node-i18n-lint':
+      '@liam-workspace/node-i18n-lint':
         specifier: ^0.2.0
         version: 0.2.0(typescript@6.0.3)
       '@redocly/cli':
@@ -63,12 +63,12 @@ importers:
 
   packages/app:
     dependencies:
-      '@liam-public/browser-react-ui':
+      '@liam-workspace/auth-client':
+        specifier: ^0.2.0
+        version: 0.2.0
+      '@liam-workspace/browser-react-ui':
         specifier: ^0.1.0
         version: 0.1.0(@types/react-dom@19.2.3(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@liam-workspace/auth-client':
-        specifier: ^0.1.1
-        version: 0.1.1
       '@pp/common':
         specifier: workspace:*
         version: link:../common
@@ -155,12 +155,12 @@ importers:
 
   packages/db:
     dependencies:
-      '@liam-public/node-config':
+      '@liam-workspace/node-config':
         specifier: ^0.1.0
         version: 0.1.0
-      '@liam-public/node-postgres':
-        specifier: ^0.3.1
-        version: 0.3.1(@types/pg@8.23.1)
+      '@liam-workspace/node-postgres':
+        specifier: ^0.4.0
+        version: 0.4.0(@types/pg@8.23.1)
       '@pp/common':
         specifier: workspace:*
         version: link:../common
@@ -189,21 +189,21 @@ importers:
 
   packages/server:
     dependencies:
-      '@liam-public/node-config':
-        specifier: ^0.1.0
-        version: 0.1.0
-      '@liam-public/node-logger':
-        specifier: ^0.1.0
-        version: 0.1.0
-      '@liam-public/node-nest-common':
-        specifier: ^0.1.1
-        version: 0.1.1(@nestjs/common@11.2.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
-      '@liam-public/node-postgres':
-        specifier: ^0.3.1
-        version: 0.3.1(@types/pg@8.23.1)
       '@liam-workspace/node-auth-server':
         specifier: ^0.5.1
         version: 0.5.1
+      '@liam-workspace/node-config':
+        specifier: ^0.1.0
+        version: 0.1.0
+      '@liam-workspace/node-logger':
+        specifier: ^0.1.0
+        version: 0.1.0
+      '@liam-workspace/node-nest-common':
+        specifier: ^0.1.1
+        version: 0.1.1(@nestjs/common@11.2.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
+      '@liam-workspace/node-postgres':
+        specifier: ^0.4.0
+        version: 0.4.0(@types/pg@8.23.1)
       '@liam-workspace/platform':
         specifier: ^0.1.0
         version: 0.1.0
@@ -517,47 +517,47 @@ packages:
   '@levischuck/tiny-cbor@0.2.11':
     resolution: {integrity: sha512-llBRm4dT4Z89aRsm6u2oEZ8tfwL/2l6BwpZ7JcyieouniDECM5AqNgr/y08zalEIvW3RSK4upYyybDcmjXqAow==}
 
-  '@liam-public/browser-react-ui@0.1.0':
-    resolution: {integrity: sha512-ZEw5JafkdoOze97HhUZ7GyyKPZZeY1mW2CyXvshSb+a0TFQ3gWF5IHokrjLwPdtT3IN9bXD1pwftEafgvzMhHg==}
+  '@liam-public/node-webauthn@0.1.1':
+    resolution: {integrity: sha512-GdMeEW3muXN/+ub5o6Bdoa9Yhv4Ia+cVU3Wx/LLsPHljAnJXDaqeaOLuf8DbFS2CBhYPIx3cOeP7AqiTaY9vvw==}
+
+  '@liam-workspace/auth-client@0.2.0':
+    resolution: {integrity: sha512-wPfLYN1DS1+R0PKx0frmE6OUySmJw7wnXVks+fCkilR8IH0Azo0OmNM7XN5y/r7uawMEHQxaEe8lSAltU/7BUg==, tarball: https://npm.pkg.github.com/download/@liam-workspace/auth-client/0.2.0/8ae41e506052a3963d211e60c41a9a3aafbf101e}
+
+  '@liam-workspace/browser-react-ui@0.1.0':
+    resolution: {integrity: sha512-7m/pwndwArKtcHu3AqEfRXJDzL6ZC8LJ04JrI5m3qheg91+e5S0XXvjXiLTctFNQENoTSGlE069Yi4I+uhkIhQ==, tarball: https://npm.pkg.github.com/download/@liam-workspace/browser-react-ui/0.1.0/fb9323b6d7062f754cafcd50b49e76c9be696a20}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
 
-  '@liam-public/node-config@0.1.0':
-    resolution: {integrity: sha512-eW17e/X9p0d7Ni2E+NlG1cS2TCG7Yprm+PsJ0iDR07HVwL1OB9/z30qIE6wTDLLqQmSxekv++NxmwqpftJl5RQ==}
+  '@liam-workspace/node-auth-server@0.5.1':
+    resolution: {integrity: sha512-c78LNcTLLQeW3XV4Pvid6S4I1v+oif1Q0itDHgZ1YEoQyh18kCcKf+lo9fCyXdIxclgR4m963IyZgdxP09uwfQ==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-auth-server/0.5.1/a57226121801f3a0851b0926b3528fddc808bbb3}
 
-  '@liam-public/node-frontend-lint@0.4.0':
-    resolution: {integrity: sha512-3tQpNRVR5cyrfwqGmih79yHNhMNk6bH4tM7U/T322gt3ZRbCG8uSENATKfMw6skXKekvbzWVfnXcMxoI4tnUxg==}
+  '@liam-workspace/node-config@0.1.0':
+    resolution: {integrity: sha512-ULuIu7TpFIpGwlArqbe0k1h6QshiXTrW0cEc6q7OWjFYaoMPGxqfeLuR2Ql6Bc3KZupw7B2UdIy+BZ6PHeJl2g==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-config/0.1.0/86e17fbad5c1e48ef95083da9995c9b5c23258d7}
+
+  '@liam-workspace/node-frontend-lint@0.4.0':
+    resolution: {integrity: sha512-xC3Ar6Guerpba5XDNx1Fhyq0CWdZR4T5TydRAS6fHZNW1yeKqIg5FvOGHUiRB+wNbNnTSu229iUrpBJ29kPQpw==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-frontend-lint/0.4.0/e738aff41f020507457bd66d01ee6a5c0decbdf9}
     hasBin: true
     peerDependencies:
       typescript: '>=5.0.0'
 
-  '@liam-public/node-i18n-lint@0.2.0':
-    resolution: {integrity: sha512-aae0Pf2pdu8GbWVhHG50vSVu+IoDRHLnn7U56IkGPEcWmMIYHUw4AnYUURvsJy2CU/rxkutF6PlNp4v/2VE1Zg==}
+  '@liam-workspace/node-i18n-lint@0.2.0':
+    resolution: {integrity: sha512-RAl/C7WhZL4T7GDFAxrBnwSjWT+fOX3TKcAzK0Q5ZuO4FRKFxrGKOuE6hASJ0wuTFtP5WPRIyJWesBvjLXagyQ==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-i18n-lint/0.2.0/da6c8107b2bd40205ecc16492e170b0e3378002d}
     hasBin: true
     peerDependencies:
       typescript: '>=5.0.0'
 
-  '@liam-public/node-logger@0.1.0':
-    resolution: {integrity: sha512-WrcO4OMWfrdSYSsv0TPOfHE9ySuhAvZxt2Nlp0p5JRNj61JDA4kLjwEug10WmPYGZDwD6n24AD66bNBZaGCWEg==}
+  '@liam-workspace/node-logger@0.1.0':
+    resolution: {integrity: sha512-lUrPfwgP0rw/Mj3K6mda9fE8yujQDgI8MTrkZ/3wKs1spP/yjAvVxc6Jba9MpW+6lAD/CaTvq3Ph8CibiXcoag==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-logger/0.1.0/8bff07954bcc3f4e201bbc9371f142230c92f924}
 
-  '@liam-public/node-nest-common@0.1.1':
-    resolution: {integrity: sha512-9gFZ3UBMjt6ydwY81YTh3UifYplQYUv17EVjkAiz3pBIdb2hl/BKA5eFRIhhD/UZ6UKQWJU1G1KM9Qy6NhjivQ==}
+  '@liam-workspace/node-nest-common@0.1.1':
+    resolution: {integrity: sha512-MZZKcOkLrCO9BOaeplTi21Lo6ZK+dnVdHxwQ4ejOyBs+Y/k6kwvVXi89fIWqiayoJExUN2iPNLE1atn0s8aXZg==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-nest-common/0.1.1/19fa59d9dbf4c1fbcf74d049188e9ea007925908}
     peerDependencies:
       '@nestjs/common': ^11.0.0
       rxjs: ^7.8.1
 
-  '@liam-public/node-postgres@0.3.1':
-    resolution: {integrity: sha512-M6m8VgdG8FW9/u4t7V6MUO3panoe1BnWNKqDUa2hYMF864w+dgvNEnkNzIwtpNow8lrobDPv9oRZyl2YxFQKgg==}
-
-  '@liam-public/node-webauthn@0.1.1':
-    resolution: {integrity: sha512-GdMeEW3muXN/+ub5o6Bdoa9Yhv4Ia+cVU3Wx/LLsPHljAnJXDaqeaOLuf8DbFS2CBhYPIx3cOeP7AqiTaY9vvw==}
-
-  '@liam-workspace/auth-client@0.1.1':
-    resolution: {integrity: sha512-B2N5fnnaDEUBgXCYr+/wGhaIw0DxR0J6O3EBSGLSH7T6SbxzfozNBsPeylsrEwuxdsFQDeCUpZgnVwzfmtl+LQ==, tarball: https://npm.pkg.github.com/download/@liam-workspace/auth-client/0.1.1/59d837cc0c220c2557ef0bf50e86405f37e7b32c}
-
-  '@liam-workspace/node-auth-server@0.5.1':
-    resolution: {integrity: sha512-c78LNcTLLQeW3XV4Pvid6S4I1v+oif1Q0itDHgZ1YEoQyh18kCcKf+lo9fCyXdIxclgR4m963IyZgdxP09uwfQ==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-auth-server/0.5.1/a57226121801f3a0851b0926b3528fddc808bbb3}
+  '@liam-workspace/node-postgres@0.4.0':
+    resolution: {integrity: sha512-wFhQB2cimcZOI36I9ic93dYtNFszpwAr1ES7ZrcoKNx+Gqp+hcscPXK1qkFDL2OA2Fb/mFNROHNdJr1YbqFFsg==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-postgres/0.4.0/458d4b168065a364a28d23cec5d03cd31478aef5}
 
   '@liam-workspace/platform@0.1.0':
     resolution: {integrity: sha512-dd6Pb8BzxgNBjmVkTBtO5TlcvcsfqgYlVfnNSiX76u/o8nJd5Sht/gEydsqxOrisTf6trDTDGQjVcNxd2eoNZA==, tarball: https://npm.pkg.github.com/download/@liam-workspace/platform/0.1.0/9a6edfe775c4f250460eb6ea41baae8e6f3d12b6}
@@ -4429,7 +4429,13 @@ snapshots:
 
   '@levischuck/tiny-cbor@0.2.11': {}
 
-  '@liam-public/browser-react-ui@0.1.0(@types/react-dom@19.2.3(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@liam-public/node-webauthn@0.1.1':
+    dependencies:
+      '@simplewebauthn/server': 13.3.2
+
+  '@liam-workspace/auth-client@0.2.0': {}
+
+  '@liam-workspace/browser-react-ui@0.1.0(@types/react-dom@19.2.3(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       class-variance-authority: 0.7.1
       clsx: 2.1.1
@@ -4442,45 +4448,39 @@ snapshots:
       - '@types/react'
       - '@types/react-dom'
 
-  '@liam-public/node-config@0.1.0': {}
+  '@liam-workspace/node-auth-server@0.5.1':
+    dependencies:
+      '@liam-public/node-webauthn': 0.1.1
+      jose: 6.2.9
 
-  '@liam-public/node-frontend-lint@0.4.0(typescript@6.0.3)':
+  '@liam-workspace/node-config@0.1.0': {}
+
+  '@liam-workspace/node-frontend-lint@0.4.0(typescript@6.0.3)':
     dependencies:
       typescript: 6.0.3
 
-  '@liam-public/node-i18n-lint@0.2.0(typescript@6.0.3)':
+  '@liam-workspace/node-i18n-lint@0.2.0(typescript@6.0.3)':
     dependencies:
       typescript: 6.0.3
 
-  '@liam-public/node-logger@0.1.0':
+  '@liam-workspace/node-logger@0.1.0':
     dependencies:
       pino: 10.3.1
       pino-pretty: 13.1.3
       pino-socket: 7.4.0
 
-  '@liam-public/node-nest-common@0.1.1(@nestjs/common@11.2.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)':
+  '@liam-workspace/node-nest-common@0.1.1(@nestjs/common@11.2.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)':
     dependencies:
       '@nestjs/common': 11.2.1(reflect-metadata@0.2.2)(rxjs@7.8.2)
       rxjs: 7.8.2
 
-  '@liam-public/node-postgres@0.3.1(@types/pg@8.23.1)':
+  '@liam-workspace/node-postgres@0.4.0(@types/pg@8.23.1)':
     dependencies:
       node-pg-migrate: 8.0.4(@types/pg@8.23.1)(pg@8.23.0)
       pg: 8.23.0
     transitivePeerDependencies:
       - '@types/pg'
       - pg-native
-
-  '@liam-public/node-webauthn@0.1.1':
-    dependencies:
-      '@simplewebauthn/server': 13.3.2
-
-  '@liam-workspace/auth-client@0.1.1': {}
-
-  '@liam-workspace/node-auth-server@0.5.1':
-    dependencies:
-      '@liam-public/node-webauthn': 0.1.1
-      jose: 6.2.9
 
   '@liam-workspace/platform@0.1.0': {}
 

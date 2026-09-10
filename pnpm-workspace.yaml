@@ -11,6 +11,10 @@ allowBuilds:
 
 minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
+  # First-party packages, published by our own pipeline. The freshness guard
+  # exists to blunt a third-party takeover; it cannot protect against us, and
+  # without this every first-party release is unusable here for 7 days.
+  - "@liam-workspace/*"
   - "@tanstack/router-core"
   - "@tanstack/router-generator"
   - "@testing-library/user-event"

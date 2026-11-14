@@ -26,8 +26,7 @@ function parseBareOrigin(name: string, value: string | undefined): string {
     throw new Error(`${name} must be a bare origin`)
   }
 
-  const loopback =
-    url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname)
+  const loopback = url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname)
 
   if (
     url.origin === "null" ||

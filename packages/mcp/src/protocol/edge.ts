@@ -21,13 +21,19 @@ export function sendChallenge(res: Response, config: GatewayConfig): void {
 
 export function createOriginGuard(config: GatewayConfig): RequestHandler {
   const expectedHost = new URL(config.publicOrigin).host.toLowerCase()
-  const allowedOrigins = new Set([config.publicOrigin, ...config.allowedOrigins])
+  const allowedOrigins = new Set([
+    config.publicOrigin,
+    ...config.allowedOrigins,
+  ])
 
   return (req, res, next) => {
     const host = req.headers.host?.toLowerCase()
     const origin = req.headers.origin
 
-    if (host !== expectedHost || (origin !== undefined && !allowedOrigins.has(origin))) {
+    if (
+      host !== expectedHost ||
+      (origin !== undefined && !allowedOrigins.has(origin))
+    ) {
       res.status(403).end()
       return
     }

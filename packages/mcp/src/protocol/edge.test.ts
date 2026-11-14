@@ -41,13 +41,19 @@ describe("MCP protocol edge", () => {
     const guard = createOriginGuard(config)
     const denied = response()
     const next = vi.fn()
-    guard({ headers: { host: "evil.example.test" } } as never, denied as never, next)
+    guard(
+      { headers: { host: "evil.example.test" } } as never,
+      denied as never,
+      next,
+    )
     expect(denied.status).toHaveBeenCalledWith(403)
     expect(next).not.toHaveBeenCalled()
 
     const allowed = response()
     guard(
-      { headers: { host: "MCP.EXAMPLE.TEST", origin: "https://claude.ai" } } as never,
+      {
+        headers: { host: "MCP.EXAMPLE.TEST", origin: "https://claude.ai" },
+      } as never,
       allowed as never,
       next,
     )

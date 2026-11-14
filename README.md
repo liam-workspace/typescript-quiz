@@ -31,10 +31,10 @@ answers.
 
 Four workspace packages, built in this order:
 
-| Package           | What it is                                                            |
-| ----------------- | ---------------------------------------------------------------------- |
+| Package           | What it is                                                           |
+| ----------------- | -------------------------------------------------------------------- |
 | `packages/common` | Domain types and Zod validators for the test JSON interchange format |
-| `packages/db`     | Migrations and repositories (`@liam-workspace/node-postgres`)           |
+| `packages/db`     | Migrations and repositories (`@liam-workspace/node-postgres`)        |
 | `packages/server` | NestJS REST API — JWKS verification, grading, media signing          |
 | `packages/app`    | The React 19 + Vite single-page app                                  |
 
@@ -92,6 +92,23 @@ to the production issuer; `ALLOWED_EMAILS` defaults to empty, which rejects
 every sign-in until it is set — see the comments in `compose.yml` for both.
 
 The application will be available at http://localhost:3000.
+
+### MCP gateway
+
+The MCP gateway is a separate process. Configure `MCP_PUBLIC_ORIGIN` (the
+gateway's public origin), `MCP_AUTHORIZATION_SERVER` (the existing OIDC
+issuer), and `API_BASE_URL` (this API's public origin), then run:
+
+```bash
+pnpm dev:mcp
+```
+
+It serves Streamable HTTP at `POST /mcp` and OAuth protected-resource metadata
+at `/.well-known/oauth-protected-resource`. The selected MCP client completes
+the authorization-code/PKCE flow with the configured issuer and presents its
+JWT to the gateway; the issuer must accept that client's registration and
+redirect URI. The gateway offers only read-only tools for published tests and
+completed-attempt history, results, and review.
 
 ### 🛠️ Without Docker
 

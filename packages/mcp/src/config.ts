@@ -5,6 +5,7 @@ export interface GatewayConfig {
   readonly authorizationServer: string
   readonly apiBaseUrl: string
   readonly port: number
+  readonly bindHost: string
   readonly apiTimeoutMs: number
   readonly allowedOrigins: readonly string[]
 }
@@ -65,6 +66,16 @@ function parseInteger(
   return number
 }
 
+function parseBindHost(value: string | undefined): string {
+  const host = value ?? "127.0.0.1"
+
+  if (!host || /\s/.test(host)) {
+    throw new Error("MCP_BIND_HOST must be a non-empty host name or IP address")
+  }
+
+  return host
+}
+
 function parseAllowedOrigins(value: string | undefined): readonly string[] {
   if (!value) {
     return Object.freeze([])
@@ -88,6 +99,7 @@ export function loadGatewayConfig(env: Environment): GatewayConfig {
     ),
     apiBaseUrl: parseBareOrigin("API_BASE_URL", env.API_BASE_URL),
     port: parseInteger("MCP_PORT", env.MCP_PORT, 3100, 1, 65_535),
+    bindHost: parseBindHost(env.MCP_BIND_HOST),
     apiTimeoutMs: parseInteger(
       "MCP_API_TIMEOUT_MS",
       env.MCP_API_TIMEOUT_MS,

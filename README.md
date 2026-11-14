@@ -103,6 +103,10 @@ issuer), and `API_BASE_URL` (this API's public origin), then run:
 pnpm dev:mcp
 ```
 
+It binds to `127.0.0.1:3100` by default. Set `MCP_BIND_HOST=0.0.0.0` when
+the gateway runs behind a container or reverse proxy, and set `MCP_PORT` when
+the default port is unavailable.
+
 It serves Streamable HTTP at `POST /mcp` and OAuth protected-resource metadata
 at `/.well-known/oauth-protected-resource`. The selected MCP client completes
 the authorization-code/PKCE flow with the configured issuer and presents its

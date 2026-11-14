@@ -14,6 +14,7 @@ describe("loadGatewayConfig", () => {
       authorizationServer: "https://auth.example.test",
       apiBaseUrl: "https://api.example.test",
       port: 3100,
+      bindHost: "127.0.0.1",
       apiTimeoutMs: 10_000,
       allowedOrigins: [],
     })
@@ -26,6 +27,7 @@ describe("loadGatewayConfig", () => {
         MCP_PUBLIC_ORIGIN: "http://localhost:3100",
         API_BASE_URL: "http://127.0.0.1:3000",
         MCP_PORT: "3101",
+        MCP_BIND_HOST: "::1",
         MCP_API_TIMEOUT_MS: "1200",
         MCP_ALLOWED_ORIGINS: "https://claude.ai, http://localhost:3001",
       }),
@@ -34,6 +36,7 @@ describe("loadGatewayConfig", () => {
       authorizationServer: "https://auth.example.test",
       apiBaseUrl: "http://127.0.0.1:3000",
       port: 3101,
+      bindHost: "::1",
       apiTimeoutMs: 1200,
       allowedOrigins: ["https://claude.ai", "http://localhost:3001"],
     })

@@ -8,6 +8,7 @@ const config: GatewayConfig = {
   authorizationServer: "https://auth.example.test",
   apiBaseUrl: "https://api.example.test",
   port: 3100,
+  bindHost: "127.0.0.1",
   apiTimeoutMs: 10_000,
   allowedOrigins: ["https://claude.ai"],
 }

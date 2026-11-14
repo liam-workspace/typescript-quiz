@@ -9,3 +9,4 @@ release.json
 web2
 .playwright-mcp/
 .worktrees/
+.superpowers/

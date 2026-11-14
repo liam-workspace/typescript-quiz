@@ -1,5 +1,5 @@
 import request from "supertest"
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import type { GatewayConfig } from "../config.js"
 import { createGatewayApp } from "./create-app.js"
 
@@ -13,6 +13,7 @@ const config: GatewayConfig = {
 }
 
 describe("createGatewayApp", () => {
+  afterEach(() => vi.unstubAllGlobals())
   it("serves protected-resource discovery and only accepts POST for MCP", async () => {
     const app = createGatewayApp(config)
     await request(app)
@@ -34,5 +35,16 @@ describe("createGatewayApp", () => {
       .set("Host", "evil.example.test")
       .send({ jsonrpc: "2.0", id: 1, method: "initialize" })
       .expect(403)
+  })
+
+  it("challenges an initialize request when the API rejects its bearer", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })))
+    await request(createGatewayApp(config))
+      .post("/mcp")
+      .set("Host", "mcp.example.test")
+      .set("Authorization", "Bearer aaa.bbb.ccc")
+      .send({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} })
+      .expect("WWW-Authenticate", /resource_metadata/)
+      .expect(401)
   })
 })

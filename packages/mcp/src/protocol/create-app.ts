@@ -1,7 +1,7 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js"
 import express, { type Express, type Request, type Response } from "express"
 import type { GatewayConfig } from "../config.js"
-import { createApiClient } from "../api/client.js"
+import { ApiError, createApiClient } from "../api/client.js"
 import { createOriginGuard, extractBearer, sendChallenge } from "./edge.js"
 import { METADATA_PATHS, protectedResourceMetadata } from "./metadata.js"
 import { buildMcpServer } from "./mcp-server.js"
@@ -67,9 +67,29 @@ export function createGatewayApp(config: GatewayConfig): Express {
         sendChallenge(res, config)
         return
       }
+    const api = createApiClient(config, bearer)
+    const method =
+      typeof req.body === "object" && req.body !== null
+        ? (req.body as { method?: unknown }).method
+        : undefined
+
+    // `initialize` otherwise has no reason to touch the API. Probe the same
+    // authenticated student endpoint that tools/list uses, so a JWT-shaped
+    // but invalid/expired token gets the OAuth challenge before the client
+    // considers the MCP session established.
+    if (method === "initialize") {
+      try {
+        await api.get("/api/me")
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) {
+          sendChallenge(res, config)
+          return
+        }
+      }
+    }
       let challenge = false
       const server = buildMcpServer({
-        api: createApiClient(config, bearer),
+      api,
         onChallenge: () => {
           challenge = true
         },

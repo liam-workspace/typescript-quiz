@@ -29,16 +29,14 @@ async function sendWebResponse(
 
 function rejectBatch(req: Request, res: Response, next: () => void): void {
   if (Array.isArray(req.body)) {
-    res
-      .status(400)
-      .json({
-        jsonrpc: "2.0",
-        id: null,
-        error: {
-          code: -32600,
-          message: "Invalid Request: batches are not supported",
-        },
-      })
+    res.status(400).json({
+      jsonrpc: "2.0",
+      id: null,
+      error: {
+        code: -32600,
+        message: "Invalid Request: batches are not supported",
+      },
+    })
     return
   }
   next()
@@ -67,29 +65,29 @@ export function createGatewayApp(config: GatewayConfig): Express {
         sendChallenge(res, config)
         return
       }
-    const api = createApiClient(config, bearer)
-    const method =
-      typeof req.body === "object" && req.body !== null
-        ? (req.body as { method?: unknown }).method
-        : undefined
+      const api = createApiClient(config, bearer)
+      const method =
+        typeof req.body === "object" && req.body !== null
+          ? (req.body as { method?: unknown }).method
+          : undefined
 
-    // `initialize` otherwise has no reason to touch the API. Probe the same
-    // authenticated student endpoint that tools/list uses, so a JWT-shaped
-    // but invalid/expired token gets the OAuth challenge before the client
-    // considers the MCP session established.
-    if (method === "initialize") {
-      try {
-        await api.get("/api/me")
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 401) {
-          sendChallenge(res, config)
-          return
+      // `initialize` otherwise has no reason to touch the API. Probe the same
+      // authenticated student endpoint that tools/list uses, so a JWT-shaped
+      // but invalid/expired token gets the OAuth challenge before the client
+      // considers the MCP session established.
+      if (method === "initialize") {
+        try {
+          await api.get("/api/me")
+        } catch (error) {
+          if (error instanceof ApiError && error.status === 401) {
+            sendChallenge(res, config)
+            return
+          }
         }
       }
-    }
       let challenge = false
       const server = buildMcpServer({
-      api,
+        api,
         onChallenge: () => {
           challenge = true
         },
@@ -118,32 +116,26 @@ export function createGatewayApp(config: GatewayConfig): Express {
     if (res.headersSent) return
     const type = (error as { type?: unknown } | null)?.type
     if (type === "entity.parse.failed") {
-      res
-        .status(400)
-        .json({
-          jsonrpc: "2.0",
-          id: null,
-          error: { code: -32700, message: "Parse error" },
-        })
+      res.status(400).json({
+        jsonrpc: "2.0",
+        id: null,
+        error: { code: -32700, message: "Parse error" },
+      })
       return
     }
     if (type === "entity.too.large") {
-      res
-        .status(413)
-        .json({
-          jsonrpc: "2.0",
-          id: null,
-          error: { code: -32600, message: "Invalid Request: body too large" },
-        })
-      return
-    }
-    res
-      .status(500)
-      .json({
+      res.status(413).json({
         jsonrpc: "2.0",
         id: null,
-        error: { code: -32603, message: "Internal error" },
+        error: { code: -32600, message: "Invalid Request: body too large" },
       })
+      return
+    }
+    res.status(500).json({
+      jsonrpc: "2.0",
+      id: null,
+      error: { code: -32603, message: "Internal error" },
+    })
   })
   return app
 }

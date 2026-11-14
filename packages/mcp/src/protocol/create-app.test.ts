@@ -38,7 +38,10 @@ describe("createGatewayApp", () => {
   })
 
   it("challenges an initialize request when the API rejects its bearer", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })))
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status: 401 })),
+    )
     await request(createGatewayApp(config))
       .post("/mcp")
       .set("Host", "mcp.example.test")

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import type pg from "pg"
 import { describe, expect, it } from "vitest"
 import {
+  DraftNotFoundError,
   publishDraftVersion,
   type PublishViolation,
 } from "../src/repositories/publish.repository.js"
@@ -69,6 +70,85 @@ function codesOf(violations: PublishViolation[]): string[] {
 }
 
 describe("publishDraftVersion", () => {
+  it("holds the draft lock before each content validation query", async () => {
+    await withDatabase(async (pool) => {
+      const draft = await insertValidDraft(pool)
+      const publisher = await pool.connect()
+      const writer = await pool.connect()
+      const checkedValidations: string[] = []
+      const interceptedPublisher = {
+        query: async (...args: Parameters<pg.PoolClient["query"]>) => {
+          const [statement] = args
+
+          if (
+            typeof statement === "string" &&
+            (statement.includes("FROM publication_violation") ||
+              statement.includes("FROM stimulus st"))
+          ) {
+            // A draft writer must take this same row lock. NOWAIT proves
+            // publication holds it already, without relying on timing.
+            await expect(
+              writer.query(
+                "SELECT id FROM test_version WHERE id = $1 FOR UPDATE NOWAIT",
+                [draft.versionId],
+              ),
+            ).rejects.toMatchObject({ code: "55P03" })
+            checkedValidations.push(statement)
+          }
+
+          return Promise.resolve(publisher.query(...args))
+        },
+        release: publisher.release.bind(publisher),
+      } as pg.PoolClient
+      const publishingPool = {
+        connect: () => Promise.resolve(interceptedPublisher),
+      } as pg.Pool
+
+      try {
+        const result = await publishDraftVersion(publishingPool, {
+          testId: draft.testId,
+          now: new Date(),
+        })
+
+        expect(result.ok).toBe(true)
+        expect(checkedValidations).toHaveLength(2)
+        // The lock belongs to publication's transaction and ends at commit.
+        await expect(
+          writer.query(
+            "SELECT id FROM test_version WHERE id = $1 FOR UPDATE NOWAIT",
+            [draft.versionId],
+          ),
+        ).resolves.toMatchObject({ rowCount: 1 })
+      } finally {
+        writer.release()
+      }
+    })
+  }, 120_000)
+
+  it.each(["missing test", "published version"])(
+    "throws DraftNotFoundError for a %s",
+    async (scenario) => {
+      await withDatabase(async (pool) => {
+        const draft = await insertValidDraft(pool)
+
+        if (scenario === "published version") {
+          await publishDraftVersion(pool, {
+            testId: draft.testId,
+            now: new Date(),
+          })
+        }
+
+        await expect(
+          publishDraftVersion(pool, {
+            testId: scenario === "missing test" ? randomUUID() : draft.testId,
+            now: new Date(),
+          }),
+        ).rejects.toBeInstanceOf(DraftNotFoundError)
+      })
+    },
+    120_000,
+  )
+
   it("publishes a valid draft and stamps published_at", async () => {
     await withDatabase(async (pool) => {
       const draft = await insertValidDraft(pool)

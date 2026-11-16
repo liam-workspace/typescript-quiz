@@ -1,4 +1,7 @@
-import { withTransaction, type PgQueryable } from "@liam-workspace/node-postgres"
+import {
+  withTransaction,
+  type PgQueryable,
+} from "@liam-workspace/node-postgres"
 import type pg from "pg"
 
 export interface PublishViolation {
@@ -117,7 +120,8 @@ async function publishInTransaction(
 > {
   const { rows: draftRows } = await tx.query<DraftRow>(
     `SELECT id, version, test_id FROM test_version
-      WHERE test_id = $1 AND published_at IS NULL`,
+      WHERE test_id = $1 AND published_at IS NULL
+      FOR UPDATE`,
     [input.testId],
   )
 

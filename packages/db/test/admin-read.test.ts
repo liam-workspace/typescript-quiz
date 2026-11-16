@@ -3,6 +3,7 @@ import type pg from "pg"
 import { describe, expect, it } from "vitest"
 import {
   listAdminLearners,
+  listAdminQuestions,
   listAdminResults,
   listAdminTests,
   loadAdminAttemptDetail,
@@ -10,6 +11,7 @@ import {
   loadAdminTestDetail,
 } from "../src/admin.js"
 import { InvalidCursorError } from "../src/repositories/catalog.repository.js"
+import { loadForRunner } from "../src/index.js"
 import { withDatabase } from "./helpers/database.js"
 import { seedPublishedTest, type Fixture } from "./helpers/fixtures.js"
 
@@ -24,6 +26,54 @@ async function addDraft(pool: pg.Pool, testId: string): Promise<string> {
   )
 
   return id
+}
+
+async function addDraftQuestions(
+  pool: pg.Pool,
+  versionId: string,
+  prompts: string[],
+): Promise<string[]> {
+  const sectionId = randomUUID()
+  const groupId = randomUUID()
+  await pool.query(
+    `INSERT INTO test_section (id, test_version_id, ordinal, title, type,
+       duration_seconds, navigation, allow_answer_change)
+     VALUES ($1, $2, 1, 'Draft reading', 'reading', 600, 'free', true)`,
+    [sectionId, versionId],
+  )
+  await pool.query(
+    `INSERT INTO question_group (id, test_version_id, test_section_id, ordinal)
+     VALUES ($1, $2, $3, 1)`,
+    [groupId, versionId, sectionId],
+  )
+
+  return Promise.all(
+    prompts.map(async (prompt, index) => {
+      const id = `f0000000-0000-0000-0000-${String(index + 1).padStart(12, "0")}`
+      await pool.query(
+        `INSERT INTO question (id, test_version_id, question_group_id,
+         question_key, ordinal, prompt, type, points)
+       VALUES ($1, $2, $3, $4, $5, $6, 'single_choice', 1)`,
+        [id, versionId, groupId, `draft-${index}`, index + 1, prompt],
+      )
+      // Insert in reverse order to exercise the projection's choice ordering.
+      await pool.query(
+        `INSERT INTO choice (id, question_id, ordinal, label, is_correct)
+       VALUES ($2, $1, 2, 'Incorrect', false), ($3, $1, 1, 'Correct', true)`,
+        [
+          id,
+          id.replace("f0000000", "f2000000"),
+          id.replace("f0000000", "f1000000"),
+        ],
+      )
+
+      return id
+    }),
+  )
+}
+
+function questionIds(questions: Array<{ id: string }>): string[] {
+  return questions.map((question) => question.id)
 }
 
 async function finishAttempt(
@@ -54,6 +104,150 @@ async function finishAttempt(
 }
 
 describe("admin read projections", () => {
+  it("lists only latest-version questions, including unpublished drafts", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const initial = await listAdminQuestions(pool, {
+        ...page,
+        testId: f.testId,
+      })
+      expect(questionIds(initial.items)).toEqual(f.questionIds)
+
+      const versionId = await addDraft(pool, f.testId)
+      const ids = await addDraftQuestions(pool, versionId, ["Draft question"])
+      expect(
+        await listAdminQuestions(pool, { ...page, testId: f.testId }),
+      ).toMatchObject({
+        items: [{ id: ids[0], prompt: "Draft question" }],
+        nextCursor: null,
+      })
+    })
+  }, 120_000)
+
+  it("bounds question pages and continues through tied prompts without repeats", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const versionId = await addDraft(pool, f.testId)
+      const ids = await addDraftQuestions(pool, versionId, [
+        "Same",
+        "Same",
+        "Zebra",
+      ])
+      const first = await listAdminQuestions(pool, { limit: 1, cursor: null })
+      expect(questionIds(first.items)).toEqual([ids[0]])
+      expect(first.nextCursor).not.toBeNull()
+      const second = await listAdminQuestions(pool, {
+        limit: 1,
+        cursor: first.nextCursor,
+      })
+      expect(questionIds(second.items)).toEqual([ids[1]])
+      expect(second.nextCursor).not.toBeNull()
+      const third = await listAdminQuestions(pool, {
+        limit: 1,
+        cursor: second.nextCursor,
+      })
+      expect(questionIds(third.items)).toEqual([ids[2]])
+      expect(third.nextCursor).toBeNull()
+    })
+  }, 120_000)
+
+  it("restricts question search to the requested test and matches prompts case-insensitively", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const otherTestId = randomUUID()
+      const otherVersionId = randomUUID()
+      await pool.query(`INSERT INTO test (id, slug) VALUES ($1, 'other')`, [
+        otherTestId,
+      ])
+      await pool.query(
+        `INSERT INTO test_version (id, test_id, version, title, duration_seconds)
+         VALUES ($1, $2, 1, 'Other test', 600)`,
+        [otherVersionId, otherTestId],
+      )
+      const ids = await addDraftQuestions(pool, otherVersionId, [
+        "What is this draft?",
+      ])
+      expect(
+        (await listAdminQuestions(pool, { ...page, search: "WHAT" })).items,
+      ).toHaveLength(2)
+      expect(
+        (
+          await listAdminQuestions(pool, {
+            ...page,
+            testId: otherTestId,
+            search: "WHAT",
+          })
+        ).items,
+      ).toMatchObject([{ id: ids[0] }])
+      expect(
+        (
+          await listAdminQuestions(pool, {
+            ...page,
+            testId: f.testId,
+            search: "WHAT",
+          })
+        ).items,
+      ).toMatchObject([{ id: f.questionIds[0] }])
+      expect(
+        await listAdminQuestions(pool, { ...page, testId: randomUUID() }),
+      ).toEqual({ items: [], nextCursor: null })
+      expect(
+        await listAdminQuestions(pool, { ...page, search: "absent" }),
+      ).toEqual({ items: [], nextCursor: null })
+    })
+  }, 120_000)
+
+  it("returns ordered correct-choice data only through the admin question surface", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const versionId = await addDraft(pool, f.testId)
+      const ids = await addDraftQuestions(pool, versionId, ["Draft question"])
+      const result = await listAdminQuestions(pool, page)
+      expect(result).toEqual({
+        items: [
+          {
+            id: ids[0],
+            prompt: "Draft question",
+            choices: [
+              {
+                id: "f1000000-0000-0000-0000-000000000001",
+                label: "Correct",
+                isCorrect: true,
+              },
+              {
+                id: "f2000000-0000-0000-0000-000000000001",
+                label: "Incorrect",
+                isCorrect: false,
+              },
+            ],
+          },
+        ],
+        nextCursor: null,
+      })
+      expect(
+        JSON.stringify(await loadForRunner(pool, versionId, null)),
+      ).not.toContain("isCorrect")
+      expect(await import("../src/index.js")).not.toHaveProperty(
+        "listAdminQuestions",
+      )
+    })
+  }, 120_000)
+
+  it("rejects cursors owned by other admin lists", async () => {
+    await withDatabase(async (pool) => {
+      const cursor = Buffer.from(
+        JSON.stringify({
+          kind: "tests",
+          key: "Same",
+          id: randomUUID(),
+        }),
+      ).toString("base64url")
+      await expect(
+        listAdminQuestions(pool, { limit: 1, cursor }),
+      ).rejects.toBeInstanceOf(InvalidCursorError)
+    })
+  }, 120_000)
+
   it("shows the latest draft while retaining the current published pointer", async () => {
     await withDatabase(async (pool) => {
       const f = await seedPublishedTest(pool)
@@ -321,7 +515,12 @@ describe("admin read projections", () => {
 
   it("rejects invalid cursor shapes and out-of-bounds page sizes", async () => {
     await withDatabase(async (pool) => {
-      const lists = [listAdminTests, listAdminResults, listAdminLearners]
+      const lists = [
+        listAdminTests,
+        listAdminResults,
+        listAdminLearners,
+        listAdminQuestions,
+      ]
       const checks: Array<Promise<unknown>> = []
 
       for (const list of lists) {

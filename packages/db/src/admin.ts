@@ -33,6 +33,7 @@ import {
 } from "./repositories/media.repository.js"
 import {
   listAdminLearners,
+  listAdminQuestions,
   listAdminResults,
   listAdminTests,
   loadAdminAttemptDetail,
@@ -59,6 +60,7 @@ export {
   recordMediaAsset,
   resolveVersionId,
   listAdminLearners,
+  listAdminQuestions,
   listAdminResults,
   listAdminTests,
   loadAdminAttemptDetail,

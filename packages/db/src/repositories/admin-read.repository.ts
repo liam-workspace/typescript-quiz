@@ -9,6 +9,8 @@ import {
   type AdminLearnerPage,
   type AdminOverview,
   type AdminPagination,
+  type AdminQuestion,
+  type AdminQuestionPage,
   type AdminResultPage,
   type AdminResultSummary,
   type AdminTestDetail,
@@ -20,7 +22,7 @@ import {
 import { InvalidCursorError } from "./catalog.repository.js"
 
 interface Cursor {
-  kind: "tests" | "results" | "learners"
+  kind: "tests" | "questions" | "results" | "learners"
   key: string
   id: string
 }
@@ -212,6 +214,54 @@ export async function listAdminTests(
     nextCursor:
       rows.length > query.limit
         ? encodeCursor("tests", last.title, last.id)
+        : null,
+  }
+}
+
+/** Answer-key projection restricted to the admin entry point. */
+export async function listAdminQuestions(
+  db: PgQueryable,
+  query: AdminPagination & { testId?: string; search?: string },
+): Promise<AdminQuestionPage> {
+  const cursor = decodeCursor(query, "questions")
+  const { rows } = await db.query<AdminQuestion>(
+    `
+    WITH page AS MATERIALIZED (
+      SELECT q.id, q.prompt
+        FROM test t
+        JOIN LATERAL (
+          SELECT id FROM test_version
+           WHERE test_id = t.id ORDER BY version DESC LIMIT 1
+        ) latest ON true
+        JOIN question q ON q.test_version_id = latest.id
+       WHERE ($1::uuid IS NULL OR t.id = $1)
+         AND ($2::text IS NULL OR q.prompt ILIKE '%' || $2 || '%')
+         AND ($3::text IS NULL OR (q.prompt, q.id) > ($3, $4::uuid))
+       ORDER BY q.prompt, q.id LIMIT $5
+    )
+    SELECT page.id, page.prompt, COALESCE((
+      SELECT jsonb_agg(jsonb_build_object('id', c.id, 'label', c.label,
+        'isCorrect', c.is_correct) ORDER BY c.ordinal)
+        FROM choice c WHERE c.question_id = page.id
+    ), '[]'::jsonb) AS choices
+      FROM page ORDER BY page.prompt, page.id
+  `,
+    [
+      query.testId ?? null,
+      query.search ?? null,
+      cursor?.key ?? null,
+      cursor?.id ?? null,
+      query.limit + 1,
+    ],
+  )
+  const items = rows.slice(0, query.limit)
+  const last = items[items.length - 1]
+
+  return {
+    items,
+    nextCursor:
+      rows.length > query.limit
+        ? encodeCursor("questions", last.prompt, last.id)
         : null,
   }
 }

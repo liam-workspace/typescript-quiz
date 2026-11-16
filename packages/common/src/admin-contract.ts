@@ -12,7 +12,11 @@ export const adminTestFilterSchema = z.object({
 }).strict()
 export type AdminTestFilter = z.infer<typeof adminTestFilterSchema>
 
-const choicePatchSchema = z.object({ label: z.string().trim().min(1).max(2_000) }).strict()
+const choicePatchSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().trim().min(1).max(2_000),
+  isCorrect: z.boolean(),
+}).strict()
 export const draftQuestionPatchSchema = z.object({
   prompt: z.string().trim().min(1).max(20_000).optional(),
   choices: z.array(choicePatchSchema).min(2).max(100).optional(),
@@ -43,7 +47,7 @@ export interface AdminTestDetail extends AdminTestSummary {
 export interface AdminQuestion {
   id: string
   prompt: string
-  choices: Array<{ id: string; label: string }>
+  choices: Array<{ id: string; label: string; isCorrect: boolean }>
 }
 export interface AdminQuestionPage { items: AdminQuestion[]; nextCursor: string | null }
 export interface AdminResultSummary {

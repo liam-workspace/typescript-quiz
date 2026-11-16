@@ -3,6 +3,7 @@ import {
   adminPaginationSchema,
   adminTestFilterSchema,
   draftQuestionPatchSchema,
+  type AdminQuestion,
 } from "../src/admin-contract.js"
 
 describe("admin contracts", () => {
@@ -22,13 +23,62 @@ describe("admin contracts", () => {
     expect(adminTestFilterSchema.safeParse({ status: "invalid", extra: true }).success).toBe(false)
   })
 
-  it("accepts prompt and choice text edits while rejecting answer key and unknown fields", () => {
-    expect(draftQuestionPatchSchema.parse({ prompt: "Updated?", choices: [{ label: "A" }, { label: "B" }] })).toEqual({
+  it("accepts prompt and choice edits including correct-choice state", () => {
+    expect(draftQuestionPatchSchema.parse({ prompt: "Updated?", choices: [
+      { id: "choice-a", label: "A", isCorrect: false },
+      { id: "choice-b", label: "B", isCorrect: true },
+    ] })).toEqual({
       prompt: "Updated?",
-      choices: [{ label: "A" }, { label: "B" }],
+      choices: [
+        { id: "choice-a", label: "A", isCorrect: false },
+        { id: "choice-b", label: "B", isCorrect: true },
+      ],
     })
+  })
+
+  it("requires a stable choice ID", () => {
+    expect(draftQuestionPatchSchema.safeParse({ choices: [
+      { label: "A", isCorrect: true }, { id: "choice-b", label: "B", isCorrect: false },
+    ] }).success).toBe(false)
+    expect(draftQuestionPatchSchema.safeParse({ choices: [
+      { id: "", label: "A", isCorrect: true }, { id: "choice-b", label: "B", isCorrect: false },
+    ] }).success).toBe(false)
+  })
+
+  it("requires isCorrect for each choice", () => {
+    expect(draftQuestionPatchSchema.safeParse({ choices: [
+      { id: "choice-a", label: "A" }, { id: "choice-b", label: "B", isCorrect: false },
+    ] }).success).toBe(false)
+  })
+
+  it("rejects unknown fields in choice items", () => {
+    expect(draftQuestionPatchSchema.safeParse({ choices: [
+      { id: "choice-a", label: "A", isCorrect: true, extra: true },
+      { id: "choice-b", label: "B", isCorrect: false },
+    ] }).success).toBe(false)
     expect(draftQuestionPatchSchema.safeParse({ answerKey: ["a"] }).success).toBe(false)
-    expect(draftQuestionPatchSchema.safeParse({ choices: [{ label: "", isCorrect: true }] }).success).toBe(false)
     expect(draftQuestionPatchSchema.safeParse({ prompt: "valid", extra: true }).success).toBe(false)
+  })
+
+  it("requires at least two choices", () => {
+    expect(draftQuestionPatchSchema.safeParse({ choices: [
+      { id: "choice-a", label: "A", isCorrect: true },
+    ] }).success).toBe(false)
+  })
+
+  it("rejects blank choice labels", () => {
+    expect(draftQuestionPatchSchema.safeParse({ choices: [
+      { id: "choice-a", label: "", isCorrect: true },
+      { id: "choice-b", label: "B", isCorrect: false },
+    ] }).success).toBe(false)
+  })
+
+  it("includes correct-choice state in the admin question projection", () => {
+    const question: AdminQuestion = {
+      id: "question-1",
+      prompt: "Pick one",
+      choices: [{ id: "choice-a", label: "A", isCorrect: true }],
+    }
+    expect(question.choices[0]?.isCorrect).toBe(true)
   })
 })

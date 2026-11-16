@@ -31,6 +31,14 @@ import {
   type MediaAssetRow,
   type MediaKind,
 } from "./repositories/media.repository.js"
+import {
+  listAdminLearners,
+  listAdminResults,
+  listAdminTests,
+  loadAdminAttemptDetail,
+  loadAdminOverview,
+  loadAdminTestDetail,
+} from "./repositories/admin-read.repository.js"
 
 export type { PublishViolation, MediaAssetRow, MediaKind }
 
@@ -41,4 +49,10 @@ export {
   publishDraftVersion,
   recordMediaAsset,
   resolveVersionId,
+  listAdminLearners,
+  listAdminResults,
+  listAdminTests,
+  loadAdminAttemptDetail,
+  loadAdminOverview,
+  loadAdminTestDetail,
 }

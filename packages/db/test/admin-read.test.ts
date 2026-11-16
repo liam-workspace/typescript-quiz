@@ -299,6 +299,26 @@ describe("admin read projections", () => {
     })
   }, 120_000)
 
+  it.each([
+    "2026-02-30",
+    "2026-02-30 10:00:00.123456+00",
+    "2025-02-29 10:00:00.123456+00",
+    "2026-02-28",
+  ])(
+    "rejects malformed result cursor timestamp %s",
+    async (key) => {
+      await withDatabase(async (pool) => {
+        const cursor = Buffer.from(
+          JSON.stringify({ kind: "results", key, id: randomUUID() }),
+        ).toString("base64url")
+        await expect(
+          listAdminResults(pool, { limit: 20, cursor }),
+        ).rejects.toBeInstanceOf(InvalidCursorError)
+      })
+    },
+    120_000,
+  )
+
   it("rejects invalid cursor shapes and out-of-bounds page sizes", async () => {
     await withDatabase(async (pool) => {
       const lists = [listAdminTests, listAdminResults, listAdminLearners]

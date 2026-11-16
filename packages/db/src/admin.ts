@@ -39,11 +39,20 @@ import {
   loadAdminOverview,
   loadAdminTestDetail,
 } from "./repositories/admin-read.repository.js"
+import {
+  DraftQuestionNotFoundError,
+  InvalidDraftChoicesError,
+  PublishedVersionMutationError,
+  patchDraftQuestion,
+} from "./repositories/admin-draft.repository.js"
 
 export type { PublishViolation, MediaAssetRow, MediaKind }
 
 export {
   DraftNotFoundError,
+  DraftQuestionNotFoundError,
+  InvalidDraftChoicesError,
+  PublishedVersionMutationError,
   exportTestDocument,
   importTestDocument,
   publishDraftVersion,
@@ -55,4 +64,5 @@ export {
   loadAdminAttemptDetail,
   loadAdminOverview,
   loadAdminTestDetail,
+  patchDraftQuestion,
 }

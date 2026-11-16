@@ -7,8 +7,11 @@ import {
   adminPaginationSchema,
   adminTestFilterSchema,
   testDocumentSchema,
+  type AdminAttemptDetail,
+  type AdminLearnerPage,
   type AdminOverview,
   type AdminQuestionPage,
+  type AdminResultPage,
   type AdminTestDetail,
   type AdminTestPage,
   type Clock,
@@ -20,8 +23,11 @@ import {
   DraftNotFoundError,
   exportTestDocument,
   importTestDocument,
+  listAdminLearners,
   listAdminQuestions,
+  listAdminResults,
   listAdminTests,
+  loadAdminAttemptDetail,
   loadAdminOverview,
   loadAdminTestDetail,
   publishDraftVersion,
@@ -213,6 +219,15 @@ const questionQuerySchema = adminTestFilterSchema
     testId: z.string().regex(UUID_PATTERN).optional(),
   })
 
+const resultQuerySchema = z.strictObject({
+  ...pageQueryShape,
+  testId: z.string().regex(UUID_PATTERN).optional(),
+  learnerId: z.string().regex(UUID_PATTERN).optional(),
+})
+const learnerQuerySchema = adminTestFilterSchema
+  .pick({ search: true })
+  .extend(pageQueryShape)
+
 function parseAdminQuery<T>(schema: z.ZodType<T>, query: unknown): T {
   const parsed = schema.safeParse(query)
 
@@ -288,6 +303,46 @@ export class AdminService {
     const parsed = parseAdminQuery(questionQuerySchema, query)
 
     return readAdminPage(() => listAdminQuestions(this.readPool, parsed))
+  }
+
+  listResults(query: Record<string, unknown>): Promise<AdminResultPage> {
+    const parsed = parseAdminQuery(resultQuerySchema, query)
+
+    return readAdminPage(() => listAdminResults(this.readPool, parsed))
+  }
+
+  async attemptDetail(
+    attemptId: string,
+    adminSubject: string,
+  ): Promise<AdminAttemptDetail> {
+    const detail = UUID_PATTERN.test(attemptId)
+      ? await loadAdminAttemptDetail(this.readPool, attemptId)
+      : null
+
+    if (!detail) {
+      throw new ProblemException({
+        type: "attempt_not_found",
+        title: "No such completed attempt exists.",
+        status: HttpStatus.NOT_FOUND,
+      })
+    }
+
+    // Await the immutable audit append before disclosing the retrieved answers.
+    // A failed append fails the request; denied/missing reads never reach it.
+    await this.readPool.query(
+      `INSERT INTO admin_audit_log
+         (admin_subject, action, resource_type, resource_id)
+       VALUES ($1, 'attempt_detail_viewed', 'attempt', $2)`,
+      [adminSubject, attemptId],
+    )
+
+    return detail
+  }
+
+  listLearners(query: Record<string, unknown>): Promise<AdminLearnerPage> {
+    const parsed = parseAdminQuery(learnerQuerySchema, query)
+
+    return readAdminPage(() => listAdminLearners(this.readPool, parsed))
   }
 
   /**

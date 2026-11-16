@@ -1,6 +1,9 @@
 import type { PgPool } from "@liam-workspace/node-postgres"
 import {
   testDocumentSchema,
+  type AdminAttemptDetail,
+  type AdminLearnerPage,
+  type AdminResultPage,
   type AdminOverview,
   type AdminQuestionPage,
   type AdminTestDetail,
@@ -12,6 +15,7 @@ import type { App } from "supertest/types.js"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { REQUEST_POOL } from "../src/database/tokens.js"
 import { createTestApp, type TestApp } from "./helpers/app.js"
+import { provisionStudent, seedWriteFixture } from "./helpers/write-fixture.js"
 
 const SUB = "google-oauth2|admin-test"
 const EMAIL = "tom@example.com"
@@ -59,9 +63,18 @@ function validDoc(slug: string): TestDocument {
 
 describe("admin routes", () => {
   let app: TestApp | undefined = undefined
+  let failAuditWrites = false
 
   beforeAll(async () => {
-    app = await createTestApp()
+    app = await createTestApp({
+      beforePoolQuery: (sql) => {
+        if (failAuditWrites && sql.includes("INSERT INTO admin_audit_log")) {
+          throw new Error("Simulated audit persistence failure")
+        }
+
+        return Promise.resolve()
+      },
+    })
   })
 
   afterAll(async () => {
@@ -81,6 +94,9 @@ describe("admin routes", () => {
     "/api/admin/tests",
     "/api/admin/tests/00000000-0000-0000-0000-000000000000",
     "/api/admin/questions",
+    "/api/admin/results",
+    "/api/admin/results/attempts/00000000-0000-0000-0000-000000000000",
+    "/api/admin/learners",
   ]
 
   it.each(readPaths)("GET %s requires a token", async (path) => {
@@ -359,6 +375,342 @@ describe("admin routes", () => {
       })
     }
   })
+
+  async function completedAttempt(subject: string) {
+    const a = ready()
+    const pool = a.get<PgPool>(REQUEST_POOL)
+    const student = await provisionStudent(a, subject)
+    const fixture = await seedWriteFixture(pool, student.studentId)
+    await request(a.http.getHttpServer() as App)
+      .post(`/api/attempts/${fixture.attemptId}/submit`)
+      .set("Authorization", `Bearer ${student.token}`)
+      .send({
+        clientInstanceId: "admin-results-device",
+        responses: [
+          {
+            questionId: fixture.appliedQuestionId,
+            seq: 1,
+            selectedChoiceIds: [fixture.choiceIds[0]],
+          },
+        ],
+      })
+      .expect(201)
+
+    return { pool, student, fixture }
+  }
+
+  it("lists answer-free aggregate results with learner/test filters and pagination", async () => {
+    const a = ready()
+    const { pool, student, fixture } = await completedAttempt(
+      `${SUB}-results-owner`,
+    )
+    const second = await seedWriteFixture(pool, student.studentId)
+    await request(a.http.getHttpServer() as App)
+      .post(`/api/attempts/${second.attemptId}/submit`)
+      .set("Authorization", `Bearer ${student.token}`)
+      .send({
+        clientInstanceId: "second-admin-result",
+        responses: [
+          {
+            questionId: second.appliedQuestionId,
+            seq: 1,
+            selectedChoiceIds: [second.choiceIds[1]],
+          },
+        ],
+      })
+      .expect(201)
+    const admin = await a.mint({
+      sub: `${SUB}-results`,
+      email: EMAIL,
+      isAdmin: true,
+    })
+    const firstResponse = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/results")
+      .query({ learnerId: student.studentId, limit: 1 })
+      .set("Authorization", `Bearer ${admin}`)
+      .expect(200)
+    const first = firstResponse.body as AdminResultPage
+    expect(first.items).toHaveLength(1)
+    expect(first.nextCursor).toEqual(expect.any(String))
+    const nextResponse = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/results")
+      .query({
+        learnerId: student.studentId,
+        limit: 1,
+        cursor: first.nextCursor,
+      })
+      .set("Authorization", `Bearer ${admin}`)
+      .expect(200)
+    const next = nextResponse.body as AdminResultPage
+    expect(next.items).toHaveLength(1)
+    expect(next.nextCursor).toBeNull()
+    const results = [...first.items, ...next.items]
+    expect(results.map((item) => item.attemptId).sort()).toEqual(
+      [fixture.attemptId, second.attemptId].sort(),
+    )
+    const result = results.find((item) => item.attemptId === fixture.attemptId)
+
+    if (!result) {
+      throw new Error("Expected the completed attempt in the results page")
+    }
+
+    expect(result).toMatchObject({
+      learnerId: student.studentId,
+      score: 1,
+      maxScore: 2,
+    })
+    expect(Object.keys(result).sort()).toEqual(
+      [
+        "attemptId",
+        "testId",
+        "testTitle",
+        "learnerId",
+        "learnerName",
+        "score",
+        "maxScore",
+        "completedAt",
+      ].sort(),
+    )
+    const filtered = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/results")
+      .query({ learnerId: student.studentId, testId: result.testId })
+      .set("Authorization", `Bearer ${admin}`)
+      .expect(200)
+    expect(filtered.body).toEqual({ items: [result], nextCursor: null })
+    expect(JSON.stringify(results)).not.toContain(fixture.choiceIds[0])
+  })
+
+  it("loads another learner's attempt only for admins and audits each successful view", async () => {
+    const a = ready()
+    const { pool, student, fixture } = await completedAttempt(
+      `${SUB}-detail-owner`,
+    )
+    const adminSubject = `${SUB}-detail-viewer`
+    const admin = await a.mint({
+      sub: adminSubject,
+      email: EMAIL,
+      isAdmin: true,
+    })
+    const path = `/api/admin/results/attempts/${fixture.attemptId}`
+    await request(a.http.getHttpServer() as App)
+      .get(path)
+      .set("Authorization", `Bearer ${student.token}`)
+      .expect(403)
+    const before = await pool.query(
+      "SELECT id FROM admin_audit_log WHERE resource_id = $1",
+      [fixture.attemptId],
+    )
+    expect(before.rows).toEqual([])
+    const response = await request(a.http.getHttpServer() as App)
+      .get(path)
+      .set("Authorization", `Bearer ${admin}`)
+      .expect(200)
+    const detail = response.body as AdminAttemptDetail
+    expect(detail).toMatchObject({
+      attemptId: fixture.attemptId,
+      learnerId: student.studentId,
+      score: 1,
+      maxScore: 2,
+      answers: [
+        {
+          questionId: fixture.appliedQuestionId,
+          response: { selectedChoiceIds: [fixture.choiceIds[0]] },
+          score: 1,
+          maxScore: 1,
+        },
+        {
+          questionId: fixture.staleQuestionId,
+          response: { selectedChoiceIds: [] },
+          score: 0,
+          maxScore: 1,
+        },
+      ],
+    })
+    const audit = await pool.query(
+      "SELECT admin_subject, action, resource_type, resource_id, metadata FROM admin_audit_log WHERE resource_id = $1",
+      [fixture.attemptId],
+    )
+    expect(audit.rows).toEqual([
+      {
+        admin_subject: adminSubject,
+        action: "attempt_detail_viewed",
+        resource_type: "attempt",
+        resource_id: fixture.attemptId,
+        metadata: {},
+      },
+    ])
+    await request(a.http.getHttpServer() as App)
+      .get(path)
+      .set("Authorization", `Bearer ${admin}`)
+      .expect(200)
+    const repeated = await pool.query(
+      "SELECT id FROM admin_audit_log WHERE resource_id = $1",
+      [fixture.attemptId],
+    )
+    expect(repeated.rows).toHaveLength(2)
+  })
+
+  it("withholds attempt answers when the audit append fails", async () => {
+    const a = ready()
+    const { pool, fixture } = await completedAttempt(
+      `${SUB}-audit-failure-owner`,
+    )
+    const admin = await a.mint({
+      sub: `${SUB}-audit-failure-viewer`,
+      email: EMAIL,
+      isAdmin: true,
+    })
+    failAuditWrites = true
+
+    try {
+      const response = await request(a.http.getHttpServer() as App)
+        .get(`/api/admin/results/attempts/${fixture.attemptId}`)
+        .set("Authorization", `Bearer ${admin}`)
+        .expect(500)
+      expect(response.body).not.toHaveProperty("answers")
+      expect(JSON.stringify(response.body)).not.toContain(fixture.choiceIds[0])
+    } finally {
+      failAuditWrites = false
+    }
+
+    const audit = await pool.query(
+      "SELECT id FROM admin_audit_log WHERE resource_id = $1",
+      [fixture.attemptId],
+    )
+    expect(audit.rows).toEqual([])
+  })
+
+  it("returns attempt_not_found without auditing missing, malformed, or running attempts", async () => {
+    const a = ready()
+    const pool = a.get<PgPool>(REQUEST_POOL)
+    const student = await provisionStudent(a, `${SUB}-running-owner`)
+    const running = await seedWriteFixture(pool, student.studentId)
+    const adminSubject = `${SUB}-missing-viewer`
+    const token = await a.mint({
+      sub: adminSubject,
+      email: EMAIL,
+      isAdmin: true,
+    })
+    for (const id of [
+      "00000000-0000-0000-0000-000000000000",
+      "not-a-uuid",
+      running.attemptId,
+    ]) {
+      // eslint-disable-next-line no-await-in-loop -- Supertest binds/closes this shared server per request.
+      const response = await request(a.http.getHttpServer() as App)
+        .get(`/api/admin/results/attempts/${id}`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(404)
+      expect(response.body).toMatchObject({
+        type: "attempt_not_found",
+        status: 404,
+      })
+    }
+    const audit = await pool.query(
+      "SELECT id FROM admin_audit_log WHERE admin_subject = $1",
+      [adminSubject],
+    )
+    expect(audit.rows).toEqual([])
+  })
+
+  it("searches and pages learner profiles and activity without exposing roles", async () => {
+    const a = ready()
+    const { pool, student } = await completedAttempt(`${SUB}-learners-a`)
+    const other = await provisionStudent(a, `${SUB}-learners-b`)
+    await pool.query(
+      "UPDATE student SET display_name = $2, email = $3 WHERE id = $1",
+      [student.studentId, "Admin learner Alpha", "admin-learner-a@example.com"],
+    )
+    await pool.query(
+      "UPDATE student SET display_name = $2, email = $3 WHERE id = $1",
+      [other.studentId, "Admin learner Beta", "admin-learner-b@example.com"],
+    )
+    const admin = await a.mint({
+      sub: `${SUB}-learner-reader`,
+      email: EMAIL,
+      isAdmin: true,
+    })
+    const firstResponse = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/learners")
+      .query({ search: " admin learner ", limit: 1 })
+      .set("Authorization", `Bearer ${admin}`)
+      .expect(200)
+    const first = firstResponse.body as AdminLearnerPage
+    expect(first.items).toEqual([
+      {
+        id: student.studentId,
+        displayName: "Admin learner Alpha",
+        email: "admin-learner-a@example.com",
+        attemptCount: 1,
+        lastAttemptAt: first.items[0].lastAttemptAt,
+      },
+    ])
+    expect(first.items[0].lastAttemptAt).toEqual(expect.any(String))
+    expect(first.nextCursor).toEqual(expect.any(String))
+    const nextResponse = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/learners")
+      .query({ search: "admin learner", limit: 1, cursor: first.nextCursor })
+      .set("Authorization", `Bearer ${admin}`)
+      .expect(200)
+    expect(nextResponse.body).toEqual({
+      items: [
+        {
+          id: other.studentId,
+          displayName: "Admin learner Beta",
+          email: "admin-learner-b@example.com",
+          attemptCount: 0,
+          lastAttemptAt: null,
+        },
+      ],
+      nextCursor: null,
+    })
+    const byEmail = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/learners")
+      .query({ search: "admin-learner-b@" })
+      .set("Authorization", `Bearer ${admin}`)
+      .expect(200)
+    expect(
+      (byEmail.body as AdminLearnerPage).items.map((item) => item.id),
+    ).toEqual([other.studentId])
+  })
+
+  it.each(["/api/admin/results", "/api/admin/learners"])(
+    "GET %s validates pagination, cursors, and allowed filters",
+    async (path) => {
+      const a = ready()
+      const admin = await a.mint({
+        sub: `${SUB}-activity-validation`,
+        email: EMAIL,
+        isAdmin: true,
+      })
+      const invalid = path.endsWith("results")
+        ? [
+            { limit: "0" },
+            { limit: "101" },
+            { limit: "1.5" },
+            { cursor: "invalid" },
+            { learnerId: "bad" },
+            { testId: "bad" },
+            { search: "unused" },
+          ]
+        : [
+            { limit: "0" },
+            { limit: "101" },
+            { limit: "1.5" },
+            { cursor: "invalid" },
+            { search: "x".repeat(201) },
+            { role: "admin" },
+          ]
+      for (const query of invalid) {
+        // eslint-disable-next-line no-await-in-loop -- Supertest binds/closes this shared server per request.
+        await request(a.http.getHttpServer() as App)
+          .get(path)
+          .query(query)
+          .set("Authorization", `Bearer ${admin}`)
+          .expect(400)
+      }
+    },
+  )
 
   it("POST /admin/tests/import is 401 without a token", async () => {
     const a = ready()

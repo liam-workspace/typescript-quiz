@@ -1,3 +1,4 @@
+import type { JwtClaims } from "@liam-workspace/node-auth-server"
 import {
   Body,
   Controller,
@@ -6,6 +7,7 @@ import {
   Param,
   Post,
   Query,
+  Req,
   UploadedFile,
   UseFilters,
   UseGuards,
@@ -13,8 +15,11 @@ import {
 } from "@nestjs/common"
 import { FileInterceptor } from "@nestjs/platform-express"
 import type {
+  AdminAttemptDetail,
+  AdminLearnerPage,
   AdminOverview,
   AdminQuestionPage,
+  AdminResultPage,
   AdminTestDetail,
   AdminTestPage,
   TestDocument,
@@ -57,6 +62,28 @@ export class AdminController {
     @Query() query: Record<string, unknown>,
   ): Promise<AdminQuestionPage> {
     return this.admin.listQuestions(query)
+  }
+
+  @Get("results")
+  listResults(
+    @Query() query: Record<string, unknown>,
+  ): Promise<AdminResultPage> {
+    return this.admin.listResults(query)
+  }
+
+  @Get("results/attempts/:id")
+  attemptDetail(
+    @Param("id") attemptId: string,
+    @Req() request: { claims: JwtClaims & { sub: string } },
+  ): Promise<AdminAttemptDetail> {
+    return this.admin.attemptDetail(attemptId, request.claims.sub)
+  }
+
+  @Get("learners")
+  listLearners(
+    @Query() query: Record<string, unknown>,
+  ): Promise<AdminLearnerPage> {
+    return this.admin.listLearners(query)
   }
 
   @Post("tests/import")

@@ -3,11 +3,27 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { resolve, sep } from "node:path"
 import { withTransaction, type PgPool } from "@liam-workspace/node-postgres"
 import { HttpStatus, Inject, Injectable } from "@nestjs/common"
-import { testDocumentSchema, type Clock, type TestDocument } from "@pp/common"
+import {
+  adminPaginationSchema,
+  adminTestFilterSchema,
+  testDocumentSchema,
+  type AdminOverview,
+  type AdminQuestionPage,
+  type AdminTestDetail,
+  type AdminTestPage,
+  type Clock,
+  type TestDocument,
+} from "@pp/common"
+import { InvalidCursorError } from "@pp/db"
+import { z } from "zod"
 import {
   DraftNotFoundError,
   exportTestDocument,
   importTestDocument,
+  listAdminQuestions,
+  listAdminTests,
+  loadAdminOverview,
+  loadAdminTestDetail,
   publishDraftVersion,
   recordMediaAsset,
   resolveVersionId,
@@ -15,7 +31,7 @@ import {
   type MediaKind,
 } from "@pp/db/admin"
 import { ProblemException } from "../attempts/problem.exception.js"
-import { CLOCK, JOB_POOL } from "../database/tokens.js"
+import { CLOCK, JOB_POOL, REQUEST_POOL } from "../database/tokens.js"
 import { loadServerConfig } from "../config.js"
 
 export interface ImportResult {
@@ -177,12 +193,102 @@ function parseVersion(raw: string | undefined): number | undefined {
   return Number.isInteger(value) && value > 0 ? value : UNRESOLVABLE_VERSION
 }
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const pageQueryShape = {
+  limit: z
+    .string()
+    .regex(/^\d+$/)
+    .transform(Number)
+    .pipe(adminPaginationSchema.shape.limit)
+    .default(20),
+  cursor: adminPaginationSchema.shape.cursor.default(null),
+}
+const testQuerySchema = adminTestFilterSchema.extend(pageQueryShape)
+const questionQuerySchema = adminTestFilterSchema
+  .pick({ search: true })
+  .extend({
+    ...pageQueryShape,
+    testId: z.string().regex(UUID_PATTERN).optional(),
+  })
+
+function parseAdminQuery<T>(schema: z.ZodType<T>, query: unknown): T {
+  const parsed = schema.safeParse(query)
+
+  if (!parsed.success) {
+    throw new ProblemException({
+      type: "invalid_query",
+      title: "The query parameters failed validation.",
+      status: HttpStatus.BAD_REQUEST,
+      issues: parsed.error.issues,
+    })
+  }
+
+  return parsed.data
+}
+
+async function readAdminPage<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read()
+  } catch (error) {
+    if (error instanceof InvalidCursorError) {
+      throw new ProblemException({
+        type: "bad_cursor",
+        title: "The cursor could not be decoded.",
+        status: HttpStatus.BAD_REQUEST,
+      })
+    }
+
+    throw error
+  }
+}
+
+function testNotFound(): ProblemException {
+  return new ProblemException({
+    type: "test_not_found",
+    title: "No such test exists.",
+    status: HttpStatus.NOT_FOUND,
+  })
+}
+
 @Injectable()
 export class AdminService {
   constructor(
     @Inject(JOB_POOL) private readonly pool: PgPool,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(REQUEST_POOL) private readonly readPool: PgPool,
   ) {}
+
+  overview(): Promise<AdminOverview> {
+    return loadAdminOverview(this.readPool, {})
+  }
+
+  listTests(query: Record<string, unknown>): Promise<AdminTestPage> {
+    const parsed = parseAdminQuery(testQuerySchema, query)
+
+    return readAdminPage(() => listAdminTests(this.readPool, parsed))
+  }
+
+  async testDetail(testId: string): Promise<AdminTestDetail> {
+    if (!UUID_PATTERN.test(testId)) {
+      throw testNotFound()
+    }
+
+    const detail = await loadAdminTestDetail(this.readPool, testId)
+
+    if (!detail) {
+      throw testNotFound()
+    }
+
+    return detail
+  }
+
+  listQuestions(query: Record<string, unknown>): Promise<AdminQuestionPage> {
+    const parsed = parseAdminQuery(questionQuerySchema, query)
+
+    return readAdminPage(() => listAdminQuestions(this.readPool, parsed))
+  }
 
   /**
    * `JOB_POOL`, not `REQUEST_POOL`: a 40-question import is exactly the long

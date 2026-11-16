@@ -1,5 +1,12 @@
 import type { PgPool } from "@liam-workspace/node-postgres"
-import { testDocumentSchema, type TestDocument } from "@pp/common"
+import {
+  testDocumentSchema,
+  type AdminOverview,
+  type AdminQuestionPage,
+  type AdminTestDetail,
+  type AdminTestPage,
+  type TestDocument,
+} from "@pp/common"
 import request from "supertest"
 import type { App } from "supertest/types.js"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
@@ -68,6 +75,290 @@ describe("admin routes", () => {
 
     return app
   }
+
+  const readPaths = [
+    "/api/admin/overview",
+    "/api/admin/tests",
+    "/api/admin/tests/00000000-0000-0000-0000-000000000000",
+    "/api/admin/questions",
+  ]
+
+  it.each(readPaths)("GET %s requires a token", async (path) => {
+    await request(ready().http.getHttpServer() as App)
+      .get(path)
+      .expect(401)
+  })
+
+  it.each(readPaths)(
+    "GET %s refuses non-admins with admin_required",
+    async (path) => {
+      const a = ready()
+      const token = await a.mint({ sub: `${SUB}-read-nonadmin`, email: EMAIL })
+      const response = await request(a.http.getHttpServer() as App)
+        .get(path)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(403)
+
+      expect(response.body).toMatchObject({
+        type: "admin_required",
+        status: 403,
+      })
+    },
+  )
+
+  it("returns overview counters to an admin", async () => {
+    const a = ready()
+    const token = await a.mint({
+      sub: `${SUB}-overview`,
+      email: EMAIL,
+      isAdmin: true,
+    })
+    const response = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/overview")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200)
+    const overview = response.body as AdminOverview
+
+    const imported = await request(a.http.getHttpServer() as App)
+      .post("/api/admin/tests/import")
+      .set("Authorization", `Bearer ${token}`)
+      .send(validDoc("overview-counters"))
+      .expect(201)
+    const { testId } = imported.body as { testId: string }
+    const afterImport = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/overview")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200)
+    expect(afterImport.body).toEqual({
+      tests: {
+        total: overview.tests.total + 1,
+        drafts: overview.tests.drafts + 1,
+        published: overview.tests.published,
+      },
+      attempts: overview.attempts,
+      learners: overview.learners,
+    })
+
+    await request(a.http.getHttpServer() as App)
+      .post(`/api/admin/tests/${testId}/publish`)
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200)
+    const afterPublish = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/overview")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200)
+    expect(afterPublish.body).toEqual({
+      tests: {
+        total: overview.tests.total + 1,
+        drafts: overview.tests.drafts,
+        published: overview.tests.published + 1,
+      },
+      attempts: overview.attempts,
+      learners: overview.learners,
+    })
+  })
+
+  it("filters and pages the latest catalogue version and loads draft details", async () => {
+    const a = ready()
+    const token = await a.mint({
+      sub: `${SUB}-catalogue`,
+      email: EMAIL,
+      isAdmin: true,
+    })
+    const auth = `Bearer ${token}`
+    const ids: string[] = []
+    for (const [slug, title] of [
+      ["read-a", "Catalogue A"],
+      ["read-b", "Catalogue B"],
+    ]) {
+      // eslint-disable-next-line no-await-in-loop -- Supertest binds/closes this shared server per request.
+      const imported = await request(a.http.getHttpServer() as App)
+        .post("/api/admin/tests/import")
+        .set("Authorization", auth)
+        .send({ ...validDoc(slug), title })
+        .expect(201)
+      ids.push((imported.body as { testId: string }).testId)
+    }
+
+    const firstResponse = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/tests")
+      .query({ search: " catalogue ", status: "draft", limit: 1 })
+      .set("Authorization", auth)
+      .expect(200)
+    const first = firstResponse.body as AdminTestPage
+    expect(first.items).toMatchObject([
+      {
+        id: ids[0],
+        title: "Catalogue A",
+        status: "draft",
+        currentVersionId: null,
+      },
+    ])
+    expect(first.nextCursor).toEqual(expect.any(String))
+
+    const secondResponse = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/tests")
+      .query({
+        search: "catalogue",
+        status: "draft",
+        limit: 1,
+        cursor: first.nextCursor,
+      })
+      .set("Authorization", auth)
+      .expect(200)
+    const second = secondResponse.body as AdminTestPage
+    expect(second.items).toMatchObject([{ id: ids[1], title: "Catalogue B" }])
+    expect(second.nextCursor).toBeNull()
+
+    const detailResponse = await request(a.http.getHttpServer() as App)
+      .get(`/api/admin/tests/${ids[0]}`)
+      .set("Authorization", auth)
+      .expect(200)
+    const detail = detailResponse.body as AdminTestDetail
+    expect(detail).toMatchObject({
+      id: ids[0],
+      status: "draft",
+      durationSeconds: 100,
+      description: null,
+      sections: [{ title: "Listening — Part 1", questionCount: 1 }],
+    })
+    expect(detail.sections[0].id).toEqual(expect.any(String))
+
+    const published = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/tests")
+      .query({ search: "catalogue", status: "published" })
+      .set("Authorization", auth)
+      .expect(200)
+    expect(published.body).toEqual({ items: [], nextCursor: null })
+  })
+
+  it("searches and pages questions with real editable choice IDs", async () => {
+    const a = ready()
+    const token = await a.mint({
+      sub: `${SUB}-questions`,
+      email: EMAIL,
+      isAdmin: true,
+    })
+    const doc = validDoc("question-search")
+    const [group] = doc.sections[0].groups
+    group.questions = [
+      { ...group.questions[0], questionKey: "q1", prompt: "Searchable Alpha?" },
+      { ...group.questions[0], questionKey: "q2", prompt: "Searchable Beta?" },
+    ]
+    const imported = await request(a.http.getHttpServer() as App)
+      .post("/api/admin/tests/import")
+      .set("Authorization", `Bearer ${token}`)
+      .send(doc)
+      .expect(201)
+    const { testId } = imported.body as { testId: string }
+
+    const firstResponse = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/questions")
+      .query({ testId, search: " searchable ", limit: 1 })
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200)
+    const first = firstResponse.body as AdminQuestionPage
+    expect(first.items).toMatchObject([
+      {
+        prompt: "Searchable Alpha?",
+        choices: [
+          { label: "yes", isCorrect: true },
+          { label: "no", isCorrect: false },
+        ],
+      },
+    ])
+    expect(first.items[0].id).toEqual(expect.any(String))
+    expect(first.items[0].choices[0].id).toEqual(expect.any(String))
+    expect(first.nextCursor).toEqual(expect.any(String))
+
+    const secondResponse = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/questions")
+      .query({
+        testId,
+        search: "searchable",
+        limit: 1,
+        cursor: first.nextCursor,
+      })
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200)
+    const second = secondResponse.body as AdminQuestionPage
+    expect(second.items).toMatchObject([{ prompt: "Searchable Beta?" }])
+    expect(second.items[0].id).not.toBe(first.items[0].id)
+    expect(second.nextCursor).toBeNull()
+
+    const absent = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/questions")
+      .query({ testId: "00000000-0000-0000-0000-000000000000" })
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200)
+    expect(absent.body).toEqual({ items: [], nextCursor: null })
+  })
+
+  it.each(["/api/admin/tests", "/api/admin/questions"])(
+    "GET %s bounds pagination and rejects malformed filters/cursors",
+    async (path) => {
+      const a = ready()
+      const token = await a.mint({
+        sub: `${SUB}-read-validation`,
+        email: EMAIL,
+        isAdmin: true,
+      })
+
+      for (const limit of ["0", "101", "1.5", "nope", "", "Infinity"]) {
+        // eslint-disable-next-line no-await-in-loop -- Supertest binds/closes this shared server per request.
+        await request(a.http.getHttpServer() as App)
+          .get(path)
+          .query({ limit })
+          .set("Authorization", `Bearer ${token}`)
+          .expect(400)
+      }
+      await request(a.http.getHttpServer() as App)
+        .get(path)
+        .query({ limit: 100 })
+        .set("Authorization", `Bearer ${token}`)
+        .expect(200)
+      for (const query of [
+        { cursor: "invalid" },
+        { cursor: "" },
+        { search: "x".repeat(201) },
+      ]) {
+        // eslint-disable-next-line no-await-in-loop -- Supertest binds/closes this shared server per request.
+        await request(a.http.getHttpServer() as App)
+          .get(path)
+          .query(query)
+          .set("Authorization", `Bearer ${token}`)
+          .expect(400)
+      }
+      const query = path.endsWith("tests")
+        ? { status: "unknown" }
+        : { testId: "not-a-uuid" }
+      await request(a.http.getHttpServer() as App)
+        .get(path)
+        .query(query)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(400)
+    },
+  )
+
+  it("returns test_not_found for missing or malformed test IDs", async () => {
+    const a = ready()
+    const token = await a.mint({
+      sub: `${SUB}-read-missing`,
+      email: EMAIL,
+      isAdmin: true,
+    })
+    for (const id of ["00000000-0000-0000-0000-000000000000", "not-a-uuid"]) {
+      // eslint-disable-next-line no-await-in-loop -- Supertest binds/closes this shared server per request.
+      const response = await request(a.http.getHttpServer() as App)
+        .get(`/api/admin/tests/${id}`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(404)
+      expect(response.body).toMatchObject({
+        type: "test_not_found",
+        status: 404,
+      })
+    }
+  })
 
   it("POST /admin/tests/import is 401 without a token", async () => {
     const a = ready()

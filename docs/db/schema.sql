@@ -541,6 +541,30 @@ CREATE TABLE stimulus_play (
 
 
 -- =====================================================================
+--  ADMIN AUDIT
+-- =====================================================================
+
+-- Audit identity comes from the admin's OIDC subject, independently of a
+-- student profile. Resource identifiers are text so records can name both
+-- UUID-backed resources and external resources. No foreign keys: history
+-- must survive resource deletion. Updates and deletes are rejected below.
+CREATE TABLE admin_audit_log (
+    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    admin_subject  text        NOT NULL,
+    action         text        NOT NULL,
+    resource_type  text        NOT NULL,
+    resource_id    text        NOT NULL,
+    metadata       jsonb       NOT NULL DEFAULT '{}'::jsonb,
+    created_at     timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT admin_audit_admin_subject_not_blank CHECK (length(btrim(admin_subject)) > 0),
+    CONSTRAINT admin_audit_action_not_blank        CHECK (length(btrim(action)) > 0),
+    CONSTRAINT admin_audit_resource_type_not_blank CHECK (length(btrim(resource_type)) > 0),
+    CONSTRAINT admin_audit_resource_id_not_blank   CHECK (length(btrim(resource_id)) > 0)
+);
+
+
+-- =====================================================================
 --  DURABILITY
 -- =====================================================================
 
@@ -577,7 +601,21 @@ CREATE INDEX failed_write_pending_idx  ON failed_write (received_at DESC, id) WH
 --  IMMUTABILITY
 --  A published version and every row beneath it are frozen. Without this
 --  an author could edit a question after a child had been scored on it.
+--  Admin audit records are append-only, regardless of publication state.
 -- =====================================================================
+
+CREATE OR REPLACE FUNCTION reject_admin_audit_change() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'admin audit records are immutable (attempted %)', TG_OP
+        USING ERRCODE = 'restrict_violation';
+END;
+$$;
+
+CREATE TRIGGER admin_audit_log_immutable
+    BEFORE UPDATE OR DELETE ON admin_audit_log
+    FOR EACH ROW EXECUTE FUNCTION reject_admin_audit_change();
+
 
 CREATE OR REPLACE FUNCTION reject_published_content_change() RETURNS trigger
 LANGUAGE plpgsql AS $$

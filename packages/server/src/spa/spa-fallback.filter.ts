@@ -1,4 +1,3 @@
-import { join } from "node:path"
 import {
   Catch,
   NotFoundException,
@@ -60,7 +59,8 @@ export class SpaFallbackFilter implements ExceptionFilter {
       !req.path.startsWith("/media/")
 
     if (servesSpa) {
-      res.sendFile(join(this.spaRoot, "index.html"))
+      // Keep hidden ancestors (e.g. .worktrees) outside dotfile checks.
+      res.sendFile("index.html", { root: this.spaRoot })
 
       return
     }

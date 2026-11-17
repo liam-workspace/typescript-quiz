@@ -6,8 +6,15 @@ exports.up = (pgm) => {
 ALTER TYPE section_type ADD VALUE IF NOT EXISTS 'math';
 ALTER TABLE question ADD COLUMN prompt_blocks jsonb;
 ALTER TABLE choice ADD COLUMN label_blocks jsonb;
-UPDATE question SET prompt_blocks = jsonb_build_array(jsonb_build_object('kind', 'text', 'value', prompt));
-UPDATE choice SET label_blocks = jsonb_build_array(jsonb_build_object('kind', 'text', 'value', label));
+-- Published content is immutable: leave its blocks null and retain legacy text.
+UPDATE question q
+   SET prompt_blocks = jsonb_build_array(jsonb_build_object('kind', 'text', 'value', q.prompt))
+  FROM test_version tv
+ WHERE tv.id = q.test_version_id AND tv.published_at IS NULL;
+UPDATE choice c
+   SET label_blocks = jsonb_build_array(jsonb_build_object('kind', 'text', 'value', c.label))
+  FROM question q JOIN test_version tv ON tv.id = q.test_version_id
+ WHERE q.id = c.question_id AND tv.published_at IS NULL;
 -- Math generation workflow records are mutable and never student-visible.
 CREATE TABLE math_problem_template (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

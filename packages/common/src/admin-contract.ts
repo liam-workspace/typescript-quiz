@@ -58,6 +58,7 @@ export interface AdminTestPage {
 }
 
 export interface AdminTestDetail extends AdminTestSummary {
+  versionId: string
   description: string | null
   durationSeconds: number
   sections: Array<{ id: string; title: string; questionCount: number }>

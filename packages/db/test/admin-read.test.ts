@@ -322,6 +322,31 @@ describe("admin read projections", () => {
     })
   }, 120_000)
 
+  it.each(["older published version", "null"])(
+    "exposes the latest draft version ID when the publication pointer is %s",
+    async (publicationPointer) => {
+      await withDatabase(async (pool) => {
+        const f = await seedPublishedTest(pool)
+        const draftVersionId = await addDraft(pool, f.testId)
+
+        if (publicationPointer === "null") {
+          await pool.query(
+            `UPDATE test SET current_version_id = NULL WHERE id = $1`,
+            [f.testId],
+          )
+        }
+
+        expect(await loadAdminTestDetail(pool, f.testId)).toMatchObject({
+          id: f.testId,
+          status: "draft",
+          versionId: draftVersionId,
+          currentVersionId: publicationPointer === "null" ? null : f.versionId,
+        })
+      })
+    },
+    120_000,
+  )
+
   it("returns only aggregate completed results pinned to their historical version", async () => {
     await withDatabase(async (pool) => {
       const f = await seedPublishedTest(pool)

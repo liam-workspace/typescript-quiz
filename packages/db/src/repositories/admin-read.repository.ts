@@ -299,6 +299,7 @@ export async function loadAdminTestDetail(
 
   return {
     ...toTestSummary(row),
+    versionId: row.version_id,
     description: null,
     durationSeconds: row.duration_seconds,
     sections: row.sections,

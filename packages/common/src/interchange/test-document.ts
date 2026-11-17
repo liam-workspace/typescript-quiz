@@ -104,8 +104,12 @@ const playbackSchema = z
   .nullable()
 
 export const contentBlockSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("text"), value: z.string() }),
-  z.object({ kind: z.literal("math"), tex: z.string(), display: z.boolean() }),
+  z.strictObject({ kind: z.literal("text"), value: z.string() }),
+  z.strictObject({
+    kind: z.literal("math"),
+    tex: z.string(),
+    display: z.boolean(),
+  }),
 ])
 
 export type ContentBlock = z.infer<typeof contentBlockSchema>

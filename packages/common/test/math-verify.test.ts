@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  contentBlockSchema,
   deriveDistractors,
   renderCanonicalLatex,
   testDocumentSchema,
@@ -71,6 +72,90 @@ describe("math verification", () => {
   it.each(problems)("verifies $family", (spec) => {
     expect(verifyMathProblem(spec).valid).toBe(true)
     expect(verifyMathProblem({ ...spec, answer: answer(99) }).valid).toBe(false)
+  })
+
+  it("rejects nested powers before they can produce oversized integers", () => {
+    let power: MathProblemSpec["expression"] = fraction(1, 2)
+    for (let i = 0; i < 4; i += 1) {
+      power = { kind: "power", left: power, right: integer(8) }
+    }
+    const spec: MathProblemSpec = {
+      ...problems[3],
+      expression: {
+        kind: "equation",
+        left: { kind: "variable", name: "x" },
+        right: { kind: "subtract", left: power, right: power },
+      },
+      answer: answer(0),
+    }
+    expect(verifyMathProblem(spec)).toEqual({
+      valid: false,
+      errors: ["expression exceeds arithmetic limit"],
+    })
+  })
+
+  it("enforces constraints on expression values and the answer without variable declarations", () => {
+    const constraints = { min: 0, max: 10, nonNegative: true }
+    expect(
+      verifyMathProblem({
+        ...problems[2],
+        constraints,
+        expression: { kind: "divide", left: integer(-6), right: integer(-8) },
+      }).valid,
+    ).toBe(false)
+    expect(
+      verifyMathProblem({
+        ...problems[3],
+        constraints,
+        expression: {
+          kind: "equation",
+          left: { kind: "variable", name: "x" },
+          right: integer(11),
+        },
+        answer: answer(11),
+      }).valid,
+    ).toBe(false)
+    expect(
+      verifyMathProblem({
+        ...problems[3],
+        constraints,
+        expression: {
+          kind: "equation",
+          left: {
+            kind: "divide",
+            left: {
+              kind: "multiply",
+              left: { kind: "variable", name: "x" },
+              right: integer(5),
+            },
+            right: integer(5),
+          },
+          right: integer(3),
+        },
+        answer: answer(3),
+      }).valid,
+    ).toBe(false)
+    expect(
+      verifyMathProblem({ ...problems[3], variables: { y: 2 } }).valid,
+    ).toBe(false)
+    expect(
+      verifyMathProblem({ ...problems[3], variables: { x: 5 } }).valid,
+    ).toBe(false)
+  })
+
+  it("rejects unknown content block fields", () => {
+    expect(
+      contentBlockSchema.safeParse({ kind: "text", value: "A", extra: true })
+        .success,
+    ).toBe(false)
+    expect(
+      contentBlockSchema.safeParse({
+        kind: "math",
+        tex: "x",
+        display: false,
+        extra: true,
+      }).success,
+    ).toBe(false)
   })
 
   it("rejects equivalent choices and incorrect correctness flags", () => {

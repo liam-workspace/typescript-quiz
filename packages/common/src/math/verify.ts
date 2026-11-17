@@ -46,7 +46,16 @@ interface Linear {
 }
 const zero = { n: 0n, d: 1n }
 const one = { n: 1n, d: 1n }
+const maxBits = 512
+const maxNodes = 256
+function bitLength(value: bigint): number {
+  return (value < 0n ? -value : value).toString(2).length
+}
 function rational(numerator: bigint, denominator: bigint): Rational {
+  if (bitLength(numerator) > maxBits || bitLength(denominator) > maxBits) {
+    throw new Error("expression exceeds arithmetic limit")
+  }
+
   let n = numerator
   let d = denominator
 
@@ -99,12 +108,36 @@ function answerValue(answer: MathAnswer): Rational {
 
   return value
 }
-function evaluate(ast: MathAst, variable: string | null, depth = 0): Linear {
-  if (!ast || depth > 32) {
+type Constraints = MathProblemSpec["constraints"]
+function checkConstraint(value: Rational, constraints: Constraints): void {
+  if (
+    value.n < BigInt(constraints.min) * value.d ||
+    value.n > BigInt(constraints.max) * value.d ||
+    (constraints.nonNegative && value.n < 0n)
+  ) {
+    throw new Error("value outside constraints")
+  }
+}
+function evaluate(
+  ast: MathAst,
+  context: {
+    variable: string | null
+    constraints: Constraints
+    budget: { nodes: number }
+    substitution?: Rational
+  },
+  depth = 0,
+): Linear {
+  const { variable, constraints, budget, substitution } = context
+  budget.nodes += 1
+
+  if (!ast || depth > 32 || budget.nodes > maxNodes) {
     throw new Error("invalid or too deep expression")
   }
 
   if (ast.kind === "integer") {
+    checkConstraint(rational(numberInteger(ast.value), 1n), constraints)
+
     return {
       coefficient: zero,
       constant: rational(numberInteger(ast.value), 1n),
@@ -112,6 +145,13 @@ function evaluate(ast: MathAst, variable: string | null, depth = 0): Linear {
   }
 
   if (ast.kind === "fraction") {
+    checkConstraint(rational(numberInteger(ast.numerator), 1n), constraints)
+    checkConstraint(rational(numberInteger(ast.denominator), 1n), constraints)
+    checkConstraint(
+      rational(numberInteger(ast.numerator), numberInteger(ast.denominator)),
+      constraints,
+    )
+
     return {
       coefficient: zero,
       constant: rational(
@@ -126,6 +166,12 @@ function evaluate(ast: MathAst, variable: string | null, depth = 0): Linear {
       throw new Error("unexpected variable")
     }
 
+    if (substitution) {
+      checkConstraint(substitution, constraints)
+
+      return { coefficient: zero, constant: substitution }
+    }
+
     return { coefficient: one, constant: zero }
   }
 
@@ -133,10 +179,22 @@ function evaluate(ast: MathAst, variable: string | null, depth = 0): Linear {
     throw new Error("unsupported expression")
   }
 
-  const left = evaluate(ast.left, variable, depth + 1)
-  const right = evaluate(ast.right, variable, depth + 1)
+  const left = evaluate(ast.left, context, depth + 1)
+  const right = evaluate(ast.right, context, depth + 1)
+  const result = evaluateOperation(ast.kind, left, right)
 
-  switch (ast.kind) {
+  if (result.coefficient.n === 0n) {
+    checkConstraint(result.constant, constraints)
+  }
+
+  return result
+}
+function evaluateOperation(
+  kind: MathAst["kind"],
+  left: Linear,
+  right: Linear,
+): Linear {
+  switch (kind) {
     case "add":
       return {
         coefficient: add(left.coefficient, right.coefficient),
@@ -188,6 +246,13 @@ function evaluate(ast: MathAst, variable: string | null, depth = 0): Linear {
         throw new Error("nonlinear expression")
       }
 
+      if (
+        bitLength(left.constant.n) * Number(exponent) > maxBits ||
+        bitLength(left.constant.d) * Number(exponent) > maxBits
+      ) {
+        throw new Error("expression exceeds arithmetic limit")
+      }
+
       return exponent === 0n
         ? { coefficient: zero, constant: one }
         : {
@@ -203,8 +268,15 @@ function evaluate(ast: MathAst, variable: string | null, depth = 0): Linear {
       throw new Error("unsupported expression")
   }
 }
-function collectVariables(ast: MathAst, names: Set<string>, depth = 0): void {
-  if (!ast || depth > 32) {
+function collectVariables(
+  ast: MathAst,
+  context: { names: Set<string>; nodes: number },
+  depth = 0,
+): void {
+  const { names } = context
+  context.nodes += 1
+
+  if (!ast || depth > 32 || context.nodes > maxNodes) {
     throw new Error("invalid or too deep expression")
   }
 
@@ -215,8 +287,8 @@ function collectVariables(ast: MathAst, names: Set<string>, depth = 0): void {
 
     names.add(ast.name)
   } else if ("left" in ast && "right" in ast) {
-    collectVariables(ast.left, names, depth + 1)
-    collectVariables(ast.right, names, depth + 1)
+    collectVariables(ast.left, context, depth + 1)
+    collectVariables(ast.right, context, depth + 1)
   }
 }
 function solve(spec: MathProblemSpec): Rational {
@@ -228,20 +300,61 @@ function solve(spec: MathProblemSpec): Rational {
     }
 
     const names = new Set<string>()
-    collectVariables(ast, names)
+    collectVariables(ast, { names, nodes: 0 })
 
     if (names.size !== 1) {
       throw new Error("expected one variable")
     }
 
     const [variable] = [...names]
-    const left = evaluate(ast.left, variable)
-    const right = evaluate(ast.right, variable)
+    const declared = Object.keys(spec.variables)
 
-    return div(
+    if (declared.some((name) => name !== variable)) {
+      throw new Error("unexpected variable declaration")
+    }
+
+    const budget = { nodes: 0 }
+    const left = evaluate(ast.left, {
+      variable,
+      constraints: spec.constraints,
+      budget,
+    })
+    const right = evaluate(ast.right, {
+      variable,
+      constraints: spec.constraints,
+      budget,
+    })
+
+    const solution = div(
       add(right.constant, neg(left.constant)),
       add(left.coefficient, neg(right.coefficient)),
     )
+    const valueBudget = { nodes: 0 }
+    evaluate(ast.left, {
+      variable,
+      constraints: spec.constraints,
+      budget: valueBudget,
+      substitution: solution,
+    })
+    evaluate(ast.right, {
+      variable,
+      constraints: spec.constraints,
+      budget: valueBudget,
+      substitution: solution,
+    })
+
+    if (
+      declared.length &&
+      !equal(solution, rational(numberInteger(spec.variables[variable]), 1n))
+    ) {
+      throw new Error("variable declaration does not match solution")
+    }
+
+    return solution
+  }
+
+  if (Object.keys(spec.variables).length) {
+    throw new Error("unexpected variable declaration")
   }
 
   if (spec.family === "fraction_addition") {
@@ -273,7 +386,11 @@ function solve(spec: MathProblemSpec): Rational {
     throw new Error("unsupported family")
   }
 
-  return evaluate(ast, null).constant
+  return evaluate(ast, {
+    variable: null,
+    constraints: spec.constraints,
+    budget: { nodes: 0 },
+  }).constant
 }
 
 export function verifyMathProblem(spec: MathProblemSpec): ValidationResult {
@@ -282,6 +399,8 @@ export function verifyMathProblem(spec: MathProblemSpec): ValidationResult {
       !spec ||
       typeof spec.seed !== "string" ||
       !spec.variables ||
+      typeof spec.variables !== "object" ||
+      Array.isArray(spec.variables) ||
       !spec.constraints
     ) {
       throw new Error("invalid problem spec")
@@ -310,6 +429,8 @@ export function verifyMathProblem(spec: MathProblemSpec): ValidationResult {
     }
     const actual = solve(spec)
     const expected = answerValue(spec.answer)
+    checkConstraint(actual, spec.constraints)
+    checkConstraint(expected, spec.constraints)
 
     if (!equal(actual, expected)) {
       throw new Error("answer does not match expression")

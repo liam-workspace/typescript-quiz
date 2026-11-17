@@ -15,6 +15,9 @@ export class PublishedVersionMutationError extends Error {}
 /** A patch must retain exactly the question's existing choice IDs. */
 export class InvalidDraftChoicesError extends Error {}
 
+/** Flat text cannot safely replace multiple rich text fragments. */
+export class AmbiguousDraftTextError extends Error {}
+
 interface ChoiceRow {
   id: string
   label: string
@@ -30,29 +33,31 @@ interface StoredBlock {
 
 function synchronizeTextBlocks(
   blocks: StoredBlock[] | null,
+  previousValue: string,
   value: string,
-): StoredBlock[] {
-  // A flat edit replaces the full text projection. Keep its first block's
-  // metadata and all non-text content without retaining stale text fragments.
-  const existing = blocks ?? []
-  const firstTextIndex = existing.findIndex((block) => block.kind === "text")
-  const synchronized = existing.flatMap((block, index) => {
-    if (block.kind !== "text") {
-      return [block]
-    }
-
-    if (index !== firstTextIndex) {
-      return []
-    }
-
-    return [{ ...block, value }]
-  })
-
-  if (firstTextIndex === -1) {
-    synchronized.push({ kind: "text", value })
+): string | null {
+  if (value === previousValue) {
+    return null
   }
 
-  return synchronized
+  const existing = blocks ?? []
+  const textBlocks = existing.filter((block) => block.kind === "text")
+
+  if (textBlocks.length > 1) {
+    throw new AmbiguousDraftTextError(
+      "Cannot edit flat text with multiple text blocks",
+    )
+  }
+
+  if (textBlocks.length === 0) {
+    return JSON.stringify([...existing, { kind: "text", value }])
+  }
+
+  return JSON.stringify(
+    existing.map((block) =>
+      block.kind === "text" ? { ...block, value } : block,
+    ),
+  )
 }
 
 export function patchDraftQuestion(
@@ -111,13 +116,16 @@ export function patchDraftQuestion(
 
     if (patch.prompt !== undefined) {
       await tx.query(
-        `UPDATE question SET prompt = $2, prompt_blocks = $3 WHERE id = $1`,
+        `UPDATE question SET prompt = $2, prompt_blocks = CASE WHEN $4 THEN prompt_blocks ELSE $3::jsonb END WHERE id = $1`,
         [
           input.questionId,
           patch.prompt,
-          JSON.stringify(
-            synchronizeTextBlocks(questions[0].prompt_blocks, patch.prompt),
+          synchronizeTextBlocks(
+            questions[0].prompt_blocks,
+            questions[0].prompt,
+            patch.prompt,
           ),
+          patch.prompt === questions[0].prompt,
         ],
       )
     }
@@ -132,9 +140,16 @@ export function patchDraftQuestion(
       )
 
       for (const [index, choice] of patch.choices.entries()) {
+        const existing = choices.find((row) => row.id === choice.id)
+
+        if (existing === undefined) {
+          throw new InvalidDraftChoicesError(input.questionId)
+        }
+
         // eslint-disable-next-line no-await-in-loop -- Ordered writes share one transaction connection.
         await tx.query(
-          `UPDATE choice SET ordinal = $3, label = $4, is_correct = $5, label_blocks = $6
+          `UPDATE choice SET ordinal = $3, label = $4, is_correct = $5,
+            label_blocks = CASE WHEN $7 THEN label_blocks ELSE $6::jsonb END
             WHERE question_id = $1 AND id = $2`,
           [
             input.questionId,
@@ -142,13 +157,12 @@ export function patchDraftQuestion(
             index + 1,
             choice.label,
             choice.isCorrect,
-            JSON.stringify(
-              synchronizeTextBlocks(
-                choices.find((existing) => existing.id === choice.id)
-                  ?.label_blocks ?? null,
-                choice.label,
-              ),
+            synchronizeTextBlocks(
+              existing.label_blocks,
+              existing.label,
+              choice.label,
             ),
+            choice.label === existing.label,
           ],
         )
       }

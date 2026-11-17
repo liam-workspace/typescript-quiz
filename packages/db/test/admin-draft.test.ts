@@ -204,6 +204,82 @@ describe("patchDraftQuestion", () => {
     })
   }, 120_000)
 
+  it("preserves interleaved blocks during unchanged text and choice reorder", async () => {
+    await withDatabase(async (pool) => {
+      const f = await insertDraft(pool)
+      const promptBlocks = [
+        { kind: "text", value: "Question ", language: "en" },
+        { kind: "math", value: "1", display: true },
+        { kind: "text", value: "?", emphasis: true },
+      ]
+      const labelBlocks = [
+        { kind: "text", value: "Y" },
+        { kind: "image", value: "diagram.svg", alt: "diagram" },
+        { kind: "text", value: "es", language: "en" },
+      ]
+      await pool.query(`UPDATE question SET prompt_blocks = $1 WHERE id = $2`, [
+        JSON.stringify(promptBlocks),
+        f.questionId,
+      ])
+      await pool.query(`UPDATE choice SET label_blocks = $1 WHERE id = $2`, [
+        JSON.stringify(labelBlocks),
+        f.choices[0].id,
+      ])
+      await patchDraftQuestion(pool, {
+        ...f,
+        patch: {
+          prompt: "Question 1?",
+          choices: [
+            { ...f.choices[1], isCorrect: true },
+            { ...f.choices[0], isCorrect: false },
+          ],
+        },
+      })
+      const rows = await readQuestion(pool, f.questionId)
+      expect(rows[0]).toMatchObject({ id: f.choices[1].id, is_correct: true })
+      expect(rows[1]).toMatchObject({ id: f.choices[0].id, is_correct: false })
+      expect(rows[0].prompt_blocks).toEqual(promptBlocks)
+      expect(rows[1].label_blocks).toEqual(labelBlocks)
+      expect(rows[0].label_blocks).toBeNull()
+    })
+  }, 120_000)
+
+  it("rejects ambiguous prompt and choice edits without partial writes", async () => {
+    await withDatabase(async (pool) => {
+      const f = await insertDraft(pool)
+      const blocks = JSON.stringify([
+        { kind: "text", value: "first" },
+        { kind: "math", value: "x" },
+        { kind: "text", value: "last" },
+      ])
+      await pool.query(`UPDATE question SET prompt_blocks = $1 WHERE id = $2`, [
+        blocks,
+        f.questionId,
+      ])
+      await pool.query(`UPDATE choice SET label_blocks = $1 WHERE id = $2`, [
+        blocks,
+        f.choices[0].id,
+      ])
+      const before = await readQuestion(pool, f.questionId)
+      await expect(
+        patchDraftQuestion(pool, {
+          ...f,
+          patch: { prompt: "Changed?", choices: [...f.choices].reverse() },
+        }),
+      ).rejects.toThrow("Cannot edit flat text with multiple text blocks")
+      expect(await readQuestion(pool, f.questionId)).toEqual(before)
+      await expect(
+        patchDraftQuestion(pool, {
+          ...f,
+          patch: {
+            choices: [f.choices[1], { ...f.choices[0], label: "Changed" }],
+          },
+        }),
+      ).rejects.toThrow("Cannot edit flat text with multiple text blocks")
+      expect(await readQuestion(pool, f.questionId)).toEqual(before)
+    })
+  }, 120_000)
+
   it("supports prompt-only and choices-only patches without changing omitted fields", async () => {
     await withDatabase(async (pool) => {
       const f = await insertDraft(pool)
@@ -249,7 +325,10 @@ describe("patchDraftQuestion", () => {
       )
       await patchDraftQuestion(pool, {
         ...f,
-        patch: { prompt: "New text?", choices: f.choices },
+        patch: {
+          prompt: "New text?",
+          choices: [{ ...f.choices[0], label: "New label" }, f.choices[1]],
+        },
       })
       const rows = await readQuestion(pool, f.questionId)
       expect(rows[0].prompt_blocks).toEqual([
@@ -257,7 +336,7 @@ describe("patchDraftQuestion", () => {
       ])
       expect(rows[0].label_blocks).toEqual([
         { kind: "math", value: "2" },
-        { kind: "text", value: "Yes" },
+        { kind: "text", value: "New label" },
       ])
     })
   }, 120_000)

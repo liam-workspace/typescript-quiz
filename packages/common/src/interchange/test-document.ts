@@ -103,8 +103,16 @@ const playbackSchema = z
   })
   .nullable()
 
+export const contentBlockSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("text"), value: z.string() }),
+  z.object({ kind: z.literal("math"), tex: z.string(), display: z.boolean() }),
+])
+
+export type ContentBlock = z.infer<typeof contentBlockSchema>
+
 const choiceSchema = z.object({
   label: z.string().min(1),
+  labelBlocks: z.array(contentBlockSchema).optional(),
   isCorrect: z.boolean(),
   // Inline <svg> for a picture choice (TOEFL Primary's listen_pick_picture)
   // -- see migration 1005 and svgImageSchema above.
@@ -115,6 +123,7 @@ const questionSchema = z
   .object({
     questionKey: z.string().min(1),
     prompt: z.string().min(1),
+    promptBlocks: z.array(contentBlockSchema).optional(),
     type: z.enum(["single_choice", "multi_choice"]),
     points: z.number().int().positive(),
     tags: z.array(z.string().min(1)).optional(),

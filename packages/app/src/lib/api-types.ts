@@ -1,3 +1,50 @@
+import type {
+  AdminAttemptDetail,
+  AdminLearnerPage,
+  AdminLearnerSummary,
+  AdminOverview,
+  AdminPagination,
+  AdminQuestion,
+  AdminQuestionPage,
+  AdminResultPage,
+  AdminResultSummary,
+  AdminTestDetail,
+  AdminTestFilter,
+  AdminTestPage,
+  AdminTestSummary,
+  DraftQuestionPatch,
+} from "@pp/common"
+
+// Use the server's shared admin contracts, including authoritative answer data.
+export type {
+  AdminAttemptDetail,
+  AdminLearnerPage,
+  AdminLearnerSummary,
+  AdminOverview,
+  AdminQuestion,
+  AdminQuestionPage,
+  AdminResultPage,
+  AdminResultSummary,
+  AdminTestDetail,
+  AdminTestPage,
+  AdminTestSummary,
+  DraftQuestionPatch,
+}
+
+export type AdminPageQuery = Partial<AdminPagination>
+
+export type AdminTestQuery = AdminPageQuery & AdminTestFilter
+
+export type AdminQuestionQuery = AdminPageQuery &
+  Pick<AdminTestFilter, "search"> & { testId?: string }
+
+export type AdminResultQuery = AdminPageQuery & {
+  testId?: string
+  learnerId?: string
+}
+
+export type AdminLearnerQuery = AdminPageQuery & Pick<AdminTestFilter, "search">
+
 export type SectionType = "listening" | "reading" | "vocabulary" | "grammar"
 
 export type StudentLevel = "primary-step-1" | "primary-step-2"

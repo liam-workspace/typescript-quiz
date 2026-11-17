@@ -18,8 +18,41 @@ export class InvalidDraftChoicesError extends Error {}
 interface ChoiceRow {
   id: string
   label: string
+  label_blocks: StoredBlock[] | null
   ordinal: number
   is_correct: boolean
+}
+
+interface StoredBlock {
+  kind: string
+  [key: string]: unknown
+}
+
+function synchronizeTextBlocks(
+  blocks: StoredBlock[] | null,
+  value: string,
+): StoredBlock[] {
+  // A flat edit replaces the full text projection. Keep its first block's
+  // metadata and all non-text content without retaining stale text fragments.
+  const existing = blocks ?? []
+  const firstTextIndex = existing.findIndex((block) => block.kind === "text")
+  const synchronized = existing.flatMap((block, index) => {
+    if (block.kind !== "text") {
+      return [block]
+    }
+
+    if (index !== firstTextIndex) {
+      return []
+    }
+
+    return [{ ...block, value }]
+  })
+
+  if (firstTextIndex === -1) {
+    synchronized.push({ kind: "text", value })
+  }
+
+  return synchronized
 }
 
 export function patchDraftQuestion(
@@ -44,8 +77,11 @@ export function patchDraftQuestion(
       throw new PublishedVersionMutationError(input.versionId)
     }
 
-    const { rows: questions } = await tx.query<{ prompt: string }>(
-      `SELECT prompt FROM question
+    const { rows: questions } = await tx.query<{
+      prompt: string
+      prompt_blocks: StoredBlock[] | null
+    }>(
+      `SELECT prompt, prompt_blocks FROM question
         WHERE id = $1 AND test_version_id = $2 FOR UPDATE`,
       [input.questionId, input.versionId],
     )
@@ -55,7 +91,7 @@ export function patchDraftQuestion(
     }
 
     const { rows: choices } = await tx.query<ChoiceRow>(
-      `SELECT id, label, ordinal, is_correct FROM choice
+      `SELECT id, label, label_blocks, ordinal, is_correct FROM choice
         WHERE question_id = $1 ORDER BY ordinal FOR UPDATE`,
       [input.questionId],
     )
@@ -74,10 +110,16 @@ export function patchDraftQuestion(
     }
 
     if (patch.prompt !== undefined) {
-      await tx.query(`UPDATE question SET prompt = $2 WHERE id = $1`, [
-        input.questionId,
-        patch.prompt,
-      ])
+      await tx.query(
+        `UPDATE question SET prompt = $2, prompt_blocks = $3 WHERE id = $1`,
+        [
+          input.questionId,
+          patch.prompt,
+          JSON.stringify(
+            synchronizeTextBlocks(questions[0].prompt_blocks, patch.prompt),
+          ),
+        ],
+      )
     }
 
     if (patch.choices !== undefined) {
@@ -92,7 +134,7 @@ export function patchDraftQuestion(
       for (const [index, choice] of patch.choices.entries()) {
         // eslint-disable-next-line no-await-in-loop -- Ordered writes share one transaction connection.
         await tx.query(
-          `UPDATE choice SET ordinal = $3, label = $4, is_correct = $5
+          `UPDATE choice SET ordinal = $3, label = $4, is_correct = $5, label_blocks = $6
             WHERE question_id = $1 AND id = $2`,
           [
             input.questionId,
@@ -100,6 +142,13 @@ export function patchDraftQuestion(
             index + 1,
             choice.label,
             choice.isCorrect,
+            JSON.stringify(
+              synchronizeTextBlocks(
+                choices.find((existing) => existing.id === choice.id)
+                  ?.label_blocks ?? null,
+                choice.label,
+              ),
+            ),
           ],
         )
       }

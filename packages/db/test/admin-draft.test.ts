@@ -66,8 +66,11 @@ async function readQuestion(pool: pg.Pool, questionId: string) {
     label: string
     is_correct: boolean
     image_svg: string | null
+    prompt_blocks: unknown[] | null
+    label_blocks: unknown[] | null
   }>(
-    `SELECT q.prompt, c.id, c.ordinal, c.label, c.is_correct, c.image_svg
+    `SELECT q.prompt, q.prompt_blocks, c.id, c.ordinal, c.label,
+            c.label_blocks, c.is_correct, c.image_svg
        FROM question q JOIN choice c ON c.question_id = q.id
       WHERE q.id = $1 ORDER BY c.ordinal`,
     [questionId],
@@ -132,15 +135,29 @@ describe("patchDraftQuestion", () => {
     })
   }, 120_000)
 
-  it("updates prompt, ordered labels, and correctness while preserving choice IDs and images", async () => {
+  it("synchronizes flat text and blocks while preserving choice IDs, images, and other block fields", async () => {
     await withDatabase(async (pool) => {
       const f = await insertDraft(pool)
       const image =
         '<svg xmlns="http://www.w3.org/2000/svg"><circle r="5"/></svg>'
-      await pool.query(`UPDATE choice SET image_svg = $1 WHERE id = $2`, [
-        image,
-        f.choices[0].id,
+      await pool.query(`UPDATE question SET prompt_blocks = $1 WHERE id = $2`, [
+        JSON.stringify([
+          { kind: "text", value: "Question 1?", language: "en" },
+          { kind: "math", value: "x + 1", display: true },
+        ]),
+        f.questionId,
       ])
+      await pool.query(
+        `UPDATE choice SET image_svg = $1, label_blocks = $2 WHERE id = $3`,
+        [
+          image,
+          JSON.stringify([
+            { kind: "image", value: "diagram.svg", alt: "Diagram" },
+            { kind: "text", value: "Yes", language: "en" },
+          ]),
+          f.choices[0].id,
+        ],
+      )
       const patch = {
         prompt: "Updated question?",
         choices: [
@@ -156,17 +173,30 @@ describe("patchDraftQuestion", () => {
       expect(await readQuestion(pool, f.questionId)).toEqual([
         {
           prompt: "Updated question?",
+          prompt_blocks: [
+            { kind: "text", value: "Updated question?", language: "en" },
+            { kind: "math", value: "x + 1", display: true },
+          ],
           id: f.choices[1].id,
           ordinal: 1,
           label: "Second first",
+          label_blocks: [{ kind: "text", value: "Second first" }],
           is_correct: true,
           image_svg: null,
         },
         {
           prompt: "Updated question?",
+          prompt_blocks: [
+            { kind: "text", value: "Updated question?", language: "en" },
+            { kind: "math", value: "x + 1", display: true },
+          ],
           id: f.choices[0].id,
           ordinal: 2,
           label: "First second",
+          label_blocks: [
+            { kind: "image", value: "diagram.svg", alt: "Diagram" },
+            { kind: "text", value: "First second", language: "en" },
+          ],
           is_correct: false,
           image_svg: image,
         },
@@ -187,6 +217,14 @@ describe("patchDraftQuestion", () => {
         prompt: "Prompt only?",
         choices: f.choices,
       })
+      expect(await readQuestion(pool, f.questionId)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            prompt_blocks: [{ kind: "text", value: "Prompt only?" }],
+            label_blocks: null,
+          }),
+        ]),
+      )
       const choices = [...f.choices].reverse()
       expect(
         await patchDraftQuestion(pool, { ...f, patch: { choices } }),
@@ -195,6 +233,32 @@ describe("patchDraftQuestion", () => {
         prompt: "Prompt only?",
         choices,
       })
+    })
+  }, 120_000)
+
+  it("adds canonical text to empty and non-text-only blocks", async () => {
+    await withDatabase(async (pool) => {
+      const f = await insertDraft(pool)
+      await pool.query(
+        `UPDATE question SET prompt_blocks = '[]' WHERE id = $1`,
+        [f.questionId],
+      )
+      await pool.query(
+        `UPDATE choice SET label_blocks = '[{"kind":"math","value":"2"}]' WHERE id = $1`,
+        [f.choices[0].id],
+      )
+      await patchDraftQuestion(pool, {
+        ...f,
+        patch: { prompt: "New text?", choices: f.choices },
+      })
+      const rows = await readQuestion(pool, f.questionId)
+      expect(rows[0].prompt_blocks).toEqual([
+        { kind: "text", value: "New text?" },
+      ])
+      expect(rows[0].label_blocks).toEqual([
+        { kind: "math", value: "2" },
+        { kind: "text", value: "Yes" },
+      ])
     })
   }, 120_000)
 
@@ -237,6 +301,16 @@ describe("patchDraftQuestion", () => {
   it("rejects all edits to a published version", async () => {
     await withDatabase(async (pool) => {
       const f = await insertDraft(pool)
+      await pool.query(
+        `UPDATE question SET prompt_blocks = jsonb_build_array(jsonb_build_object('kind', 'text', 'value', prompt))
+          WHERE id = $1`,
+        [f.questionId],
+      )
+      await pool.query(
+        `UPDATE choice SET label_blocks = jsonb_build_array(jsonb_build_object('kind', 'text', 'value', label))
+          WHERE question_id = $1`,
+        [f.questionId],
+      )
       await pool.query(
         `UPDATE test_version SET published_at = now() WHERE id = $1`,
         [f.versionId],

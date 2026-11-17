@@ -41,6 +41,7 @@ import {
   loadAdminTestDetail,
 } from "./repositories/admin-read.repository.js"
 import {
+  AmbiguousDraftTextError,
   DraftQuestionNotFoundError,
   InvalidDraftChoicesError,
   PublishedVersionMutationError,
@@ -50,6 +51,7 @@ import {
 export type { PublishViolation, MediaAssetRow, MediaKind }
 
 export {
+  AmbiguousDraftTextError,
   DraftNotFoundError,
   DraftQuestionNotFoundError,
   InvalidDraftChoicesError,

@@ -22,6 +22,7 @@ import {
 import { InvalidCursorError } from "@pp/db"
 import { z } from "zod"
 import {
+  AmbiguousDraftTextError,
   DraftNotFoundError,
   DraftQuestionNotFoundError,
   InvalidDraftChoicesError,
@@ -353,6 +354,15 @@ export class AdminService {
         throw new ProblemException({
           type: "published_version_immutable",
           title: "Published versions cannot be edited.",
+          status: HttpStatus.CONFLICT,
+        })
+      }
+
+      if (error instanceof AmbiguousDraftTextError) {
+        throw new ProblemException({
+          type: "ambiguous_draft_text",
+          title:
+            "Flat editing cannot safely modify rich content with multiple text blocks.",
           status: HttpStatus.CONFLICT,
         })
       }

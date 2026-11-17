@@ -314,6 +314,66 @@ describe("admin routes", () => {
     expect(await questionAudits(f.pool, f.question.id)).toEqual([])
   })
 
+  it.each(["prompt", "choice"] as const)(
+    "rejects ambiguous rich %s edits without mutation or audit",
+    async (target) => {
+      const f = await draftFixture(`draft-edit-ambiguous-${target}`)
+      const blocks = [
+        { kind: "text", value: "First fragment" },
+        { kind: "text", value: "Second fragment" },
+      ]
+
+      if (target === "prompt") {
+        await f.pool.query(
+          "UPDATE question SET prompt_blocks = $2::jsonb WHERE id = $1",
+          [f.question.id, JSON.stringify(blocks)],
+        )
+      } else {
+        await f.pool.query(
+          "UPDATE choice SET label_blocks = $2::jsonb WHERE id = $1",
+          [f.question.choices[0].id, JSON.stringify(blocks)],
+        )
+      }
+
+      const snapshot = async () => ({
+        question: (
+          await f.pool.query(
+            "SELECT prompt, prompt_blocks FROM question WHERE id = $1",
+            [f.question.id],
+          )
+        ).rows,
+        choices: (
+          await f.pool.query(
+            "SELECT id, label, label_blocks, ordinal, is_correct FROM choice WHERE question_id = $1 ORDER BY ordinal",
+            [f.question.id],
+          )
+        ).rows,
+      })
+      const before = await snapshot()
+      const response = await request(ready().http.getHttpServer() as App)
+        .patch(f.path)
+        .set("Authorization", `Bearer ${f.token}`)
+        .send({
+          prompt: "Must not persist",
+          choices: [...f.question.choices].reverse().map((choice) => ({
+            ...choice,
+            label: `Edited ${choice.label}`,
+            isCorrect: !choice.isCorrect,
+          })),
+        })
+        .expect(409)
+
+      expect(response.body).toMatchObject({
+        type: "ambiguous_draft_text",
+        title:
+          "Flat editing cannot safely modify rich content with multiple text blocks.",
+        status: 409,
+      })
+      expect(await snapshot()).toEqual(before)
+      expect(await questionAudits(f.pool, f.question.id)).toEqual([])
+    },
+  )
+
   it("returns 500 when the post-commit audit fails, with the edit already committed", async () => {
     const f = await draftFixture("draft-edit-audit-failure")
     failAuditWrites = true

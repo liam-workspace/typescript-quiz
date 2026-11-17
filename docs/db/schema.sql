@@ -26,7 +26,7 @@ BEGIN;
 -- adding it there (or the reverse) is the drift these types exist to
 -- make visible.
 
-CREATE TYPE section_type   AS ENUM ('listening', 'reading', 'vocabulary', 'grammar');
+CREATE TYPE section_type   AS ENUM ('listening', 'reading', 'vocabulary', 'grammar', 'math');
 CREATE TYPE nav_mode       AS ENUM ('free', 'forward_only');
 CREATE TYPE stimulus_type  AS ENUM ('audio', 'passage', 'image', 'mixed');
 CREATE TYPE question_type  AS ENUM ('single_choice', 'multi_choice');
@@ -237,6 +237,7 @@ CREATE TABLE question (
     question_key       text          NOT NULL,
     ordinal            integer       NOT NULL,      -- position within the whole test
     prompt             text          NOT NULL,
+    prompt_blocks      jsonb,
     type               question_type NOT NULL,
     points             integer       NOT NULL,
 
@@ -259,6 +260,7 @@ CREATE TABLE choice (
     question_id  uuid    NOT NULL REFERENCES question (id) ON DELETE CASCADE,
     ordinal      integer NOT NULL,
     label        text    NOT NULL,
+    label_blocks jsonb,
     is_correct   boolean NOT NULL,
 
     CONSTRAINT choice_ordinal_positive CHECK (ordinal > 0),
@@ -824,3 +826,95 @@ CREATE OR REPLACE VIEW publication_violation AS
 -- first place and never reaches publication.
 
 COMMIT;
+
+
+-- Math generation workflow records are mutable and never student-visible.
+CREATE TABLE math_problem_template (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name text NOT NULL,
+    version text NOT NULL,
+    family text NOT NULL,
+    parameters jsonb NOT NULL DEFAULT '{}'::jsonb,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (name, version)
+);
+
+CREATE TABLE ai_generation_request (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    template_id uuid REFERENCES math_problem_template (id) ON DELETE RESTRICT,
+    parameters jsonb NOT NULL,
+    provider text NOT NULL,
+    model text NOT NULL,
+    prompt_template_version text NOT NULL,
+    seed text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE ai_generation_candidate (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    request_id uuid NOT NULL REFERENCES ai_generation_request (id) ON DELETE RESTRICT,
+    canonical_spec jsonb NOT NULL,
+    content_hash text NOT NULL UNIQUE CHECK (length(btrim(content_hash)) > 0),
+    raw_response jsonb,
+    validator_reports jsonb,
+    status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'in_review', 'approved', 'rejected', 'regeneration_requested')),
+    reviewer_subject text,
+    reviewed_at timestamptz,
+    test_version_id uuid REFERENCES test_version (id) ON DELETE RESTRICT,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE FUNCTION enforce_math_candidate_transition() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        IF NEW.status <> 'draft' THEN
+            RAISE EXCEPTION 'invalid candidate status transition to %', NEW.status USING ERRCODE = 'check_violation';
+        END IF;
+    ELSIF NEW.status <> OLD.status AND NOT (
+        (OLD.status = 'draft' AND NEW.status IN ('in_review', 'rejected')) OR
+        (OLD.status = 'in_review' AND NEW.status IN ('approved', 'rejected', 'regeneration_requested')) OR
+        (OLD.status = 'regeneration_requested' AND NEW.status = 'draft')
+    ) THEN
+        RAISE EXCEPTION 'invalid candidate status transition from % to %', OLD.status, NEW.status USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER ai_generation_candidate_transition
+    BEFORE INSERT OR UPDATE OF status ON ai_generation_candidate
+    FOR EACH ROW EXECUTE FUNCTION enforce_math_candidate_transition();
+
+CREATE TABLE question_math (
+    question_id uuid PRIMARY KEY REFERENCES question (id) ON DELETE CASCADE,
+    source_candidate_id uuid REFERENCES ai_generation_candidate (id) ON DELETE RESTRICT,
+    canonical_spec jsonb NOT NULL,
+    answer_spec jsonb NOT NULL,
+    solution_blocks jsonb NOT NULL,
+    verification_version text NOT NULL,
+    content_hash text NOT NULL
+);
+
+-- Check both parents on UPDATE to prevent moving metadata into or out of a
+-- published version by changing question_id.
+CREATE FUNCTION reject_published_math_change() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM question q JOIN test_version tv ON tv.id = q.test_version_id
+        WHERE tv.published_at IS NOT NULL AND
+          (q.id = CASE WHEN TG_OP <> 'INSERT' THEN OLD.question_id END OR
+           q.id = CASE WHEN TG_OP <> 'DELETE' THEN NEW.question_id END)
+    ) THEN
+        RAISE EXCEPTION 'math content belongs to a published version and is immutable (% on %)', TG_OP, TG_TABLE_NAME
+            USING ERRCODE = 'restrict_violation';
+    END IF;
+    RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+CREATE TRIGGER question_math_immutable
+    BEFORE INSERT OR UPDATE OR DELETE ON question_math
+    FOR EACH ROW EXECUTE FUNCTION reject_published_math_change();

@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -18,6 +19,7 @@ import type {
   AdminAttemptDetail,
   AdminLearnerPage,
   AdminOverview,
+  AdminQuestion,
   AdminQuestionPage,
   AdminResultPage,
   AdminTestDetail,
@@ -62,6 +64,21 @@ export class AdminController {
     @Query() query: Record<string, unknown>,
   ): Promise<AdminQuestionPage> {
     return this.admin.listQuestions(query)
+  }
+
+  @Patch("drafts/:versionId/questions/:questionId")
+  patchDraftQuestion(
+    @Param("versionId") versionId: string,
+    @Param("questionId") questionId: string,
+    @Body() body: unknown,
+    @Req() request: { claims: JwtClaims & { sub: string } },
+  ): Promise<AdminQuestion> {
+    return this.admin.patchDraftQuestion(
+      versionId,
+      questionId,
+      body,
+      request.claims.sub,
+    )
   }
 
   @Get("results")

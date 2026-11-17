@@ -5,6 +5,7 @@ import {
   type AdminLearnerPage,
   type AdminResultPage,
   type AdminOverview,
+  type AdminQuestion,
   type AdminQuestionPage,
   type AdminTestDetail,
   type AdminTestPage,
@@ -13,6 +14,7 @@ import {
 import request from "supertest"
 import type { App } from "supertest/types.js"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import type { ImportResult } from "../src/admin/admin.service.js"
 import { REQUEST_POOL } from "../src/database/tokens.js"
 import { createTestApp, type TestApp } from "./helpers/app.js"
 import { provisionStudent, seedWriteFixture } from "./helpers/write-fixture.js"
@@ -88,6 +90,253 @@ describe("admin routes", () => {
 
     return app
   }
+
+  async function draftFixture(slug: string) {
+    const a = ready()
+    const adminSubject = `${SUB}-${slug}`
+    const token = await a.mint({
+      sub: adminSubject,
+      email: EMAIL,
+      isAdmin: true,
+    })
+    const imported = await request(a.http.getHttpServer() as App)
+      .post("/api/admin/tests/import")
+      .set("Authorization", `Bearer ${token}`)
+      .send(validDoc(slug))
+      .expect(201)
+    const { testId, versionId } = imported.body as ImportResult
+    const questions = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/questions")
+      .query({ testId })
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200)
+    const [question] = (questions.body as AdminQuestionPage).items
+
+    return {
+      token,
+      adminSubject,
+      testId,
+      versionId,
+      question,
+      path: `/api/admin/drafts/${versionId}/questions/${question.id}`,
+      pool: a.get<PgPool>(REQUEST_POOL),
+    }
+  }
+
+  async function questionAudits(pool: PgPool, questionId: string) {
+    const audit = await pool.query<{
+      admin_subject: string
+      action: string
+      resource_type: string
+      resource_id: string
+      metadata: { versionId: string }
+    }>(
+      "SELECT admin_subject, action, resource_type, resource_id, metadata FROM admin_audit_log WHERE resource_id = $1",
+      [questionId],
+    )
+
+    return audit.rows
+  }
+
+  it("edits a draft prompt and stable choices, then appends its audit row", async () => {
+    const f = await draftFixture("draft-edit-ok")
+    const choices = [...f.question.choices].reverse().map((choice, index) => ({
+      ...choice,
+      label: `Edited ${index + 1}`,
+      isCorrect: index === 0,
+    }))
+    const response = await request(ready().http.getHttpServer() as App)
+      .patch(f.path)
+      .set("Authorization", `Bearer ${f.token}`)
+      .send({ prompt: "  Edited prompt?  ", choices })
+      .expect(200)
+    const updated = response.body as AdminQuestion
+    expect(updated).toEqual({
+      id: f.question.id,
+      prompt: "Edited prompt?",
+      choices,
+    })
+    const persisted = await request(ready().http.getHttpServer() as App)
+      .get("/api/admin/questions")
+      .query({ testId: f.testId })
+      .set("Authorization", `Bearer ${f.token}`)
+      .expect(200)
+    expect((persisted.body as AdminQuestionPage).items).toEqual([updated])
+    expect(await questionAudits(f.pool, f.question.id)).toEqual([
+      {
+        admin_subject: f.adminSubject,
+        action: "draft_question_updated",
+        resource_type: "question",
+        resource_id: f.question.id,
+        metadata: { versionId: f.versionId },
+      },
+    ])
+  })
+
+  it("rejects published edits without changing the export or appending audit", async () => {
+    const f = await draftFixture("draft-edit-published")
+    await request(ready().http.getHttpServer() as App)
+      .post(`/api/admin/tests/${f.testId}/publish`)
+      .set("Authorization", `Bearer ${f.token}`)
+      .expect(200)
+    const response = await request(ready().http.getHttpServer() as App)
+      .patch(f.path)
+      .set("Authorization", `Bearer ${f.token}`)
+      .send({ prompt: "Must not persist" })
+      .expect(409)
+    expect(response.body).toMatchObject({
+      type: "published_version_immutable",
+      status: 409,
+    })
+    const exported = await request(ready().http.getHttpServer() as App)
+      .get(`/api/admin/tests/${f.testId}/export`)
+      .set("Authorization", `Bearer ${f.token}`)
+      .expect(200)
+    expect(exported.body).toEqual(validDoc("draft-edit-published"))
+    expect(await questionAudits(f.pool, f.question.id)).toEqual([])
+  })
+
+  it("rejects question/version mismatches without mutation or audit", async () => {
+    const f = await draftFixture("draft-edit-mismatch")
+    const other = await draftFixture("draft-edit-other")
+    const response = await request(ready().http.getHttpServer() as App)
+      .patch(`/api/admin/drafts/${other.versionId}/questions/${f.question.id}`)
+      .set("Authorization", `Bearer ${f.token}`)
+      .send({ prompt: "Must not persist" })
+      .expect(404)
+    expect(response.body).toMatchObject({
+      type: "draft_question_not_found",
+      status: 404,
+    })
+    const stored = await f.pool.query<{ prompt: string }>(
+      "SELECT prompt FROM question WHERE id = $1",
+      [f.question.id],
+    )
+    expect(stored.rows[0].prompt).toBe(f.question.prompt)
+    expect(await questionAudits(f.pool, f.question.id)).toEqual([])
+  })
+
+  it("requires authentication and admin permission for draft edits", async () => {
+    const f = await draftFixture("draft-edit-denied")
+    const nonAdmin = await ready().mint({
+      sub: `${SUB}-draft-editor-denied`,
+      email: EMAIL,
+    })
+    await request(ready().http.getHttpServer() as App)
+      .patch(f.path)
+      .send({ prompt: "Must not persist" })
+      .expect(401)
+    const response = await request(ready().http.getHttpServer() as App)
+      .patch(f.path)
+      .set("Authorization", `Bearer ${nonAdmin}`)
+      .send({ prompt: "Must not persist" })
+      .expect(403)
+    expect(response.body).toMatchObject({ type: "admin_required", status: 403 })
+    expect(await questionAudits(f.pool, f.question.id)).toEqual([])
+    const stored = await f.pool.query<{ prompt: string }>(
+      "SELECT prompt FROM question WHERE id = $1",
+      [f.question.id],
+    )
+    expect(stored.rows[0].prompt).toBe(f.question.prompt)
+  })
+
+  it.each([
+    {},
+    { prompt: " " },
+    { prompt: 123 },
+    { prompt: "Allowed", points: 3 },
+    { choices: [] },
+    {
+      choices: [
+        { id: "x", label: "Yes", isCorrect: true, extra: true },
+        { id: "y", label: "No", isCorrect: false },
+      ],
+    },
+  ])("validates draft patch bodies strictly: %j", async (body) => {
+    const f = await draftFixture(`draft-edit-invalid-${crypto.randomUUID()}`)
+    const response = await request(ready().http.getHttpServer() as App)
+      .patch(f.path)
+      .set("Authorization", `Bearer ${f.token}`)
+      .send(body)
+      .expect(400)
+    expect(response.body).toMatchObject({
+      type: "invalid_draft_question_patch",
+      status: 400,
+    })
+    expect(await questionAudits(f.pool, f.question.id)).toEqual([])
+  })
+
+  it("rejects malformed or missing draft paths without audit", async () => {
+    const f = await draftFixture("draft-edit-invalid-path")
+    const missing = "00000000-0000-0000-0000-000000000000"
+    for (const [versionId, questionId] of [
+      ["not-a-uuid", f.question.id],
+      [f.versionId, "not-a-uuid"],
+      [missing, f.question.id],
+      [f.versionId, missing],
+    ]) {
+      // eslint-disable-next-line no-await-in-loop -- Supertest binds/closes this shared server per request.
+      const response = await request(ready().http.getHttpServer() as App)
+        .patch(`/api/admin/drafts/${versionId}/questions/${questionId}`)
+        .set("Authorization", `Bearer ${f.token}`)
+        .send({ prompt: "Must not persist" })
+        .expect(404)
+      expect(response.body).toMatchObject({
+        type: "draft_question_not_found",
+        status: 404,
+      })
+    }
+    expect(await questionAudits(f.pool, f.question.id)).toEqual([])
+  })
+
+  it("rejects changed choice identities without committing a prompt or audit", async () => {
+    const f = await draftFixture("draft-edit-invalid-choices")
+    const response = await request(ready().http.getHttpServer() as App)
+      .patch(f.path)
+      .set("Authorization", `Bearer ${f.token}`)
+      .send({
+        prompt: "Must not persist",
+        choices: f.question.choices.map((choice) => ({
+          ...choice,
+          id: crypto.randomUUID(),
+        })),
+      })
+      .expect(400)
+    expect(response.body).toMatchObject({
+      type: "invalid_draft_choices",
+      status: 400,
+    })
+    const stored = await f.pool.query<{ prompt: string }>(
+      "SELECT prompt FROM question WHERE id = $1",
+      [f.question.id],
+    )
+    expect(stored.rows[0].prompt).toBe(f.question.prompt)
+    expect(await questionAudits(f.pool, f.question.id)).toEqual([])
+  })
+
+  it("returns 500 when the post-commit audit fails, with the edit already committed", async () => {
+    const f = await draftFixture("draft-edit-audit-failure")
+    failAuditWrites = true
+
+    try {
+      const response = await request(ready().http.getHttpServer() as App)
+        .patch(f.path)
+        .set("Authorization", `Bearer ${f.token}`)
+        .send({ prompt: "Committed before audit failure" })
+        .expect(500)
+      expect(response.body).not.toHaveProperty("choices")
+      expect(response.body).not.toHaveProperty("prompt")
+    } finally {
+      failAuditWrites = false
+    }
+
+    const stored = await f.pool.query<{ prompt: string }>(
+      "SELECT prompt FROM question WHERE id = $1",
+      [f.question.id],
+    )
+    expect(stored.rows[0].prompt).toBe("Committed before audit failure")
+    expect(await questionAudits(f.pool, f.question.id)).toEqual([])
+  })
 
   const readPaths = [
     "/api/admin/overview",

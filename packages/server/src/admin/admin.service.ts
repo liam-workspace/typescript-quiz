@@ -6,10 +6,12 @@ import { HttpStatus, Inject, Injectable } from "@nestjs/common"
 import {
   adminPaginationSchema,
   adminTestFilterSchema,
+  draftQuestionPatchSchema,
   testDocumentSchema,
   type AdminAttemptDetail,
   type AdminLearnerPage,
   type AdminOverview,
+  type AdminQuestion,
   type AdminQuestionPage,
   type AdminResultPage,
   type AdminTestDetail,
@@ -21,6 +23,9 @@ import { InvalidCursorError } from "@pp/db"
 import { z } from "zod"
 import {
   DraftNotFoundError,
+  DraftQuestionNotFoundError,
+  InvalidDraftChoicesError,
+  PublishedVersionMutationError,
   exportTestDocument,
   importTestDocument,
   listAdminLearners,
@@ -30,6 +35,7 @@ import {
   loadAdminAttemptDetail,
   loadAdminOverview,
   loadAdminTestDetail,
+  patchDraftQuestion,
   publishDraftVersion,
   recordMediaAsset,
   resolveVersionId,
@@ -303,6 +309,75 @@ export class AdminService {
     const parsed = parseAdminQuery(questionQuerySchema, query)
 
     return readAdminPage(() => listAdminQuestions(this.readPool, parsed))
+  }
+
+  async patchDraftQuestion(
+    versionId: string,
+    questionId: string,
+    body: unknown,
+    adminSubject: string,
+  ): Promise<AdminQuestion> {
+    if (!UUID_PATTERN.test(versionId) || !UUID_PATTERN.test(questionId)) {
+      throw new ProblemException({
+        type: "draft_question_not_found",
+        title: "No such draft question exists in this version.",
+        status: HttpStatus.NOT_FOUND,
+      })
+    }
+
+    const parsed = draftQuestionPatchSchema.safeParse(body)
+
+    if (!parsed.success) {
+      throw new ProblemException({
+        type: "invalid_draft_question_patch",
+        title: "The draft question patch failed validation.",
+        status: HttpStatus.BAD_REQUEST,
+        issues: parsed.error.issues,
+      })
+    }
+
+    const question = await patchDraftQuestion(this.readPool, {
+      versionId,
+      questionId,
+      patch: parsed.data,
+    }).catch((error: unknown) => {
+      if (error instanceof DraftQuestionNotFoundError) {
+        throw new ProblemException({
+          type: "draft_question_not_found",
+          title: "No such draft question exists in this version.",
+          status: HttpStatus.NOT_FOUND,
+        })
+      }
+
+      if (error instanceof PublishedVersionMutationError) {
+        throw new ProblemException({
+          type: "published_version_immutable",
+          title: "Published versions cannot be edited.",
+          status: HttpStatus.CONFLICT,
+        })
+      }
+
+      if (error instanceof InvalidDraftChoicesError) {
+        throw new ProblemException({
+          type: "invalid_draft_choices",
+          title: "Choices must retain the question's existing choice IDs.",
+          status: HttpStatus.BAD_REQUEST,
+        })
+      }
+
+      throw error
+    })
+
+    // The repository transaction has committed. Await the append before
+    // returning success; an audit failure returns 500 but cannot undo the edit.
+    await this.readPool.query(
+      `INSERT INTO admin_audit_log
+         (admin_subject, action, resource_type, resource_id, metadata)
+       VALUES ($1, 'draft_question_updated', 'question', $2, $3::jsonb)`,
+      [adminSubject, questionId, JSON.stringify({ versionId })],
+    )
+
+    return question
   }
 
   listResults(query: Record<string, unknown>): Promise<AdminResultPage> {

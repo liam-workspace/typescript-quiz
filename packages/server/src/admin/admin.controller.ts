@@ -23,6 +23,7 @@ import type {
   AdminQuestion,
   AdminQuestionPage,
   AdminResultPage,
+  AdminResultRollups,
   AdminTestDetail,
   AdminTestPage,
   TestDocument,
@@ -87,6 +88,13 @@ export class AdminController {
     @Query() query: Record<string, unknown>,
   ): Promise<AdminResultPage> {
     return this.admin.listResults(query)
+  }
+
+  @Get("results/rollups")
+  resultRollups(
+    @Query() query: Record<string, unknown>,
+  ): Promise<AdminResultRollups> {
+    return this.admin.resultRollups(query)
   }
 
   @Get("results/attempts/:id")

@@ -4,6 +4,7 @@ import {
   type AdminAttemptDetail,
   type AdminLearnerPage,
   type AdminResultPage,
+  type AdminResultRollups,
   type AdminOverview,
   type AdminQuestion,
   type AdminQuestionPage,
@@ -91,7 +92,7 @@ describe("admin routes", () => {
     return app
   }
 
-  async function draftFixture(slug: string) {
+  async function draftFixture(slug: string, doc = validDoc(slug)) {
     const a = ready()
     const adminSubject = `${SUB}-${slug}`
     const token = await a.mint({
@@ -102,7 +103,7 @@ describe("admin routes", () => {
     const imported = await request(a.http.getHttpServer() as App)
       .post("/api/admin/tests/import")
       .set("Authorization", `Bearer ${token}`)
-      .send(validDoc(slug))
+      .send(doc)
       .expect(201)
     const { testId, versionId } = imported.body as ImportResult
     const questions = await request(a.http.getHttpServer() as App)
@@ -404,6 +405,7 @@ describe("admin routes", () => {
     "/api/admin/tests/00000000-0000-0000-0000-000000000000",
     "/api/admin/questions",
     "/api/admin/results",
+    "/api/admin/results/rollups",
     "/api/admin/results/attempts/00000000-0000-0000-0000-000000000000",
     "/api/admin/learners",
   ]
@@ -774,7 +776,6 @@ describe("admin routes", () => {
         "testId",
         "testTitle",
         "learnerId",
-        "learnerName",
         "score",
         "maxScore",
         "completedAt",
@@ -787,6 +788,136 @@ describe("admin routes", () => {
       .expect(200)
     expect(filtered.body).toEqual({ items: [result], nextCursor: null })
     expect(JSON.stringify(results)).not.toContain(fixture.choiceIds[0])
+  })
+
+  it("returns de-identified rollups with a test filter and a per-dimension limit", async () => {
+    const a = ready()
+    const slug = "rollup-limits"
+    const doc = validDoc(slug)
+    const [group] = doc.sections[0].groups
+    const [template] = group.questions
+    group.questions = Array.from({ length: 21 }, (_, index) => ({
+      ...template,
+      questionKey: `question-${index + 1}`,
+    }))
+    const f = await draftFixture(slug, doc)
+    const http = a.http.getHttpServer() as App
+    await request(http)
+      .post(`/api/admin/tests/${f.testId}/publish`)
+      .set("Authorization", `Bearer ${f.token}`)
+      .expect(200)
+    const student = await provisionStudent(a, `${SUB}-rollup-owner`)
+    const start = await request(http)
+      .post("/api/attempts")
+      .set("Authorization", `Bearer ${student.token}`)
+      .send({ slug })
+      .expect(201)
+    const { id: attemptId } = start.body as { id: string }
+    await request(http)
+      .post(`/api/attempts/${attemptId}/submit`)
+      .set("Authorization", `Bearer ${student.token}`)
+      .send({
+        clientInstanceId: "rollup-device",
+        responses: [
+          {
+            questionId: f.question.id,
+            seq: 1,
+            selectedChoiceIds: [f.question.choices[0].id],
+          },
+        ],
+      })
+      .expect(201)
+
+    async function rollups(query: { testId?: string; limit?: number }) {
+      const response = await request(http)
+        .get("/api/admin/results/rollups")
+        .query(query)
+        .set("Authorization", `Bearer ${f.token}`)
+        .expect(200)
+
+      return response.body as AdminResultRollups
+    }
+    const all = await rollups({ testId: f.testId, limit: 100 })
+    const totals = {
+      attemptCount: 1,
+      score: 1,
+      maxScore: 21,
+      answeredCount: 1,
+      correctCount: 1,
+    }
+    const { rows: questions } = await f.pool.query<{
+      id: string
+      label: string
+      section_id: string
+    }>(
+      `SELECT q.id, q.question_key AS label, g.test_section_id AS section_id
+         FROM question q JOIN question_group g ON g.id = q.question_group_id
+        WHERE q.test_version_id = $1 ORDER BY q.question_key`,
+      [f.versionId],
+    )
+    expect(questions).toHaveLength(21)
+    expect(all).toEqual({
+      tests: [{ id: f.testId, label: slug, ...totals }],
+      versions: [{ id: f.versionId, label: `${doc.title} (v1)`, ...totals }],
+      sections: [
+        {
+          id: questions[0].section_id,
+          label: doc.sections[0].title,
+          ...totals,
+        },
+      ],
+      questions: questions.map(({ id, label }) => {
+        const answered = Number(id === f.question.id)
+
+        return {
+          id,
+          label,
+          attemptCount: 1,
+          score: answered,
+          maxScore: 1,
+          answeredCount: answered,
+          correctCount: answered,
+        }
+      }),
+    })
+    expect(await rollups({ testId: f.testId })).toEqual({
+      ...all,
+      questions: all.questions.slice(0, 20),
+    })
+    expect(await rollups({ testId: f.testId, limit: 1 })).toEqual({
+      ...all,
+      questions: all.questions.slice(0, 1),
+    })
+    expect(
+      await rollups({ testId: "00000000-0000-0000-0000-000000000000" }),
+    ).toEqual({ tests: [], versions: [], sections: [], questions: [] })
+    expect((await rollups({})).tests).toContainEqual(all.tests[0])
+    for (const privateValue of [
+      student.studentId,
+      attemptId,
+      ...f.question.choices.map(({ id }) => id),
+    ]) {
+      expect(JSON.stringify(all)).not.toContain(privateValue)
+    }
+  })
+
+  it.each([
+    { testId: "invalid" },
+    { limit: "0" },
+    { limit: "101" },
+    { limit: "1.5" },
+    { limit: ["1", "2"] },
+    { cursor: "unused" },
+    { learnerId: "00000000-0000-0000-0000-000000000000" },
+  ])("rejects invalid or unsupported rollup parameters %o", async (query) => {
+    const a = ready()
+    const token = await a.mint({ sub: SUB, email: EMAIL, isAdmin: true })
+    const response = await request(a.http.getHttpServer() as App)
+      .get("/api/admin/results/rollups")
+      .query(query)
+      .set("Authorization", `Bearer ${token}`)
+      .expect(400)
+    expect(response.body).toMatchObject({ type: "invalid_query" })
   })
 
   it("loads another learner's attempt only for admins and audits each successful view", async () => {

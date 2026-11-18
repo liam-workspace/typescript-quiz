@@ -14,6 +14,7 @@ import {
   type AdminQuestion,
   type AdminQuestionPage,
   type AdminResultPage,
+  type AdminResultRollups,
   type AdminTestDetail,
   type AdminTestPage,
   type Clock,
@@ -35,6 +36,7 @@ import {
   listAdminTests,
   loadAdminAttemptDetail,
   loadAdminOverview,
+  loadAdminResultRollups,
   loadAdminTestDetail,
   patchDraftQuestion,
   publishDraftVersion,
@@ -231,6 +233,7 @@ const resultQuerySchema = z.strictObject({
   testId: z.string().regex(UUID_PATTERN).optional(),
   learnerId: z.string().regex(UUID_PATTERN).optional(),
 })
+const rollupQuerySchema = resultQuerySchema.pick({ limit: true, testId: true })
 const learnerQuerySchema = adminTestFilterSchema
   .pick({ search: true })
   .extend(pageQueryShape)
@@ -394,6 +397,13 @@ export class AdminService {
     const parsed = parseAdminQuery(resultQuerySchema, query)
 
     return readAdminPage(() => listAdminResults(this.readPool, parsed))
+  }
+
+  resultRollups(query: Record<string, unknown>): Promise<AdminResultRollups> {
+    return loadAdminResultRollups(
+      this.readPool,
+      parseAdminQuery(rollupQuerySchema, query),
+    )
   }
 
   async attemptDetail(

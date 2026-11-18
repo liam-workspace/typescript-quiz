@@ -38,6 +38,7 @@ import {
   listAdminTests,
   loadAdminAttemptDetail,
   loadAdminOverview,
+  loadAdminResultRollups,
   loadAdminTestDetail,
 } from "./repositories/admin-read.repository.js"
 import {
@@ -100,6 +101,7 @@ export {
   listAdminTests,
   loadAdminAttemptDetail,
   loadAdminOverview,
+  loadAdminResultRollups,
   loadAdminTestDetail,
   patchDraftQuestion,
 }

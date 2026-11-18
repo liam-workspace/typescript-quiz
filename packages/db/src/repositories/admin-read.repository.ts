@@ -311,25 +311,14 @@ interface ResultDbRow {
   test_id: string
   test_title: string
   learner_id: string
-  learner_name: string
   points_earned: number
   points_possible: number
   submitted_at: Date
-  cursor_submitted_at: string
-  test_version_id: string
 }
 
-// Intentionally selects only the finalized score cache and identity. It never
-// joins responses, choices, or a student-owned result/review projection.
-const RESULT_PROJECTION = `
-  SELECT a.id AS attempt_id, tv.test_id, tv.title AS test_title,
-         s.id AS learner_id, s.display_name AS learner_name,
-         a.points_earned, a.points_possible, a.submitted_at,
-         a.submitted_at::text AS cursor_submitted_at, a.test_version_id
-    FROM attempt a
-    JOIN test_version tv ON tv.id = a.test_version_id
-    JOIN student s ON s.id = a.student_id
-   WHERE a.status <> 'in_progress'
+const RESULT_COLUMNS = `
+  a.id AS attempt_id, tv.test_id, tv.title AS test_title,
+  a.student_id AS learner_id, a.points_earned, a.points_possible, a.submitted_at
 `
 
 function toResultSummary(row: ResultDbRow): AdminResultSummary {
@@ -338,7 +327,6 @@ function toResultSummary(row: ResultDbRow): AdminResultSummary {
     testId: row.test_id,
     testTitle: row.test_title,
     learnerId: row.learner_id,
-    learnerName: row.learner_name,
     score: row.points_earned,
     maxScore: row.points_possible,
     completedAt: row.submitted_at.toISOString(),
@@ -350,9 +338,14 @@ export async function listAdminResults(
   query: AdminPagination & { testId?: string; learnerId?: string },
 ): Promise<AdminResultPage> {
   const cursor = decodeCursor(query, "results")
-  const { rows } = await db.query<ResultDbRow>(
+  const { rows } = await db.query<
+    ResultDbRow & { cursor_submitted_at: string }
+  >(
     `
-    ${RESULT_PROJECTION}
+    SELECT ${RESULT_COLUMNS}, a.submitted_at::text AS cursor_submitted_at
+      FROM attempt a
+      JOIN test_version tv ON tv.id = a.test_version_id
+    WHERE a.status <> 'in_progress'
       AND ($1::uuid IS NULL OR tv.test_id = $1)
       AND ($2::uuid IS NULL OR a.student_id = $2)
       AND ($3::timestamptz IS NULL OR a.submitted_at < $3
@@ -422,8 +415,16 @@ export async function loadAdminAttemptDetail(
   db: PgQueryable,
   attemptId: string,
 ): Promise<AdminAttemptDetail | null> {
-  const { rows } = await db.query<ResultDbRow>(
-    `${RESULT_PROJECTION} AND a.id = $1`,
+  const { rows } = await db.query<
+    ResultDbRow & { learner_name: string; test_version_id: string }
+  >(
+    `
+    SELECT ${RESULT_COLUMNS}, s.display_name AS learner_name, a.test_version_id
+      FROM attempt a
+      JOIN test_version tv ON tv.id = a.test_version_id
+      JOIN student s ON s.id = a.student_id
+     WHERE a.status <> 'in_progress' AND a.id = $1
+  `,
     [attemptId],
   )
 
@@ -451,7 +452,11 @@ export async function loadAdminAttemptDetail(
     [attemptId, result.test_version_id],
   )
 
-  return { ...toResultSummary(result), answers: answers.rows.map(toAnswer) }
+  return {
+    ...toResultSummary(result),
+    learnerName: result.learner_name,
+    answers: answers.rows.map(toAnswer),
+  }
 }
 
 interface LearnerDbRow {

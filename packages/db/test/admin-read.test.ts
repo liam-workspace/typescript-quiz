@@ -347,7 +347,7 @@ describe("admin read projections", () => {
     120_000,
   )
 
-  it("returns only aggregate completed results pinned to their historical version", async () => {
+  it("lists completed results by historical test version without learner names or emails", async () => {
     await withDatabase(async (pool) => {
       const f = await seedPublishedTest(pool)
       const attemptId = await finishAttempt(pool, f)
@@ -369,7 +369,6 @@ describe("admin read projections", () => {
             testId: f.testId,
             testTitle: "TOEFL Primary — Practice Test 04",
             learnerId: f.studentId,
-            learnerName: "Tom",
             score: 1,
             maxScore: 2,
             completedAt: "2026-11-16T10:00:00.123Z",
@@ -411,12 +410,13 @@ describe("admin read projections", () => {
     })
   }, 120_000)
 
-  it("loads selected and unanswered answer details only on the attempt detail projection", async () => {
+  it("loads the learner name and answer data on the attempt detail projection", async () => {
     await withDatabase(async (pool) => {
       const f = await seedPublishedTest(pool)
       const id = await finishAttempt(pool, f)
       expect(await loadAdminAttemptDetail(pool, id)).toMatchObject({
         attemptId: id,
+        learnerName: "Tom",
         answers: [
           {
             questionId: f.questionIds[0],

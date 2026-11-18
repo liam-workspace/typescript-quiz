@@ -80,7 +80,6 @@ export interface AdminResultSummary {
   testId: string
   testTitle: string
   learnerId: string
-  learnerName: string
   score: number
   maxScore: number
   completedAt: string
@@ -92,6 +91,7 @@ export interface AdminResultPage {
 }
 
 export interface AdminAttemptDetail extends AdminResultSummary {
+  learnerName: string
   answers: Array<{
     questionId: string
     response: unknown

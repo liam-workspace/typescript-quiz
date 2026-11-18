@@ -814,6 +814,7 @@ describe("admin routes", () => {
       .get(path)
       .set("Authorization", `Bearer ${admin}`)
       .expect(200)
+      .expect("Cache-Control", "no-store")
     const detail = response.body as AdminAttemptDetail
     expect(detail).toMatchObject({
       attemptId: fixture.attemptId,
@@ -852,6 +853,7 @@ describe("admin routes", () => {
       .get(path)
       .set("Authorization", `Bearer ${admin}`)
       .expect(200)
+      .expect("Cache-Control", "no-store")
     const repeated = await pool.query(
       "SELECT id FROM admin_audit_log WHERE resource_id = $1",
       [fixture.attemptId],

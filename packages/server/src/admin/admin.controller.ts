@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   Param,
   Patch,
@@ -89,6 +90,7 @@ export class AdminController {
   }
 
   @Get("results/attempts/:id")
+  @Header("Cache-Control", "no-store")
   attemptDetail(
     @Param("id") attemptId: string,
     @Req() request: { claims: JwtClaims & { sub: string } },

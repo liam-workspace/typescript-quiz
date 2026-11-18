@@ -74,6 +74,7 @@ export function getAdminAttempt(
 ): Promise<AdminAttemptDetail> {
   return apiFetch<AdminAttemptDetail>(
     `/admin/results/attempts/${encodeURIComponent(attemptId)}`,
+    { cache: "no-store" },
   )
 }
 

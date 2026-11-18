@@ -1,5 +1,11 @@
 import { Module } from "@nestjs/common"
 import { MulterModule } from "@nestjs/platform-express"
+import { MathGenerationController } from "../math/math-generation.controller.js"
+import {
+  MathGenerationService,
+  MATH_WORDING_PROVIDER,
+  templateWordingProvider,
+} from "../math/math-generation.service.js"
 import { loadServerConfig } from "../config.js"
 import { AdminController, AdminMediaController } from "./admin.controller.js"
 import { AdminService } from "./admin.service.js"
@@ -30,7 +36,15 @@ import { AdminService } from "./admin.service.js"
       }),
     }),
   ],
-  controllers: [AdminController, AdminMediaController],
-  providers: [AdminService],
+  controllers: [
+    AdminController,
+    AdminMediaController,
+    MathGenerationController,
+  ],
+  providers: [
+    AdminService,
+    MathGenerationService,
+    { provide: MATH_WORDING_PROVIDER, useValue: templateWordingProvider },
+  ],
 })
 export class AdminModule {}

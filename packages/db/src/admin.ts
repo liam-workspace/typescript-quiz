@@ -48,9 +48,42 @@ import {
   patchDraftQuestion,
 } from "./repositories/admin-draft.repository.js"
 
-export type { PublishViolation, MediaAssetRow, MediaKind }
+import {
+  CandidateReviewError,
+  claimQueuedGenerationRequest,
+  createGenerationRequest,
+  insertGenerationCandidate,
+  listCandidates,
+  listGenerationRequests,
+  loadCandidateDetail,
+  reviewCandidate,
+  type CandidateDetail,
+  type CandidateSummary,
+  type GenerationCandidateInput,
+  type GenerationRequest,
+  type GenerationRequestInput,
+} from "./repositories/math-generation.repository.js"
+
+export type {
+  PublishViolation,
+  MediaAssetRow,
+  MediaKind,
+  CandidateDetail,
+  CandidateSummary,
+  GenerationCandidateInput,
+  GenerationRequest,
+  GenerationRequestInput,
+}
 
 export {
+  CandidateReviewError,
+  claimQueuedGenerationRequest,
+  createGenerationRequest,
+  insertGenerationCandidate,
+  listCandidates,
+  listGenerationRequests,
+  loadCandidateDetail,
+  reviewCandidate,
   AmbiguousDraftTextError,
   DraftNotFoundError,
   DraftQuestionNotFoundError,

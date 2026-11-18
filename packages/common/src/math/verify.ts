@@ -109,12 +109,15 @@ function answerValue(answer: MathAnswer): Rational {
   return value
 }
 type Constraints = MathProblemSpec["constraints"]
+function withinConstraints(value: Rational, constraints: Constraints): boolean {
+  return (
+    value.n >= BigInt(constraints.min) * value.d &&
+    value.n <= BigInt(constraints.max) * value.d &&
+    (!constraints.nonNegative || value.n >= 0n)
+  )
+}
 function checkConstraint(value: Rational, constraints: Constraints): void {
-  if (
-    value.n < BigInt(constraints.min) * value.d ||
-    value.n > BigInt(constraints.max) * value.d ||
-    (constraints.nonNegative && value.n < 0n)
-  ) {
+  if (!withinConstraints(value, constraints)) {
     throw new Error("value outside constraints")
   }
 }
@@ -268,6 +271,13 @@ function evaluateOperation(
       throw new Error("unsupported expression")
   }
 }
+function variableName(name: unknown): string {
+  if (typeof name !== "string" || !/^[a-zA-Z]$/u.test(name)) {
+    throw new Error("invalid variable name")
+  }
+
+  return name
+}
 function collectVariables(
   ast: MathAst,
   context: { names: Set<string>; nodes: number },
@@ -281,11 +291,7 @@ function collectVariables(
   }
 
   if (ast.kind === "variable") {
-    if (!/^[a-zA-Z]$/u.test(ast.name)) {
-      throw new Error("invalid variable name")
-    }
-
-    names.add(ast.name)
+    names.add(variableName(ast.name))
   } else if ("left" in ast && "right" in ast) {
     collectVariables(ast.left, context, depth + 1)
     collectVariables(ast.right, context, depth + 1)
@@ -449,6 +455,7 @@ export function verifyMathProblem(spec: MathProblemSpec): ValidationResult {
         }
 
         const value = answerValue(choice.answer)
+        checkConstraint(value, spec.constraints)
         const key = `${value.n}/${value.d}`
 
         if (seen.has(key)) {
@@ -480,6 +487,31 @@ export function verifyMathProblem(spec: MathProblemSpec): ValidationResult {
   }
 }
 
+function* distractorCandidates(spec: MathProblemSpec, value: Rational) {
+  let hash = 2166136261
+  for (const char of spec.seed) {
+    hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0
+  }
+  const sign = hash % 2 ? 1n : -1n
+
+  for (const step of [1n, 2n, 3n]) {
+    for (const direction of [sign, -sign]) {
+      yield add(value, { n: direction * step, d: 1n })
+    }
+  }
+
+  // Four in-range integers suffice. Narrower intervals can also supply halves
+  // and thirds, provided their reduced numerators fit the answer format.
+  const { min, max, nonNegative } = spec.constraints
+  const lower = BigInt(nonNegative ? Math.max(0, min) : min)
+  const upper = BigInt(max)
+  for (const d of [1n, 2n, 3n]) {
+    for (let n = lower * d; n <= upper * d; n += 1n) {
+      yield rational(n, d)
+    }
+  }
+}
+
 export function deriveDistractors(spec: MathProblemSpec): MathAnswer[] {
   const result = verifyMathProblem({ ...spec, choices: undefined })
 
@@ -488,30 +520,37 @@ export function deriveDistractors(spec: MathProblemSpec): MathAnswer[] {
   }
 
   const value = answerValue(spec.answer)
-  let hash = 2166136261
-  for (const char of spec.seed) {
-    hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0
-  }
-  const sign = hash % 2 ? 1n : -1n
-
-  return [sign, -sign, sign * 2n].map((offset) => {
-    const candidate = add(value, { n: offset, d: 1n })
+  const seen = new Set([`${value.n}/${value.d}`])
+  const distractors: MathAnswer[] = []
+  for (const candidate of distractorCandidates(spec, value)) {
+    const key = `${candidate.n}/${candidate.d}`
     const numerator = Number(candidate.n)
     const denominator = Number(candidate.d)
 
     if (
+      seen.has(key) ||
+      !withinConstraints(candidate, spec.constraints) ||
       !Number.isSafeInteger(numerator) ||
       !Number.isSafeInteger(denominator)
     ) {
-      throw new Error("distractor exceeds safe integer range")
+      continue
     }
 
-    return {
+    seen.add(key)
+    distractors.push({
       kind: candidate.d === 1n ? "integer" : "rational",
       numerator,
       denominator,
+    })
+
+    if (distractors.length === 3) {
+      return distractors
     }
-  })
+  }
+
+  throw new Error(
+    "constraints allow fewer than three representable distractors",
+  )
 }
 
 export function renderCanonicalLatex(ast: MathAst): string {
@@ -525,11 +564,7 @@ export function renderCanonicalLatex(ast: MathAst): string {
       return `\\frac{${ast.numerator}}{${ast.denominator}}`
 
     case "variable":
-      if (!/^[a-zA-Z]$/u.test(ast.name)) {
-        throw new Error("invalid variable name")
-      }
-
-      return ast.name
+      return variableName(ast.name)
 
     case "add":
       return `${renderCanonicalLatex(ast.left)} + ${renderCanonicalLatex(ast.right)}`

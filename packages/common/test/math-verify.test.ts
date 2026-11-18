@@ -217,6 +217,93 @@ describe("math verification", () => {
     ).toBe(true)
   })
 
+  it("enforces the full constraint range on generated and supplied choices", () => {
+    const spec: MathProblemSpec = {
+      ...problems[2],
+      constraints: { min: -5, max: 1, nonNegative: true },
+      expression: { kind: "divide", left: integer(0), right: integer(1) },
+      answer: answer(0),
+    }
+    const distractors = deriveDistractors(spec)
+    expect(distractors).toHaveLength(3)
+    for (const choice of distractors) {
+      expect(choice.numerator).toBeGreaterThan(0)
+      expect(choice.numerator).toBeLessThanOrEqual(choice.denominator)
+    }
+    const choices = [
+      { answer: spec.answer, isCorrect: true },
+      ...distractors.map((value) => ({ answer: value, isCorrect: false })),
+    ]
+    expect(verifyMathProblem({ ...spec, choices }).valid).toBe(true)
+    for (const value of [answer(-1, 2), answer(3, 2)]) {
+      expect(
+        verifyMathProblem({
+          ...spec,
+          choices: [...choices, { answer: value, isCorrect: false }],
+        }).errors,
+      ).toEqual(["value outside constraints"])
+    }
+  })
+
+  it("derives three distinct representable choices at the safe integer limit", () => {
+    const max = Number.MAX_SAFE_INTEGER
+    const spec: MathProblemSpec = {
+      ...problems[3],
+      constraints: { min: max - 3, max, nonNegative: true },
+      expression: {
+        kind: "equation",
+        left: { kind: "variable", name: "x" },
+        right: integer(max),
+      },
+      answer: answer(max),
+    }
+    const distractors = deriveDistractors(spec)
+    expect(distractors).toEqual(deriveDistractors(spec))
+    expect(distractors).toHaveLength(3)
+    expect(distractors).toEqual(
+      expect.arrayContaining([
+        answer(max - 1),
+        answer(max - 2),
+        answer(max - 3),
+      ]),
+    )
+  })
+
+  it("rejects non-string variable names before coercion", () => {
+    for (const name of [["x"], { toString: () => "x" }]) {
+      const variable = {
+        kind: "variable" as const,
+        name: name as unknown as string,
+      }
+      expect(
+        verifyMathProblem({
+          ...problems[3],
+          expression: { kind: "equation", left: variable, right: integer(4) },
+        }).errors,
+      ).toEqual(["invalid variable name"])
+      expect(() => renderCanonicalLatex(variable)).toThrow(
+        "invalid variable name",
+      )
+    }
+  })
+
+  it("reports when the range has fewer than three representable alternatives", () => {
+    const max = Number.MAX_SAFE_INTEGER
+    const spec: MathProblemSpec = {
+      ...problems[3],
+      constraints: { min: max - 1, max, nonNegative: true },
+      expression: {
+        kind: "equation",
+        left: { kind: "variable", name: "x" },
+        right: integer(max),
+      },
+      answer: answer(max),
+    }
+    expect(() => deriveDistractors(spec)).toThrow(
+      "constraints allow fewer than three representable distractors",
+    )
+  })
+
   it("renders canonical latex from the AST", () => {
     expect(renderCanonicalLatex(problems[0].expression)).toBe(
       "\\frac{1}{2} + \\frac{1}{3}",

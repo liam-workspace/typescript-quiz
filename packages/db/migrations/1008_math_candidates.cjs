@@ -84,17 +84,27 @@ CREATE TABLE question_math (
     content_hash text NOT NULL
 );
 
--- Check both parents on UPDATE to prevent moving metadata into or out of a
--- published version by changing question_id.
 CREATE FUNCTION reject_published_math_change() RETURNS trigger
 LANGUAGE plpgsql AS $$
+DECLARE
+    has_published_parent boolean;
 BEGIN
-    IF EXISTS (
-        SELECT 1 FROM question q JOIN test_version tv ON tv.id = q.test_version_id
-        WHERE tv.published_at IS NOT NULL AND
-          (q.id = CASE WHEN TG_OP <> 'INSERT' THEN OLD.question_id END OR
-           q.id = CASE WHEN TG_OP <> 'DELETE' THEN NEW.question_id END)
-    ) THEN
+    -- Lock both parents in version ID order when metadata moves. FOR SHARE
+    -- conflicts with publication and reads its committed timestamp after waiting.
+    SELECT bool_or(parent.published_at IS NOT NULL) INTO has_published_parent
+      FROM (
+          SELECT tv.published_at
+            FROM test_version tv
+           WHERE tv.id IN (
+               SELECT q.test_version_id FROM question q
+                WHERE q.id = CASE WHEN TG_OP <> 'INSERT' THEN OLD.question_id END
+                   OR q.id = CASE WHEN TG_OP <> 'DELETE' THEN NEW.question_id END
+           )
+           ORDER BY tv.id
+           FOR SHARE OF tv
+      ) parent;
+
+    IF has_published_parent THEN
         RAISE EXCEPTION 'math content belongs to a published version and is immutable (% on %)', TG_OP, TG_TABLE_NAME
             USING ERRCODE = 'restrict_violation';
     END IF;

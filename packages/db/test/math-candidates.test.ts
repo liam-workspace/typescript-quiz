@@ -1,5 +1,8 @@
+import { runner } from "node-pg-migrate"
+import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 import type pg from "pg"
+import { migrateToLatest } from "../src/migrate.js"
 import { withDatabase } from "./helpers/database.js"
 import { seedPublishedTest } from "./helpers/fixtures.js"
 
@@ -140,8 +143,35 @@ describe("math candidate persistence", () => {
     })
   }, 120_000)
 
-  it("waits for an in-flight publication and rejects the metadata update after commit", async () => {
-    await withDatabase(async (pool) => {
+  it("upgrades the original 1008 trigger to wait for publication and reject the metadata update after commit", async () => {
+    await withDatabase(async (pool, { databaseUrl }) => {
+      await pool.query("DROP SCHEMA public CASCADE; CREATE SCHEMA public")
+      await runner({
+        databaseUrl,
+        dir: fileURLToPath(new URL("../migrations", import.meta.url)),
+        direction: "up",
+        count: 9,
+        migrationsTable: "pp_migrations",
+      })
+      // Earlier deployments recorded 1008 with this unlocked function.
+      await pool.query(`
+        CREATE OR REPLACE FUNCTION reject_published_math_change() RETURNS trigger
+        LANGUAGE plpgsql AS $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM question q JOIN test_version tv ON tv.id = q.test_version_id
+                WHERE tv.published_at IS NOT NULL AND
+                  (q.id = CASE WHEN TG_OP <> 'INSERT' THEN OLD.question_id END OR
+                   q.id = CASE WHEN TG_OP <> 'DELETE' THEN NEW.question_id END)
+            ) THEN
+                RAISE EXCEPTION 'math content belongs to a published version and is immutable (% on %)', TG_OP, TG_TABLE_NAME
+                    USING ERRCODE = 'restrict_violation';
+            END IF;
+            RETURN COALESCE(NEW, OLD);
+        END;
+        $$;
+      `)
+
       const fixture = await seedPublishedTest(pool)
       const { questionId, versionId } = await seedDraftQuestion(
         pool,
@@ -152,6 +182,8 @@ describe("math candidate persistence", () => {
          VALUES ($1, '{}', '{}', '[]', 'v1', 'hash-1')`,
         [questionId],
       )
+
+      await migrateToLatest(databaseUrl)
 
       const publisher = await pool.connect()
       const writer = await pool.connect()

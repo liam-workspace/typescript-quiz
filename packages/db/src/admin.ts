@@ -52,6 +52,7 @@ import {
 import {
   CandidateReviewError,
   claimQueuedGenerationRequest,
+  completeGenerationRequest,
   createGenerationRequest,
   insertGenerationCandidate,
   listCandidates,
@@ -59,6 +60,8 @@ import {
   loadCandidateDetail,
   reviewCandidate,
   type CandidateDetail,
+  type CandidatePresentation,
+  type GenerationClaim,
   type CandidateSummary,
   type GenerationCandidateInput,
   type GenerationRequest,
@@ -70,6 +73,8 @@ export type {
   MediaAssetRow,
   MediaKind,
   CandidateDetail,
+  CandidatePresentation,
+  GenerationClaim,
   CandidateSummary,
   GenerationCandidateInput,
   GenerationRequest,
@@ -79,6 +84,7 @@ export type {
 export {
   CandidateReviewError,
   claimQueuedGenerationRequest,
+  completeGenerationRequest,
   createGenerationRequest,
   insertGenerationCandidate,
   listCandidates,

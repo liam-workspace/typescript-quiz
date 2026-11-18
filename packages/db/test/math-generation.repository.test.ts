@@ -3,9 +3,11 @@ import {
   type PgQueryable,
 } from "@liam-workspace/node-postgres"
 import type { MathProblemSpec } from "@pp/common"
-import { expect, it } from "vitest"
+import { assert, expect, it } from "vitest"
 import {
   claimQueuedGenerationRequest,
+  completeGenerationRequest,
+  type CandidatePresentation,
   createGenerationRequest,
   insertGenerationCandidate,
   listCandidates,
@@ -78,19 +80,173 @@ it("skips a locked request, completes the next batch once, and lists both pages"
   })
 })
 
-it("rolls back partial batches and releases the request for another worker", async () => {
+it("commits the claim and releases its row lock before calling the provider", async () => {
   await withDatabase(async (pool) => {
     const job = await createGenerationRequest(pool, request)
+    const observed = { status: "", locked: false, idleTransactions: -1 }
+    const completed = await claimQueuedGenerationRequest(pool, async () => {
+      const page = await listGenerationRequests(pool)
+      observed.status = page.items[0].status
+      const lock = await pool.query(
+        "SELECT id FROM ai_generation_request WHERE id=$1 FOR UPDATE NOWAIT",
+        [job.id],
+      )
+      observed.locked = lock.rowCount === 1
+      const { rows } = await pool.query<{ count: number }>(
+        "SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=current_database() AND application_name='pp:test' AND state='idle in transaction'",
+      )
+      observed.idleTransactions = rows[0].count
+
+      return [{ canonicalSpec: spec }]
+    })
+    expect(observed).toEqual({
+      status: "processing",
+      locked: true,
+      idleTransactions: 0,
+    })
+    expect(completed).toMatchObject({ id: job.id, status: "completed" })
+  })
+})
+
+it("recovers expired leases and fences expired, replaced, and replayed completions", async () => {
+  await withDatabase(async (pool) => {
+    const job = await createGenerationRequest(pool, request)
+    const first = await claimQueuedGenerationRequest(pool)
+    assert(first)
+    expect(first).toMatchObject({
+      id: job.id,
+      status: "processing",
+    })
+    expect(first.claimToken).toBeTypeOf("string")
+    expect(first.leaseExpiresAt).toBeInstanceOf(Date)
+    expect(await claimQueuedGenerationRequest(pool)).toBeNull()
     await expect(
-      claimQueuedGenerationRequest(pool, () =>
-        Promise.resolve([{ canonicalSpec: spec }, { canonicalSpec: spec }]),
-      ),
-    ).rejects.toMatchObject({ code: "23505" })
-    expect(await listCandidates(pool, job.id)).toEqual([])
-    const claimed = await claimQueuedGenerationRequest(pool, () =>
-      Promise.resolve([{ canonicalSpec: spec }]),
+      insertGenerationCandidate(pool, {
+        requestId: job.id,
+        canonicalSpec: spec,
+      }),
+    ).rejects.toThrow()
+    await pool.query(
+      "UPDATE ai_generation_request SET lease_expires_at=now()-interval '1 second' WHERE id=$1",
+      [job.id],
     )
-    expect(claimed?.id).toBe(job.id)
+    const batch = [{ canonicalSpec: spec }]
+    expect(await completeGenerationRequest(pool, first, batch)).toBeNull()
+    const next = await claimQueuedGenerationRequest(pool)
+    assert(next)
+    expect(next.id).toBe(first.id)
+    expect(next.claimToken).not.toBe(first.claimToken)
+    expect(await completeGenerationRequest(pool, first, batch)).toBeNull()
+    expect(await listCandidates(pool, job.id)).toEqual([])
+    const results = await Promise.all([
+      completeGenerationRequest(pool, next, batch),
+      completeGenerationRequest(pool, next, batch),
+    ])
+    expect(results.filter(Boolean)).toHaveLength(1)
+    expect(await completeGenerationRequest(pool, next, batch)).toBeNull()
+    expect(await listCandidates(pool, job.id)).toHaveLength(1)
+    expect(await claimQueuedGenerationRequest(pool)).toBeNull()
+  })
+})
+
+it("keeps valid siblings and reports duplicate canonical content without starving later jobs", async () => {
+  await withDatabase(async (pool) => {
+    const job = await createGenerationRequest(pool, request)
+    const later = await createGenerationRequest(pool, request)
+    const generate = () =>
+      Promise.resolve([
+        { canonicalSpec: spec },
+        { canonicalSpec: spec },
+        { canonicalSpec: { ...spec, seed: "another" } },
+      ])
+    expect(await claimQueuedGenerationRequest(pool, generate)).toMatchObject({
+      id: job.id,
+      status: "completed",
+    })
+    const candidates = await listCandidates(pool, job.id)
+    expect(candidates).toHaveLength(3)
+    expect(candidates.filter((c) => c.status === "in_review")).toHaveLength(2)
+    const rejected = candidates.find((c) => c.status === "rejected")
+    assert(rejected)
+    expect(rejected).toMatchObject({
+      validation: { valid: false, source: "duplicate" },
+    })
+    expect(candidates.map((c) => c.contentHash)).toContain(
+      rejected.validation?.duplicateContentHash,
+    )
+    expect(await loadCandidateDetail(pool, rejected.id)).toMatchObject({
+      canonicalSpec: null,
+    })
+    expect(
+      await claimQueuedGenerationRequest(pool, () =>
+        Promise.resolve([{ canonicalSpec: spec }]),
+      ),
+    ).toMatchObject({ id: later.id, status: "completed" })
+    expect(await listCandidates(pool, later.id)).toMatchObject([
+      { status: "rejected", validation: { source: "duplicate" } },
+    ])
+    expect(await claimQueuedGenerationRequest(pool)).toBeNull()
+  })
+})
+
+it("records a thrown provider error as a terminal rejection with audit-only diagnostics", async () => {
+  await withDatabase(async (pool) => {
+    const job = await createGenerationRequest(pool, request)
+    const completed = await claimQueuedGenerationRequest(pool, () =>
+      Promise.reject(new Error("private provider diagnostic")),
+    )
+    expect(completed).toMatchObject({ id: job.id, status: "completed" })
+    const candidates = await listCandidates(pool, job.id)
+    expect(candidates).toMatchObject([
+      { status: "rejected", validation: { source: "provider" } },
+    ])
+    expect(JSON.stringify(candidates)).not.toContain(
+      "private provider diagnostic",
+    )
+    const detail = await loadCandidateDetail(pool, candidates[0].id, {
+      includeAudit: true,
+    })
+    expect(JSON.stringify(detail?.audit)).toContain(
+      "private provider diagnostic",
+    )
+    expect(await claimQueuedGenerationRequest(pool)).toBeNull()
+  })
+})
+
+it("round trips the normalized presentation independently of the raw provider response", async () => {
+  await withDatabase(async (pool) => {
+    const job = await createGenerationRequest(pool, request)
+    const presentation: CandidatePresentation = {
+      promptBlocks: [{ kind: "text", value: "Simplify the ratio." }],
+      choices: [
+        {
+          label: "3/4",
+          labelBlocks: [{ kind: "math", tex: "3/4", display: false }],
+          isCorrect: true,
+        },
+        {
+          label: "4/3",
+          labelBlocks: [{ kind: "math", tex: "4/3", display: false }],
+          isCorrect: false,
+        },
+      ],
+      solutionBlocks: [{ kind: "text", value: "Divide both numbers by two." }],
+    }
+    const candidate = await insertGenerationCandidate(pool, {
+      requestId: job.id,
+      canonicalSpec: spec,
+      presentation,
+      rawResponse: { promptBlocks: ["private draft"] },
+    })
+    expect(await listCandidates(pool, job.id)).toMatchObject([
+      { ...presentation },
+    ])
+    const detail = await loadCandidateDetail(pool, candidate.id)
+    expect(detail).toMatchObject({ ...presentation, canonicalSpec: spec })
+    expect(JSON.stringify(detail)).not.toContain("private draft")
+    expect((await listGenerationRequests(pool)).items[0].status).toBe(
+      "completed",
+    )
   })
 })
 
@@ -162,6 +318,31 @@ it("requires a passing deterministic report even for an in-review row", async ()
         decision: "approved",
       }),
     ).rejects.toThrow()
+  })
+})
+
+it("revalidates the stored spec at approval even when its original report passed", async () => {
+  await withDatabase(async (pool) => {
+    const job = await createGenerationRequest(pool, request)
+    const candidate = await insertGenerationCandidate(pool, {
+      requestId: job.id,
+      canonicalSpec: spec,
+    })
+    await pool.query(
+      "UPDATE ai_generation_candidate SET canonical_spec = jsonb_set(canonical_spec, '{answer,numerator}', '99') WHERE id=$1",
+      [candidate.id],
+    )
+    await expect(
+      reviewCandidate(pool, {
+        candidateId: candidate.id,
+        reviewerSubject: "admin",
+        decision: "approved",
+      }),
+    ).rejects.toMatchObject({ code: "invalid_transition" })
+    expect(await loadCandidateDetail(pool, candidate.id)).toMatchObject({
+      status: "in_review",
+      validation: { valid: true },
+    })
   })
 })
 

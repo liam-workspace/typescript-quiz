@@ -6,6 +6,7 @@ import {
   adminPaginationSchema,
   verifyMathProblem,
   type AdminPagination,
+  type ContentBlock,
   type MathProblemSpec,
   type ValidationResult,
 } from "@pp/common"
@@ -28,19 +29,37 @@ export interface GenerationRequest extends Omit<
   id: string
   templateId: string | null
   createdAt: Date
-  status: "queued" | "completed"
+  status: "queued" | "processing" | "completed"
+}
+
+export interface GenerationClaim extends GenerationRequest {
+  status: "processing"
+  claimToken: string
+  leaseExpiresAt: Date
+}
+
+export interface CandidatePresentation {
+  promptBlocks: ContentBlock[]
+  choices: Array<{
+    label: string
+    labelBlocks: ContentBlock[]
+    isCorrect: boolean
+  }>
+  solutionBlocks: ContentBlock[]
 }
 
 export type GenerationCandidateInput =
   | {
       canonicalSpec: MathProblemSpec
+      presentation?: CandidatePresentation
       validationErrors?: string[]
       rawResponse?: unknown
     }
   | { providerFailure: string; rawResponse?: unknown }
 
 interface CandidateValidation extends ValidationResult {
-  source: "provider" | "math" | "presentation"
+  source: "provider" | "math" | "presentation" | "duplicate"
+  duplicateContentHash?: string
 }
 
 export interface CandidateSummary {
@@ -52,6 +71,9 @@ export interface CandidateSummary {
     | "approved"
     | "rejected"
     | "regeneration_requested"
+  promptBlocks: ContentBlock[] | null
+  choices: CandidatePresentation["choices"] | null
+  solutionBlocks: ContentBlock[] | null
   contentHash: string
   validation: CandidateValidation | null
   reviewReason: string | null
@@ -77,8 +99,9 @@ export class CandidateReviewError extends Error {
 }
 
 const requestColumns = `id, template_id AS "templateId", parameters, provider,
-  model, prompt_template_version AS "promptTemplateVersion", seed, created_at AS "createdAt"`
+  model, prompt_template_version AS "promptTemplateVersion", seed, created_at AS "createdAt", status`
 const candidateColumns = `id, request_id AS "requestId", status, content_hash AS "contentHash",
+  prompt_blocks AS "promptBlocks", choices, solution_blocks AS "solutionBlocks",
   validator_reports->'validation' AS validation, validator_reports->>'reviewReason' AS "reviewReason",
   reviewer_subject AS "reviewerSubject", reviewed_at AS "reviewedAt",
   test_version_id AS "testVersionId", created_at AS "createdAt"`
@@ -91,7 +114,7 @@ export async function createGenerationRequest(
     `INSERT INTO ai_generation_request
        (template_id, parameters, provider, model, prompt_template_version, seed)
      VALUES ($1, $2::jsonb, $3, $4, $5, $6)
-     RETURNING ${requestColumns}, 'queued' AS status`,
+     RETURNING ${requestColumns}`,
     [
       input.templateId ?? null,
       JSON.stringify(input.parameters),
@@ -119,9 +142,7 @@ export async function listGenerationRequests(
   }
 
   const { rows } = await db.query<GenerationRequest>(
-    `SELECT ${requestColumns},
-       CASE WHEN EXISTS (SELECT 1 FROM ai_generation_candidate WHERE request_id = r.id)
-            THEN 'completed' ELSE 'queued' END AS status
+    `SELECT ${requestColumns}
        FROM ai_generation_request r
       WHERE $1::uuid IS NULL OR (r.created_at, r.id) <
           (SELECT created_at, id FROM ai_generation_request WHERE id = $1)
@@ -157,27 +178,57 @@ async function writeCandidate(
   input: GenerationCandidateInput,
 ) {
   const validation = validationFor(input)
-  // JSON null represents a failed provider call without a canonical problem.
-  // Only such failures use a synthetic hash. PostgreSQL canonicalizes jsonb
-  // object keys before hashing real specs, regardless of JS property order.
+  const presentation =
+    validation.valid && "canonicalSpec" in input
+      ? input.presentation
+      : undefined
+  const canonicalSpec = JSON.stringify(
+    "canonicalSpec" in input ? input.canonicalSpec : null,
+  )
+  const rawResponse = JSON.stringify(input.rawResponse)
+  const hashSql = "encode(sha256(convert_to($2::jsonb::text, 'UTF8')), 'hex')"
   const { rows } = await tx.query<{ id: string }>(
     `INSERT INTO ai_generation_candidate
-       (request_id, canonical_spec, content_hash, raw_response, validator_reports)
+       (request_id, canonical_spec, content_hash, raw_response, validator_reports,
+        prompt_blocks, choices, solution_blocks)
      VALUES ($1, $2::jsonb,
        CASE WHEN $2::jsonb = 'null'::jsonb THEN 'failure:' || gen_random_uuid()::text
-            ELSE encode(sha256(convert_to($2::jsonb::text, 'UTF8')), 'hex') END,
-       $3::jsonb, $4::jsonb) RETURNING id`,
+            ELSE ${hashSql} END,
+       $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb)
+     ON CONFLICT (content_hash) DO NOTHING RETURNING id`,
     [
       requestId,
-      JSON.stringify("canonicalSpec" in input ? input.canonicalSpec : null),
-      JSON.stringify(input.rawResponse),
+      canonicalSpec,
+      rawResponse,
       JSON.stringify({ validation }),
+      JSON.stringify(presentation?.promptBlocks),
+      JSON.stringify(presentation?.choices),
+      JSON.stringify(presentation?.solutionBlocks),
     ],
   )
+  let candidate = rows.at(0)
+
+  if (!candidate) {
+    // The original owns the canonical hash. Give this rejected outcome its
+    // own identity and record the conflicting hash for review.
+    const duplicate = await tx.query<{ id: string }>(
+      `INSERT INTO ai_generation_candidate
+         (request_id, canonical_spec, content_hash, raw_response, validator_reports)
+       VALUES ($1, 'null'::jsonb, 'failure:' || gen_random_uuid()::text, $3::jsonb,
+         jsonb_build_object('validation', jsonb_build_object('valid', false,
+           'source', 'duplicate', 'errors', jsonb_build_array('Duplicate canonical content'),
+           'duplicateContentHash', ${hashSql}))) RETURNING id`,
+      [requestId, canonicalSpec, rawResponse],
+    )
+    ;[candidate] = duplicate.rows
+  }
+
   const updated = await tx.query<CandidateSummary>(
-    `UPDATE ai_generation_candidate SET status=$2, updated_at=now()
+    `UPDATE ai_generation_candidate
+        SET status=CASE WHEN validator_reports->'validation'->'valid'='true'::jsonb
+                        THEN 'in_review' ELSE 'rejected' END, updated_at=now()
       WHERE id=$1 RETURNING ${candidateColumns}`,
-    [rows[0].id, validation.valid ? "in_review" : "rejected"],
+    [candidate.id],
   )
 
   return updated.rows[0]
@@ -187,64 +238,103 @@ export function insertGenerationCandidate(
   pool: pg.Pool,
   input: { requestId: string } & GenerationCandidateInput,
 ) {
-  return withTransaction(pool, (tx) =>
-    writeCandidate(tx, input.requestId, input),
-  )
+  return withTransaction(pool, async (tx) => {
+    // A direct insert historically completed the request. An active worker
+    // must instead present its claim and commit its entire batch.
+    const updated = await tx.query(
+      "UPDATE ai_generation_request SET status='completed' WHERE id=$1 AND status <> 'processing' RETURNING id",
+      [input.requestId],
+    )
+
+    if (!updated.rowCount) {
+      throw new Error("Request is missing or requires a generation claim")
+    }
+
+    return writeCandidate(tx, input.requestId, input)
+  })
 }
 
-/**
- * Holds the request row lock until the entire batch is durable. A worker
- * returns a providerFailure outcome for a provider error. A crash or aborted
- * transaction releases the lock and rolls back all partial writes.
- */
+type GenerateBatch = (
+  request: GenerationRequest,
+) => Promise<readonly GenerationCandidateInput[]>
+
 export function claimQueuedGenerationRequest(
   pool: pg.Pool,
-  generate: (
-    request: GenerationRequest,
-  ) => Promise<readonly GenerationCandidateInput[]>,
+): Promise<GenerationClaim | null>
+
+export function claimQueuedGenerationRequest(
+  pool: pg.Pool,
+  generate: GenerateBatch,
+): Promise<GenerationRequest | null>
+
+export async function claimQueuedGenerationRequest(
+  pool: pg.Pool,
+  generate?: GenerateBatch,
+) {
+  // One autocommitted statement. Once it returns, no connection or row lock
+  // is reserved while the provider runs.
+  const { rows } = await pool.query<GenerationClaim>(
+    `UPDATE ai_generation_request SET status='processing', claim_token=gen_random_uuid(),
+        lease_expires_at=clock_timestamp()+interval '5 minutes'
+      WHERE id=(SELECT id FROM ai_generation_request
+        WHERE status='queued' OR (status='processing' AND lease_expires_at<=clock_timestamp())
+        ORDER BY created_at,id LIMIT 1 FOR UPDATE SKIP LOCKED)
+      RETURNING ${requestColumns}, claim_token AS "claimToken", lease_expires_at AS "leaseExpiresAt"`,
+  )
+  const claim = rows.at(0) ?? null
+
+  if (!claim || !generate) {
+    return claim
+  }
+
+  const batch = await generateOutcomes(generate, claim)
+
+  return completeGenerationRequest(pool, claim, batch)
+}
+
+async function generateOutcomes(
+  generate: GenerateBatch,
+  claim: GenerationClaim,
+): Promise<readonly GenerationCandidateInput[]> {
+  try {
+    return await generate(claim)
+  } catch (error) {
+    return [
+      {
+        providerFailure: "Provider request failed",
+        rawResponse: error instanceof Error ? error.message : String(error),
+      },
+    ]
+  }
+}
+
+export function completeGenerationRequest(
+  pool: pg.Pool,
+  claim: Pick<GenerationClaim, "id" | "claimToken">,
+  batch: readonly GenerationCandidateInput[],
 ): Promise<GenerationRequest | null> {
   return withTransaction(pool, async (tx) => {
-    for (;;) {
-      // eslint-disable-next-line no-await-in-loop -- Retry the selection with a fresh snapshot after a concurrent commit.
-      const { rows } = await tx.query<GenerationRequest>(
-        `SELECT ${requestColumns}, 'queued' AS status FROM ai_generation_request r
-          WHERE NOT EXISTS (SELECT 1 FROM ai_generation_candidate WHERE request_id=r.id)
-          ORDER BY created_at, id LIMIT 1 FOR UPDATE OF r SKIP LOCKED`,
-      )
-      const job = rows.at(0)
+    const { rows } = await tx.query<GenerationRequest>(
+      `UPDATE ai_generation_request SET status='completed', claim_token=NULL, lease_expires_at=NULL
+        WHERE id=$1 AND status='processing' AND claim_token=$2 AND lease_expires_at>clock_timestamp()
+        RETURNING ${requestColumns}`,
+      [claim.id, claim.claimToken],
+    )
+    const job = rows.at(0)
 
-      if (!job) {
-        return null
-      }
-
-      // The selection's snapshot might predate a worker committing just
-      // before we acquired the lock. Check again under the acquired lock.
-      // eslint-disable-next-line no-await-in-loop -- Recheck under the row lock.
-      const existing = await tx.query(
-        "SELECT 1 FROM ai_generation_candidate WHERE request_id=$1 LIMIT 1",
-        [job.id],
-      )
-
-      if (existing.rows.length) {
-        continue
-      }
-
-      // eslint-disable-next-line no-await-in-loop -- Generate only after claiming this request.
-      const batch = await generate(job)
-
-      if (batch.length === 0) {
-        throw new Error(
-          "Generation batch requires a candidate or failure report",
-        )
-      }
-
-      for (const input of batch) {
-        // eslint-disable-next-line no-await-in-loop -- Batch inserts share a single transaction client.
-        await writeCandidate(tx, job.id, input)
-      }
-
-      return { ...job, status: "completed" }
+    if (!job) {
+      return null
     }
+
+    const outcomes = batch.length
+      ? batch
+      : [{ providerFailure: "Provider returned no candidates" }]
+    for (const input of outcomes) {
+      // eslint-disable-next-line no-await-in-loop -- All outcomes commit with the fenced completion.
+      await writeCandidate(tx, job.id, input)
+    }
+
+    return job
   })
 }
 

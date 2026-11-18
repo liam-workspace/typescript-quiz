@@ -10,6 +10,7 @@ import {
   loadAdminOverview,
   loadAdminTestDetail,
 } from "../src/admin.js"
+import { loadAdminResultRollups } from "../src/repositories/admin-read.repository.js"
 import { InvalidCursorError } from "../src/repositories/catalog.repository.js"
 import { loadForRunner } from "../src/index.js"
 import { withDatabase } from "./helpers/database.js"
@@ -383,6 +384,163 @@ describe("admin read projections", () => {
       expect(
         (await listAdminResults(pool, { ...page, testId: randomUUID() })).items,
       ).toEqual([])
+    })
+  }, 120_000)
+
+  it("rolls up all finished attempts across historical versions without identity or answer data", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      await finishAttempt(pool, f)
+      const secondVersion = await addDraft(pool, f.testId)
+      const [questionId] = await addDraftQuestions(pool, secondVersion, [
+        "A weighted multi-choice item",
+      ])
+      await pool.query(
+        "UPDATE question SET type = 'multi_choice', points = 3 WHERE id = $1",
+        [questionId],
+      )
+      const correctOne = questionId.replace("f0000000", "f1000000")
+      const correctTwo = randomUUID()
+      await pool.query(
+        "INSERT INTO choice (id, question_id, ordinal, label, is_correct) VALUES ($1, $2, 3, 'Another correct answer', true)",
+        [correctTwo, questionId],
+      )
+      await pool.query(
+        "UPDATE test_version SET published_at = now() WHERE id = $1",
+        [secondVersion],
+      )
+      await pool.query(
+        "UPDATE test SET current_version_id = $1 WHERE id = $2",
+        [secondVersion, f.testId],
+      )
+      const section = await pool.query<{ id: string }>(
+        "SELECT id FROM test_section WHERE test_version_id = $1",
+        [secondVersion],
+      )
+      const sectionId = section.rows[0].id
+
+      async function addExpiredAttempt(
+        selected: string[],
+        correct: number,
+      ): Promise<void> {
+        const id = randomUUID()
+        const answered = Number(selected.length > 0)
+        await pool.query(
+          `INSERT INTO attempt (id, student_id, test_version_id, status, submitted_at, expires_at, started_at,
+             points_earned, points_possible, percentage, answered_count, unanswered_count, correct_count, incorrect_count, question_count)
+           VALUES ($1, $2, $3, 'expired', now(), now(), now() - interval '1 hour', $4, 3, $5, $6, $7, $8, $9, 1)`,
+          [
+            id,
+            f.studentId,
+            secondVersion,
+            correct * 3,
+            correct * 100,
+            answered,
+            1 - answered,
+            correct,
+            answered - correct,
+          ],
+        )
+        await pool.query(
+          "INSERT INTO response (attempt_id, question_id, test_version_id, client_instance_id, client_seq) VALUES ($1, $2, $3, 'test', 1)",
+          [id, questionId, secondVersion],
+        )
+        await pool.query(
+          "INSERT INTO response_choice (attempt_id, question_id, choice_id) SELECT $1, $2, unnest($3::uuid[])",
+          [id, questionId, selected],
+        )
+      }
+      await Promise.all([
+        addExpiredAttempt([correctTwo, correctOne], 1),
+        addExpiredAttempt([correctOne], 0),
+        addExpiredAttempt(
+          [correctOne, questionId.replace("f0000000", "f2000000")],
+          0,
+        ),
+        addExpiredAttempt([], 0),
+      ])
+      await pool.query(
+        "INSERT INTO attempt (student_id, test_version_id) VALUES ($1, $2)",
+        [f.studentId, secondVersion],
+      )
+
+      const rollups = await loadAdminResultRollups(pool, { testId: f.testId })
+      const first = {
+        attemptCount: 1,
+        score: 1,
+        maxScore: 2,
+        answeredCount: 1,
+        correctCount: 1,
+      }
+      const second = {
+        attemptCount: 4,
+        score: 3,
+        maxScore: 12,
+        answeredCount: 3,
+        correctCount: 1,
+      }
+      const listening = { ...first, maxScore: 1 }
+      const reading = {
+        ...listening,
+        answeredCount: 0,
+        correctCount: 0,
+        score: 0,
+      }
+      expect(rollups).toEqual({
+        tests: [
+          {
+            id: f.testId,
+            label: f.slug,
+            attemptCount: 5,
+            score: 4,
+            maxScore: 14,
+            answeredCount: 4,
+            correctCount: 2,
+          },
+        ],
+        versions: [
+          { id: secondVersion, label: "Updated draft (v2)", ...second },
+          {
+            id: f.versionId,
+            label: "TOEFL Primary — Practice Test 04 (v1)",
+            ...first,
+          },
+        ],
+        sections: [
+          { id: sectionId, label: "Draft reading", ...second },
+          {
+            id: f.listeningSectionId,
+            label: "Listening — Part 1",
+            ...listening,
+          },
+          { id: f.readingSectionId, label: "Reading", ...reading },
+        ],
+        questions: [
+          { id: questionId, label: "draft-0", ...second },
+          { id: f.questionIds[0], label: "q1", ...listening },
+          { id: f.questionIds[1], label: "q2", ...reading },
+        ],
+      })
+      const bounded = await loadAdminResultRollups(pool, { limit: 1 })
+      for (const dimension of [
+        "tests",
+        "versions",
+        "sections",
+        "questions",
+      ] as const) {
+        expect(bounded[dimension]).toEqual([rollups[dimension][0]])
+      }
+      expect(
+        await loadAdminResultRollups(pool, { testId: randomUUID() }),
+      ).toEqual({
+        tests: [],
+        versions: [],
+        sections: [],
+        questions: [],
+      })
+      await expect(
+        loadAdminResultRollups(pool, { limit: 101 }),
+      ).rejects.toThrow()
     })
   }, 120_000)
 

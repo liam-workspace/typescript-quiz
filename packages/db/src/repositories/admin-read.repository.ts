@@ -13,6 +13,8 @@ import {
   type AdminQuestionPage,
   type AdminResultPage,
   type AdminResultSummary,
+  type AdminResultRollup,
+  type AdminResultRollups,
   type AdminTestDetail,
   type AdminTestFilter,
   type AdminTestPage,
@@ -370,6 +372,81 @@ export async function listAdminResults(
         ? encodeCursor("results", last.cursor_submitted_at, last.attempt_id)
         : null,
   }
+}
+
+/** Most-attempted items per dimension, independent of attempt-list pagination. */
+export async function loadAdminResultRollups(
+  db: PgQueryable,
+  query: { testId?: string; limit?: number } = {},
+): Promise<AdminResultRollups> {
+  const limit = adminPaginationSchema.shape.limit.parse(query.limit ?? 20)
+  const { rows } = await db.query<
+    AdminResultRollup & { dimension: keyof AdminResultRollups }
+  >(
+    `
+    WITH finished AS (
+      SELECT a.id, a.test_version_id, a.points_earned, a.points_possible, a.answered_count, a.correct_count
+        FROM attempt a JOIN test_version tv ON tv.id = a.test_version_id
+       WHERE a.status <> 'in_progress' AND ($1::uuid IS NULL OR tv.test_id = $1)
+    ), version_totals AS (
+      SELECT test_version_id, count(*) AS attempts, sum(points_earned) AS score,
+             sum(points_possible) AS max_score, sum(answered_count) AS answered, sum(correct_count) AS correct
+        FROM finished GROUP BY test_version_id
+    ), selections AS (
+      -- A cleared response has zero choices. Only nonempty selections count as answered.
+      SELECT rc.question_id, array_agg(rc.choice_id ORDER BY rc.choice_id) AS selected
+        FROM finished f JOIN response_choice rc ON rc.attempt_id = f.id
+       GROUP BY rc.question_id, rc.attempt_id
+    ), question_totals AS (
+      SELECT q.id, q.question_key, g.test_section_id, v.attempts, q.points,
+             count(s.selected) AS answered, count(*) FILTER (WHERE s.selected = key.choices) AS correct
+        FROM version_totals v JOIN question q ON q.test_version_id = v.test_version_id
+        JOIN question_group g ON g.id = q.question_group_id
+        -- Match the scorer's exact-set rule for both single-choice and multi-choice items.
+        CROSS JOIN LATERAL (
+          SELECT array_agg(c.id ORDER BY c.id) AS choices
+            FROM choice c WHERE c.question_id = q.id AND c.is_correct
+        ) key
+        LEFT JOIN selections s ON s.question_id = q.id
+       GROUP BY q.id, g.test_section_id, v.attempts
+    ), groups(dimension, id, label, attempts, score, max_score, answered, correct) AS (
+      SELECT 'tests', t.id, t.slug, sum(v.attempts), sum(v.score), sum(v.max_score), sum(v.answered), sum(v.correct)
+        FROM version_totals v JOIN test_version tv ON tv.id = v.test_version_id JOIN test t ON t.id = tv.test_id
+       GROUP BY t.id
+      UNION ALL
+      SELECT 'versions', tv.id, tv.title || ' (v' || tv.version || ')', v.attempts, v.score, v.max_score, v.answered, v.correct
+        FROM version_totals v JOIN test_version tv ON tv.id = v.test_version_id
+      UNION ALL
+      SELECT 'sections', ts.id, ts.title, v.attempts, coalesce(sum(q.points * q.correct), 0),
+             coalesce(sum(q.points * v.attempts), 0), coalesce(sum(q.answered), 0), coalesce(sum(q.correct), 0)
+        FROM version_totals v JOIN test_section ts ON ts.test_version_id = v.test_version_id
+        LEFT JOIN question_totals q ON q.test_section_id = ts.id GROUP BY ts.id, v.attempts
+      UNION ALL
+      SELECT 'questions', q.id, q.question_key, q.attempts, q.points * q.correct, q.points * q.attempts, q.answered, q.correct
+        FROM question_totals q
+    )
+    SELECT dimension, id, label, attempts::float8 AS "attemptCount", score::float8,
+           max_score::float8 AS "maxScore", answered::float8 AS "answeredCount", correct::float8 AS "correctCount"
+      FROM (
+        SELECT groups.*, row_number() OVER (PARTITION BY dimension ORDER BY attempts DESC, label, id) AS rank
+          FROM groups
+      ) ranked
+     WHERE rank <= $2 ORDER BY dimension, rank
+  `,
+    [query.testId ?? null, limit],
+  )
+
+  const rollups: AdminResultRollups = {
+    tests: [],
+    versions: [],
+    sections: [],
+    questions: [],
+  }
+  for (const { dimension, ...row } of rows) {
+    rollups[dimension].push(row)
+  }
+
+  return rollups
 }
 
 interface AnswerDbRow {

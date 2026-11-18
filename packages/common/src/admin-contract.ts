@@ -85,6 +85,24 @@ export interface AdminResultSummary {
   completedAt: string
 }
 
+export interface AdminResultRollup {
+  id: string
+  label: string
+  attemptCount: number
+  score: number
+  maxScore: number
+  answeredCount: number
+  correctCount: number
+}
+
+/** Completed-attempt totals, with each dimension bounded independently. */
+export interface AdminResultRollups {
+  tests: AdminResultRollup[]
+  versions: AdminResultRollup[]
+  sections: AdminResultRollup[]
+  questions: AdminResultRollup[]
+}
+
 export interface AdminResultPage {
   items: AdminResultSummary[]
   nextCursor: string | null

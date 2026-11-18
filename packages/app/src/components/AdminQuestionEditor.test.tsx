@@ -49,10 +49,10 @@ function response(body: unknown, status = 200) {
   })
 }
 
-function renderEditor(detail: AdminTestDetail = quiz) {
+function renderEditor(detail: AdminTestDetail = quiz, questions = [question]) {
   return render(
     <AdminQuizDetailScreen
-      initialData={{ quiz: detail, questions: [question], nextCursor: null }}
+      initialData={{ quiz: detail, questions, nextCursor: null }}
     />,
   )
 }
@@ -145,8 +145,11 @@ describe("draft question editor", () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
-  it("saves to the draft version and refreshes the visible question from the server", async () => {
+  it("saves to the draft version and refreshes questions without unsaved edits", async () => {
     const user = userEvent.setup()
+    const editedQuestion = { ...question, id: "question-2", prompt: "Second" }
+    const untouchedQuestion = { ...question, id: "question-3", prompt: "Third" }
+    const revertedQuestion = { ...question, id: "question-4", prompt: "Fourth" }
     let saved = false
     vi.stubGlobal("fetch", (input: unknown, init?: RequestInit) => {
       if (
@@ -172,7 +175,18 @@ describe("draft question editor", () => {
       if (saved && input === "/api/admin/questions?limit=20&testId=quiz-1") {
         return Promise.resolve(
           response({
-            items: [{ ...question, prompt: "Server-confirmed prompt" }],
+            items: [
+              { ...question, prompt: "Server-confirmed prompt" },
+              { ...editedQuestion, prompt: "Server changed the second prompt" },
+              {
+                ...untouchedQuestion,
+                prompt: "Server changed the third prompt",
+              },
+              {
+                ...revertedQuestion,
+                prompt: "Server changed the fourth prompt",
+              },
+            ],
             nextCursor: null,
           }),
         )
@@ -180,20 +194,32 @@ describe("draft question editor", () => {
 
       throw new Error(`Unexpected request: ${String(input)}`)
     })
-    renderEditor()
-    await user.clear(screen.getByRole("textbox", { name: "Question prompt" }))
-    await user.type(
-      screen.getByRole("textbox", { name: "Question prompt" }),
-      "Choose an even number.",
+    renderEditor(quiz, [
+      question,
+      editedQuestion,
+      untouchedQuestion,
+      revertedQuestion,
+    ])
+    const [prompt, editedPrompt, untouchedPrompt, revertedPrompt] =
+      screen.getAllByRole("textbox", { name: "Question prompt" })
+    const firstEditor = within(screen.getAllByRole("article")[0])
+    await user.clear(prompt)
+    await user.type(prompt, "Choose an even number.")
+    await user.clear(editedPrompt)
+    await user.type(editedPrompt, "An unsaved edit")
+    await user.type(revertedPrompt, "!")
+    await user.keyboard("{Backspace}")
+    await user.click(
+      firstEditor.getByRole("button", { name: "Move choice 2 up" }),
     )
-    await user.click(screen.getByRole("button", { name: "Move choice 2 up" }))
-    await user.click(screen.getByRole("button", { name: "Save question" }))
+    await user.click(firstEditor.getByRole("button", { name: "Save question" }))
     expect(
       await screen.findByRole("heading", { name: "Refreshed quiz" }),
     ).toBeInTheDocument()
-    expect(
-      screen.getByRole("textbox", { name: "Question prompt" }),
-    ).toHaveValue("Server-confirmed prompt")
+    expect(prompt).toHaveValue("Server-confirmed prompt")
+    expect(editedPrompt).toHaveValue("An unsaved edit")
+    expect(untouchedPrompt).toHaveValue("Server changed the third prompt")
+    expect(revertedPrompt).toHaveValue("Server changed the fourth prompt")
     expect(screen.getByRole("status")).toHaveTextContent(/saved/i)
   })
 
@@ -203,8 +229,9 @@ describe("draft question editor", () => {
       Promise.resolve(
         response(
           {
-            type: "rich_text_edit_ambiguous",
-            title: "Ambiguous rich text",
+            type: "ambiguous_draft_text",
+            title:
+              "Flat editing cannot safely modify rich content with multiple text blocks.",
             status: 409,
           },
           409,

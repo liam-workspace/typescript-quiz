@@ -12,13 +12,17 @@ import { Route as rootRouteImport } from './pages/__root'
 import { Route as SignInRouteImport } from './pages/sign-in'
 import { Route as HistoryRouteImport } from './pages/history'
 import { Route as CallbackRouteImport } from './pages/callback'
+import { Route as AdminRouteImport } from './pages/admin'
 import { Route as IndexRouteImport } from './pages/index'
+import { Route as AdminIndexRouteImport } from './pages/admin.index'
 import { Route as TestsSlugRouteImport } from './pages/tests.$slug'
+import { Route as AdminQuizzesRouteImport } from './pages/admin.quizzes'
 import { Route as AttemptsAttemptIdTimeUpRouteImport } from './pages/attempts.$attemptId.time-up'
 import { Route as AttemptsAttemptIdRunRouteImport } from './pages/attempts.$attemptId.run'
 import { Route as AttemptsAttemptIdReviewRouteImport } from './pages/attempts.$attemptId.review'
 import { Route as AttemptsAttemptIdResultRouteImport } from './pages/attempts.$attemptId.result'
 import { Route as AttemptsAttemptIdHandInRouteImport } from './pages/attempts.$attemptId.hand-in'
+import { Route as AdminQuizzesTestIdRouteImport } from './pages/admin.quizzes.$testId'
 import { Route as AttemptsAttemptIdSectionsSectionIdRulesRouteImport } from './pages/attempts.$attemptId.sections.$sectionId.rules'
 
 const SignInRoute = SignInRouteImport.update({
@@ -36,15 +40,30 @@ const CallbackRoute = CallbackRouteImport.update({
   path: '/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
 const TestsSlugRoute = TestsSlugRouteImport.update({
   id: '/tests/$slug',
   path: '/tests/$slug',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminQuizzesRoute = AdminQuizzesRouteImport.update({
+  id: '/quizzes',
+  path: '/quizzes',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AttemptsAttemptIdTimeUpRoute = AttemptsAttemptIdTimeUpRouteImport.update({
   id: '/attempts/$attemptId/time-up',
@@ -71,6 +90,11 @@ const AttemptsAttemptIdHandInRoute = AttemptsAttemptIdHandInRouteImport.update({
   path: '/attempts/$attemptId/hand-in',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminQuizzesTestIdRoute = AdminQuizzesTestIdRouteImport.update({
+  id: '/$testId',
+  path: '/$testId',
+  getParentRoute: () => AdminQuizzesRoute,
+} as any)
 const AttemptsAttemptIdSectionsSectionIdRulesRoute =
   AttemptsAttemptIdSectionsSectionIdRulesRouteImport.update({
     id: '/attempts/$attemptId/sections/$sectionId/rules',
@@ -80,10 +104,14 @@ const AttemptsAttemptIdSectionsSectionIdRulesRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/callback': typeof CallbackRoute
   '/history': typeof HistoryRoute
   '/sign-in': typeof SignInRoute
+  '/admin/quizzes': typeof AdminQuizzesRouteWithChildren
   '/tests/$slug': typeof TestsSlugRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/quizzes/$testId': typeof AdminQuizzesTestIdRoute
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
   '/attempts/$attemptId/review': typeof AttemptsAttemptIdReviewRoute
@@ -96,7 +124,10 @@ export interface FileRoutesByTo {
   '/callback': typeof CallbackRoute
   '/history': typeof HistoryRoute
   '/sign-in': typeof SignInRoute
+  '/admin/quizzes': typeof AdminQuizzesRouteWithChildren
   '/tests/$slug': typeof TestsSlugRoute
+  '/admin': typeof AdminIndexRoute
+  '/admin/quizzes/$testId': typeof AdminQuizzesTestIdRoute
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
   '/attempts/$attemptId/review': typeof AttemptsAttemptIdReviewRoute
@@ -107,10 +138,14 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/callback': typeof CallbackRoute
   '/history': typeof HistoryRoute
   '/sign-in': typeof SignInRoute
+  '/admin/quizzes': typeof AdminQuizzesRouteWithChildren
   '/tests/$slug': typeof TestsSlugRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/quizzes/$testId': typeof AdminQuizzesTestIdRoute
   '/attempts/$attemptId/hand-in': typeof AttemptsAttemptIdHandInRoute
   '/attempts/$attemptId/result': typeof AttemptsAttemptIdResultRoute
   '/attempts/$attemptId/review': typeof AttemptsAttemptIdReviewRoute
@@ -122,10 +157,14 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/callback'
     | '/history'
     | '/sign-in'
+    | '/admin/quizzes'
     | '/tests/$slug'
+    | '/admin/'
+    | '/admin/quizzes/$testId'
     | '/attempts/$attemptId/hand-in'
     | '/attempts/$attemptId/result'
     | '/attempts/$attemptId/review'
@@ -138,7 +177,10 @@ export interface FileRouteTypes {
     | '/callback'
     | '/history'
     | '/sign-in'
+    | '/admin/quizzes'
     | '/tests/$slug'
+    | '/admin'
+    | '/admin/quizzes/$testId'
     | '/attempts/$attemptId/hand-in'
     | '/attempts/$attemptId/result'
     | '/attempts/$attemptId/review'
@@ -148,10 +190,14 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/callback'
     | '/history'
     | '/sign-in'
+    | '/admin/quizzes'
     | '/tests/$slug'
+    | '/admin/'
+    | '/admin/quizzes/$testId'
     | '/attempts/$attemptId/hand-in'
     | '/attempts/$attemptId/result'
     | '/attempts/$attemptId/review'
@@ -162,6 +208,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   CallbackRoute: typeof CallbackRoute
   HistoryRoute: typeof HistoryRoute
   SignInRoute: typeof SignInRoute
@@ -197,6 +244,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -204,12 +258,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/tests/$slug': {
       id: '/tests/$slug'
       path: '/tests/$slug'
       fullPath: '/tests/$slug'
       preLoaderRoute: typeof TestsSlugRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/quizzes': {
+      id: '/admin/quizzes'
+      path: '/quizzes'
+      fullPath: '/admin/quizzes'
+      preLoaderRoute: typeof AdminQuizzesRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/attempts/$attemptId/time-up': {
       id: '/attempts/$attemptId/time-up'
@@ -246,6 +314,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AttemptsAttemptIdHandInRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/quizzes/$testId': {
+      id: '/admin/quizzes/$testId'
+      path: '/$testId'
+      fullPath: '/admin/quizzes/$testId'
+      preLoaderRoute: typeof AdminQuizzesTestIdRouteImport
+      parentRoute: typeof AdminQuizzesRoute
+    }
     '/attempts/$attemptId/sections/$sectionId/rules': {
       id: '/attempts/$attemptId/sections/$sectionId/rules'
       path: '/attempts/$attemptId/sections/$sectionId/rules'
@@ -256,8 +331,33 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminQuizzesRouteChildren {
+  AdminQuizzesTestIdRoute: typeof AdminQuizzesTestIdRoute
+}
+
+const AdminQuizzesRouteChildren: AdminQuizzesRouteChildren = {
+  AdminQuizzesTestIdRoute: AdminQuizzesTestIdRoute,
+}
+
+const AdminQuizzesRouteWithChildren = AdminQuizzesRoute._addFileChildren(
+  AdminQuizzesRouteChildren,
+)
+
+interface AdminRouteChildren {
+  AdminQuizzesRoute: typeof AdminQuizzesRouteWithChildren
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminQuizzesRoute: AdminQuizzesRouteWithChildren,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   CallbackRoute: CallbackRoute,
   HistoryRoute: HistoryRoute,
   SignInRoute: SignInRoute,

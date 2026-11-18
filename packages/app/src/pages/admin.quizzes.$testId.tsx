@@ -46,25 +46,50 @@ export async function loadAdminQuizDetail(
   return { quiz, questions, nextCursor: null }
 }
 
+function hasQuestionChanges(original: AdminQuestion, edited: AdminQuestion) {
+  return (
+    original.prompt !== edited.prompt ||
+    original.choices.length !== edited.choices.length ||
+    original.choices.some((choice, index) => {
+      const editedChoice = edited.choices[index]
+
+      return (
+        choice.id !== editedChoice.id ||
+        choice.label !== editedChoice.label ||
+        choice.isCorrect !== editedChoice.isCorrect
+      )
+    })
+  )
+}
+
 export function AdminQuizDetailScreen({
   initialData,
 }: {
   readonly initialData: AdminQuizDetailData
 }) {
   const { t } = useTranslation("runner")
-  const [data, setData] = useState(initialData)
+  const [data, setData] = useState(() => ({
+    ...initialData,
+    questionEdits: new Map<string, AdminQuestion>(),
+  }))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const editable = data.quiz.status === "draft"
 
   function updateQuestion(question: AdminQuestion) {
-    setData((current) => ({
-      ...current,
-      questions: current.questions.map((item) =>
-        item.id === question.id ? question : item,
-      ),
-    }))
+    setData((current) => {
+      const original = current.questions.find((item) => item.id === question.id)
+      const questionEdits = new Map(current.questionEdits)
+
+      if (original && hasQuestionChanges(original, question)) {
+        questionEdits.set(question.id, question)
+      } else {
+        questionEdits.delete(question.id)
+      }
+
+      return { ...current, questionEdits }
+    })
     setError(null)
     setSaved(false)
   }
@@ -127,23 +152,28 @@ export function AdminQuizDetailScreen({
       })
       committed = true
       const refreshed = await loadAdminQuizDetail(data.quiz.id)
-      setData((current) => ({
-        ...refreshed,
-        questions: refreshed.questions.map((item) => {
-          if (
-            item.id === question.id ||
-            refreshed.quiz.versionId !== current.quiz.versionId ||
-            refreshed.quiz.status !== "draft"
-          ) {
-            return item
-          }
+      setData((current) => {
+        const questionEdits = new Map<string, AdminQuestion>()
 
-          return (
-            current.questions.find((existing) => existing.id === item.id) ??
-            item
-          )
-        }),
-      }))
+        if (
+          refreshed.quiz.versionId === current.quiz.versionId &&
+          refreshed.quiz.status === "draft"
+        ) {
+          for (const item of refreshed.questions) {
+            const edited = current.questionEdits.get(item.id)
+
+            if (
+              item.id !== question.id &&
+              edited &&
+              hasQuestionChanges(item, edited)
+            ) {
+              questionEdits.set(item.id, edited)
+            }
+          }
+        }
+
+        return { ...refreshed, questionEdits }
+      })
       setSaved(true)
     } catch {
       setError(
@@ -209,16 +239,20 @@ export function AdminQuizDetailScreen({
           })}
         </p>
       ) : null}
-      {data.questions.map((question) => (
-        <AdminQuestionEditor
-          key={question.id}
-          question={question}
-          editable={editable}
-          saving={saving}
-          onChange={updateQuestion}
-          onSave={() => saveQuestion(question)}
-        />
-      ))}
+      {data.questions.map((item) => {
+        const question = data.questionEdits.get(item.id) ?? item
+
+        return (
+          <AdminQuestionEditor
+            key={question.id}
+            question={question}
+            editable={editable}
+            saving={saving}
+            onChange={updateQuestion}
+            onSave={() => saveQuestion(question)}
+          />
+        )
+      })}
     </section>
   )
 }

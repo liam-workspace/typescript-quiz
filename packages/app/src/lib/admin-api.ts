@@ -10,6 +10,8 @@ import type {
   AdminQuestionQuery,
   AdminResultPage,
   AdminResultQuery,
+  AdminResultRollupQuery,
+  AdminResultRollups,
   AdminTestDetail,
   AdminTestPage,
   AdminTestQuery,
@@ -67,6 +69,12 @@ export function listAdminResults(
   query: AdminResultQuery = {},
 ): Promise<AdminResultPage> {
   return apiFetch<AdminResultPage>(listPath("/admin/results", query))
+}
+
+export function getAdminResultRollups(
+  query: AdminResultRollupQuery = {},
+): Promise<AdminResultRollups> {
+  return apiFetch<AdminResultRollups>(listPath("/admin/results/rollups", query))
 }
 
 export function getAdminAttempt(

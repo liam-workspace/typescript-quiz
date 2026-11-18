@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   getAdminAttempt,
   getAdminOverview,
+  getAdminResultRollups,
   getAdminTest,
   listAdminLearners,
   listAdminQuestions,
@@ -15,6 +16,7 @@ import {
   patchDraftQuestion,
 } from "./admin-api.js"
 import { ApiError } from "./api-client.js"
+import type { AdminResultRollups } from "./api-types.js"
 
 function respondWith(body: unknown, status = 200) {
   const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
@@ -127,6 +129,68 @@ describe("admin-api", () => {
       cursor: "opaque+/=",
       limit: "5",
     })
+  })
+
+  it("loads result rollups without an empty query suffix", async () => {
+    const rollups: AdminResultRollups = {
+      tests: [
+        {
+          id: "test-1",
+          label: "Arithmetic",
+          attemptCount: 2,
+          score: 8,
+          maxScore: 10,
+          answeredCount: 9,
+          correctCount: 8,
+        },
+      ],
+      versions: [],
+      sections: [],
+      questions: [],
+    }
+    const fetchMock = respondWith(rollups)
+
+    expect(await getAdminResultRollups()).toEqual(rollups)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/admin/results/rollups")
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBeUndefined()
+  })
+
+  it.each([
+    [{ testId: "test/1 +&=?" }, "?testId=test%2F1+%2B%26%3D%3F"],
+    [{ limit: 5 }, "?limit=5"],
+    [
+      { testId: "test/1 +&=?", limit: 5 },
+      "?testId=test%2F1+%2B%26%3D%3F&limit=5",
+    ],
+  ] as const)("encodes result rollup filters %j", async (query, suffix) => {
+    const fetchMock = respondWith({
+      tests: [],
+      versions: [],
+      sections: [],
+      questions: [],
+    })
+
+    await getAdminResultRollups(query)
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      `/api/admin/results/rollups${suffix}`,
+    )
+  })
+
+  it("propagates result rollup request errors from apiFetch", async () => {
+    const problem = {
+      type: "invalid_query",
+      title: "The query parameters failed validation.",
+      status: 400,
+    }
+    respondWith(problem, 400)
+
+    const error = await getAdminResultRollups({ limit: 0 }).catch(
+      (caught: unknown) => caught,
+    )
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error).toMatchObject({ problem })
   })
 
   it("encodes learner search and pagination", async () => {

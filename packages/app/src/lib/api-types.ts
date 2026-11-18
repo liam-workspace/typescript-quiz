@@ -7,6 +7,7 @@ import type {
   AdminQuestion,
   AdminQuestionPage,
   AdminResultPage,
+  AdminResultRollups,
   AdminResultSummary,
   AdminTestDetail,
   AdminTestFilter,
@@ -24,6 +25,7 @@ export type {
   AdminQuestion,
   AdminQuestionPage,
   AdminResultPage,
+  AdminResultRollups,
   AdminResultSummary,
   AdminTestDetail,
   AdminTestPage,
@@ -41,6 +43,11 @@ export type AdminQuestionQuery = AdminPageQuery &
 export type AdminResultQuery = AdminPageQuery & {
   testId?: string
   learnerId?: string
+}
+
+export interface AdminResultRollupQuery {
+  testId?: string
+  limit?: number
 }
 
 export type AdminLearnerQuery = AdminPageQuery & Pick<AdminTestFilter, "search">

@@ -16,7 +16,9 @@ import { Route as AdminRouteImport } from './pages/admin'
 import { Route as IndexRouteImport } from './pages/index'
 import { Route as AdminIndexRouteImport } from './pages/admin.index'
 import { Route as TestsSlugRouteImport } from './pages/tests.$slug'
+import { Route as AdminResultsRouteImport } from './pages/admin.results'
 import { Route as AdminQuizzesRouteImport } from './pages/admin.quizzes'
+import { Route as AdminLearnersRouteImport } from './pages/admin.learners'
 import { Route as AttemptsAttemptIdTimeUpRouteImport } from './pages/attempts.$attemptId.time-up'
 import { Route as AttemptsAttemptIdRunRouteImport } from './pages/attempts.$attemptId.run'
 import { Route as AttemptsAttemptIdReviewRouteImport } from './pages/attempts.$attemptId.review'
@@ -60,9 +62,19 @@ const TestsSlugRoute = TestsSlugRouteImport.update({
   path: '/tests/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminResultsRoute = AdminResultsRouteImport.update({
+  id: '/results',
+  path: '/results',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminQuizzesRoute = AdminQuizzesRouteImport.update({
   id: '/quizzes',
   path: '/quizzes',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminLearnersRoute = AdminLearnersRouteImport.update({
+  id: '/learners',
+  path: '/learners',
   getParentRoute: () => AdminRoute,
 } as any)
 const AttemptsAttemptIdTimeUpRoute = AttemptsAttemptIdTimeUpRouteImport.update({
@@ -108,7 +120,9 @@ export interface FileRoutesByFullPath {
   '/callback': typeof CallbackRoute
   '/history': typeof HistoryRoute
   '/sign-in': typeof SignInRoute
+  '/admin/learners': typeof AdminLearnersRoute
   '/admin/quizzes': typeof AdminQuizzesRouteWithChildren
+  '/admin/results': typeof AdminResultsRoute
   '/tests/$slug': typeof TestsSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/quizzes/$testId': typeof AdminQuizzesTestIdRoute
@@ -124,7 +138,9 @@ export interface FileRoutesByTo {
   '/callback': typeof CallbackRoute
   '/history': typeof HistoryRoute
   '/sign-in': typeof SignInRoute
+  '/admin/learners': typeof AdminLearnersRoute
   '/admin/quizzes': typeof AdminQuizzesRouteWithChildren
+  '/admin/results': typeof AdminResultsRoute
   '/tests/$slug': typeof TestsSlugRoute
   '/admin': typeof AdminIndexRoute
   '/admin/quizzes/$testId': typeof AdminQuizzesTestIdRoute
@@ -142,7 +158,9 @@ export interface FileRoutesById {
   '/callback': typeof CallbackRoute
   '/history': typeof HistoryRoute
   '/sign-in': typeof SignInRoute
+  '/admin/learners': typeof AdminLearnersRoute
   '/admin/quizzes': typeof AdminQuizzesRouteWithChildren
+  '/admin/results': typeof AdminResultsRoute
   '/tests/$slug': typeof TestsSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/quizzes/$testId': typeof AdminQuizzesTestIdRoute
@@ -161,7 +179,9 @@ export interface FileRouteTypes {
     | '/callback'
     | '/history'
     | '/sign-in'
+    | '/admin/learners'
     | '/admin/quizzes'
+    | '/admin/results'
     | '/tests/$slug'
     | '/admin/'
     | '/admin/quizzes/$testId'
@@ -177,7 +197,9 @@ export interface FileRouteTypes {
     | '/callback'
     | '/history'
     | '/sign-in'
+    | '/admin/learners'
     | '/admin/quizzes'
+    | '/admin/results'
     | '/tests/$slug'
     | '/admin'
     | '/admin/quizzes/$testId'
@@ -194,7 +216,9 @@ export interface FileRouteTypes {
     | '/callback'
     | '/history'
     | '/sign-in'
+    | '/admin/learners'
     | '/admin/quizzes'
+    | '/admin/results'
     | '/tests/$slug'
     | '/admin/'
     | '/admin/quizzes/$testId'
@@ -272,11 +296,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TestsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/results': {
+      id: '/admin/results'
+      path: '/results'
+      fullPath: '/admin/results'
+      preLoaderRoute: typeof AdminResultsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/quizzes': {
       id: '/admin/quizzes'
       path: '/quizzes'
       fullPath: '/admin/quizzes'
       preLoaderRoute: typeof AdminQuizzesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/learners': {
+      id: '/admin/learners'
+      path: '/learners'
+      fullPath: '/admin/learners'
+      preLoaderRoute: typeof AdminLearnersRouteImport
       parentRoute: typeof AdminRoute
     }
     '/attempts/$attemptId/time-up': {
@@ -344,12 +382,16 @@ const AdminQuizzesRouteWithChildren = AdminQuizzesRoute._addFileChildren(
 )
 
 interface AdminRouteChildren {
+  AdminLearnersRoute: typeof AdminLearnersRoute
   AdminQuizzesRoute: typeof AdminQuizzesRouteWithChildren
+  AdminResultsRoute: typeof AdminResultsRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminLearnersRoute: AdminLearnersRoute,
   AdminQuizzesRoute: AdminQuizzesRouteWithChildren,
+  AdminResultsRoute: AdminResultsRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 

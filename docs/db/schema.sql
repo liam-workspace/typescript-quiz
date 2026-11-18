@@ -847,14 +847,31 @@ CREATE TABLE ai_generation_request (
     model text NOT NULL,
     prompt_template_version text NOT NULL,
     seed text NOT NULL,
-    created_at timestamptz NOT NULL DEFAULT now()
+    created_at timestamptz NOT NULL DEFAULT now(),
+    status text NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'processing', 'completed')),
+    claim_token uuid,
+    lease_expires_at timestamptz,
+    CONSTRAINT ai_generation_request_lease CHECK (
+        (status = 'processing' AND claim_token IS NOT NULL AND lease_expires_at IS NOT NULL)
+        OR (status <> 'processing' AND claim_token IS NULL AND lease_expires_at IS NULL)
+    )
 );
+
+CREATE INDEX ai_generation_request_pending_idx ON ai_generation_request (created_at, id)
+    WHERE status <> 'completed';
 
 CREATE TABLE ai_generation_candidate (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     request_id uuid NOT NULL REFERENCES ai_generation_request (id) ON DELETE RESTRICT,
     canonical_spec jsonb NOT NULL,
     content_hash text NOT NULL UNIQUE CHECK (length(btrim(content_hash)) > 0),
+    -- Historical rows and failed outcomes can lack a validated presentation.
+    prompt_blocks jsonb CHECK (jsonb_typeof(prompt_blocks) = 'array'),
+    choices jsonb CHECK (jsonb_typeof(choices) = 'array'),
+    solution_blocks jsonb CHECK (jsonb_typeof(solution_blocks) = 'array'),
+    CONSTRAINT ai_generation_candidate_presentation CHECK (
+        num_nonnulls(prompt_blocks, choices, solution_blocks) IN (0, 3)
+    ),
     raw_response jsonb,
     validator_reports jsonb,
     status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'in_review', 'approved', 'rejected', 'regeneration_requested')),

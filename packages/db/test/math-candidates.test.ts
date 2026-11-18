@@ -99,6 +99,145 @@ describe("math candidate persistence", () => {
     })
   }, 120_000)
 
+  it("upgrades 1009 requests without requeueing finished work or trusting raw presentations", async () => {
+    await withDatabase(async (pool, { databaseUrl }) => {
+      await pool.query("DROP SCHEMA public CASCADE; CREATE SCHEMA public")
+      await runner({
+        databaseUrl,
+        dir: fileURLToPath(new URL("../migrations", import.meta.url)),
+        direction: "up",
+        count: 10,
+        migrationsTable: "pp_migrations",
+      })
+      const { rows: requests } = await pool.query<{ id: string }>(
+        `INSERT INTO ai_generation_request (parameters, provider, model, prompt_template_version, seed)
+         SELECT '{}', 'provider', 'model', 'v1', seed FROM unnest(ARRAY['queued', 'success', 'failure']) seed
+         RETURNING id`,
+      )
+      const { rows: candidates } = await pool.query<{ id: string }>(
+        `INSERT INTO ai_generation_candidate (request_id, canonical_spec, content_hash, raw_response)
+         VALUES ($1, '{"family":"ratio"}', 'hash', '{"promptBlocks":["raw"]}'),
+                ($2, 'null', 'failure:old', NULL) RETURNING id`,
+        [requests[1].id, requests[2].id],
+      )
+      await pool.query(
+        "UPDATE ai_generation_candidate SET status='in_review' WHERE id=$1",
+        [candidates[0].id],
+      )
+      await pool.query(
+        "UPDATE ai_generation_candidate SET status='rejected' WHERE id=$1",
+        [candidates[1].id],
+      )
+
+      await migrateToLatest(databaseUrl)
+
+      expect(
+        (
+          await pool.query(
+            "SELECT seed, status, claim_token, lease_expires_at FROM ai_generation_request ORDER BY seed",
+          )
+        ).rows,
+      ).toEqual([
+        {
+          seed: "failure",
+          status: "completed",
+          claim_token: null,
+          lease_expires_at: null,
+        },
+        {
+          seed: "queued",
+          status: "queued",
+          claim_token: null,
+          lease_expires_at: null,
+        },
+        {
+          seed: "success",
+          status: "completed",
+          claim_token: null,
+          lease_expires_at: null,
+        },
+      ])
+      expect(
+        (
+          await pool.query(
+            "SELECT status, canonical_spec, raw_response, prompt_blocks, choices, solution_blocks FROM ai_generation_candidate WHERE id=$1",
+            [candidates[0].id],
+          )
+        ).rows[0],
+      ).toEqual({
+        status: "in_review",
+        canonical_spec: { family: "ratio" },
+        raw_response: { promptBlocks: ["raw"] },
+        prompt_blocks: null,
+        choices: null,
+        solution_blocks: null,
+      })
+    })
+  }, 120_000)
+
+  it("requires a token and expiration together for processing requests and accepts complete candidate presentations", async () => {
+    await withDatabase(async (pool) => {
+      const id = await candidate(pool)
+      const {
+        rows: [request],
+      } = await pool.query<{ id: string }>(
+        "SELECT request_id AS id FROM ai_generation_candidate WHERE id=$1",
+        [id],
+      )
+      const updateRequest = (
+        status: string,
+        token: string | null,
+        expires: Date | null,
+      ) =>
+        pool.query(
+          "UPDATE ai_generation_request SET status=$2, claim_token=$3, lease_expires_at=$4 WHERE id=$1",
+          [request.id, status, token, expires],
+        )
+      const token = "a3317a21-2222-4111-8111-111111111111"
+      const expires = new Date()
+      await expect(updateRequest("invalid", null, null)).rejects.toMatchObject({
+        code: "23514",
+      })
+      await expect(
+        updateRequest("processing", null, expires),
+      ).rejects.toMatchObject({ code: "23514" })
+      await expect(
+        updateRequest("processing", token, null),
+      ).rejects.toMatchObject({ code: "23514" })
+      await expect(
+        updateRequest("queued", token, expires),
+      ).rejects.toMatchObject({ code: "23514" })
+      await updateRequest("processing", token, expires)
+      await expect(
+        updateRequest("completed", token, expires),
+      ).rejects.toMatchObject({ code: "23514" })
+      await updateRequest("completed", null, null)
+
+      const updatePresentation = (choices: unknown) =>
+        pool.query<{ choices: unknown }>(
+          `UPDATE ai_generation_candidate SET prompt_blocks='[{"kind":"text","value":"Choose two"}]',
+           choices=$2, solution_blocks='[{"kind":"math","tex":"1+1=2","display":false}]' WHERE id=$1 RETURNING choices`,
+          [id, JSON.stringify(choices)],
+        )
+      await expect(
+        pool.query(
+          "UPDATE ai_generation_candidate SET prompt_blocks='[]' WHERE id=$1",
+          [id],
+        ),
+      ).rejects.toMatchObject({ code: "23514" })
+      await expect(updatePresentation({})).rejects.toMatchObject({
+        code: "23514",
+      })
+      const choices = [
+        { labelBlocks: [{ kind: "text", value: "One" }], isCorrect: false },
+        { labelBlocks: [{ kind: "text", value: "Two" }], isCorrect: true },
+      ]
+      expect((await updatePresentation(choices)).rows[0].choices).toEqual(
+        choices,
+      )
+    })
+  }, 120_000)
+
   it("allows math metadata changes for drafts and rejects published mutations", async () => {
     await withDatabase(async (pool) => {
       const fixture = await seedPublishedTest(pool)

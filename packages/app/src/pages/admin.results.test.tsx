@@ -10,7 +10,11 @@ import { cleanup, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
-import type { AdminAttemptDetail, AdminLearnerPage } from "../lib/api-types.js"
+import type {
+  AdminAttemptDetail,
+  AdminLearnerPage,
+  AdminResultSummary,
+} from "../lib/api-types.js"
 import { Route as LearnersRoute } from "./admin.learners.js"
 import { Route as ResultsRoute } from "./admin.results.js"
 
@@ -35,12 +39,11 @@ const attempt: AdminAttemptDetail = {
     },
   ],
 }
-const result = {
+const result: AdminResultSummary = {
   attemptId,
   testId: quizId,
   testTitle: "Number practice",
   learnerId,
-  learnerName: "Sam Nguyen",
   score: 8,
   maxScore: 10,
   completedAt: "2026-11-16T08:00:00.000Z",
@@ -112,7 +115,7 @@ describe("admin results and learners", () => {
     vi.unstubAllGlobals()
   })
 
-  it("opens with completed-attempt scores and keeps answer data out of the list", async () => {
+  it("shows completed-attempt scores without exposing learner identity or answers", async () => {
     const fetch = respondTo({
       "/api/admin/results?limit=20": { items: [attempt], nextCursor: null },
     })
@@ -122,8 +125,15 @@ describe("admin results and learners", () => {
       name: "Completed attempts",
     })
     expect(within(table).getByText("Number practice")).toBeInTheDocument()
-    expect(within(table).getByText("Sam Nguyen")).toBeInTheDocument()
     expect(within(table).getByText("8 / 10")).toBeInTheDocument()
+    expect(screen.queryByText("Sam Nguyen")).not.toBeInTheDocument()
+    expect(within(table).queryByText(learnerId)).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: /Sam Nguyen/i })).toBeNull()
+    expect(
+      within(table).getByRole("link", {
+        name: "View attempt on Number practice",
+      }),
+    ).toBeInTheDocument()
     expect(screen.queryByText(/selected-choice-1/)).not.toBeInTheDocument()
     expect(fetch.mock.calls.map(([url]) => url)).toEqual([
       "/api/admin/results?limit=20",
@@ -172,7 +182,7 @@ describe("admin results and learners", () => {
     respondTo({
       [`/api/admin/results?limit=20&testId=${quizId}`]: firstPage,
       [`/api/admin/results?limit=20&testId=${quizId}&cursor=next-page`]: {
-        items: [{ ...result, learnerName: "Avery Tran" }],
+        items: [{ ...result, testTitle: "Advanced number practice" }],
         nextCursor: null,
       },
     })
@@ -180,8 +190,10 @@ describe("admin results and learners", () => {
     visit(`/admin/results?testId=${quizId}`)
 
     await user.click(await screen.findByRole("link", { name: "Next page" }))
-    expect(await screen.findByText("Avery Tran")).toBeInTheDocument()
-    expect(screen.queryByText("Sam Nguyen")).not.toBeInTheDocument()
+    expect(
+      await screen.findByText("Advanced number practice"),
+    ).toBeInTheDocument()
+    expect(screen.queryByText("Number practice")).not.toBeInTheDocument()
     expect(
       screen.queryByRole("link", { name: "Next page" }),
     ).not.toBeInTheDocument()
@@ -205,6 +217,7 @@ describe("admin results and learners", () => {
       await screen.findByRole("heading", { name: "Attempt detail" }),
     ).toBeInTheDocument()
     expect(screen.getByText(/read-only/i)).toHaveTextContent(/audited/i)
+    expect(screen.getByText("Sam Nguyen")).toBeInTheDocument()
     expect(screen.getByText("selected-choice-1")).toBeInTheDocument()
     expect(
       screen.queryByRole("table", { name: "Completed attempts" }),
@@ -238,7 +251,7 @@ describe("admin results and learners", () => {
     ).toBeInTheDocument()
   })
 
-  it("opens a local learner’s completed result history without requesting answers", async () => {
+  it("focuses a local learner’s completed result history without requesting answers", async () => {
     const fetch = respondTo({
       "/api/admin/learners?limit=20&search=Sam": learners,
       [`/api/admin/results?limit=5&learnerId=${learnerId}`]: firstPage,
@@ -247,11 +260,17 @@ describe("admin results and learners", () => {
     visit("/admin/learners?search=Sam")
 
     expect(await screen.findByText("sam@example.test")).toBeInTheDocument()
-    await user.click(screen.getByRole("link", { name: /view history/i }))
+    screen.getByRole("link", { name: /view history/i }).focus()
+    await user.keyboard("{Enter}")
 
     const history = await screen.findByRole("region", {
       name: /result history/i,
     })
+    expect(
+      within(history).getByRole("heading", {
+        name: "Result history for Sam Nguyen",
+      }),
+    ).toHaveFocus()
     expect(within(history).getByText("Number practice")).toBeInTheDocument()
     expect(within(history).getByText("8 / 10")).toBeInTheDocument()
     expect(

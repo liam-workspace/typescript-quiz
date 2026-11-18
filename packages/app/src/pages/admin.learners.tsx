@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router"
-import type { SubmitEvent } from "react"
+import { useEffect, useRef, type SubmitEvent } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod"
 import { listAdminLearners, listAdminResults } from "../lib/admin-api.js"
@@ -159,6 +159,11 @@ function LearnerHistory({
 }) {
   const { i18n, t } = useTranslation("runner")
   const dates = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" })
+  const headingRef = useRef<HTMLHeadingElement>(null)
+
+  useEffect(() => {
+    headingRef.current?.focus()
+  }, [learner.id])
 
   return (
     <section
@@ -166,7 +171,12 @@ function LearnerHistory({
       aria-labelledby="learner-history-title"
       className="device-card mt-6"
     >
-      <h3 id="learner-history-title" className="text-lg font-bold">
+      <h3
+        id="learner-history-title"
+        ref={headingRef}
+        tabIndex={-1}
+        className="text-lg font-bold"
+      >
         {t("admin.learners.historyTitle", {
           defaultValue: "Result history for {{name}}",
           name: learner.displayName,

@@ -169,9 +169,6 @@ function ResultsTable({
               {t("admin.results.quiz", { defaultValue: "Quiz" })}
             </th>
             <th scope="col">
-              {t("admin.results.learner", { defaultValue: "Learner" })}
-            </th>
-            <th scope="col">
               {t("admin.results.score", { defaultValue: "Score" })}
             </th>
             <th scope="col">
@@ -198,19 +195,6 @@ function ResultsTable({
                   {item.testTitle}
                 </Link>
               </th>
-              <td>
-                <Link
-                  to="/admin/results"
-                  search={{ testId: search.testId, learnerId: item.learnerId }}
-                  aria-label={t("admin.results.filterLearner", {
-                    defaultValue: "Filter by learner {{name}}",
-                    name: item.learnerName,
-                  })}
-                  className="text-teal inline-flex min-h-11 items-center underline underline-offset-4"
-                >
-                  {item.learnerName}
-                </Link>
-              </td>
               <td className="font-bold whitespace-nowrap">
                 {item.score} / {item.maxScore}
               </td>
@@ -225,8 +209,7 @@ function ResultsTable({
                   search={{ ...search, attemptId: item.attemptId }}
                   preload={false}
                   aria-label={t("admin.results.viewAttemptLabel", {
-                    defaultValue: "View attempt for {{name}} on {{quiz}}",
-                    name: item.learnerName,
+                    defaultValue: "View attempt on {{quiz}}",
                     quiz: item.testTitle,
                   })}
                   className="text-teal inline-flex min-h-11 items-center font-semibold whitespace-nowrap underline underline-offset-4"
@@ -408,7 +391,7 @@ function ResultsRouteComponent() {
       <p className="screen-subtitle">
         {t("admin.results.subtitle", {
           defaultValue:
-            "Review completed-attempt scores. Select a quiz or learner to filter its results.",
+            "Review completed-attempt scores. Filter by quiz ID or learner ID.",
         })}
       </p>
       <ResultsFilters key={`${testId ?? ""}:${learnerId ?? ""}`} {...search} />

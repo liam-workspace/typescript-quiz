@@ -13,6 +13,7 @@ import {
   listCandidates,
   listGenerationRequests,
   loadCandidateDetail,
+  renewGenerationClaim,
   reviewCandidate,
 } from "../src/admin.js"
 import { withDatabase } from "./helpers/database.js"
@@ -130,12 +131,25 @@ it("recovers expired leases and fences expired, replaced, and replayed completio
       "UPDATE ai_generation_request SET lease_expires_at=now()-interval '1 second' WHERE id=$1",
       [job.id],
     )
+    expect(await renewGenerationClaim(pool, first)).toBe(false)
     const batch = [{ canonicalSpec: spec }]
     expect(await completeGenerationRequest(pool, first, batch)).toBeNull()
     const next = await claimQueuedGenerationRequest(pool)
     assert(next)
     expect(next.id).toBe(first.id)
     expect(next.claimToken).not.toBe(first.claimToken)
+    expect(await renewGenerationClaim(pool, first)).toBe(false)
+    await pool.query(
+      "UPDATE ai_generation_request SET lease_expires_at=now()+interval '20 seconds' WHERE id=$1",
+      [next.id],
+    )
+    expect(await renewGenerationClaim(pool, next)).toBe(true)
+    const renewal = await pool.query<{ extended: boolean; token: string }>(
+      `SELECT lease_expires_at > clock_timestamp()+interval '4 minutes' AS extended,
+              claim_token AS token FROM ai_generation_request WHERE id=$1`,
+      [next.id],
+    )
+    expect(renewal.rows).toEqual([{ extended: true, token: next.claimToken }])
     expect(await completeGenerationRequest(pool, first, batch)).toBeNull()
     expect(await listCandidates(pool, job.id)).toEqual([])
     const results = await Promise.all([
@@ -143,6 +157,7 @@ it("recovers expired leases and fences expired, replaced, and replayed completio
       completeGenerationRequest(pool, next, batch),
     ])
     expect(results.filter(Boolean)).toHaveLength(1)
+    expect(await renewGenerationClaim(pool, next)).toBe(false)
     expect(await completeGenerationRequest(pool, next, batch)).toBeNull()
     expect(await listCandidates(pool, job.id)).toHaveLength(1)
     expect(await claimQueuedGenerationRequest(pool)).toBeNull()
@@ -186,6 +201,118 @@ it("keeps valid siblings and reports duplicate canonical content without starvin
       { status: "rejected", validation: { source: "duplicate" } },
     ])
     expect(await claimQueuedGenerationRequest(pool)).toBeNull()
+  })
+})
+
+it("completes concurrent batches that share canonical hashes in opposite order", async () => {
+  await withDatabase(async (pool) => {
+    await createGenerationRequest(pool, request)
+    await createGenerationRequest(pool, request)
+    const first = await claimQueuedGenerationRequest(pool)
+    const second = await claimQueuedGenerationRequest(pool)
+    assert(first && second)
+    const batch = [
+      { canonicalSpec: spec },
+      { canonicalSpec: { ...spec, seed: "overlap" } },
+    ]
+
+    // Hold each worker at its first successful insert until both sessions
+    // are waiting. Unordered workers would now own opposite unique keys.
+    await pool.query(`
+      CREATE FUNCTION pause_after_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN PERFORM pg_advisory_xact_lock_shared(2026); RETURN NEW; END $$;
+      CREATE TRIGGER pause_after_insert AFTER INSERT ON ai_generation_candidate
+        FOR EACH ROW EXECUTE FUNCTION pause_after_insert();`)
+    const gate = await pool.connect()
+    await gate.query("SELECT pg_advisory_lock(2026)")
+    const completions = Promise.allSettled([
+      completeGenerationRequest(pool, first, batch),
+      completeGenerationRequest(pool, second, batch.toReversed()),
+    ])
+
+    try {
+      await expect
+        .poll(async () => {
+          const { rows } = await pool.query<{ waiting: number }>(
+            `SELECT count(*)::int AS waiting FROM pg_stat_activity
+            WHERE datname=current_database() AND application_name='pp:test'
+              AND wait_event_type='Lock' AND query LIKE '%INSERT INTO ai_generation_candidate%'`,
+          )
+
+          return rows[0].waiting
+        })
+        .toBe(2)
+    } finally {
+      await gate.query("SELECT pg_advisory_unlock(2026)")
+      gate.release()
+      await completions
+    }
+
+    expect(await completions).toMatchObject([
+      { status: "fulfilled", value: { id: first.id, status: "completed" } },
+      { status: "fulfilled", value: { id: second.id, status: "completed" } },
+    ])
+    const candidates = [
+      ...(await listCandidates(pool, first.id)),
+      ...(await listCandidates(pool, second.id)),
+    ]
+    const owners = candidates.filter((row) => row.status === "in_review")
+    const duplicates = candidates.filter(
+      (row) => row.validation?.source === "duplicate",
+    )
+    expect(owners).toHaveLength(2)
+    expect(duplicates).toHaveLength(2)
+    expect(
+      new Set(duplicates.map((row) => row.validation?.duplicateContentHash)),
+    ).toEqual(new Set(owners.map((row) => row.contentHash)))
+  })
+})
+
+it("bounds malformed audit data without losing any sibling outcomes", async () => {
+  await withDatabase(async (pool) => {
+    const job = await createGenerationRequest(pool, request)
+    const malformed = { "private\0key": "private\ud800" }
+    const circular: Record<string, unknown> = {}
+    circular.self = circular
+    const raw = [malformed, circular, 1n, "private".repeat(100_000)]
+    const candidates = raw.map((rawResponse, i) => ({
+      providerFailure: `provider failure ${i}`,
+      rawResponse,
+    }))
+    const completed = await claimQueuedGenerationRequest(pool, () =>
+      Promise.resolve([...candidates, { canonicalSpec: spec }]),
+    )
+    expect(completed?.id).toBe(job.id)
+    const summaries = await listCandidates(pool, job.id)
+    expect(summaries).toHaveLength(5)
+    expect(summaries.filter((row) => row.status === "in_review")).toHaveLength(
+      1,
+    )
+    expect(JSON.stringify(summaries)).not.toContain("private")
+    const byError = new Map(
+      summaries.map((row) => [row.validation?.errors[0], row]),
+    )
+    const audited = await Promise.all(
+      raw.map(async (_, i) => {
+        const summary = byError.get(`provider failure ${i}`)
+        assert(summary)
+        expect(await loadCandidateDetail(pool, summary.id)).not.toHaveProperty(
+          "audit",
+        )
+        const detail = await loadCandidateDetail(pool, summary.id, {
+          includeAudit: true,
+        })
+
+        return detail?.audit?.rawResponse
+      }),
+    )
+    expect(audited[0]).toEqual({
+      encoding: "json-text",
+      jsonText: JSON.stringify(malformed),
+    })
+    for (const unavailable of audited.slice(1)) {
+      expect(unavailable).toMatchObject({ omitted: true })
+    }
   })
 })
 

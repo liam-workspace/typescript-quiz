@@ -172,6 +172,94 @@ function validationFor(input: GenerationCandidateInput): CandidateValidation {
   return { ...math, source: "math" }
 }
 
+const maxAuditBytes = 64 * 1024
+const omittedAudit = JSON.stringify({ omitted: true })
+
+function serializeAudit(value: unknown): string | undefined {
+  if (value === undefined) {
+    return undefined
+  }
+
+  let remaining = maxAuditBytes
+  const encoding = { needsEscaping: false }
+
+  function captureString(text: string) {
+    remaining -= text.length
+
+    if (remaining < 0) {
+      throw new RangeError("Audit exceeds serialization limits")
+    }
+
+    encoding.needsEscaping ||= text.includes("\0") || !text.isWellFormed()
+
+    return text
+  }
+
+  function capture(item: unknown, depth: number): unknown {
+    remaining -= 1
+
+    if (remaining < 0 || depth > 32) {
+      throw new RangeError("Audit exceeds serialization limits")
+    }
+
+    if (typeof item === "string") {
+      return captureString(item)
+    }
+
+    if (
+      item === null ||
+      typeof item === "boolean" ||
+      typeof item === "number"
+    ) {
+      return item
+    }
+
+    if (Array.isArray(item) && item.length <= remaining) {
+      return Array.from({ length: item.length }, (_, i) =>
+        capture(item[i], depth + 1),
+      )
+    }
+
+    if (
+      typeof item === "object" &&
+      (Object.getPrototypeOf(item) === Object.prototype ||
+        Object.getPrototypeOf(item) === null)
+    ) {
+      const copy: Record<string, unknown> = Object.create(null) as Record<
+        string,
+        unknown
+      >
+
+      for (const key in item) {
+        if (Object.hasOwn(item, key)) {
+          copy[captureString(key)] = capture(
+            (item as Record<string, unknown>)[key],
+            depth + 1,
+          )
+        }
+      }
+
+      return copy
+    }
+
+    throw new TypeError("Unsupported audit value")
+  }
+
+  try {
+    const json = JSON.stringify(capture(value, 0))
+    // PostgreSQL rejects NUL and lone surrogates even in escaped JSON. Store
+    // their original JSON spelling inside a PostgreSQL-safe string.
+    const encoded = encoding.needsEscaping
+      ? JSON.stringify({ encoding: "json-text", jsonText: json })
+      : json
+
+    return Buffer.byteLength(encoded) > maxAuditBytes ? omittedAudit : encoded
+  } catch {
+    // Cycles, non-JSON values, throwing getters and oversized payloads are audit only.
+    return omittedAudit
+  }
+}
+
 async function writeCandidate(
   tx: PgQueryable,
   requestId: string,
@@ -185,7 +273,7 @@ async function writeCandidate(
   const canonicalSpec = JSON.stringify(
     "canonicalSpec" in input ? input.canonicalSpec : null,
   )
-  const rawResponse = JSON.stringify(input.rawResponse)
+  const rawResponse = serializeAudit(input.rawResponse)
   const hashSql = "encode(sha256(convert_to($2::jsonb::text, 'UTF8')), 'hex')"
   const { rows } = await tx.query<{ id: string }>(
     `INSERT INTO ai_generation_candidate
@@ -292,6 +380,19 @@ export async function claimQueuedGenerationRequest(
   return completeGenerationRequest(pool, claim, batch)
 }
 
+export async function renewGenerationClaim(
+  db: PgQueryable,
+  claim: Pick<GenerationClaim, "id" | "claimToken">,
+): Promise<boolean> {
+  const { rowCount } = await db.query(
+    `UPDATE ai_generation_request SET lease_expires_at=clock_timestamp()+interval '5 minutes'
+      WHERE id=$1 AND status='processing' AND claim_token=$2 AND lease_expires_at>clock_timestamp()`,
+    [claim.id, claim.claimToken],
+  )
+
+  return rowCount === 1
+}
+
 async function generateOutcomes(
   generate: GenerateBatch,
   claim: GenerationClaim,
@@ -302,10 +403,34 @@ async function generateOutcomes(
     return [
       {
         providerFailure: "Provider request failed",
-        rawResponse: error instanceof Error ? error.message : String(error),
+        rawResponse: error instanceof Error ? error.message : error,
       },
     ]
   }
+}
+
+async function orderForInsertion(
+  tx: PgQueryable,
+  batch: readonly GenerationCandidateInput[],
+) {
+  if (batch.length < 2) {
+    return batch
+  }
+
+  // PostgreSQL's normalized jsonb text is the input to the unique hash.
+  // Every transaction acquires overlapping canonical keys in the same order,
+  // including when providers construct equivalent objects in different orders.
+  const specs = batch.map((input) =>
+    "canonicalSpec" in input ? input.canonicalSpec : null,
+  )
+  const { rows } = await tx.query<{ index: number }>(
+    `SELECT (ordinality - 1)::int AS index
+       FROM jsonb_array_elements($1::jsonb) WITH ORDINALITY AS entries(spec, ordinality)
+      ORDER BY spec::text COLLATE "C", ordinality`,
+    [JSON.stringify(specs)],
+  )
+
+  return rows.map(({ index }) => batch[index])
 }
 
 export function completeGenerationRequest(
@@ -327,7 +452,7 @@ export function completeGenerationRequest(
     }
 
     const outcomes = batch.length
-      ? batch
+      ? await orderForInsertion(tx, batch)
       : [{ providerFailure: "Provider returned no candidates" }]
     for (const input of outcomes) {
       // eslint-disable-next-line no-await-in-loop -- All outcomes commit with the fenced completion.

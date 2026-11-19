@@ -1,5 +1,11 @@
-import { Link, createFileRoute } from "@tanstack/react-router"
-import { useEffect, useRef, type SubmitEvent } from "react"
+import { Link, createFileRoute, useLocation } from "@tanstack/react-router"
+import {
+  useEffect,
+  useRef,
+  type MouseEvent,
+  type RefObject,
+  type SubmitEvent,
+} from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod"
 import { listAdminLearners, listAdminResults } from "../lib/admin-api.js"
@@ -69,9 +75,14 @@ function LearnerSearch({ search }: LearnersSearch) {
 function LearnerDirectory({
   items,
   search,
+  onHistoryClick,
 }: {
   readonly items: AdminLearnerSummary[]
   readonly search: LearnersSearch
+  readonly onHistoryClick: (
+    event: MouseEvent<HTMLAnchorElement>,
+    learnerId: string,
+  ) => void
 }) {
   const { i18n, t } = useTranslation("runner")
   const dates = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" })
@@ -131,6 +142,8 @@ function LearnerDirectory({
                   to="/admin/learners"
                   search={{ ...search, learnerId: learner.id }}
                   hash="learner-result-history"
+                  hashScrollIntoView={false}
+                  onClick={(event) => onHistoryClick(event, learner.id)}
                   aria-label={t("admin.learners.viewHistoryLabel", {
                     defaultValue: "View history for {{name}}",
                     name: learner.displayName,
@@ -153,17 +166,18 @@ function LearnerDirectory({
 function LearnerHistory({
   learner,
   history,
+  headingRef,
 }: {
   readonly learner: AdminLearnerSummary
   readonly history: AdminResultPage
+  readonly headingRef: RefObject<HTMLHeadingElement | null>
 }) {
   const { i18n, t } = useTranslation("runner")
   const dates = new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" })
-  const headingRef = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => {
     headingRef.current?.focus()
-  }, [learner.id])
+  }, [headingRef, learner.id])
 
   return (
     <section
@@ -226,8 +240,35 @@ function LearnerHistory({
 
 function LearnersRouteComponent() {
   const { t } = useTranslation("runner")
+  const href = useLocation({ select: (location) => location.publicHref })
   const { search, cursor } = Route.useSearch()
   const { page, learner, history } = Route.useLoaderData()
+  const headingRef = useRef<HTMLHeadingElement>(null)
+
+  function focusOpenHistory(
+    event: MouseEvent<HTMLAnchorElement>,
+    learnerId: string,
+  ) {
+    const heading = headingRef.current
+
+    if (
+      !heading ||
+      learner?.id !== learnerId ||
+      event.button !== 0 ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey
+    ) {
+      return
+    }
+
+    if (event.currentTarget.getAttribute("href") === href) {
+      event.preventDefault()
+    }
+
+    heading.focus()
+  }
 
   return (
     <section aria-labelledby="admin-learners-title">
@@ -236,7 +277,11 @@ function LearnersRouteComponent() {
       </h2>
       <LearnerSearch key={search} search={search} />
       {page.items.length > 0 ? (
-        <LearnerDirectory items={page.items} search={{ search, cursor }} />
+        <LearnerDirectory
+          items={page.items}
+          search={{ search, cursor }}
+          onHistoryClick={focusOpenHistory}
+        />
       ) : (
         <p
           role="status"
@@ -279,7 +324,11 @@ function LearnersRouteComponent() {
         </nav>
       )}
       {learner && history && (
-        <LearnerHistory learner={learner} history={history} />
+        <LearnerHistory
+          learner={learner}
+          history={history}
+          headingRef={headingRef}
+        />
       )}
     </section>
   )

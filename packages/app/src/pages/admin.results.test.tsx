@@ -430,4 +430,27 @@ describe("admin results and learners", () => {
       `/api/admin/results/attempts/${attemptId}`,
     )
   })
+
+  it("returns focus to the result history heading when the same learner is selected again", async () => {
+    respondTo({
+      "/api/admin/learners?limit=20": learners,
+      [`/api/admin/results?limit=5&learnerId=${learnerId}`]: firstPage,
+    })
+    const user = userEvent.setup()
+    visit("/admin/learners")
+
+    const link = await screen.findByRole("link", { name: /view history/i })
+    await user.click(link)
+    const historyHeading = await screen.findByRole("heading", {
+      name: "Result history for Sam Nguyen",
+    })
+    expect(historyHeading).toHaveFocus()
+
+    const openHistoryLink = screen.getByRole("link", { name: /view history/i })
+    openHistoryLink.focus()
+    expect(openHistoryLink).toHaveFocus()
+    await user.keyboard("{Enter}")
+
+    expect(historyHeading).toHaveFocus()
+  })
 })

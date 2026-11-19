@@ -1,4 +1,5 @@
 import type { PgPool } from "@liam-workspace/node-postgres"
+import * as generationRepository from "@pp/db/admin"
 import type { CandidateDetail, GenerationRequest } from "@pp/db/admin"
 import request from "supertest"
 import type { App } from "supertest/types.js"
@@ -199,7 +200,8 @@ describe("math generation and review", () => {
       .expect(400)
   })
 
-  it("returns a receipt while provider I/O holds a committed claim", async () => {
+  it("renews the committed lease while a provider call is pending", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] })
     const adapter = ready().get<MathEnrichmentProvider>(MATH_WORDING_PROVIDER)
     const started = Promise.withResolvers<boolean>()
     const response = Promise.withResolvers<unknown>()
@@ -208,22 +210,120 @@ describe("math generation and review", () => {
 
       return response.promise
     })
-    const receipt = await queue()
-    await started.promise
 
     try {
-      const claimed = await pool().query<{ status: string; leased: boolean }>(
-        "SELECT status, claim_token IS NOT NULL AS leased FROM ai_generation_request WHERE id=$1",
+      const receipt = await queue()
+      await started.promise
+      const shortened = await pool().query<{ expiry: Date }>(
+        `UPDATE ai_generation_request SET lease_expires_at=clock_timestamp()+interval '15 seconds'
+         WHERE id=$1 AND status='processing' AND claim_token IS NOT NULL RETURNING lease_expires_at AS expiry`,
         [receipt.requestId],
       )
-      expect(claimed.rows).toEqual([{ status: "processing", leased: true }])
+      expect(shortened.rowCount).toBe(1)
+      vi.advanceTimersByTime(60_000)
+      await vi.waitFor(async () => {
+        const renewed = await pool().query<{ expiry: Date }>(
+          "SELECT lease_expires_at AS expiry FROM ai_generation_request WHERE id=$1",
+          [receipt.requestId],
+        )
+        expect(renewed.rows[0].expiry.getTime()).toBeGreaterThan(
+          shortened.rows[0].expiry.getTime(),
+        )
+      })
       await candidates(receipt.candidatesUrl, 0)
-    } finally {
       response.resolve({ prompt: "Add.", explanation: "Add the numerators." })
+      const [result] = await candidates(receipt.candidatesUrl, 1)
+      expect(result.status).toBe("in_review")
+    } finally {
+      response.resolve(null)
+      vi.useRealTimers()
     }
+  })
 
-    const [result] = await candidates(receipt.candidatesUrl, 1)
-    expect(result.status).toBe("in_review")
+  it.each(["refused", "unavailable"])(
+    "aborts when renewal is %s and reuses the candidate key after reclaim",
+    async (failure) => {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] })
+      const adapter = ready().get<MathEnrichmentProvider>(MATH_WORDING_PROVIDER)
+      const started = Promise.withResolvers<AbortSignal>()
+      const response = Promise.withResolvers<unknown>()
+      const enrich = vi
+        .spyOn(adapter, "enrich")
+        .mockImplementationOnce((_brief, _spec, signal) => {
+          started.resolve(signal)
+
+          return response.promise
+        })
+      const renew = vi.spyOn(generationRepository, "renewGenerationClaim")
+
+      if (failure === "refused") {
+        renew.mockResolvedValueOnce(false)
+      } else {
+        renew.mockRejectedValueOnce(new Error("Renewal unavailable"))
+      }
+
+      try {
+        const receipt = await queue({ ...payload, count: 2 })
+        const signal = await started.promise
+        vi.advanceTimersByTime(60_000)
+        await vi.waitFor(() => expect(signal.aborted).toBe(true))
+        await candidates(receipt.candidatesUrl, 0)
+        expect(enrich).toHaveBeenCalledTimes(1)
+        const expired = await pool().query(
+          "UPDATE ai_generation_request SET lease_expires_at=clock_timestamp() WHERE id=$1 AND status='processing'",
+          [receipt.requestId],
+        )
+        expect(expired.rowCount).toBe(1)
+        const wake = await queue()
+        await candidates(receipt.candidatesUrl, 2)
+        await candidates(wake.candidatesUrl, 1)
+        const keys = enrich.mock.calls.map((call) => call[3])
+        expect(keys).toEqual([
+          `math-generation:${receipt.requestId}:0`,
+          `math-generation:${receipt.requestId}:0`,
+          `math-generation:${receipt.requestId}:1`,
+          `math-generation:${wake.requestId}:0`,
+        ])
+      } finally {
+        response.resolve(null)
+        vi.useRealTimers()
+      }
+    },
+  )
+
+  it("finishes the batch when a provider ignores its deadline", async () => {
+    const adapter = ready().get<MathEnrichmentProvider>(MATH_WORDING_PROVIDER)
+    const started = Promise.withResolvers<AbortSignal>()
+    const response = Promise.withResolvers<unknown>()
+    const deadline = new AbortController()
+    const timeout = vi
+      .spyOn(AbortSignal, "timeout")
+      .mockReturnValueOnce(deadline.signal)
+    vi.spyOn(adapter, "enrich").mockImplementationOnce(
+      (_brief, _spec, signal) => {
+        started.resolve(signal)
+
+        return response.promise
+      },
+    )
+
+    try {
+      const receipt = await queue({ ...payload, count: 2 })
+      const signal = await started.promise
+      expect(timeout).toHaveBeenCalledWith(10_000)
+      deadline.abort()
+      const rows = await candidates(receipt.candidatesUrl, 2)
+      expect(signal.aborted).toBe(true)
+      expect(rows.map((row) => row.status).sort()).toEqual([
+        "in_review",
+        "rejected",
+      ])
+      expect(
+        rows.find((row) => row.status === "rejected")?.validation?.source,
+      ).toBe("provider")
+    } finally {
+      response.resolve(null)
+    }
   })
 
   it("retains an invalid Unicode response alongside its valid sibling", async () => {
@@ -248,6 +348,30 @@ describe("math generation and review", () => {
     expect((detail.body as CandidateDetail).audit?.rawResponse).toEqual({
       encoding: "json-text",
       jsonText: JSON.stringify(malformed),
+    })
+  })
+
+  it("retains sibling candidates when a provider returns cyclic audit data", async () => {
+    const adapter = ready().get<MathEnrichmentProvider>(MATH_WORDING_PROVIDER)
+    const cyclic: Record<string, unknown> = {}
+    cyclic.self = cyclic
+    vi.spyOn(adapter, "enrich").mockResolvedValueOnce(cyclic)
+    const receipt = await queue({ ...payload, count: 2 })
+    const rows = await candidates(receipt.candidatesUrl, 2)
+    expect(rows.map((row) => row.status).sort()).toEqual([
+      "in_review",
+      "rejected",
+    ])
+    const rejected = rows.find(
+      (row) => row.validation?.source === "presentation",
+    )
+
+    if (!rejected) {
+      throw new Error("Missing rejected presentation")
+    }
+
+    expect((await raw(rejected.id).expect(200)).body).toMatchObject({
+      audit: { rawResponse: { omitted: true } },
     })
   })
 

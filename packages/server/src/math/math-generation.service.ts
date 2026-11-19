@@ -16,12 +16,14 @@ import {
 } from "@pp/common"
 import {
   claimQueuedGenerationRequest,
+  completeGenerationRequest,
   createGenerationRequest,
   listCandidates,
   listGenerationRequests,
   loadCandidateDetail,
+  renewGenerationClaim,
   type GenerationCandidateInput,
-  type GenerationRequest,
+  type GenerationClaim,
 } from "@pp/db/admin"
 import { z } from "zod"
 import { ProblemException } from "../attempts/problem.exception.js"
@@ -79,6 +81,7 @@ export interface MathEnrichmentProvider {
     brief: Brief,
     spec: MathProblemSpec,
     signal: AbortSignal,
+    idempotencyKey: string,
   ): Promise<unknown>
 }
 
@@ -122,16 +125,6 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
 function databaseText(value: string): boolean {
   return value.isWellFormed() && !value.includes("\0")
 }
-function auditPayload(value: unknown): unknown {
-  const json = JSON.stringify(value)
-
-  // JSON.stringify escapes these code units as ASCII. The string preserves the
-  // entire response losslessly even when the database cannot decode it as JSONB.
-  return json && /\\u(?:0000|d[89a-f][\da-f]{2})/iu.test(json)
-    ? { encoding: "json-text", jsonText: json }
-    : value
-}
-
 function missing(): ProblemException {
   return new ProblemException({
     type: "math_candidate_not_found",
@@ -215,36 +208,36 @@ async function enrichCandidate(
   adapter: MathEnrichmentProvider,
   brief: Brief,
   problem: ReturnType<typeof makeProblem>,
+  leaseSignal: AbortSignal,
+  idempotencyKey: string,
 ): Promise<GenerationCandidateInput> {
   const { spec, exprTex, choices } = problem
-  const controller = new AbortController()
-  let timeout: NodeJS.Timeout | undefined = undefined
+  leaseSignal.throwIfAborted()
+  const signal = AbortSignal.any([leaseSignal, AbortSignal.timeout(10_000)])
+  const cancelled = Promise.withResolvers<never>()
+  const onAbort = () => cancelled.reject(new Error("Provider timed out"))
+  signal.addEventListener("abort", onAbort, { once: true })
   let rawResponse: unknown = undefined
 
   try {
-    const deadline = new Promise<never>((_, reject) => {
-      timeout = setTimeout(() => {
-        controller.abort()
-        reject(new Error("Provider timed out"))
-      }, 10_000)
-    })
     rawResponse = await Promise.race([
       adapter.enrich(
         structuredClone(brief),
         structuredClone(spec),
-        controller.signal,
+        signal,
+        idempotencyKey,
       ),
-      deadline,
+      cancelled.promise,
     ])
   } catch (error) {
+    leaseSignal.throwIfAborted()
+
     return {
       providerFailure: "Provider request failed",
-      rawResponse: auditPayload(
-        error instanceof Error ? error.message : String(error),
-      ),
+      rawResponse: error instanceof Error ? error.message : error,
     }
   } finally {
-    clearTimeout(timeout)
+    signal.removeEventListener("abort", onAbort)
   }
 
   const parsed = enrichmentSchema.safeParse(rawResponse)
@@ -253,7 +246,7 @@ async function enrichCandidate(
     return {
       canonicalSpec: spec,
       validationErrors: ["Provider wording failed the presentation schema"],
-      rawResponse: auditPayload(rawResponse),
+      rawResponse,
     }
   }
 
@@ -316,19 +309,52 @@ export class MathGenerationService implements OnModuleInit, OnModuleDestroy {
   }
   private async drain() {
     while (!this.stopping) {
-      // The claim commits before the callback runs. Completion is fenced by its lease token.
       // eslint-disable-next-line no-await-in-loop -- Claim the next batch after the current one finishes.
-      const completed = await claimQueuedGenerationRequest(
-        this.jobs,
-        (request) => this.generate(request),
-      )
+      const claim = await claimQueuedGenerationRequest(this.jobs)
 
-      if (!completed) {
+      if (!claim) {
         return
       }
+
+      // eslint-disable-next-line no-await-in-loop -- One active lease per worker.
+      await this.processClaim(claim)
     }
   }
-  private async generate(request: GenerationRequest) {
+  private async processClaim(claim: GenerationClaim) {
+    const lease = new AbortController()
+    const heartbeat: { pending?: Promise<void> } = {}
+    const timer = setInterval(() => {
+      heartbeat.pending ??= renewGenerationClaim(this.jobs, claim)
+        .then((owned) => {
+          if (!owned) {
+            lease.abort()
+          }
+        })
+        .catch(() => lease.abort())
+        .finally(() => {
+          delete heartbeat.pending
+        })
+    }, 60_000)
+    let outcomes: GenerationCandidateInput[] = []
+
+    try {
+      outcomes = await this.generate(claim, lease.signal)
+    } catch (error) {
+      outcomes = [
+        {
+          providerFailure: "Provider request failed",
+          rawResponse: error instanceof Error ? error.message : error,
+        },
+      ]
+    } finally {
+      clearInterval(timer)
+      await heartbeat.pending
+    }
+
+    lease.signal.throwIfAborted()
+    await completeGenerationRequest(this.jobs, claim, outcomes)
+  }
+  private async generate(request: GenerationClaim, leaseSignal: AbortSignal) {
     const batch = batchSchema.parse(request.parameters)
 
     if (
@@ -349,6 +375,8 @@ export class MathGenerationService implements OnModuleInit, OnModuleDestroy {
           this.adapter,
           batch.curriculumBrief,
           makeProblem(batch.templateCode, request.seed, index),
+          leaseSignal,
+          `math-generation:${request.id}:${index}`,
         ),
       )
     }

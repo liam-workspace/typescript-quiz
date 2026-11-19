@@ -88,6 +88,7 @@ const candidate = {
     seed: request.seed,
   },
 } satisfies MathCandidateDetail
+const { canonicalSpec: _spec, provenance: _provenance, ...summary } = candidate
 const profile = {
   id: "student-admin",
   displayName: "Admin",
@@ -97,11 +98,6 @@ const profile = {
 }
 
 function respondTo(overrides: Record<string, unknown> = {}) {
-  const {
-    canonicalSpec: _spec,
-    provenance: _provenance,
-    ...summary
-  } = candidate
   const routes: Record<string, unknown> = {
     "/api/me": profile,
     "/api/admin/math/generation-requests?limit=10": {
@@ -159,7 +155,9 @@ describe("admin math candidate review", () => {
     expect(
       screen.getByRole("link", { name: /fraction-addition-v1/iu }),
     ).toBeInTheDocument()
-    await user.click(screen.getByRole("link", { name: "Add the fractions." }))
+    await user.click(
+      screen.getByRole("link", { name: /^Add the fractions\./u }),
+    )
 
     expect(
       await screen.findByRole("heading", { name: "Review candidate" }),
@@ -167,6 +165,36 @@ describe("admin math candidate review", () => {
     expect(router.state.location.pathname).toBe(
       `/admin/candidates/${candidateId}`,
     )
+  })
+
+  it("distinguishes candidates with the same prompt in the review queue", async () => {
+    const secondId = "68e723ff-c740-4c99-9e1f-df5d80dea7bd"
+    respondTo({
+      [candidatesUrl]: [
+        summary,
+        {
+          ...summary,
+          id: secondId,
+          promptBlocks: [
+            text("Add the fractions."),
+            math("\\frac{1}{4}+\\frac{2}{4}"),
+          ],
+        },
+      ],
+    })
+    visit("/admin/candidates")
+
+    const list = await screen.findByRole("region", { name: "Candidates" })
+    const links = within(list).getAllByRole("link", {
+      name: /^Add the fractions\./u,
+    })
+    expect(links).toHaveLength(2)
+    expect(links[0]).toHaveAccessibleName("Add the fractions. (27ea263b)")
+    expect(links[0]).toHaveTextContent("Add the fractions. (27ea263b)")
+    expect(links[0]).toHaveAttribute("href", `/admin/candidates/${candidateId}`)
+    expect(links[1]).toHaveAccessibleName("Add the fractions. (68e723ff)")
+    expect(links[1]).toHaveTextContent("Add the fractions. (68e723ff)")
+    expect(links[1]).toHaveAttribute("href", `/admin/candidates/${secondId}`)
   })
 
   it.each(["/admin/candidates", `/admin/candidates/${candidateId}`])(

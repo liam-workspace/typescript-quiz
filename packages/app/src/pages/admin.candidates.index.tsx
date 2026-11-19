@@ -25,10 +25,10 @@ async function loadQueue(
   return { requests, candidates, selectedRequestId }
 }
 
-function candidatePrompt(candidate: MathCandidateSummary): string | undefined {
+function candidateLabel(candidate: MathCandidateSummary): string | undefined {
   for (const block of candidate.promptBlocks ?? []) {
     if (block.kind === "text" && block.value.trim() !== "") {
-      return block.value
+      return `${block.value.trim()} (${candidate.id.slice(0, 8)})`
     }
   }
 
@@ -163,7 +163,7 @@ function CandidateQueue() {
                   search={{ cursor }}
                   className={`${linkClass} min-w-0 wrap-anywhere`}
                 >
-                  {candidatePrompt(candidate) ??
+                  {candidateLabel(candidate) ??
                     t("admin.candidates.unnamed", {
                       defaultValue: "Candidate {{id}}",
                       id: candidate.id,

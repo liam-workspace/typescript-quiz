@@ -860,6 +860,13 @@ CREATE TABLE ai_generation_request (
 CREATE INDEX ai_generation_request_pending_idx ON ai_generation_request (created_at, id)
     WHERE status <> 'completed';
 
+-- The family and normalized expression identify a problem. Verification derives
+-- its answer. Seeds, validation bounds and randomized choices vary by request.
+CREATE FUNCTION math_candidate_content_hash(spec jsonb) RETURNS text
+LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
+    SELECT encode(sha256(convert_to(jsonb_build_array(spec->'family', spec->'expression')::text, 'UTF8')), 'hex');
+$$;
+
 CREATE TABLE ai_generation_candidate (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     request_id uuid NOT NULL REFERENCES ai_generation_request (id) ON DELETE RESTRICT,
@@ -903,6 +910,26 @@ $$;
 CREATE TRIGGER ai_generation_candidate_transition
     BEFORE INSERT OR UPDATE OF status ON ai_generation_candidate
     FOR EACH ROW EXECUTE FUNCTION enforce_math_candidate_transition();
+
+-- Review decisions are written by both the standalone repository and the HTTP
+-- audit transaction. Enforce ownership and release rejected problems for both.
+CREATE FUNCTION apply_math_candidate_review_identity() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.status = 'rejected' THEN
+        NEW.content_hash := 'failure:' || NEW.id::text;
+    ELSIF NEW.status = 'approved' AND NEW.validator_reports #> '{validation,valid}' = 'true'::jsonb
+          AND NEW.content_hash <> math_candidate_content_hash(NEW.canonical_spec) THEN
+        RAISE EXCEPTION 'candidate does not own its canonical math identity' USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER ai_generation_candidate_review_identity
+    BEFORE UPDATE OF status ON ai_generation_candidate
+    FOR EACH ROW WHEN (OLD.status IS DISTINCT FROM NEW.status)
+    EXECUTE FUNCTION apply_math_candidate_review_identity();
 
 CREATE TABLE question_math (
     question_id uuid PRIMARY KEY REFERENCES question (id) ON DELETE CASCADE,

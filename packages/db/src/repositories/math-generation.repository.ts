@@ -274,14 +274,14 @@ async function writeCandidate(
     "canonicalSpec" in input ? input.canonicalSpec : null,
   )
   const rawResponse = serializeAudit(input.rawResponse)
-  const hashSql = "encode(sha256(convert_to($2::jsonb::text, 'UTF8')), 'hex')"
   const { rows } = await tx.query<{ id: string }>(
     `INSERT INTO ai_generation_candidate
        (request_id, canonical_spec, content_hash, raw_response, validator_reports,
         prompt_blocks, choices, solution_blocks)
      VALUES ($1, $2::jsonb,
-       CASE WHEN $2::jsonb = 'null'::jsonb THEN 'failure:' || gen_random_uuid()::text
-            ELSE ${hashSql} END,
+       CASE WHEN $4::jsonb #> '{validation,valid}' = 'true'::jsonb
+            THEN math_candidate_content_hash($2::jsonb)
+            ELSE 'failure:' || gen_random_uuid()::text END,
        $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb)
      ON CONFLICT (content_hash) DO NOTHING RETURNING id`,
     [
@@ -305,7 +305,7 @@ async function writeCandidate(
        VALUES ($1, 'null'::jsonb, 'failure:' || gen_random_uuid()::text, $3::jsonb,
          jsonb_build_object('validation', jsonb_build_object('valid', false,
            'source', 'duplicate', 'errors', jsonb_build_array('Duplicate canonical content'),
-           'duplicateContentHash', ${hashSql}))) RETURNING id`,
+           'duplicateContentHash', math_candidate_content_hash($2::jsonb)))) RETURNING id`,
       [requestId, canonicalSpec, rawResponse],
     )
     ;[candidate] = duplicate.rows
@@ -417,16 +417,15 @@ async function orderForInsertion(
     return batch
   }
 
-  // PostgreSQL's normalized jsonb text is the input to the unique hash.
-  // Every transaction acquires overlapping canonical keys in the same order,
-  // including when providers construct equivalent objects in different orders.
+  // Acquire overlapping unique keys in the same order across workers,
+  // even when request seeds and choice order differ.
   const specs = batch.map((input) =>
     "canonicalSpec" in input ? input.canonicalSpec : null,
   )
   const { rows } = await tx.query<{ index: number }>(
     `SELECT (ordinality - 1)::int AS index
        FROM jsonb_array_elements($1::jsonb) WITH ORDINALITY AS entries(spec, ordinality)
-      ORDER BY spec::text COLLATE "C", ordinality`,
+      ORDER BY math_candidate_content_hash(spec) COLLATE "C", ordinality`,
     [JSON.stringify(specs)],
   )
 
@@ -504,10 +503,13 @@ export function reviewCandidate(
 ): Promise<CandidateSummary> {
   return withTransaction(pool, async (tx) => {
     const { rows } = await tx.query<
-      Pick<CandidateDetail, "status" | "validation" | "canonicalSpec">
+      Pick<CandidateDetail, "status" | "validation" | "canonicalSpec"> & {
+        ownsContent: boolean
+      }
     >(
-      `SELECT status, validator_reports->'validation' AS validation, canonical_spec AS "canonicalSpec" FROM ai_generation_candidate
-        WHERE id=$1 FOR UPDATE`,
+      `SELECT status, validator_reports->'validation' AS validation, canonical_spec AS "canonicalSpec",
+           content_hash = math_candidate_content_hash(canonical_spec) AS "ownsContent"
+         FROM ai_generation_candidate WHERE id=$1 FOR UPDATE`,
       [input.candidateId],
     )
     const candidate = rows.at(0)
@@ -523,6 +525,7 @@ export function reviewCandidate(
       input.decision === "approved" &&
       candidate.status === "in_review" &&
       candidate.validation?.valid === true &&
+      candidate.ownsContent &&
       candidate.canonicalSpec !== null &&
       verifyMathProblem(candidate.canonicalSpec).valid
 

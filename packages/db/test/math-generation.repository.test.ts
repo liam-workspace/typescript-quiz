@@ -3,6 +3,8 @@ import {
   type PgQueryable,
 } from "@liam-workspace/node-postgres"
 import type { MathProblemSpec } from "@pp/common"
+import { runner } from "node-pg-migrate"
+import { fileURLToPath } from "node:url"
 import { assert, expect, it } from "vitest"
 import {
   claimQueuedGenerationRequest,
@@ -16,6 +18,7 @@ import {
   renewGenerationClaim,
   reviewCandidate,
 } from "../src/admin.js"
+import { migrateToLatest } from "../src/migrate.js"
 import { withDatabase } from "./helpers/database.js"
 
 const request = {
@@ -36,6 +39,15 @@ const spec: MathProblemSpec = {
   seed: "sample",
   constraints: { min: 0, max: 10, nonNegative: true },
   variables: {},
+}
+
+const otherSpec: MathProblemSpec = {
+  ...spec,
+  expression: {
+    kind: "divide",
+    left: { kind: "integer", value: 3 },
+    right: { kind: "integer", value: 4 },
+  },
 }
 
 it("skips a locked request, completes the next batch once, and lists both pages", async () => {
@@ -172,7 +184,7 @@ it("keeps valid siblings and reports duplicate canonical content without starvin
       Promise.resolve([
         { canonicalSpec: spec },
         { canonicalSpec: spec },
-        { canonicalSpec: { ...spec, seed: "another" } },
+        { canonicalSpec: otherSpec },
       ])
     expect(await claimQueuedGenerationRequest(pool, generate)).toMatchObject({
       id: job.id,
@@ -204,6 +216,174 @@ it("keeps valid siblings and reports duplicate canonical content without starvin
   })
 })
 
+it("rejects a second request for the same math despite a new seed, bounds and choice order", async () => {
+  await withDatabase(async (pool) => {
+    const choices = [
+      { answer: spec.answer, isCorrect: true },
+      { answer: { ...spec.answer, numerator: 1 }, isCorrect: false },
+    ]
+    const first = await createGenerationRequest(pool, request)
+    const owner = await insertGenerationCandidate(pool, {
+      requestId: first.id,
+      canonicalSpec: { ...spec, choices },
+    })
+    await reviewCandidate(pool, {
+      candidateId: owner.id,
+      reviewerSubject: "admin",
+      decision: "approved",
+    })
+    const second = await createGenerationRequest(pool, {
+      ...request,
+      seed: "next",
+    })
+    const duplicate = await insertGenerationCandidate(pool, {
+      requestId: second.id,
+      canonicalSpec: {
+        ...spec,
+        seed: second.seed,
+        constraints: { ...spec.constraints, max: 100 },
+        choices: choices.toReversed(),
+      },
+    })
+    expect(duplicate).toMatchObject({
+      status: "rejected",
+      validation: {
+        source: "duplicate",
+        duplicateContentHash: owner.contentHash,
+      },
+    })
+    await expect(
+      reviewCandidate(pool, {
+        candidateId: duplicate.id,
+        reviewerSubject: "admin",
+        decision: "approved",
+      }),
+    ).rejects.toMatchObject({ code: "invalid_transition" })
+  })
+})
+
+it("accepts corrected wording after the presentation failed validation", async () => {
+  await withDatabase(async (pool) => {
+    const first = await createGenerationRequest(pool, request)
+    const failed = await insertGenerationCandidate(pool, {
+      requestId: first.id,
+      canonicalSpec: spec,
+      validationErrors: ["Invalid wording"],
+    })
+    expect(failed).toMatchObject({
+      status: "rejected",
+      validation: { source: "presentation" },
+    })
+    const second = await createGenerationRequest(pool, request)
+    const corrected = await insertGenerationCandidate(pool, {
+      requestId: second.id,
+      canonicalSpec: spec,
+      presentation: {
+        promptBlocks: [{ kind: "text", value: "Simplify the ratio 6:8." }],
+        choices: [
+          {
+            label: "3:4",
+            labelBlocks: [{ kind: "text", value: "3:4" }],
+            isCorrect: true,
+          },
+          {
+            label: "4:3",
+            labelBlocks: [{ kind: "text", value: "4:3" }],
+            isCorrect: false,
+          },
+        ],
+        solutionBlocks: [{ kind: "text", value: "Divide both terms by two." }],
+      },
+    })
+    expect(corrected.status).toBe("in_review")
+    expect(failed.contentHash).toMatch(/^failure:/u)
+  })
+})
+
+it("backfills an approved owner, rejects pending collisions, and releases old invalid wording", async () => {
+  await withDatabase(async (pool, { databaseUrl }) => {
+    await pool.query("DROP SCHEMA public CASCADE; CREATE SCHEMA public")
+    await runner({
+      databaseUrl,
+      dir: fileURLToPath(new URL("../migrations", import.meta.url)),
+      direction: "up",
+      count: 11,
+      migrationsTable: "pp_migrations",
+    })
+    const job = await createGenerationRequest(pool, request)
+    const { rows: legacy } = await pool.query<{ id: string }>(
+      `INSERT INTO ai_generation_candidate(request_id, canonical_spec, content_hash, validator_reports)
+       VALUES ($1, $2, 'old-pending', $5), ($1, $3, 'old-approved', $5),
+              ($1, $4, 'old-invalid', '{"validation":{"valid":false,"source":"presentation"}}'),
+              ($1, 'null', 'failure:old-duplicate', '{"validation":{"valid":false,"source":"duplicate","duplicateContentHash":"old-pending"}}'),
+              ($1, $2, 'old-second-approval', $5)
+       RETURNING id`,
+      [
+        job.id,
+        spec,
+        { ...spec, seed: "another" },
+        otherSpec,
+        { validation: { valid: true, source: "math", errors: [] } },
+      ],
+    )
+    await pool.query(
+      "UPDATE ai_generation_candidate SET status='in_review' WHERE id=ANY($1::uuid[])",
+      [[legacy[0].id, legacy[1].id, legacy[4].id]],
+    )
+    await pool.query(
+      "UPDATE ai_generation_candidate SET status='approved', reviewer_subject='first reviewer' WHERE id=$1",
+      [legacy[1].id],
+    )
+    await pool.query(
+      "UPDATE ai_generation_candidate SET status='approved', reviewer_subject='later reviewer', created_at=created_at+interval '1 second' WHERE id=$1",
+      [legacy[4].id],
+    )
+    await pool.query(
+      "UPDATE ai_generation_candidate SET status='rejected' WHERE id=ANY($1::uuid[])",
+      [[legacy[2].id, legacy[3].id]],
+    )
+
+    await migrateToLatest(databaseUrl)
+
+    const approved = await loadCandidateDetail(pool, legacy[1].id)
+    assert(approved)
+    expect(approved).toMatchObject({
+      status: "approved",
+      reviewerSubject: "first reviewer",
+    })
+    expect(await loadCandidateDetail(pool, legacy[4].id)).toMatchObject({
+      status: "approved",
+      reviewerSubject: "later reviewer",
+      canonicalSpec: spec,
+    })
+    const duplicate = {
+      status: "rejected",
+      validation: {
+        source: "duplicate",
+        duplicateContentHash: approved.contentHash,
+      },
+    }
+    expect(await loadCandidateDetail(pool, legacy[0].id)).toMatchObject(
+      duplicate,
+    )
+    expect(await loadCandidateDetail(pool, legacy[3].id)).toMatchObject(
+      duplicate,
+    )
+    expect(
+      await insertGenerationCandidate(pool, {
+        requestId: job.id,
+        canonicalSpec: { ...spec, seed: "new" },
+      }),
+    ).toMatchObject(duplicate)
+    expect(
+      await insertGenerationCandidate(pool, {
+        requestId: job.id,
+        canonicalSpec: otherSpec,
+      }),
+    ).toMatchObject({ status: "in_review" })
+  })
+})
+
 it("completes concurrent batches that share canonical hashes in opposite order", async () => {
   await withDatabase(async (pool) => {
     await createGenerationRequest(pool, request)
@@ -213,7 +393,7 @@ it("completes concurrent batches that share canonical hashes in opposite order",
     assert(first && second)
     const batch = [
       { canonicalSpec: spec },
-      { canonicalSpec: { ...spec, seed: "overlap" } },
+      { canonicalSpec: { ...otherSpec, seed: "z" } },
     ]
 
     // Hold each worker at its first successful insert until both sessions
@@ -227,7 +407,10 @@ it("completes concurrent batches that share canonical hashes in opposite order",
     await gate.query("SELECT pg_advisory_lock(2026)")
     const completions = Promise.allSettled([
       completeGenerationRequest(pool, first, batch),
-      completeGenerationRequest(pool, second, batch.toReversed()),
+      completeGenerationRequest(pool, second, [
+        { canonicalSpec: { ...otherSpec, seed: "a" } },
+        { canonicalSpec: { ...spec, seed: "z" } },
+      ]),
     ])
 
     try {
@@ -473,6 +656,43 @@ it("revalidates the stored spec at approval even when its original report passed
   })
 })
 
+it("bars approval when the stored spec has changed to another owner's valid math", async () => {
+  await withDatabase(async (pool) => {
+    const job = await createGenerationRequest(pool, request)
+    const first = await insertGenerationCandidate(pool, {
+      requestId: job.id,
+      canonicalSpec: spec,
+    })
+    await reviewCandidate(pool, {
+      candidateId: first.id,
+      reviewerSubject: "admin",
+      decision: "approved",
+    })
+    const second = await insertGenerationCandidate(pool, {
+      requestId: job.id,
+      canonicalSpec: otherSpec,
+    })
+    await pool.query(
+      "UPDATE ai_generation_candidate SET canonical_spec=$2 WHERE id=$1",
+      [second.id, spec],
+    )
+    await expect(
+      reviewCandidate(pool, {
+        candidateId: second.id,
+        reviewerSubject: "admin",
+        decision: "approved",
+      }),
+    ).rejects.toMatchObject({ code: "invalid_transition" })
+    // The HTTP review and its audit record share a separate transaction.
+    await expect(
+      pool.query(
+        "UPDATE ai_generation_candidate SET status='approved' WHERE id=$1",
+        [second.id],
+      ),
+    ).rejects.toMatchObject({ code: "23514" })
+  })
+})
+
 it("records the rejection reason and keeps the original validation evidence", async () => {
   await withDatabase(async (pool) => {
     const job = await createGenerationRequest(pool, request)
@@ -488,18 +708,18 @@ it("records the rejection reason and keeps the original validation evidence", as
       candidateId: candidate.id,
       reviewerSubject: "admin",
       decision: "rejected",
-      reason: "Too difficult",
+      reason: "Ambiguous wording",
     })
     expect(rejected).toMatchObject({
       status: "rejected",
       reviewerSubject: "admin",
-      reviewReason: "Too difficult",
+      reviewReason: "Ambiguous wording",
     })
     const detail = await loadCandidateDetail(pool, candidate.id)
     expect(detail?.reviewedAt).toBeInstanceOf(Date)
     expect(detail).toMatchObject({
       status: "rejected",
-      reviewReason: "Too difficult",
+      reviewReason: "Ambiguous wording",
       validation: { valid: true },
       provenance: {
         provider: "test",
@@ -508,6 +728,13 @@ it("records the rejection reason and keeps the original validation evidence", as
         seed: "sample",
       },
     })
+    const next = await createGenerationRequest(pool, request)
+    expect(
+      await insertGenerationCandidate(pool, {
+        requestId: next.id,
+        canonicalSpec: spec,
+      }),
+    ).toMatchObject({ status: "in_review" })
   })
 })
 

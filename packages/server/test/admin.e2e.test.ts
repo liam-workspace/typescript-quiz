@@ -1,6 +1,7 @@
 import type { PgPool } from "@liam-workspace/node-postgres"
 import {
   testDocumentSchema,
+  type MathProblemSpec,
   type AdminAttemptDetail,
   type AdminLearnerPage,
   type AdminResultPage,
@@ -12,6 +13,7 @@ import {
   type AdminTestPage,
   type TestDocument,
 } from "@pp/common"
+import { insertGenerationCandidate, reviewCandidate } from "@pp/db/admin"
 import request from "supertest"
 import type { App } from "supertest/types.js"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
@@ -78,6 +80,8 @@ describe("admin routes", () => {
         return Promise.resolve()
       },
     })
+    // Concurrent supertest requests need a listener that stays open until teardown.
+    await app.http.listen(0, "127.0.0.1")
   })
 
   afterAll(async () => {
@@ -138,6 +142,273 @@ describe("admin routes", () => {
 
     return audit.rows
   }
+
+  const mathImports = "/api/admin/math/imports"
+
+  async function mathFixture(value: number, approve = true) {
+    const pool = ready().get<PgPool>(REQUEST_POOL)
+    const slug = `math-import-${value}`
+    // Seed a completed batch so the real queue worker cannot claim it during setup.
+    const {
+      rows: [source],
+    } = await pool.query<{ id: string }>(
+      `INSERT INTO ai_generation_request (parameters, provider, model, prompt_template_version, seed, status)
+       VALUES ('{}','fixture','template','v1',$1,'completed') RETURNING id`,
+      [slug],
+    )
+    const answer = (n: number) => ({
+      kind: "integer" as const,
+      numerator: n,
+      denominator: 1,
+    })
+    const spec: MathProblemSpec = {
+      family: "ratio",
+      seed: slug,
+      variables: {},
+      expression: {
+        kind: "divide",
+        left: { kind: "integer", value },
+        right: { kind: "integer", value: 1 },
+      },
+      answer: answer(value),
+      constraints: { min: 0, max: 100, nonNegative: true },
+      choices: [
+        { answer: answer(value), isCorrect: true },
+        { answer: answer(value + 1), isCorrect: false },
+      ],
+    }
+    const block = (tex: string) => ({
+      kind: "math" as const,
+      tex,
+      display: false,
+    })
+    const presentation = {
+      promptBlocks: [
+        { kind: "text" as const, value: "Calculate" },
+        block(`${value}/1`),
+      ],
+      choices: [value, value + 1].map((n) => ({
+        label: String(n),
+        labelBlocks: [block(String(n))],
+        isCorrect: n === value,
+      })),
+      solutionBlocks: [block(String(value))],
+    }
+    const candidate = await insertGenerationCandidate(pool, {
+      requestId: source.id,
+      canonicalSpec: spec,
+      presentation,
+    })
+
+    if (approve) {
+      await reviewCandidate(pool, {
+        candidateId: candidate.id,
+        decision: "approved",
+        reviewerSubject: SUB,
+      })
+    }
+
+    const token = await ready().mint({ sub: SUB, email: EMAIL, isAdmin: true })
+    const body = {
+      slug,
+      title: "Math practice",
+      durationSeconds: 300,
+      level: "primary-step-1",
+      candidateIds: [candidate.id],
+    }
+    const submit = (ids = body.candidateIds) =>
+      request(ready().http.getHttpServer() as App)
+        .post(mathImports)
+        .set("Authorization", `Bearer ${token}`)
+        .send({ ...body, candidateIds: ids })
+
+    return { pool, slug, spec, presentation, candidate, submit, body, token }
+  }
+
+  it("guards math imports and rejects malformed selections and metadata", async () => {
+    const a = ready()
+    const server = a.http.getHttpServer() as App
+    const learner = await a.mint({ sub: "math-import-learner", email: EMAIL })
+    const admin = await a.mint({ sub: SUB, email: EMAIL, isAdmin: true })
+    const id = "00000000-0000-4000-8000-000000000001"
+    const body = {
+      title: "Algebra",
+      slug: "algebra",
+      durationSeconds: 60,
+      candidateIds: [id],
+    }
+    await request(server).post(mathImports).send(body).expect(401)
+    await request(server)
+      .post(mathImports)
+      .set("Authorization", `Bearer ${learner}`)
+      .send(body)
+      .expect(403)
+    await Promise.all(
+      [
+        { ...body, candidateIds: [] },
+        { ...body, candidateIds: [id, id] },
+        { ...body, durationSeconds: 0 },
+        { ...body, title: "   " },
+        { ...body, slug: "algebra\0" },
+      ].map((invalid) =>
+        request(server)
+          .post(mathImports)
+          .set("Authorization", `Bearer ${admin}`)
+          .send(invalid)
+          .expect(400),
+      ),
+    )
+  })
+
+  it("imports approved math in selection order with draft-only content, provenance, and audit", async () => {
+    const a = await mathFixture(73)
+    const b = await mathFixture(74)
+    const ids = [b.candidate.id, a.candidate.id]
+    const attempts = await Promise.all([a.submit(ids), a.submit(ids)])
+    const [success, conflict] = attempts.sort(
+      (left, right) => left.status - right.status,
+    )
+    expect([success.status, conflict.status]).toEqual([201, 409])
+    const { testId, versionId } = success.body as ImportResult
+    const rows = await a.pool.query(
+      `SELECT tv.published_at, ts.type, q.prompt_blocks, qm.canonical_spec, qm.answer_spec,
+              qm.solution_blocks, qm.verification_version, qm.content_hash, qm.source_candidate_id, ac.test_version_id,
+              (SELECT jsonb_agg(jsonb_build_object('label',c.label,'labelBlocks',c.label_blocks,'isCorrect',c.is_correct) ORDER BY c.ordinal)
+                 FROM choice c WHERE c.question_id=q.id) AS choices
+         FROM question q JOIN test_version tv ON tv.id=q.test_version_id
+         JOIN question_group g ON g.id=q.question_group_id JOIN test_section ts ON ts.id=g.test_section_id
+         JOIN question_math qm ON qm.question_id=q.id JOIN ai_generation_candidate ac ON ac.id=qm.source_candidate_id
+        WHERE tv.id=$1 AND tv.test_id=$2 ORDER BY q.ordinal`,
+      [versionId, testId],
+    )
+    expect(rows.rows).toEqual(
+      [b, a].map((f) => ({
+        published_at: null,
+        type: "math",
+        prompt_blocks: f.presentation.promptBlocks,
+        canonical_spec: f.spec,
+        answer_spec: f.spec.answer,
+        solution_blocks: f.presentation.solutionBlocks,
+        choices: f.presentation.choices,
+        verification_version: "v1",
+        content_hash: f.candidate.contentHash,
+        source_candidate_id: f.candidate.id,
+        test_version_id: versionId,
+      })),
+    )
+    expect(await questionAudits(a.pool, versionId)).toEqual([
+      expect.objectContaining({
+        admin_subject: SUB,
+        action: "math_candidates_imported",
+        metadata: { candidateIds: ids },
+      }),
+    ])
+    const exported = await request(ready().http.getHttpServer() as App)
+      .get(`/api/admin/tests/${testId}/export`)
+      .query({ version: 1 })
+      .set("Authorization", `Bearer ${a.token}`)
+      .expect(200)
+    const {
+      sections: [
+        {
+          groups: [{ questions }],
+        },
+      ],
+    } = testDocumentSchema.parse(exported.body)
+    expect(questions.map((q) => q.promptBlocks)).toEqual([
+      b.presentation.promptBlocks,
+      a.presentation.promptBlocks,
+    ])
+    expect(questions[0].choices).toEqual(b.presentation.choices)
+    // Release fixture references before other suites reset generation history.
+    await a.pool.query(
+      "DELETE FROM question_math WHERE source_candidate_id=ANY($1::uuid[])",
+      [ids],
+    )
+  })
+
+  it("imports reviewed legacy numerical choices and rejects a mislabeled answer key", async () => {
+    const legacy = await mathFixture(80, false)
+    const wrong = await mathFixture(81, false)
+    await legacy.pool.query(
+      `UPDATE ai_generation_candidate SET canonical_spec=canonical_spec-'choices', status='approved' WHERE id=$1`,
+      [legacy.candidate.id],
+    )
+    await wrong.pool.query(
+      `UPDATE ai_generation_candidate SET choices=jsonb_set(choices,'{0,label}','"0"'), status='approved' WHERE id=$1`,
+      [wrong.candidate.id],
+    )
+    await wrong.submit().expect(409)
+    await legacy.submit().expect(201)
+    await legacy.pool.query(
+      "DELETE FROM question_math WHERE source_candidate_id=$1",
+      [legacy.candidate.id],
+    )
+  })
+
+  it("rejects unapproved, changed, and historical non-owner candidates without creating a draft", async () => {
+    const pending = await mathFixture(75, false)
+    const changed = await mathFixture(76)
+    const historical = await mathFixture(77)
+    const invalid = await mathFixture(78, false)
+    await changed.pool.query(
+      `UPDATE ai_generation_candidate SET prompt_blocks='[{"kind":"text","value":"different valid wording"}]' WHERE id=$1`,
+      [changed.candidate.id],
+    )
+    await historical.pool.query(
+      "UPDATE ai_generation_candidate SET content_hash='historical:' || id::text WHERE id=$1",
+      [historical.candidate.id],
+    )
+    // Simulate a legacy approval with an invalid answer and a stale success report.
+    await invalid.pool.query(
+      `UPDATE ai_generation_candidate SET status='approved', canonical_spec=jsonb_set(canonical_spec,'{answer,numerator}','0') WHERE id=$1`,
+      [invalid.candidate.id],
+    )
+    await Promise.all(
+      [pending, changed, historical, invalid].map((f) =>
+        f.submit().expect(409),
+      ),
+    )
+    expect(
+      (
+        await changed.pool.query(
+          "SELECT id FROM test WHERE slug=ANY($1::text[])",
+          [[pending.slug, changed.slug, historical.slug, invalid.slug]],
+        )
+      ).rows,
+    ).toEqual([])
+  })
+
+  it("rolls back every import row when the final audit insert fails", async () => {
+    const f = await mathFixture(79)
+    const counts = () =>
+      f.pool.query(`SELECT (SELECT count(*) FROM test) AS tests,
+      (SELECT count(*) FROM test_version) AS versions, (SELECT count(*) FROM test_section) AS sections,
+      (SELECT count(*) FROM question_group) AS groups, (SELECT count(*) FROM question) AS questions,
+      (SELECT count(*) FROM choice) AS choices, (SELECT count(*) FROM question_math) AS math,
+      (SELECT count(*) FROM admin_audit_log) AS audits`)
+    const before = (await counts()).rows
+    await f.pool.query(
+      "ALTER TABLE admin_audit_log ADD CONSTRAINT fail_math_import_audit CHECK (action <> 'math_candidates_imported') NOT VALID",
+    )
+
+    try {
+      await f.submit().expect(500)
+      expect((await counts()).rows).toEqual(before)
+      expect(
+        (
+          await f.pool.query(
+            "SELECT test_version_id FROM ai_generation_candidate WHERE id=$1",
+            [f.candidate.id],
+          )
+        ).rows,
+      ).toEqual([{ test_version_id: null }])
+    } finally {
+      await f.pool.query(
+        "ALTER TABLE admin_audit_log DROP CONSTRAINT fail_math_import_audit",
+      )
+    }
+  })
 
   it("edits a draft prompt and stable choices, then appends its audit row", async () => {
     const f = await draftFixture("draft-edit-ok")

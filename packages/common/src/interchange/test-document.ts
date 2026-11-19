@@ -114,7 +114,7 @@ export const contentBlockSchema = z.discriminatedUnion("kind", [
 
 export type ContentBlock = z.infer<typeof contentBlockSchema>
 
-const choiceSchema = z.object({
+export const testChoiceSchema = z.object({
   label: z.string().min(1),
   labelBlocks: z.array(contentBlockSchema).optional(),
   isCorrect: z.boolean(),
@@ -132,7 +132,7 @@ const questionSchema = z
     points: z.number().int().positive(),
     tags: z.array(z.string().min(1)).optional(),
     choices: z
-      .array(choiceSchema)
+      .array(testChoiceSchema)
       .min(2, "a question needs at least 2 choices"),
   })
   .superRefine((q, ctx) => {
@@ -182,7 +182,7 @@ const groupSchema = z.object({
 const sectionSchema = z
   .object({
     title: z.string().min(1),
-    type: z.enum(["listening", "reading", "vocabulary", "grammar"]),
+    type: z.enum(["listening", "reading", "vocabulary", "grammar", "math"]),
     durationSeconds: z.number().int().positive(),
     navigation: z.enum(["free", "forward_only"]),
     allowAnswerChange: z.boolean(),

@@ -119,6 +119,14 @@ export class AdminController {
     return this.admin.import(body)
   }
 
+  @Post("math/imports")
+  importApprovedMathCandidates(
+    @Body() body: unknown,
+    @Req() request: { claims: JwtClaims & { sub: string } },
+  ): Promise<ImportResult> {
+    return this.admin.importApprovedMathCandidates(body, request.claims.sub)
+  }
+
   @Post("tests/:testId/publish")
   @HttpCode(200)
   publish(@Param("testId") testId: string): Promise<PublishResult> {

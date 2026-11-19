@@ -30,6 +30,8 @@ import {
   PublishedVersionMutationError,
   exportTestDocument,
   importTestDocument,
+  importApprovedMathCandidates,
+  InvalidMathCandidateImportError,
   listAdminLearners,
   listAdminQuestions,
   listAdminResults,
@@ -48,6 +50,26 @@ import {
 import { ProblemException } from "../attempts/problem.exception.js"
 import { CLOCK, JOB_POOL, REQUEST_POOL } from "../database/tokens.js"
 import { loadServerConfig } from "../config.js"
+
+const mathImportText = z
+  .string()
+  .trim()
+  .min(1)
+  .refine((value) => value.isWellFormed() && !value.includes("\0"))
+
+const mathImportSchema = z.strictObject({
+  candidateIds: z
+    .array(z.uuid())
+    .min(1)
+    .refine(
+      (ids) => new Set(ids.map((id) => id.toLowerCase())).size === ids.length,
+      "Select each candidate only once",
+    ),
+  title: mathImportText,
+  slug: mathImportText,
+  durationSeconds: testDocumentSchema.shape.durationSeconds.max(2147483647),
+  level: testDocumentSchema.shape.level,
+})
 
 export interface ImportResult {
   testId: string
@@ -458,6 +480,39 @@ export class AdminService {
     }
 
     return importTestDocument(this.pool, parsed.data)
+  }
+
+  async importApprovedMathCandidates(
+    body: unknown,
+    adminSubject: string,
+  ): Promise<ImportResult> {
+    const parsed = mathImportSchema.safeParse(body)
+
+    if (!parsed.success) {
+      throw new ProblemException({
+        type: "invalid_math_import",
+        title: "The math import request failed validation.",
+        status: HttpStatus.BAD_REQUEST,
+        issues: parsed.error.issues,
+      })
+    }
+
+    try {
+      return await importApprovedMathCandidates(this.pool, {
+        ...parsed.data,
+        adminSubject,
+      })
+    } catch (error) {
+      if (error instanceof InvalidMathCandidateImportError) {
+        throw new ProblemException({
+          type: "invalid_candidate_selection",
+          title: error.message,
+          status: HttpStatus.CONFLICT,
+        })
+      }
+
+      throw error
+    }
   }
 
   async publish(testId: string): Promise<PublishResult> {

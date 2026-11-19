@@ -906,6 +906,7 @@ CREATE TABLE ai_generation_candidate (
     request_id uuid NOT NULL REFERENCES ai_generation_request (id) ON DELETE RESTRICT,
     canonical_spec jsonb NOT NULL,
     content_hash text NOT NULL UNIQUE CHECK (length(btrim(content_hash)) > 0),
+    approved_content_hash text,
     -- Historical rows and failed outcomes can lack a validated presentation.
     prompt_blocks jsonb CHECK (jsonb_typeof(prompt_blocks) = 'array'),
     choices jsonb CHECK (jsonb_typeof(choices) = 'array'),
@@ -964,6 +965,27 @@ CREATE TRIGGER ai_generation_candidate_review_identity
     BEFORE UPDATE OF status ON ai_generation_candidate
     FOR EACH ROW WHEN (OLD.status IS DISTINCT FROM NEW.status)
     EXECUTE FUNCTION apply_math_candidate_review_identity();
+
+-- The deduplication hash identifies the expression. Approval also covers the
+-- source, full spec, rendered choices, prompt, and solution the reviewer saw.
+CREATE FUNCTION math_candidate_review_hash(c ai_generation_candidate) RETURNS text
+LANGUAGE sql STABLE STRICT PARALLEL SAFE AS $$
+    SELECT encode(sha256(convert_to(jsonb_build_array(c.request_id, c.canonical_spec,
+           c.prompt_blocks, c.choices, c.solution_blocks)::text, 'UTF8')), 'hex');
+$$;
+
+CREATE FUNCTION record_math_candidate_approval() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    NEW.approved_content_hash := math_candidate_review_hash(NEW);
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER ai_generation_candidate_approval
+    BEFORE UPDATE OF status ON ai_generation_candidate
+    FOR EACH ROW WHEN (NEW.status = 'approved' AND OLD.status IS DISTINCT FROM NEW.status)
+    EXECUTE FUNCTION record_math_candidate_approval();
 
 CREATE TABLE question_math (
     question_id uuid PRIMARY KEY REFERENCES question (id) ON DELETE CASCADE,

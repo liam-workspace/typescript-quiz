@@ -19,6 +19,8 @@
 import {
   exportTestDocument,
   importTestDocument,
+  importApprovedMathCandidates,
+  InvalidMathCandidateImportError,
 } from "./repositories/test-import.repository.js"
 import {
   DraftNotFoundError,
@@ -100,6 +102,8 @@ export {
   PublishedVersionMutationError,
   exportTestDocument,
   importTestDocument,
+  importApprovedMathCandidates,
+  InvalidMathCandidateImportError,
   publishDraftVersion,
   recordMediaAsset,
   resolveVersionId,

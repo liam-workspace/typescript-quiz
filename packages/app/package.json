@@ -16,6 +16,7 @@
     "@tanstack/react-router": "1.170.16",
     "i18next": "^26.3.3",
     "i18next-browser-languagedetector": "^8.2.1",
+    "katex": "^0.19.1",
     "radix-ui": "^1.6.7",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

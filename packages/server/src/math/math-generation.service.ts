@@ -22,6 +22,7 @@ import {
   listGenerationRequests,
   loadCandidateDetail,
   renewGenerationClaim,
+  type CandidateDetail,
   type GenerationCandidateInput,
   type GenerationClaim,
 } from "@pp/db/admin"
@@ -472,11 +473,17 @@ export class MathGenerationService implements OnModuleInit, OnModuleDestroy {
     // The repository's standalone review commits its own transaction. This HTTP
     // decision must commit together with the immutable audit entry.
     return withTransaction(this.pool, async (tx) => {
-      const locked = await tx.query(
-        "SELECT id FROM ai_generation_candidate WHERE id=$1 FOR UPDATE",
+      const { rows } = await tx.query<
+        Pick<CandidateDetail, "status" | "validation" | "canonicalSpec"> & {
+          ownsContent: boolean
+        }
+      >(
+        `SELECT status, validator_reports->'validation' AS validation, canonical_spec AS "canonicalSpec",
+                content_hash = math_candidate_content_hash(canonical_spec) AS "ownsContent"
+           FROM ai_generation_candidate WHERE id=$1 FOR UPDATE`,
         [id],
       )
-      const candidate = locked.rowCount && (await loadCandidateDetail(tx, id))
+      const candidate = rows.at(0)
 
       if (!candidate) {
         throw missing()
@@ -487,6 +494,7 @@ export class MathGenerationService implements OnModuleInit, OnModuleDestroy {
           ? candidate.status === "in_review" || candidate.status === "draft"
           : candidate.status === "in_review" &&
             candidate.validation?.valid === true &&
+            candidate.ownsContent &&
             candidate.canonicalSpec !== null &&
             verifyMathProblem(candidate.canonicalSpec).valid
 

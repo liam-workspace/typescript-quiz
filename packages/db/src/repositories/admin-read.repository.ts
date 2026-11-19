@@ -398,7 +398,7 @@ export async function loadAdminResultRollups(
         FROM finished f JOIN response_choice rc ON rc.attempt_id = f.id
        GROUP BY rc.question_id, rc.attempt_id
     ), question_totals AS (
-      SELECT q.id, q.question_key, g.test_section_id, v.attempts, q.points,
+      SELECT q.id, q.question_key, q.test_version_id, g.test_section_id, v.attempts, q.points,
              count(s.selected) AS answered, count(*) FILTER (WHERE s.selected = key.choices) AS correct
         FROM version_totals v JOIN question q ON q.test_version_id = v.test_version_id
         JOIN question_group g ON g.id = q.question_group_id
@@ -409,28 +409,41 @@ export async function loadAdminResultRollups(
         ) key
         LEFT JOIN selections s ON s.question_id = q.id
        GROUP BY q.id, g.test_section_id, v.attempts
-    ), groups(dimension, id, label, attempts, score, max_score, answered, correct) AS (
-      SELECT 'tests', t.id, t.slug, sum(v.attempts), sum(v.score), sum(v.max_score), sum(v.answered), sum(v.correct)
+    ), groups(dimension, id, label, attempts, score, max_score, answered, correct, context_version_id, section_ordinal) AS (
+      SELECT 'tests', t.id, t.slug, sum(v.attempts), sum(v.score), sum(v.max_score), sum(v.answered), sum(v.correct),
+             NULL::uuid, NULL::integer
         FROM version_totals v JOIN test_version tv ON tv.id = v.test_version_id JOIN test t ON t.id = tv.test_id
        GROUP BY t.id
       UNION ALL
-      SELECT 'versions', tv.id, tv.title || ' (v' || tv.version || ')', v.attempts, v.score, v.max_score, v.answered, v.correct
+      SELECT 'versions', tv.id, tv.title || ' (v' || tv.version || ')', v.attempts, v.score, v.max_score, v.answered, v.correct,
+             NULL, NULL
         FROM version_totals v JOIN test_version tv ON tv.id = v.test_version_id
       UNION ALL
       SELECT 'sections', ts.id, ts.title, v.attempts, coalesce(sum(q.points * q.correct), 0),
-             coalesce(sum(q.points * v.attempts), 0), coalesce(sum(q.answered), 0), coalesce(sum(q.correct), 0)
+             coalesce(sum(q.points * v.attempts), 0), coalesce(sum(q.answered), 0), coalesce(sum(q.correct), 0),
+             ts.test_version_id, ts.ordinal
         FROM version_totals v JOIN test_section ts ON ts.test_version_id = v.test_version_id
         LEFT JOIN question_totals q ON q.test_section_id = ts.id GROUP BY ts.id, v.attempts
       UNION ALL
-      SELECT 'questions', q.id, q.question_key, q.attempts, q.points * q.correct, q.points * q.attempts, q.answered, q.correct
+      SELECT 'questions', q.id, q.question_key, q.attempts, q.points * q.correct, q.points * q.attempts, q.answered, q.correct,
+             q.test_version_id, NULL
         FROM question_totals q
     )
-    SELECT dimension, id, label, attempts::float8 AS "attemptCount", score::float8,
+    SELECT dimension, ranked.id,
+           CASE dimension
+             WHEN 'sections' THEN format('%s (section %s) · %s (v%s)', label, section_ordinal, t.slug, tv.version)
+             WHEN 'questions' THEN format('%s · %s (v%s)', label, t.slug, tv.version)
+             ELSE label
+           END AS label,
+           attempts::float8 AS "attemptCount", score::float8,
            max_score::float8 AS "maxScore", answered::float8 AS "answeredCount", correct::float8 AS "correctCount"
       FROM (
+        -- Rank by the base labels so display context does not change the bounded results.
         SELECT groups.*, row_number() OVER (PARTITION BY dimension ORDER BY attempts DESC, label, id) AS rank
           FROM groups
       ) ranked
+      LEFT JOIN test_version tv ON tv.id = ranked.context_version_id
+      LEFT JOIN test t ON t.id = tv.test_id
      WHERE rank <= $2 ORDER BY dimension, rank
   `,
     [query.testId ?? null, limit],

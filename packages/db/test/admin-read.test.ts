@@ -104,6 +104,56 @@ async function finishAttempt(
   return id
 }
 
+async function publishVersionWithReusedLabels(
+  pool: pg.Pool,
+  f: Fixture,
+  { testId, version }: { testId: string; version: number },
+): Promise<void> {
+  const versionId = randomUUID()
+  await pool.query(
+    `INSERT INTO test_version (id, test_id, version, title, duration_seconds)
+     SELECT $1, $2, $3, title, duration_seconds FROM test_version WHERE id = $4`,
+    [versionId, testId, version, f.versionId],
+  )
+  await pool.query(
+    `WITH section AS (
+       INSERT INTO test_section (test_version_id, ordinal, title, type, duration_seconds, navigation, allow_answer_change)
+       SELECT $1, ordinal, title, type, duration_seconds, navigation, allow_answer_change
+         FROM test_section WHERE id = $2 RETURNING id
+     ), item_group AS (
+       INSERT INTO question_group (test_version_id, test_section_id, ordinal)
+       SELECT $1, id, 1 FROM section RETURNING id
+     ), item AS (
+       INSERT INTO question (test_version_id, question_group_id, question_key, ordinal, prompt, type, points)
+       SELECT $1, item_group.id, question_key, 1, prompt, type, points
+         FROM question CROSS JOIN item_group WHERE question.id = $3 RETURNING id
+     )
+     INSERT INTO choice (question_id, ordinal, label, is_correct)
+     SELECT item.id, ordinal, label, is_correct
+       FROM choice CROSS JOIN item WHERE choice.question_id = $3`,
+    [versionId, f.listeningSectionId, f.questionIds[0]],
+  )
+  await pool.query(
+    "UPDATE test_version SET published_at = now() WHERE id = $1",
+    [versionId],
+  )
+  await pool.query("UPDATE test SET current_version_id = $1 WHERE id = $2", [
+    versionId,
+    testId,
+  ])
+  await pool.query(
+    `INSERT INTO attempt (student_id, test_version_id, status, submitted_at,
+       points_earned, points_possible, percentage, answered_count,
+       unanswered_count, correct_count, incorrect_count, question_count)
+     VALUES ($1, $2, 'submitted', now(), 0, 1, 0, 0, 1, 0, 0, 1)`,
+    [f.studentId, versionId],
+  )
+}
+
+function sortedLabels(rows: Array<{ label: string }>): string[] {
+  return rows.map(({ label }) => label).sort()
+}
+
 describe("admin read projections", () => {
   it("lists only latest-version questions, including unpublished drafts", async () => {
     await withDatabase(async (pool) => {
@@ -507,18 +557,38 @@ describe("admin read projections", () => {
           },
         ],
         sections: [
-          { id: sectionId, label: "Draft reading", ...second },
+          {
+            id: sectionId,
+            label: "Draft reading (section 1) · practice-test-04 (v2)",
+            ...second,
+          },
           {
             id: f.listeningSectionId,
-            label: "Listening — Part 1",
+            label: "Listening — Part 1 (section 1) · practice-test-04 (v1)",
             ...listening,
           },
-          { id: f.readingSectionId, label: "Reading", ...reading },
+          {
+            id: f.readingSectionId,
+            label: "Reading (section 2) · practice-test-04 (v1)",
+            ...reading,
+          },
         ],
         questions: [
-          { id: questionId, label: "draft-0", ...second },
-          { id: f.questionIds[0], label: "q1", ...listening },
-          { id: f.questionIds[1], label: "q2", ...reading },
+          {
+            id: questionId,
+            label: "draft-0 · practice-test-04 (v2)",
+            ...second,
+          },
+          {
+            id: f.questionIds[0],
+            label: "q1 · practice-test-04 (v1)",
+            ...listening,
+          },
+          {
+            id: f.questionIds[1],
+            label: "q2 · practice-test-04 (v1)",
+            ...reading,
+          },
         ],
       })
       const bounded = await loadAdminResultRollups(pool, { limit: 1 })
@@ -541,6 +611,43 @@ describe("admin read projections", () => {
       await expect(
         loadAdminResultRollups(pool, { limit: 101 }),
       ).rejects.toThrow()
+    })
+  }, 120_000)
+
+  it("distinguishes reused section titles and question keys by quiz and historical version", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      await finishAttempt(pool, f)
+      const otherTestId = randomUUID()
+      await pool.query(
+        "INSERT INTO test (id, slug) VALUES ($1, 'other-quiz')",
+        [otherTestId],
+      )
+
+      await Promise.all([
+        publishVersionWithReusedLabels(pool, f, {
+          testId: f.testId,
+          version: 2,
+        }),
+        publishVersionWithReusedLabels(pool, f, {
+          testId: otherTestId,
+          version: 1,
+        }),
+      ])
+
+      const { sections, questions } = await loadAdminResultRollups(pool)
+      expect(sortedLabels(sections)).toEqual([
+        "Listening — Part 1 (section 1) · other-quiz (v1)",
+        "Listening — Part 1 (section 1) · practice-test-04 (v1)",
+        "Listening — Part 1 (section 1) · practice-test-04 (v2)",
+        "Reading (section 2) · practice-test-04 (v1)",
+      ])
+      expect(sortedLabels(questions)).toEqual([
+        "q1 · other-quiz (v1)",
+        "q1 · practice-test-04 (v1)",
+        "q1 · practice-test-04 (v2)",
+        "q2 · practice-test-04 (v1)",
+      ])
     })
   }, 120_000)
 

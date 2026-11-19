@@ -862,16 +862,16 @@ describe("admin routes", () => {
       sections: [
         {
           id: questions[0].section_id,
-          label: doc.sections[0].title,
+          label: `${doc.sections[0].title} (section 1) · ${slug} (v1)`,
           ...totals,
         },
       ],
-      questions: questions.map(({ id, label }) => {
+      questions: questions.map(({ id, label: questionKey }) => {
         const answered = Number(id === f.question.id)
 
         return {
           id,
-          label,
+          label: `${questionKey} · ${slug} (v1)`,
           attemptCount: 1,
           score: answered,
           maxScore: 1,

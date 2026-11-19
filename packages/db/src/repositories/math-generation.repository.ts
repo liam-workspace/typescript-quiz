@@ -508,7 +508,7 @@ export function reviewCandidate(
       }
     >(
       `SELECT status, validator_reports->'validation' AS validation, canonical_spec AS "canonicalSpec",
-           content_hash = math_candidate_content_hash(canonical_spec) AS "ownsContent"
+           content_hash IS NOT DISTINCT FROM math_candidate_content_hash(canonical_spec) AS "ownsContent"
          FROM ai_generation_candidate WHERE id=$1 FOR UPDATE`,
       [input.candidateId],
     )

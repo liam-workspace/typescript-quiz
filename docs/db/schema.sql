@@ -860,11 +860,45 @@ CREATE TABLE ai_generation_request (
 CREATE INDEX ai_generation_request_pending_idx ON ai_generation_request (created_at, id)
     WHERE status <> 'completed';
 
--- The family and normalized expression identify a problem. Verification derives
--- its answer. Seeds, validation bounds and randomized choices vary by request.
+-- Rebuild the verified MathAst fields. Provider annotations, including fields
+-- attached to nested operands, are evidence only and do not identify the math.
+CREATE FUNCTION math_candidate_expression(node jsonb, depth integer DEFAULT 0) RETURNS jsonb
+LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE AS $$
+DECLARE
+    kind text := node->>'kind';
+    lhs jsonb;
+    rhs jsonb;
+BEGIN
+    IF depth > 32 THEN
+        RETURN NULL;
+    END IF;
+    CASE
+        WHEN kind = 'integer' AND jsonb_typeof(node->'value') = 'number' THEN
+            RETURN jsonb_build_object('kind', kind, 'value', trim_scale((node->>'value')::numeric));
+        WHEN kind = 'fraction' AND jsonb_typeof(node->'numerator') = 'number'
+                               AND jsonb_typeof(node->'denominator') = 'number' THEN
+            RETURN jsonb_build_object('kind', kind, 'numerator', trim_scale((node->>'numerator')::numeric),
+                                      'denominator', trim_scale((node->>'denominator')::numeric));
+        WHEN kind = 'variable' AND jsonb_typeof(node->'name') = 'string' THEN
+            RETURN jsonb_build_object('kind', kind, 'name', node->'name');
+        WHEN kind IN ('add', 'subtract', 'multiply', 'divide', 'power', 'equation') THEN
+            lhs := math_candidate_expression(node->'left', depth + 1);
+            rhs := math_candidate_expression(node->'right', depth + 1);
+            IF lhs IS NOT NULL AND rhs IS NOT NULL THEN
+                RETURN jsonb_build_object('kind', kind, 'left', lhs, 'right', rhs);
+            END IF;
+        ELSE RETURN NULL;
+    END CASE;
+    RETURN NULL;
+END;
+$$;
+
 CREATE FUNCTION math_candidate_content_hash(spec jsonb) RETURNS text
 LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
-    SELECT encode(sha256(convert_to(jsonb_build_array(spec->'family', spec->'expression')::text, 'UTF8')), 'hex');
+    SELECT encode(sha256(convert_to(jsonb_build_array(spec->'family', expression)::text, 'UTF8')), 'hex')
+      FROM math_candidate_expression(spec->'expression') expression
+     WHERE expression IS NOT NULL AND spec->>'family' IN
+           ('fraction_addition', 'percentage_of_quantity', 'ratio', 'linear_equation');
 $$;
 
 CREATE TABLE ai_generation_candidate (
@@ -919,7 +953,7 @@ BEGIN
     IF NEW.status = 'rejected' THEN
         NEW.content_hash := 'failure:' || NEW.id::text;
     ELSIF NEW.status = 'approved' AND NEW.validator_reports #> '{validation,valid}' = 'true'::jsonb
-          AND NEW.content_hash <> math_candidate_content_hash(NEW.canonical_spec) THEN
+          AND NEW.content_hash IS DISTINCT FROM math_candidate_content_hash(NEW.canonical_spec) THEN
         RAISE EXCEPTION 'candidate does not own its canonical math identity' USING ERRCODE = 'check_violation';
     END IF;
     RETURN NEW;

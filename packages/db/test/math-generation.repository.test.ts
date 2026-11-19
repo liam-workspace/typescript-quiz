@@ -216,7 +216,7 @@ it("keeps valid siblings and reports duplicate canonical content without starvin
   })
 })
 
-it("rejects a second request for the same math despite a new seed, bounds and choice order", async () => {
+it("rejects a second request for the same math despite changed metadata, seed, bounds and choices", async () => {
   await withDatabase(async (pool) => {
     const choices = [
       { answer: spec.answer, isCorrect: true },
@@ -236,10 +236,17 @@ it("rejects a second request for the same math despite a new seed, bounds and ch
       ...request,
       seed: "next",
     })
+    const annotated = {
+      kind: "divide" as const,
+      source: "provider",
+      left: { kind: "integer" as const, value: 6, note: "six" },
+      right: { kind: "integer" as const, value: 8, confidence: 1 },
+    }
     const duplicate = await insertGenerationCandidate(pool, {
       requestId: second.id,
       canonicalSpec: {
         ...spec,
+        expression: annotated,
         seed: second.seed,
         constraints: { ...spec.constraints, max: 100 },
         choices: choices.toReversed(),
@@ -313,22 +320,28 @@ it("backfills an approved owner, rejects pending collisions, and releases old in
     const job = await createGenerationRequest(pool, request)
     const { rows: legacy } = await pool.query<{ id: string }>(
       `INSERT INTO ai_generation_candidate(request_id, canonical_spec, content_hash, validator_reports)
-       VALUES ($1, $2, 'old-pending', $5), ($1, $3, 'old-approved', $5),
+       VALUES ($1, jsonb_set($2::jsonb, '{expression,note}', '"first"'), 'old-pending', $5), ($1, $3, 'old-approved', $5),
               ($1, $4, 'old-invalid', '{"validation":{"valid":false,"source":"presentation"}}'),
               ($1, 'null', 'failure:old-duplicate', '{"validation":{"valid":false,"source":"duplicate","duplicateContentHash":"old-pending"}}'),
-              ($1, $2, 'old-second-approval', $5)
+              ($1, $2, 'old-second-approval', $5),
+              ($1, $4, 'old-released-owner', $5),
+              ($1, 'null', 'old-released-duplicate', '{"validation":{"valid":false,"source":"duplicate","duplicateContentHash":"old-released-owner"}}')
        RETURNING id`,
       [
         job.id,
         spec,
-        { ...spec, seed: "another" },
+        {
+          ...spec,
+          expression: { ...spec.expression, providerAnnotation: true },
+          seed: "another",
+        },
         otherSpec,
         { validation: { valid: true, source: "math", errors: [] } },
       ],
     )
     await pool.query(
       "UPDATE ai_generation_candidate SET status='in_review' WHERE id=ANY($1::uuid[])",
-      [[legacy[0].id, legacy[1].id, legacy[4].id]],
+      [[legacy[0].id, legacy[1].id, legacy[4].id, legacy[5].id]],
     )
     await pool.query(
       "UPDATE ai_generation_candidate SET status='approved', reviewer_subject='first reviewer' WHERE id=$1",
@@ -340,8 +353,33 @@ it("backfills an approved owner, rejects pending collisions, and releases old in
     )
     await pool.query(
       "UPDATE ai_generation_candidate SET status='rejected' WHERE id=ANY($1::uuid[])",
-      [[legacy[2].id, legacy[3].id]],
+      [[legacy[2].id, legacy[3].id, legacy[5].id, legacy[6].id]],
     )
+
+    // Under 1011 a reviewer could release the annotated owner's raw AST hash
+    // after a duplicate report had already recorded it.
+    await runner({
+      databaseUrl,
+      dir: fileURLToPath(new URL("../migrations", import.meta.url)),
+      direction: "up",
+      count: 1,
+      migrationsTable: "pp_migrations",
+    })
+    const annotated = { ...otherSpec.expression, note: "owner on 1011" }
+    const input = {
+      requestId: job.id,
+      canonicalSpec: { ...otherSpec, expression: annotated },
+    }
+    const temporaryOwner = await insertGenerationCandidate(pool, input)
+    const duplicateOn1011 = await insertGenerationCandidate(pool, input)
+    expect(duplicateOn1011.validation?.duplicateContentHash).toBe(
+      temporaryOwner.contentHash,
+    )
+    await reviewCandidate(pool, {
+      candidateId: temporaryOwner.id,
+      reviewerSubject: "reviewer",
+      decision: "rejected",
+    })
 
     await migrateToLatest(databaseUrl)
 
@@ -375,12 +413,24 @@ it("backfills an approved owner, rejects pending collisions, and releases old in
         canonicalSpec: { ...spec, seed: "new" },
       }),
     ).toMatchObject(duplicate)
-    expect(
-      await insertGenerationCandidate(pool, {
-        requestId: job.id,
-        canonicalSpec: otherSpec,
-      }),
-    ).toMatchObject({ status: "in_review" })
+    const replacement = await insertGenerationCandidate(pool, {
+      requestId: job.id,
+      canonicalSpec: otherSpec,
+    })
+    expect(replacement.status).toBe("in_review")
+    const historicalDuplicates = await Promise.all(
+      [legacy[6].id, duplicateOn1011.id].map((id) =>
+        loadCandidateDetail(pool, id),
+      ),
+    )
+    for (const historicalDuplicate of historicalDuplicates) {
+      expect(historicalDuplicate).toMatchObject({
+        validation: {
+          source: "duplicate",
+          duplicateContentHash: replacement.contentHash,
+        },
+      })
+    }
   })
 })
 

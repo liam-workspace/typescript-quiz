@@ -31,11 +31,5 @@ UPDATE ai_generation_candidate c SET approved_content_hash = math_candidate_revi
   `)
 }
 
-exports.down = (pgm) => {
-  pgm.sql(`
-DROP TRIGGER ai_generation_candidate_approval ON ai_generation_candidate;
-DROP FUNCTION record_math_candidate_approval();
-DROP FUNCTION math_candidate_review_hash(ai_generation_candidate);
-ALTER TABLE ai_generation_candidate DROP COLUMN approved_content_hash;
-  `)
-}
+// Recreating the digest would approve any edits made since the original review.
+exports.down = false

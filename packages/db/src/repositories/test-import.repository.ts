@@ -12,6 +12,7 @@ import {
   type MathAnswer,
   type TestDocument,
 } from "@pp/common"
+import katex from "katex"
 import type pg from "pg"
 
 type Section = TestDocument["sections"][number]
@@ -207,7 +208,64 @@ export class InvalidMathCandidateImportError extends Error {
   }
 }
 
-const reviewedBlocks = contentBlockSchema.array().min(1)
+// Match MathContent's KaTeX policy when checking persisted presentations.
+const unsafeCommand =
+  /\\(?:href|url|includegraphics|htmlClass|htmlId|htmlStyle|htmlData|def|gdef|edef|xdef|let|futurelet|newcommand|renewcommand|providecommand|global)(?![a-z])/u
+const meaningfulText = /[\p{L}\p{N}\p{S}]/u
+
+function hasReviewedContent(blocks: ContentBlock[]): boolean {
+  let meaningful = false
+
+  for (const block of blocks) {
+    if (block.kind === "text") {
+      meaningful ||= meaningfulText.test(block.value)
+
+      continue
+    }
+
+    const { tex, display } = block
+
+    if (tex.length > 4096 || !tex.trim() || unsafeCommand.test(tex)) {
+      return false
+    }
+
+    try {
+      const markup = katex.renderToString(tex, {
+        displayMode: display,
+        trust: false,
+        throwOnError: true,
+        strict: "error",
+        maxExpand: 100,
+        maxSize: 10,
+        output: "htmlAndMathml",
+      })
+      // Only visible glyphs count. KaTeX includes the source verbatim in
+      // MathML annotations, even for formulas containing nothing but spacing.
+      const html = markup.slice(markup.indexOf("</math>") + "</math>".length)
+      for (const [, attributes, glyph] of html.matchAll(
+        /<span\b([^<>]*)>([^<>]+)<\/span>/gu,
+      )) {
+        if (
+          !attributes.includes("color:transparent;") &&
+          meaningfulText.test(glyph)
+        ) {
+          meaningful = true
+
+          break
+        }
+      }
+    } catch {
+      return false
+    }
+  }
+
+  return meaningful
+}
+
+const reviewedBlocks = contentBlockSchema
+  .array()
+  .min(1)
+  .refine(hasReviewedContent)
 
 const reviewedChoices = testChoiceSchema
   .extend({ labelBlocks: reviewedBlocks })
@@ -295,10 +353,7 @@ function candidateQuestion(
 
   // Older reviewed candidates can predate canonical choice arrays. Verify their
   // actual display values and keys against the deterministic problem as well.
-  if (
-    !verifyMathProblem({ ...candidate.canonicalSpec, choices }).valid ||
-    !blockText(prompt.data)
-  ) {
+  if (!verifyMathProblem({ ...candidate.canonicalSpec, choices }).valid) {
     throw new InvalidMathCandidateImportError()
   }
 

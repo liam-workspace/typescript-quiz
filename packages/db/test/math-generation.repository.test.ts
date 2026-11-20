@@ -4,6 +4,7 @@ import {
 } from "@liam-workspace/node-postgres"
 import type { MathProblemSpec } from "@pp/common"
 import { runner } from "node-pg-migrate"
+import type pg from "pg"
 import { fileURLToPath } from "node:url"
 import { assert, expect, it } from "vitest"
 import {
@@ -11,7 +12,9 @@ import {
   completeGenerationRequest,
   type CandidatePresentation,
   createGenerationRequest,
+  importApprovedMathCandidates,
   insertGenerationCandidate,
+  InvalidMathCandidateImportError,
   listCandidates,
   listGenerationRequests,
   loadCandidateDetail,
@@ -49,6 +52,147 @@ const otherSpec: MathProblemSpec = {
     right: { kind: "integer", value: 4 },
   },
 }
+
+const mathBlock = (tex: string) => ({
+  kind: "math" as const,
+  tex,
+  display: false,
+})
+const textBlock = (value: string) => ({ kind: "text" as const, value })
+
+const reviewedPresentation: CandidatePresentation = {
+  promptBlocks: [mathBlock("\\frac{6}{8}")],
+  choices: [
+    { label: "3:4", labelBlocks: [mathBlock("\\frac{3}{4}")], isCorrect: true },
+    { label: "4:3", labelBlocks: [textBlock("4:3")], isCorrect: false },
+  ],
+  solutionBlocks: [textBlock("Divide both terms by two.")],
+}
+
+async function approvedImport(
+  pool: pg.Pool,
+  presentation: CandidatePresentation,
+) {
+  const job = await createGenerationRequest(pool, request)
+  const candidate = await insertGenerationCandidate(pool, {
+    requestId: job.id,
+    canonicalSpec: spec,
+    presentation,
+  })
+  await reviewCandidate(pool, {
+    candidateId: candidate.id,
+    decision: "approved",
+    reviewerSubject: "reviewer",
+  })
+
+  return {
+    id: candidate.id,
+    submit: () =>
+      importApprovedMathCandidates(pool, {
+        candidateIds: [candidate.id],
+        adminSubject: "admin",
+        title: "Ratios",
+        slug: "ratios",
+        durationSeconds: 60,
+      }),
+  }
+}
+
+it.each<[string, Partial<CandidatePresentation>]>([
+  [
+    "malformed prompt TeX",
+    { promptBlocks: [textBlock("Simplify"), mathBlock("\\frac{1}{")] },
+  ],
+  [
+    "forbidden solution command",
+    { solutionBlocks: [mathBlock("\\href{https://example.com}{1}")] },
+  ],
+  [
+    "unrecognized solution command",
+    { solutionBlocks: [mathBlock("\\unknownFormula")] },
+  ],
+  ["oversize prompt TeX", { promptBlocks: [mathBlock("1".repeat(4097))] }],
+  [
+    "empty choice formula",
+    {
+      choices: [
+        {
+          ...reviewedPresentation.choices[0],
+          labelBlocks: [textBlock("3:4"), mathBlock("")],
+        },
+        reviewedPresentation.choices[1],
+      ],
+    },
+  ],
+  ["blank solution", { solutionBlocks: [textBlock(" \t ")] }],
+  [
+    "spacing-only solution formula",
+    { solutionBlocks: [mathBlock("{}\\quad")] },
+  ],
+  [
+    "phantom solution formula",
+    { solutionBlocks: [mathBlock("\\phantom{42}")] },
+  ],
+])(
+  "refuses approved content with %s before writing a draft",
+  async (_label, invalid) => {
+    await withDatabase(async (pool) => {
+      const candidate = await approvedImport(pool, {
+        ...reviewedPresentation,
+        ...invalid,
+      })
+      await expect(candidate.submit()).rejects.toBeInstanceOf(
+        InvalidMathCandidateImportError,
+      )
+      expect(
+        (await pool.query("SELECT id FROM test WHERE slug='ratios'")).rows,
+      ).toEqual([])
+    })
+  },
+)
+
+it("imports renderable nested TeX in the reviewed prompt, choices and worked solution", async () => {
+  await withDatabase(async (pool) => {
+    const candidate = await approvedImport(pool, {
+      ...reviewedPresentation,
+      solutionBlocks: [mathBlock("\\frac{6}{8}=\\frac{3}{4}")],
+    })
+    const draft = await candidate.submit()
+    expect(draft.versionId).toBeTruthy()
+  })
+})
+
+it("preserves the approval digest across a downgrade attempt and upgrade", async () => {
+  await withDatabase(async (pool, { databaseUrl }) => {
+    const candidate = await approvedImport(pool, reviewedPresentation)
+    await pool.query(
+      "UPDATE ai_generation_candidate SET solution_blocks=$2 WHERE id=$1",
+      [candidate.id, JSON.stringify([textBlock("Altered after approval.")])],
+    )
+    await expect(candidate.submit()).rejects.toBeInstanceOf(
+      InvalidMathCandidateImportError,
+    )
+
+    await expect(
+      runner({
+        databaseUrl,
+        dir: fileURLToPath(new URL("../migrations", import.meta.url)),
+        direction: "down",
+        count: 1013,
+        timestamp: true,
+        migrationsTable: "pp_migrations",
+      }),
+    ).rejects.toThrow(/disabled down migration on file: 1013/u)
+    await migrateToLatest(databaseUrl)
+
+    await expect(candidate.submit()).rejects.toBeInstanceOf(
+      InvalidMathCandidateImportError,
+    )
+    expect(
+      (await pool.query("SELECT id FROM test WHERE slug='ratios'")).rows,
+    ).toEqual([])
+  })
+})
 
 it("skips a locked request, completes the next batch once, and lists both pages", async () => {
   await withDatabase(async (pool) => {

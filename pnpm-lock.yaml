@@ -167,6 +167,9 @@ importers:
       '@pp/common':
         specifier: workspace:*
         version: link:../common
+      katex:
+        specifier: ^0.19.1
+        version: 0.19.1
       node-pg-migrate:
         specifier: ^7.9.0
         version: 7.9.1(@types/pg@8.23.1)(pg@8.23.0)

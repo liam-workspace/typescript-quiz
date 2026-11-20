@@ -56,8 +56,11 @@ describe("math generation and review", () => {
     learner = `Bearer ${await app.mint({ sub: "learner", email: "learner@example.org" })}`
   })
   beforeEach(async () => {
-    await pool().query("DELETE FROM ai_generation_candidate")
-    await pool().query("DELETE FROM ai_generation_request")
+    // Published tests in other suites retain immutable links to their reviewed candidates.
+    await pool().query(`DELETE FROM ai_generation_candidate c WHERE NOT EXISTS
+      (SELECT FROM question_math qm WHERE qm.source_candidate_id = c.id)`)
+    await pool().query(`DELETE FROM ai_generation_request r WHERE NOT EXISTS
+      (SELECT FROM ai_generation_candidate c WHERE c.request_id = r.id)`)
   })
   afterEach(() => {
     failAudit = false

@@ -1,9 +1,6 @@
-export type SectionKind =
-  | "listening"
-  | "reading"
-  | "vocabulary"
-  | "grammar"
-  | "other"
+import type { SectionType } from "./api-types.js"
+
+export type SectionKind = SectionType | "other"
 
 export type NavigationMode = "free" | "forward_only"
 

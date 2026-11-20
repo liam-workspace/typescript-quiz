@@ -191,8 +191,27 @@ describe("attempt review page", () => {
     expect(screen.queryByText("Listening")).not.toBeInTheDocument()
   })
 
+  it("renders the worked math solution only when review supplies it", () => {
+    const review = structuredClone(reviewPayload)
+    const [item] = review.items
+    item.sectionType = "math"
+    item.promptBlocks = [{ kind: "math", tex: "2+3", display: true }]
+    item.choices[0].labelBlocks = [{ kind: "math", tex: "5", display: false }]
+    const { container, rerender } = render(<ReviewScreen review={review} />)
+    expect(container.querySelectorAll("math")).toHaveLength(2)
+    expect(
+      screen.queryByRole("heading", { name: "Worked solution" }),
+    ).not.toBeInTheDocument()
+    item.solutionBlocks = [{ kind: "math", tex: "2+3=5", display: true }]
+    rerender(<ReviewScreen review={review} />)
+    expect(container.querySelectorAll("math")).toHaveLength(3)
+    expect(
+      screen.getByRole("heading", { name: "Worked solution" }),
+    ).toBeInTheDocument()
+  })
+
   it("uses a neutral section for a legacy review response with no reliable type", async () => {
-    const { sectionType: _sectionType, ...legacyItem } = reviewPayload.items[0]
+    const [{ sectionType: _sectionType, ...legacyItem }] = reviewPayload.items
     const user = userEvent.setup()
 
     render(
@@ -227,7 +246,8 @@ describe("attempt review page", () => {
   })
 
   it("uses a known sibling type for a legacy item in the same section", async () => {
-    const { sectionType: _sectionType, ...legacyItem } = reviewPayload.items[2]
+    const [, , { sectionType: _sectionType, ...legacyItem }] =
+      reviewPayload.items
     const user = userEvent.setup()
 
     render(

@@ -885,12 +885,14 @@ export function RunScreen({
         expired={expired}
       />
     )
-  } else if (section.type === "reading") {
+  } else if (section.type === "reading" || section.type === "math") {
     runner = (
       <ReadingRunner
         question={question}
         stimulus={displayStimulus}
-        passageOrdinal={currentEntry.groupIndex + 1}
+        passageOrdinal={
+          section.type === "reading" ? currentEntry.groupIndex + 1 : null
+        }
         passageFirstOrdinal={
           currentEntry.groupQuestions.at(0)?.ordinal ?? question.ordinal
         }
@@ -991,7 +993,9 @@ export function RunScreen({
       </main>
 
       <footer className="device-footer sticky bottom-0 z-[40] flex-wrap">
-        {!expired && section.type === "reading" && previousEntry ? (
+        {!expired &&
+        (section.type === "reading" || section.type === "math") &&
+        previousEntry ? (
           <button
             type="button"
             className="device-button"

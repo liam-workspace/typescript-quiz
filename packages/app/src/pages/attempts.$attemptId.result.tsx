@@ -40,6 +40,9 @@ function sectionBarColour(type: AttemptSectionScore["type"]): string {
     case "listening":
       return "bg-teal"
 
+    case "math":
+      return "bg-ink-2"
+
     case "reading":
       return "bg-clay"
 

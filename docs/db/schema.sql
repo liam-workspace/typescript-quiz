@@ -993,6 +993,7 @@ CREATE TABLE question_math (
     canonical_spec jsonb NOT NULL,
     answer_spec jsonb NOT NULL,
     solution_blocks jsonb NOT NULL,
+    show_solution_after_test boolean NOT NULL DEFAULT false,
     verification_version text NOT NULL,
     content_hash text NOT NULL
 );

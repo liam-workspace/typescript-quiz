@@ -2,6 +2,7 @@ import { Card, CardContent } from "@liam-workspace/browser-react-ui"
 import { createFileRoute, redirect } from "@tanstack/react-router"
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { MathContent } from "../components/MathContent.js"
 import { QuestionNavigator } from "../components/QuestionNavigator.js"
 import { ApiError } from "../lib/api-client.js"
 import type {
@@ -50,6 +51,7 @@ const sectionTypes = new Set<SectionType>([
   "reading",
   "vocabulary",
   "grammar",
+  "math",
 ])
 
 type ReviewSectionKind = SectionType | "other"
@@ -245,7 +247,13 @@ function ReviewChoiceList({ choices }: ReviewChoiceListProps) {
             data-state={choice.selected ? "checked" : "unchecked"}
           />
           {choice.imageSvg ? <ReviewChoiceImage svg={choice.imageSvg} /> : null}
-          <span className="min-w-0 flex-1">{choice.label}</span>
+          <span className="min-w-0 flex-1">
+            {choice.labelBlocks?.length ? (
+              <MathContent blocks={choice.labelBlocks} />
+            ) : (
+              choice.label
+            )}
+          </span>
           <ReviewChoiceMarker choice={choice} />
         </li>
       ))}
@@ -356,8 +364,20 @@ export function ReviewScreen({ review }: ReviewScreenProps) {
           <ReviewStimulusView stimulus={current.stimulus} />
         ) : null}
 
-        <p className="question-prompt mt-0">{current.prompt}</p>
+        <p className="question-prompt mt-0">
+          {current.promptBlocks?.length ? (
+            <MathContent blocks={current.promptBlocks} />
+          ) : (
+            current.prompt
+          )}
+        </p>
         <ReviewChoiceList choices={current.choices} />
+        {current.solutionBlocks?.length ? (
+          <section className="mt-4">
+            <h2>{t("review.workedSolution")}</h2>
+            <MathContent blocks={current.solutionBlocks} />
+          </section>
+        ) : null}
 
         {current.outcome === "unanswered" ? (
           <p className="text-faint mt-3 text-sm font-semibold">

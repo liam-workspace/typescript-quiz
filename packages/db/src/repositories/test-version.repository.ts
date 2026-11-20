@@ -4,6 +4,7 @@ import {
   asQuestionId,
   asSectionId,
   asStimulusId,
+  contentBlockSchema,
   type RunnerGroup,
   type RunnerQuestion,
   type RunnerSection,
@@ -11,6 +12,8 @@ import {
 } from "@pp/common"
 import type { ScoringQuestion } from "@pp/common/scoring"
 import type { PgQueryable } from "@liam-workspace/node-postgres"
+
+const displayBlocks = contentBlockSchema.array()
 
 interface RunnerRow {
   s_id: string
@@ -38,6 +41,8 @@ interface RunnerRow {
   q_ordinal: number
   q_type: string
   q_prompt: string
+  q_prompt_blocks: unknown
+  c_label_blocks: unknown
   c_id: string
   c_ordinal: number
   c_label: string
@@ -85,6 +90,7 @@ export async function loadForRunner(
             st.allow_pause st_allow_pause, st.allow_seek st_allow_seek,
             sp.play_count plays_used,
             q.id q_id, q.ordinal q_ordinal, q.type::text q_type, q.prompt q_prompt,
+            q.prompt_blocks q_prompt_blocks, c.label_blocks c_label_blocks,
             c.id c_id, c.ordinal c_ordinal, c.label c_label, c.image_svg c_image_svg
        FROM test_section ts
        JOIN question_group g ON g.test_section_id = ts.id
@@ -107,6 +113,9 @@ export async function loadForRunner(
     question.choices.push({
       id: asChoiceId(r.c_id),
       label: r.c_label,
+      ...(r.c_label_blocks
+        ? { labelBlocks: displayBlocks.parse(r.c_label_blocks) }
+        : {}),
       ...(r.c_image_svg ? { imageSvg: r.c_image_svg } : {}),
     })
   }
@@ -216,6 +225,9 @@ function findOrCreateQuestion(
     ordinal: r.q_ordinal,
     type: r.q_type as RunnerQuestion["type"],
     prompt: r.q_prompt,
+    ...(r.q_prompt_blocks
+      ? { promptBlocks: displayBlocks.parse(r.q_prompt_blocks) }
+      : {}),
     choices: [],
   }
 

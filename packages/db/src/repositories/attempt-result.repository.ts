@@ -3,6 +3,9 @@ import {
   asQuestionId,
   asSectionId,
   asStimulusId,
+  contentBlockSchema,
+  type ContentBlock,
+  type SectionType,
   gradeAttempt,
   isQuestionCorrect,
   type ChoiceId,
@@ -15,6 +18,8 @@ import type { ScoringQuestion } from "@pp/common/scoring"
 import type { PgPool, PgQueryable } from "@liam-workspace/node-postgres"
 import { InvalidCursorError } from "./catalog.repository.js"
 import { loadForScoring } from "./test-version.repository.js"
+
+const displayBlocks = contentBlockSchema.array()
 
 export interface AttemptHistoryRow {
   id: string
@@ -227,6 +232,7 @@ interface ResponseDbRow {
 }
 
 export interface ReviewChoice {
+  labelBlocks?: ContentBlock[]
   id: string
   label: string
   isCorrect: boolean
@@ -276,11 +282,9 @@ export interface ReviewItem {
   questionId: string
   ordinal: number
   sectionId: string
-  // Carried, not inferred. The review screen used to guess "listening vs
-  // reading" from a section's POSITION in the item list, which is only ever
-  // right for a two-section test in the expected order -- and the section
-  // type enum has four values.
-  sectionType: "listening" | "reading" | "vocabulary" | "grammar"
+  sectionType: SectionType
+  promptBlocks?: ContentBlock[]
+  solutionBlocks?: ContentBlock[]
   prompt: string
   outcome: "correct" | "incorrect" | "unanswered"
   stimulus?: ReviewStimulus
@@ -300,6 +304,9 @@ interface ReviewAttemptDbRow {
 }
 
 interface ReviewDbRow {
+  q_prompt_blocks: unknown
+  c_label_blocks: unknown
+  solution_blocks: unknown
   q_id: string
   q_ordinal: number
   q_prompt: string
@@ -531,6 +538,7 @@ export async function loadReview(
   const { rows } = await pool.query<ReviewDbRow>(
     `SELECT q.id q_id, q.ordinal q_ordinal, q.prompt q_prompt,
             q.type::text q_type, q.points q_points,
+            q.prompt_blocks q_prompt_blocks, c.label_blocks c_label_blocks, qm.solution_blocks,
             ts.id section_id, ts.type::text section_type,
             c.id c_id, c.label c_label, c.is_correct c_is_correct,
             (rc.choice_id IS NOT NULL) c_selected, c.image_svg c_image_svg,
@@ -543,6 +551,7 @@ export async function loadReview(
   LEFT JOIN stimulus st      ON st.id = g.stimulus_id
   LEFT JOIN media_asset ma   ON ma.id = st.media_asset_id
        JOIN choice c         ON c.question_id = q.id
+  LEFT JOIN question_math qm ON qm.question_id = q.id AND qm.show_solution_after_test
   LEFT JOIN response_choice rc
          ON rc.attempt_id = $2
         AND rc.question_id = q.id
@@ -561,6 +570,9 @@ export async function loadReview(
     accumulator.item.choices.push({
       id: choiceId,
       label: row.c_label,
+      ...(row.c_label_blocks
+        ? { labelBlocks: displayBlocks.parse(row.c_label_blocks) }
+        : {}),
       isCorrect: row.c_is_correct,
       selected: row.c_selected,
       ...(row.c_image_svg ? { imageSvg: row.c_image_svg } : {}),
@@ -607,6 +619,18 @@ function findOrCreateReview(
       sectionId,
       sectionType: row.section_type as ReviewItem["sectionType"],
       prompt: row.q_prompt,
+      ...(row.q_prompt_blocks
+        ? {
+            promptBlocks: displayBlocks.parse(row.q_prompt_blocks),
+          }
+        : {}),
+      ...(row.solution_blocks
+        ? {
+            solutionBlocks: contentBlockSchema
+              .array()
+              .parse(row.solution_blocks),
+          }
+        : {}),
       ...(row.st_id
         ? { stimulus: buildReviewStimulus(row, row.st_id, mediaUrlFor) }
         : {}),

@@ -3,6 +3,8 @@ import type {
   AdminLearnerPage,
   AdminLearnerSummary,
   AdminOverview,
+  ContentBlock,
+  SectionType,
   AdminPagination,
   AdminQuestion,
   AdminQuestionPage,
@@ -52,7 +54,7 @@ export interface AdminResultRollupQuery {
 
 export type AdminLearnerQuery = AdminPageQuery & Pick<AdminTestFilter, "search">
 
-export type SectionType = "listening" | "reading" | "vocabulary" | "grammar"
+export type { SectionType }
 
 export type StudentLevel = "primary-step-1" | "primary-step-2"
 
@@ -177,6 +179,7 @@ export interface PlayGrant {
 export interface RunnerChoice {
   id: string
   label: string
+  labelBlocks?: ContentBlock[]
   imageSvg?: string
 }
 
@@ -185,6 +188,7 @@ export interface RunnerQuestion {
   ordinal: number
   type: QuestionType
   prompt: string
+  promptBlocks?: ContentBlock[]
   choices: RunnerChoice[]
 }
 
@@ -380,6 +384,7 @@ export interface AttemptHistoryPage {
 export interface ReviewChoice {
   id: string
   label: string
+  labelBlocks?: ContentBlock[]
   isCorrect: boolean
   selected: boolean
   imageSvg?: string
@@ -427,6 +432,8 @@ export interface ReviewItem {
   sectionId: string
   sectionType: SectionType
   prompt: string
+  promptBlocks?: ContentBlock[]
+  solutionBlocks?: ContentBlock[]
   outcome: "correct" | "incorrect" | "unanswered"
   stimulus?: ReviewStimulus
   choices: ReviewChoice[]

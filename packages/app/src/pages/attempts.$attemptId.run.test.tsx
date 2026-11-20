@@ -709,6 +709,24 @@ describe("RunScreen", () => {
     expect(screen.getByRole("button", { name: "Hand in" })).toBeEnabled()
   })
 
+  it("renders math prompts and choices as formulas without a passage label", () => {
+    const envelope = structuredClone(readingEnvelope)
+    const [section] = envelope.sections
+    section.type = "math"
+    const [group] = section.groups
+    delete group.stimulus
+    const [, question] = group.questions
+    question.promptBlocks = [{ kind: "math", tex: "2+3", display: true }]
+    question.choices[0].labelBlocks = [
+      { kind: "math", tex: "5", display: false },
+    ]
+    const { container } = renderRunScreen(envelope)
+    expect(screen.getByText("Math")).toBeInTheDocument()
+    expect(container.querySelectorAll("math")).toHaveLength(2)
+    expect(screen.getByRole("button", { name: "Previous" })).toBeEnabled()
+    expect(screen.queryByText(/Passage 1 · questions/)).not.toBeInTheDocument()
+  })
+
   it("keeps Previous in the route-owned footer for reading", () => {
     renderRunScreen(readingEnvelope)
 
@@ -928,7 +946,12 @@ describe("RunScreen", () => {
 
     it("makes the runner landmarks inaccessible while a modal panel is open", async () => {
       renderRunScreen()
-      const runner = screen.getByRole("main").parentElement as HTMLElement
+      const runner = screen.getByRole("main").parentElement
+
+      if (!runner) {
+        throw new Error("Runner shell missing")
+      }
+
       const runnerFooter = runner.querySelector("footer")
 
       await userEvent.click(screen.getByRole("button", { name: "Open menu" }))

@@ -665,23 +665,18 @@ export function RunScreen({
   }
 
   const nextEntry = entries.at(currentIndex + 1)
-  const previousEntry = entries.at(currentIndex - 1)
+  const previousEntry =
+    (section.type === "reading" || section.type === "math") &&
+    section.navigation === "free" &&
+    currentIndex > 0
+      ? entries.at(currentIndex - 1)
+      : undefined
   const sectionIndex = envelope.sections.findIndex(
     (candidate) => candidate.id === section.id,
   )
   const nextSection = envelope.sections.at(sectionIndex + 1)
 
-  // Shared by Next (both sections) and Previous (reading's `free` section
-  // only -- listening's forward_only never renders a Previous button, see
-  // ListeningRunner). `PUT /position` itself does not distinguish direction:
-  // openapi.yaml's `navigation_locked` 409 only ever fires for a BACKWARD
-  // move in a forward_only section (attempt.repository.ts), which this app
-  // never attempts since it hides Previous there entirely. What CAN fire
-  // regardless of direction or navigation mode is the same
-  // SectionOrAttemptExpired 410 every other runner call uses -- surfaced
-  // here exactly like handleClaimPlay does, so a student paging through a
-  // reading passage after the section's clock has run out sees the same
-  // actionable message rather than a click that silently does nothing.
+  // Next and Previous share the same position update and expiration handling.
   const moveToQuestion = (entry: FlatEntry): void => {
     setPosition(attemptId, section.id, entry.question.id)
       .then(() => {
@@ -993,9 +988,7 @@ export function RunScreen({
       </main>
 
       <footer className="device-footer sticky bottom-0 z-[40] flex-wrap">
-        {!expired &&
-        (section.type === "reading" || section.type === "math") &&
-        previousEntry ? (
+        {!expired && previousEntry ? (
           <button
             type="button"
             className="device-button"

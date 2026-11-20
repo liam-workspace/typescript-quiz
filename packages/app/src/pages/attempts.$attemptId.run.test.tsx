@@ -727,6 +727,44 @@ describe("RunScreen", () => {
     expect(screen.queryByText(/Passage 1 · questions/)).not.toBeInTheDocument()
   })
 
+  it.each([1, 2])(
+    "hides Previous at the first question in a free math section (question count: %i)",
+    (questionCount) => {
+      const envelope = structuredClone(readingEnvelope)
+      const [section] = envelope.sections
+      const [group] = section.groups
+      section.type = "math"
+      section.questionCount = questionCount
+      section.groups = [group]
+      delete group.stimulus
+      group.questions = group.questions.slice(0, questionCount)
+      envelope.questionCount = questionCount
+      envelope.unansweredOrdinals = group.questions.map(
+        ({ ordinal }) => ordinal,
+      )
+      envelope.currentQuestionId = group.questions[0].id
+
+      renderRunScreen(envelope)
+
+      expect(
+        screen.queryByRole("button", { name: "Previous" }),
+      ).not.toBeInTheDocument()
+    },
+  )
+
+  it("hides Previous after the first question in a forward-only math section", () => {
+    const envelope = structuredClone(readingEnvelope)
+    const [section] = envelope.sections
+    section.type = "math"
+    section.navigation = "forward_only"
+
+    renderRunScreen(envelope)
+
+    expect(
+      screen.queryByRole("button", { name: "Previous" }),
+    ).not.toBeInTheDocument()
+  })
+
   it("keeps Previous in the route-owned footer for reading", () => {
     renderRunScreen(readingEnvelope)
 

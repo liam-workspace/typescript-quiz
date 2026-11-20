@@ -87,6 +87,7 @@ async function approvedImport(
 
   return {
     id: candidate.id,
+    requestId: job.id,
     submit: () =>
       importApprovedMathCandidates(pool, {
         candidateIds: [candidate.id],
@@ -159,6 +160,80 @@ it("imports renderable nested TeX in the reviewed prompt, choices and worked sol
     })
     const draft = await candidate.submit()
     expect(draft.versionId).toBeTruthy()
+  })
+})
+
+it("keeps a historical published solution hidden after a request policy change", async () => {
+  await withDatabase(async (pool, { databaseUrl }) => {
+    const candidate = await approvedImport(pool, reviewedPresentation)
+    const setPolicy = (solutionPolicy: string) =>
+      pool.query("UPDATE ai_generation_request SET parameters=$1 WHERE id=$2", [
+        { curriculumBrief: { solutionPolicy } },
+        candidate.requestId,
+      ])
+    await setPolicy("hidden")
+    const { versionId } = await candidate.submit()
+    await pool.query("UPDATE test_version SET published_at=now() WHERE id=$1", [
+      versionId,
+    ])
+
+    const options = {
+      databaseUrl,
+      dir: fileURLToPath(new URL("../migrations", import.meta.url)),
+      migrationsTable: "pp_migrations",
+      timestamp: true,
+    }
+    // Remove the policy column to reproduce an import from before migration 1014.
+    await runner({ ...options, direction: "down", count: 1014 })
+    await setPolicy("after_test")
+    await runner({ ...options, direction: "up", count: 1014 })
+
+    expect(
+      (
+        await pool.query(
+          "SELECT show_solution_after_test FROM question_math WHERE source_candidate_id=$1",
+          [candidate.id],
+        )
+      ).rows,
+    ).toEqual([{ show_solution_after_test: false }])
+  })
+})
+
+it("withholds an already-migrated published solution with an unverified flag", async () => {
+  await withDatabase(async (pool, { databaseUrl }) => {
+    const candidate = await approvedImport(pool, reviewedPresentation)
+    const { versionId } = await candidate.submit()
+    await runner({
+      databaseUrl,
+      dir: fileURLToPath(new URL("../migrations", import.meta.url)),
+      migrationsTable: "pp_migrations",
+      direction: "down",
+      count: 1015,
+      timestamp: true,
+    })
+    // This row has the same stored state as one backfilled by the original 1014.
+    await pool.query(
+      "UPDATE question_math SET show_solution_after_test=true WHERE source_candidate_id=$1",
+      [candidate.id],
+    )
+    await pool.query("UPDATE test_version SET published_at=now() WHERE id=$1", [
+      versionId,
+    ])
+    await migrateToLatest(databaseUrl)
+    expect(
+      (
+        await pool.query(
+          "SELECT after_test_solution_hash FROM question_math WHERE source_candidate_id=$1",
+          [candidate.id],
+        )
+      ).rows,
+    ).toEqual([{ after_test_solution_hash: null }])
+    await expect(
+      pool.query(
+        "UPDATE question_math SET after_test_solution_hash=NULL WHERE source_candidate_id=$1",
+        [candidate.id],
+      ),
+    ).rejects.toThrow(/immutable/u)
   })
 })
 

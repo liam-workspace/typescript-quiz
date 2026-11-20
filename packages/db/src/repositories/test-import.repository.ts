@@ -423,9 +423,10 @@ export function importApprovedMathCandidates(
     const result = await insertTestDocument(tx, doc.data)
     await tx.query(
       `INSERT INTO question_math (question_id, source_candidate_id, canonical_spec, answer_spec,
-                                   solution_blocks, show_solution_after_test, verification_version, content_hash)
+                                   solution_blocks, after_test_solution_hash, verification_version, content_hash)
        SELECT q.id, c.id, c.canonical_spec, c.canonical_spec->'answer', c.solution_blocks,
-              COALESCE(r.parameters #>> '{curriculumBrief,solutionPolicy}' = 'after_test', false), 'v1', c.content_hash
+              CASE WHEN r.parameters #>> '{curriculumBrief,solutionPolicy}' = 'after_test'
+                   THEN math_question_solution_hash(q, c.solution_blocks) END, 'v1', c.content_hash
          FROM unnest($2::uuid[]) WITH ORDINALITY AS selected(id, ordinal)
          JOIN ai_generation_candidate c ON c.id=selected.id
          JOIN ai_generation_request r ON r.id=c.request_id

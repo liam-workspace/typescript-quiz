@@ -551,7 +551,9 @@ export async function loadReview(
   LEFT JOIN stimulus st      ON st.id = g.stimulus_id
   LEFT JOIN media_asset ma   ON ma.id = st.media_asset_id
        JOIN choice c         ON c.question_id = q.id
-  LEFT JOIN question_math qm ON qm.question_id = q.id AND qm.show_solution_after_test
+  LEFT JOIN question_math qm ON qm.question_id = q.id
+                            AND qm.after_test_solution_hash IS NOT NULL
+                            AND qm.after_test_solution_hash = math_question_solution_hash(q, qm.solution_blocks)
   LEFT JOIN response_choice rc
          ON rc.attempt_id = $2
         AND rc.question_id = q.id

@@ -1,5 +1,9 @@
 import type { PgPool } from "@liam-workspace/node-postgres"
-import { testDocumentSchema, type TestDocument } from "@pp/common"
+import {
+  testDocumentSchema,
+  type AdminQuestionPage,
+  type TestDocument,
+} from "@pp/common"
 import { insertGenerationCandidate, reviewCandidate } from "@pp/db/admin"
 import { randomUUID } from "node:crypto"
 import request from "supertest"
@@ -256,12 +260,15 @@ describe("GET /attempts/:id", () => {
   })
 
   it.each([
-    ["after_test", 601],
-    ["hidden", 602],
-    [null, 603],
+    ["after_test", 601, "unchanged"],
+    ["hidden", 602, "unchanged"],
+    [null, 603, "unchanged"],
+    ["after_test", 604, "answer edit"],
+    ["after_test", 605, "prompt edit"],
+    ["after_test", 606, "choice edit"],
   ] as const)(
-    "serves published math display blocks and gates the worked solution for policy %s",
-    async (policy, value) => {
+    "serves published math display blocks and gates the worked solution for policy %s (value %i, %s)",
+    async (policy, value, edit) => {
       const a = ready()
       const pool = a.get<PgPool>(REQUEST_POOL)
       const server = a.http.getHttpServer() as App
@@ -333,7 +340,28 @@ describe("GET /attempts/:id", () => {
           candidateIds: [candidate.id],
         })
         .expect(201)
-      const { testId } = imported.body as { testId: string }
+      const { testId, versionId } = imported.body as {
+        testId: string
+        versionId: string
+      }
+      const draft = await request(server)
+        .get("/api/admin/questions")
+        .query({ testId })
+        .set("Authorization", admin)
+        .expect(200)
+      const [draftQuestion] = (draft.body as AdminQuestionPage).items
+      const prompt =
+        edit === "prompt edit" ? "Double this quantity" : draftQuestion.prompt
+      const editedChoices = draftQuestion.choices.map((c, index) => ({
+        ...c,
+        label: edit === "choice edit" && index === 0 ? "Two more" : c.label,
+        isCorrect: edit === "answer edit" ? !c.isCorrect : c.isCorrect,
+      }))
+      await request(server)
+        .patch(`/api/admin/drafts/${versionId}/questions/${draftQuestion.id}`)
+        .set("Authorization", admin)
+        .send({ prompt, choices: editedChoices })
+        .expect(200)
       const { token } = await provision(a, slug)
       const learner = `Bearer ${token}`
       await request(server)
@@ -341,11 +369,7 @@ describe("GET /attempts/:id", () => {
         .set("Authorization", learner)
         .send({ slug })
         .expect(409)
-      await request(server)
-        .post(`/api/admin/tests/${testId}/publish`)
-        .set("Authorization", admin)
-        .expect(200)
-      // Later changes to generation history must not change a published test.
+      // The import freezes the policy, even before publication.
       await pool.query(
         "UPDATE ai_generation_request SET parameters=$1 WHERE id=$2",
         [
@@ -357,21 +381,38 @@ describe("GET /attempts/:id", () => {
           source.id,
         ],
       )
+      await request(server)
+        .post(`/api/admin/tests/${testId}/publish`)
+        .set("Authorization", admin)
+        .expect(200)
       const id = await startAttempt(a, token, slug)
       const path = `/api/attempts/${id}`
       const runner = await request(server)
         .get(path)
         .set("Authorization", learner)
         .expect(200)
-      const safeChoices = choices.map((c) => ({
+      const expectedPrompt =
+        edit === "prompt edit"
+          ? [{ kind: "text", value: prompt }, promptBlocks[1]]
+          : promptBlocks
+      const safeChoices = editedChoices.map((c, index) => ({
         label: c.label,
-        labelBlocks: c.labelBlocks,
+        labelBlocks:
+          c.label === choices[index].label
+            ? choices[index].labelBlocks
+            : [...choices[index].labelBlocks, { kind: "text", value: c.label }],
       }))
       expect(runner.body).toMatchObject({
         sections: [
           {
             type: "math",
-            groups: [{ questions: [{ promptBlocks, choices: safeChoices }] }],
+            groups: [
+              {
+                questions: [
+                  { promptBlocks: expectedPrompt, choices: safeChoices },
+                ],
+              },
+            ],
           },
         ],
       })
@@ -412,8 +453,8 @@ describe("GET /attempts/:id", () => {
         items: [
           {
             sectionType: "math",
-            promptBlocks,
-            choices: choices.map((c, i) => ({
+            promptBlocks: expectedPrompt,
+            choices: editedChoices.map((c, i) => ({
               ...safeChoices[i],
               isCorrect: c.isCorrect,
             })),
@@ -421,7 +462,7 @@ describe("GET /attempts/:id", () => {
         ],
       })
 
-      if (policy === "after_test") {
+      if (policy === "after_test" && edit === "unchanged") {
         expect(review.body).toMatchObject({ items: [{ solutionBlocks }] })
       } else {
         expect(review.text).not.toContain('"solutionBlocks"')

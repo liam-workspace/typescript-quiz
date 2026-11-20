@@ -261,10 +261,14 @@ CREATE TABLE choice (
     ordinal      integer NOT NULL,
     label        text    NOT NULL,
     label_blocks jsonb,
+    image_svg    text,
     is_correct   boolean NOT NULL,
 
     CONSTRAINT choice_ordinal_positive CHECK (ordinal > 0),
     CONSTRAINT choice_label_not_blank  CHECK (length(btrim(label)) > 0),
+    CONSTRAINT choice_image_svg_shape CHECK (
+        image_svg IS NULL OR (btrim(image_svg) ILIKE '<svg%' AND length(image_svg) <= 20000)
+    ),
     CONSTRAINT choice_unique_ordinal   UNIQUE (question_id, ordinal),
     -- discriminator so response_choice can prove a choice belongs to the
     -- question it was selected for
@@ -993,7 +997,7 @@ CREATE TABLE question_math (
     canonical_spec jsonb NOT NULL,
     answer_spec jsonb NOT NULL,
     solution_blocks jsonb NOT NULL,
-    show_solution_after_test boolean NOT NULL DEFAULT false,
+    after_test_solution_hash bytea,
     verification_version text NOT NULL,
     content_hash text NOT NULL
 );
@@ -1019,3 +1023,11 @@ $$;
 CREATE TRIGGER question_math_immutable
     BEFORE INSERT OR UPDATE OR DELETE ON question_math
     FOR EACH ROW EXECUTE FUNCTION reject_published_math_change();
+
+CREATE FUNCTION math_question_solution_hash(q question, solution jsonb) RETURNS bytea
+LANGUAGE sql STABLE STRICT PARALLEL SAFE AS $$
+    SELECT sha256(convert_to(jsonb_build_array(q.prompt, q.prompt_blocks, q.type,
+               (SELECT jsonb_agg(jsonb_build_array(c.label, c.label_blocks, c.image_svg, c.is_correct)
+                                 ORDER BY c.ordinal) FROM choice c WHERE c.question_id = q.id),
+               solution)::text, 'UTF8'));
+$$;

@@ -215,8 +215,44 @@ const meaningfulText = /[\p{L}\p{N}\p{S}]/u
 // Braille Pattern Blank is a symbol and is not Unicode whitespace or ignorable.
 const blankCharacters =
   /[\p{White_Space}\p{Default_Ignorable_Code_Point}\u2800]/gu
-const transparentColor = /^(?:transparent|#[\da-f]{3}0|#[\da-f]{6}00)$/iu
-const inheritedColor = /^(?:currentcolor|inherit|revert|unset)$/iu
+const transparentColor = /^(?:transparent|#[\da-f]{3}0|#[\da-f]{6}00)$/u
+const hexColor = /^#(?:[\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/u
+// CSS Color 4 named and system colors, including legacy system colors.
+// https://www.w3.org/TR/css-color-4/#color-keywords
+const cssColorKeywords = new Set(
+  `
+    aliceblue antiquewhite aqua aquamarine azure beige bisque black
+    blanchedalmond blue blueviolet brown burlywood cadetblue chartreuse chocolate
+    coral cornflowerblue cornsilk crimson cyan darkblue darkcyan darkgoldenrod
+    darkgray darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange
+    darkorchid darkred darksalmon darkseagreen darkslateblue darkslategray
+    darkslategrey darkturquoise darkviolet deeppink deepskyblue dimgray dimgrey
+    dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite
+    gold goldenrod gray green greenyellow grey honeydew hotpink indianred indigo
+    ivory khaki lavender lavenderblush lawngreen lemonchiffon lightblue
+    lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey
+    lightpink lightsalmon lightseagreen lightskyblue lightslategray
+    lightslategrey lightsteelblue lightyellow lime limegreen linen magenta maroon
+    mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen
+    mediumslateblue mediumspringgreen mediumturquoise mediumvioletred
+    midnightblue mintcream mistyrose moccasin navajowhite navy oldlace olive
+    olivedrab orange orangered orchid palegoldenrod palegreen paleturquoise
+    palevioletred papayawhip peachpuff peru pink plum powderblue purple
+    rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown seagreen
+    seashell sienna silver skyblue slateblue slategray slategrey snow springgreen
+    steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke
+    yellow yellowgreen accentcolor accentcolortext activeborder activecaption
+    activetext appworkspace background buttonborder buttonface buttonhighlight
+    buttonshadow buttontext canvas canvastext captiontext field fieldtext
+    graytext highlight highlighttext inactiveborder inactivecaption
+    inactivecaptiontext infobackground infotext linktext mark marktext menu
+    menutext scrollbar selecteditem selecteditemtext threeddarkshadow threedface
+    threedhighlight threedlightshadow threedshadow visitedtext window windowframe
+    windowtext transparent
+  `
+    .trim()
+    .split(/\s+/u),
+)
 
 function hasVisibleText(text: string): boolean {
   return meaningfulText.test(text.replace(blankCharacters, ""))
@@ -234,9 +270,13 @@ function hasVisibleMathGlyph(markup: string): boolean {
 
     if (token.startsWith("<span")) {
       const style = /\sstyle="([^"]*)"/u.exec(attributes)?.[1] ?? ""
-      const color = /(?:^|;)\s*color\s*:\s*([^;]+)/iu.exec(style)?.[1].trim()
+      const color = /(?:^|;)\s*color\s*:\s*([^;]+)/iu
+        .exec(style)?.[1]
+        .trim()
+        .toLowerCase()
+      // KaTeX accepts unknown alphabetic colors, which CSS ignores.
       transparentSpans.push(
-        color && !inheritedColor.test(color)
+        color && (hexColor.test(color) || cssColorKeywords.has(color))
           ? transparentColor.test(color)
           : parentTransparent,
       )

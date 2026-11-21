@@ -158,6 +158,14 @@ it.each<[string, Partial<CandidatePresentation>]>([
     },
   ],
   [
+    "unknown child color within transparent math",
+    {
+      solutionBlocks: [
+        mathBlock("\\textcolor{Transparent}{\\frac{1}{\\textcolor{BlUeE}{2}}}"),
+      ],
+    },
+  ],
+  [
     "transparent short hex solution formula",
     { solutionBlocks: [mathBlock("\\textcolor{#aBc0}{42}")] },
   ],
@@ -188,6 +196,14 @@ it.each<[string, CandidatePresentation["solutionBlocks"]]>([
   [
     "visible math within transparent math",
     [mathBlock("\\textcolor{Transparent}{\\frac{1}{\\textcolor{Blue}{2}}}")],
+  ],
+  [
+    "nonzero alpha child color within transparent math",
+    [
+      mathBlock(
+        "\\textcolor{Transparent}{\\frac{1}{\\textcolor{#aBcDeF01}{2}}}",
+      ),
+    ],
   ],
   [
     "visible text alongside blank characters",

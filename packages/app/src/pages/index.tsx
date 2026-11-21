@@ -5,6 +5,8 @@ import { ApiError } from "../lib/api-client.js"
 import type { Student, TestCard, TestCatalogPage } from "../lib/api-types.js"
 import { listTests } from "../lib/catalog-api.js"
 import { getCurrentStudent } from "../lib/session-api.js"
+import { signOut } from "../lib/auth.js"
+import { SIGN_IN_PATH } from "../lib/authPaths.js"
 import { testCardActions, type TestCardAction } from "../lib/testCardState.js"
 
 export interface LibraryData {
@@ -276,17 +278,63 @@ export interface LibraryRouteErrorProps {
   readonly error: unknown
 }
 
+/**
+ * The API answers `404 student_not_provisioned` (a valid token whose account
+ * has no student profile) or `403` (the account lacks the role that allows a
+ * profile to be created). Both mean "this account cannot use the app", which
+ * retrying cannot fix: say so, and let the person switch account.
+ */
+function isNoAccess(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.problem.type === "student_not_provisioned" ||
+      error.problem.status === 403)
+  )
+}
+
 export function LibraryRouteError({ error }: LibraryRouteErrorProps) {
   const { t } = useTranslation("runner")
   const unauthorized = error instanceof ApiError && error.problem.status === 401
+  const noAccess = !unauthorized && isNoAccess(error)
+  let message = "library.error"
+
+  if (unauthorized) {
+    message = "library.unauthorized"
+  } else if (noAccess) {
+    message = "library.noAccess"
+  }
 
   return (
     <div className="device-page">
       <main className="center-main">
         <div className="device-card max-w-xl">
-          <p role="alert">
-            {t(unauthorized ? "library.unauthorized" : "library.error")}
-          </p>
+          <p role="alert">{t(message)}</p>
+          {noAccess ? (
+            <p className="text-ink-2 mt-2 text-sm">
+              {t("library.noAccess.detail")}
+            </p>
+          ) : null}
+          {/* Every error state gets a way out. Plain links, not router calls:
+              this component also renders where there is no router (tests, the
+              route's own error boundary), and a full navigation is what a
+              retry or a fresh sign-in wants anyway. */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {unauthorized || noAccess ? null : (
+              <a href="/" className={primaryActionClass}>
+                {t("library.errorRetry")}
+              </a>
+            )}
+            <a
+              href={SIGN_IN_PATH}
+              className={secondaryActionClass}
+              data-variant="secondary"
+              onClick={() => {
+                signOut()
+              }}
+            >
+              {t("menu.signOut")}
+            </a>
+          </div>
         </div>
       </main>
     </div>

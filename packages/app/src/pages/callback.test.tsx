@@ -52,7 +52,7 @@ describe("CallbackRouteError", () => {
     cleanup()
   })
 
-  it("renders 'this account cannot use this app' on a 403, with no retry control", () => {
+  it("renders 'this account cannot use this app' on a 403, with no retry but a way to switch account", () => {
     const error = new ApiError({
       type: "email_not_allowed",
       title: "not allowed",
@@ -65,7 +65,15 @@ describe("CallbackRouteError", () => {
       screen.getByText("This account cannot use this app."),
     ).toBeInTheDocument()
     expect(screen.queryByRole("button")).not.toBeInTheDocument()
-    expect(screen.queryByRole("link")).not.toBeInTheDocument()
+    // Retrying the SAME disallowed account would 403 forever, so there is no
+    // "try again". Signing in again lets the person pick a DIFFERENT account at
+    // the identity provider's chooser, which is the way out of this screen.
+    expect(
+      screen.queryByRole("link", { name: "Back to sign in" }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole("link", { name: "Use a different account" }),
+    ).toHaveAttribute("href", "/sign-in")
   })
 
   it("offers one honest retry back to sign-in for any other failure", () => {

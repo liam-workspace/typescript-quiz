@@ -203,7 +203,19 @@ export async function completeSignIn(code: string): Promise<SessionResult> {
 
   await getAuthClient().handleCallback(callbackUrl.toString())
 
-  return establishSession()
+  try {
+    return await establishSession()
+  } catch (error) {
+    // `handleCallback` has already stored the tokens. If the session call is
+    // then refused (`403 role_not_granted`) or fails, leaving them behind
+    // strands the browser: a reload opens the library with a token whose
+    // account has no student profile, and nothing on that screen can sign out.
+    // Clear them so the next visit goes through sign-in again; queued answers
+    // live elsewhere and are untouched (see api-client.ts).
+    signOut()
+
+    throw error
+  }
 }
 
 export function signOut(): void {

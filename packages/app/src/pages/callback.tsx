@@ -83,9 +83,18 @@ export function CallbackRouteError({ error }: CallbackRouteErrorProps) {
             {t(notAllowed ? "callback.notAllowed" : "callback.error")}
           </p>
           {notAllowed ? (
-            <p className="text-ink-2 text-sm">
-              {t("callback.notAllowed.detail")}
-            </p>
+            <>
+              <p className="text-ink-2 text-sm">
+                {t("callback.notAllowed.detail")}
+              </p>
+              {/* The chooser at the identity provider lets them pick another account. */}
+              <a
+                href="/sign-in"
+                className="text-teal focus-visible:outline-teal inline-flex min-h-11 w-auto touch-manipulation items-center justify-center font-bold underline"
+              >
+                {t("callback.notAllowed.switch")}
+              </a>
+            </>
           ) : (
             <a
               href="/sign-in"

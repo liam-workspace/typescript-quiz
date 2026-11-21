@@ -12,7 +12,13 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
 import type { Student, TestCard, TestCatalogPage } from "../lib/api-types.js"
+import { signOut } from "../lib/auth.js"
 import { LibraryRouteError, LibraryScreen, loadLibrary } from "./index.js"
+
+vi.mock("../lib/auth.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/auth.js")>()),
+  signOut: vi.fn(),
+}))
 
 const freshTest: TestCard = {
   id: "test-04",
@@ -338,5 +344,55 @@ describe("test library page", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "The test library could not be loaded. Please try again.",
     )
+  })
+
+  it("offers Try again and Sign out on the generic error", () => {
+    render(<LibraryRouteError error={new Error("network down")} />)
+
+    expect(screen.getByRole("link", { name: "Try again" })).toHaveAttribute(
+      "href",
+      "/",
+    )
+    expect(screen.getByRole("link", { name: "Sign out" })).toHaveAttribute(
+      "href",
+      "/sign-in",
+    )
+  })
+
+  it.each([
+    ["404 student_not_provisioned", "student_not_provisioned", 404],
+    ["403 role_not_granted", "role_not_granted", 403],
+  ])(
+    "explains a %s as missing access, with a way to sign out",
+    (_name, type, status) => {
+      render(
+        <LibraryRouteError
+          error={new ApiError({ type, title: "No access", status })}
+        />,
+      )
+
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "This account does not have access to Quiz yet.",
+      )
+      expect(
+        screen.getByText(/Ask an administrator to give this account access/u),
+      ).toBeInTheDocument()
+      // Retrying cannot fix a missing role, so it is not offered.
+      expect(screen.queryByRole("link", { name: "Try again" })).toBeNull()
+      expect(screen.getByRole("link", { name: "Sign out" })).toBeInTheDocument()
+    },
+  )
+
+  it("clears the stored session when Sign out is chosen", async () => {
+    const user = userEvent.setup()
+
+    render(<LibraryRouteError error={new Error("network down")} />)
+    // Navigation itself is the link's job; jsdom does not follow it.
+    const link = screen.getByRole("link", { name: "Sign out" })
+
+    link.addEventListener("click", (event) => event.preventDefault())
+    await user.click(link)
+
+    expect(signOut).toHaveBeenCalledTimes(1)
   })
 })

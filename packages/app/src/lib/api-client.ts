@@ -5,6 +5,7 @@ import {
   hasSession,
 } from "./auth.js"
 import { getDevBearerToken } from "./dev-auth.js"
+import { networkStore } from "./network.js"
 import type { FinalizedAttempt } from "./api-types.js"
 
 export class ApiError extends Error {
@@ -81,11 +82,35 @@ function sendRequest(url: string, init: RequestInit): Promise<Response> {
   return fetch(url, { ...init, headers })
 }
 
+/**
+ * `fetch` rejects with a TypeError when the request could not be made at
+ * all (offline, DNS, refused). Anything else is not a connectivity fact.
+ * Any response, whatever its status, proves the server is reachable.
+ */
+async function sendReportingConnectivity(
+  url: string,
+  init: RequestInit,
+): Promise<Response> {
+  try {
+    const response = await sendRequest(url, init)
+
+    networkStore.reportFetchSuccess()
+
+    return response
+  } catch (error) {
+    if (error instanceof TypeError) {
+      networkStore.reportFetchFailure()
+    }
+
+    throw error
+  }
+}
+
 export async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const response = await sendRequest(`/api${path}`, init)
+  const response = await sendReportingConnectivity(`/api${path}`, init)
 
   if (response.status === 401) {
     // Either there was no session to refresh, or a real one's refresh

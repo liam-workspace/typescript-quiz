@@ -7,6 +7,7 @@ import "@pp/app/index.css"
 // findings, because every component test builds its OWN i18next instance
 // inline. The suite was supplying the production code the app had forgotten.
 import "@pp/app/i18n"
+import { registerPwa } from "@pp/app/lib/pwa/register"
 import { routeTree } from "@pp/app/route.gen"
 import { RouterProvider, createRouter } from "@tanstack/react-router"
 import { StrictMode } from "react"
@@ -25,6 +26,8 @@ const root = document.getElementById("root")
 if (!root) {
   throw new Error("Root element not found")
 }
+
+registerPwa()
 
 createRoot(root).render(
   <StrictMode>

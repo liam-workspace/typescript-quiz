@@ -293,5 +293,11 @@
   "library.statusBest": "Mejor {{percentage}} %",
   "library.blockedByActive": "Termina primero {{title}}.",
   "library.filterEmpty": "Aquí todavía no hay nada.",
-  "library.skeletonLabel": "Cargando pruebas"
+  "library.skeletonLabel": "Cargando pruebas",
+  "sectionRules.heading": "Antes de empezar: {{section}}",
+  "sectionRules.sectionPosition": "Parte {{current}} de {{total}}",
+  "sectionRules.clockNoteFirst": "El reloj empieza cuando tocas «Estoy listo» y sigue corriendo si te vas.",
+  "sectionRules.clockNoteNext": "El reloj empieza cuando tocas «Estoy listo».",
+  "sectionRules.leave": "Salir",
+  "sectionRules.starting": "Empezando…"
 }

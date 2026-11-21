@@ -283,5 +283,11 @@
   "library.statusBest": "ベスト {{percentage}}%",
   "library.blockedByActive": "先に「{{title}}」を終わらせましょう。",
   "library.filterEmpty": "まだありません。",
-  "library.skeletonLabel": "テストを読み込み中"
+  "library.skeletonLabel": "テストを読み込み中",
+  "sectionRules.heading": "はじめる前に：{{section}}",
+  "sectionRules.sectionPosition": "{{total}}つ中{{current}}つ目",
+  "sectionRules.clockNoteFirst": "「準備ができました」をタップすると時間が始まり、離れても時間は進みます。",
+  "sectionRules.clockNoteNext": "「準備ができました」をタップすると時間が始まります。",
+  "sectionRules.leave": "離れる",
+  "sectionRules.starting": "開始中…"
 }

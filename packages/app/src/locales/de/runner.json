@@ -293,5 +293,11 @@
   "library.statusBest": "Beste {{percentage}} %",
   "library.blockedByActive": "Beende zuerst {{title}}.",
   "library.filterEmpty": "Hier ist noch nichts.",
-  "library.skeletonLabel": "Tests werden geladen"
+  "library.skeletonLabel": "Tests werden geladen",
+  "sectionRules.heading": "Bevor du anfängst: {{section}}",
+  "sectionRules.sectionPosition": "Teil {{current}} von {{total}}",
+  "sectionRules.clockNoteFirst": "Die Uhr startet, wenn du auf „Ich bin bereit“ tippst, und läuft weiter, wenn du gehst.",
+  "sectionRules.clockNoteNext": "Die Uhr startet, wenn du auf „Ich bin bereit“ tippst.",
+  "sectionRules.leave": "Verlassen",
+  "sectionRules.starting": "Startet…"
 }

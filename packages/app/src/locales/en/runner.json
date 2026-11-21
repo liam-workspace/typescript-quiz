@@ -293,5 +293,11 @@
   "library.statusBest": "Best {{percentage}}%",
   "library.blockedByActive": "Finish {{title}} first.",
   "library.filterEmpty": "Nothing here yet.",
-  "library.skeletonLabel": "Loading tests"
+  "library.skeletonLabel": "Loading tests",
+  "sectionRules.heading": "Before you begin: {{section}}",
+  "sectionRules.sectionPosition": "Section {{current}} of {{total}}",
+  "sectionRules.clockNoteFirst": "The clock starts when you tap I'm ready and keeps running if you leave.",
+  "sectionRules.clockNoteNext": "The clock starts when you tap I'm ready.",
+  "sectionRules.leave": "Leave",
+  "sectionRules.starting": "Starting…"
 }

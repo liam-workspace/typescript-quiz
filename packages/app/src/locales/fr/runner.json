@@ -293,5 +293,11 @@
   "library.statusBest": "Meilleur {{percentage}} %",
   "library.blockedByActive": "Termine d’abord {{title}}.",
   "library.filterEmpty": "Rien ici pour le moment.",
-  "library.skeletonLabel": "Chargement des tests"
+  "library.skeletonLabel": "Chargement des tests",
+  "sectionRules.heading": "Avant de commencer : {{section}}",
+  "sectionRules.sectionPosition": "Partie {{current}} sur {{total}}",
+  "sectionRules.clockNoteFirst": "Le chrono démarre quand tu touches « Je suis prêt » et continue si tu pars.",
+  "sectionRules.clockNoteNext": "Le chrono démarre quand tu touches « Je suis prêt ».",
+  "sectionRules.leave": "Quitter",
+  "sectionRules.starting": "Démarrage…"
 }

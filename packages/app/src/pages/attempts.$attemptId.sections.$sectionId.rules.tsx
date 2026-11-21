@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { z } from "zod"
+import { Icon } from "../components/Icon.js"
 import { ApiError } from "../lib/api-client.js"
 import { enterSection, getRunnerEnvelope } from "../lib/attempts-api.js"
 import { sameOriginPath } from "../lib/same-origin-path.js"
@@ -57,6 +58,8 @@ export interface SectionRulesScreenProps {
   readonly questionCount: number
   readonly durationSeconds: number
   readonly instructions: readonly string[]
+  readonly sectionNumber: number
+  readonly sectionTotal: number
   readonly finalizedPriorAttempt: FinalizedAttempt | null
   readonly navigate: (path: string) => void
 }
@@ -65,12 +68,13 @@ export function SectionRulesScreen({
   attemptId,
   sectionId,
   sectionType,
-  title,
   testTitle,
   attemptNumber,
   questionCount,
   durationSeconds,
   instructions,
+  sectionNumber,
+  sectionTotal,
   finalizedPriorAttempt,
   navigate,
 }: SectionRulesScreenProps) {
@@ -118,62 +122,71 @@ export function SectionRulesScreen({
     outcome.status === "attemptExpired"
   ) {
     return (
-      <div className="device-page">
-        <main className="center-main">
-          <section className="device-card max-w-xl">
-            <h1 className="screen-title">{t("sectionRules.expired.title")}</h1>
-            <p>
-              {outcome.status === "attemptExpired"
-                ? t("sectionRules.expired.attemptMessage")
-                : t("sectionRules.expired.sectionMessage")}
-            </p>
-            {outcome.status === "attemptExpired" && outcome.resultUrl ? (
-              <a
-                href={outcome.resultUrl}
-                className="device-button mt-4"
-                data-variant="secondary"
-              >
-                {t("sectionRules.expired.viewResult")}
-              </a>
-            ) : null}
-          </section>
+      <div className="m-page">
+        <main className="m-hero">
+          <div className="m-logo" data-tone="clay" aria-hidden="true">
+            <Icon name="clock" />
+          </div>
+          <h1 className="m-title" tabIndex={-1} data-page-title>
+            {t("sectionRules.expired.title")}
+          </h1>
+          <p className="m-sub">
+            {outcome.status === "attemptExpired"
+              ? t("sectionRules.expired.attemptMessage")
+              : t("sectionRules.expired.sectionMessage")}
+          </p>
+          {outcome.status === "attemptExpired" && outcome.resultUrl ? (
+            <a href={outcome.resultUrl} className="m-btn" data-block="true">
+              {t("sectionRules.expired.viewResult")}
+            </a>
+          ) : null}
         </main>
       </div>
     )
   }
 
+  const entering = outcome.status === "entering"
+  const sectionLabel = t(`runner.sectionChip.${sectionType}`)
+
   return (
-    <div className="device-page">
-      <header className="app-bar">
+    <div className="m-page">
+      <header className="m-appbar">
+        <a href="/" className="m-iconbtn" aria-label={t("sectionRules.leave")}>
+          <Icon name="back" />
+        </a>
+        <span className="m-brand">{t("library.brand")}</span>
+        <span className="grow" />
         <span
           className={`section-chip section-chip--${sectionType}`}
           data-section-type={sectionType}
         >
-          {t(`runner.sectionChip.${sectionType}`)}
-        </span>
-        <span className="grow" />
-        <span className="text-ink-2 text-[12.5px] font-bold">
-          {t("sectionRules.durationBeforeStart", {
-            minutes: durationMinutes,
-          })}
+          {sectionLabel}
         </span>
       </header>
-      <main className="center-main">
-        <p className="text-faint mb-1 text-[12.5px] font-bold tracking-[0.05em] uppercase">
+      <main className="m-body">
+        <p className="m-eyebrow">
           {t("sectionRules.attemptEyebrow", {
             testTitle,
             number: attemptNumber,
           })}
         </p>
-        <h1 className="screen-title">{title}</h1>
-        <p className="screen-subtitle max-w-[40ch]">
+        <h1 className="m-title mt-1" tabIndex={-1} data-page-title>
+          {t("sectionRules.heading", { section: sectionLabel })}
+        </h1>
+        <p className="m-sub">
           {t("sectionRules.questionDuration", {
             count: questionCount,
             minutes: durationMinutes,
           })}
+          {sectionTotal > 1
+            ? ` · ${t("sectionRules.sectionPosition", {
+                current: sectionNumber,
+                total: sectionTotal,
+              })}`
+            : null}
         </p>
         {finalizedPriorAttempt ? (
-          <p className="border-amber bg-amber/15 text-ink-2 mt-[14px] max-w-[430px] rounded-[9px] border px-[14px] py-[11px] text-left text-[13.5px] font-semibold">
+          <p className="m-notice">
             {t("sectionRules.finalizedPriorAttempt.notice")}{" "}
             <a
               href={finalizedPriorAttempt.resultUrl}
@@ -183,31 +196,49 @@ export function SectionRulesScreen({
             </a>
           </p>
         ) : null}
-        <section className="device-card mt-[16px] w-full max-w-[400px] text-left">
-          <h2 className="mb-[9px] text-sm font-extrabold">
-            {t("sectionRules.beforeYouBegin")}
-          </h2>
-          <ul className="text-ink-2 m-0 list-disc space-y-1 pl-[19px] text-sm leading-[1.75]">
-            {instructions.map((instruction) => (
-              <li key={instruction}>{instruction}</li>
-            ))}
-          </ul>
-          {outcome.status === "refused" ? (
-            <p role="alert" className="text-bad mt-3 text-sm font-semibold">
-              {refusalMessage(outcome.problem.type, t)}
-            </p>
-          ) : null}
-        </section>
+        <ul className="m-rules">
+          {instructions.map((instruction) => (
+            <li key={instruction}>
+              <Icon
+                name={sectionType === "listening" ? "headphones" : "check"}
+              />
+              <span>{instruction}</span>
+            </li>
+          ))}
+        </ul>
+        {outcome.status === "refused" ? (
+          <p role="alert" className="m-alert mt-3">
+            {refusalMessage(outcome.problem.type, t)}
+          </p>
+        ) : null}
+        <p className="m-reason mt-3.5">
+          {t(
+            sectionNumber <= 1
+              ? "sectionRules.clockNoteFirst"
+              : "sectionRules.clockNoteNext",
+          )}
+        </p>
+      </main>
+      <div className="m-actionbar">
+        <a
+          href="/"
+          className="m-btn"
+          data-variant="secondary"
+          style={{ flex: "0 0 auto" }}
+        >
+          {t("sectionRules.leave")}
+        </a>
         <button
           type="button"
-          className="device-button mt-[18px]"
+          className="m-btn"
           data-testid="ready-button"
           onClick={handleReady}
-          disabled={outcome.status === "entering"}
+          disabled={entering}
+          aria-busy={entering}
         >
-          {t("sectionRules.readyButton")}
+          {t(entering ? "sectionRules.starting" : "sectionRules.readyButton")}
         </button>
-      </main>
+      </div>
     </div>
   )
 }
@@ -239,6 +270,10 @@ export async function loadSectionRulesData(
     questionCount: section.questionCount,
     durationSeconds: section.durationSeconds,
     instructions: section.instructions,
+    sectionNumber:
+      envelope.sections.findIndex((candidate) => candidate.id === sectionId) +
+      1,
+    sectionTotal: envelope.sections.length,
   }
 }
 

@@ -293,5 +293,11 @@
   "library.statusBest": "Migliore {{percentage}}%",
   "library.blockedByActive": "Finisci prima {{title}}.",
   "library.filterEmpty": "Qui non c’è ancora niente.",
-  "library.skeletonLabel": "Caricamento dei test"
+  "library.skeletonLabel": "Caricamento dei test",
+  "sectionRules.heading": "Prima di iniziare: {{section}}",
+  "sectionRules.sectionPosition": "Parte {{current}} di {{total}}",
+  "sectionRules.clockNoteFirst": "Il timer parte quando tocchi «Sono pronto» e continua anche se esci.",
+  "sectionRules.clockNoteNext": "Il timer parte quando tocchi «Sono pronto».",
+  "sectionRules.leave": "Esci",
+  "sectionRules.starting": "Avvio…"
 }

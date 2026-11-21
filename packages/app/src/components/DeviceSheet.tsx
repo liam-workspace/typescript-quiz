@@ -45,6 +45,7 @@ export function DeviceSheet({
 
             if (suppressReturnFocusRef?.current) {
               suppressReturnFocusRef.current = false
+
               return
             }
 

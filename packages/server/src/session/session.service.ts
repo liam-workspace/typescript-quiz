@@ -71,7 +71,12 @@ export class SessionService {
    * grant rejects every sign-in, it never admits one.
    */
   private authorizedEmail(claims: JwtClaims): string {
-    const { email, rolesByApp } = claims
+    const { email } = claims
+    // Typed non-optional upstream, but a token may omit it at runtime and that
+    // must fail closed (403), not throw.
+    const rolesByApp = claims.rolesByApp as
+      | Partial<Record<string, string[]>>
+      | undefined
     const { accessAppId, accessRole } = loadServerConfig()
     const grantedRoles = rolesByApp?.[accessAppId] ?? []
 

@@ -141,7 +141,9 @@ describe("attempt history page", () => {
         return Promise.resolve(response(tom))
       }
 
-      return Promise.reject(new Error(`Unexpected request: ${String(input)}`))
+      const target = input instanceof Request ? input.url : input.toString()
+
+      return Promise.reject(new Error(`Unexpected request: ${target}`))
     })
     vi.stubGlobal("fetch", fetchMock)
 

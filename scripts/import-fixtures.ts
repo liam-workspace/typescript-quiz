@@ -75,18 +75,7 @@ async function findExistingTest(
  */
 async function loadFixtureDocument(path: string): Promise<TestDocument> {
   const raw = await readFile(path, "utf8")
-
-  let parsed: unknown
-
-  try {
-    parsed = JSON.parse(raw)
-  } catch (err) {
-    throw new Error(
-      `${path}: not valid JSON -- ${(err as Error).message}`,
-    )
-  }
-
-  const result = testDocumentSchema.safeParse(parsed)
+  const result = testDocumentSchema.safeParse(parseJson(raw, path))
 
   if (!result.success) {
     throw new Error(
@@ -95,6 +84,14 @@ async function loadFixtureDocument(path: string): Promise<TestDocument> {
   }
 
   return result.data
+}
+
+function parseJson(raw: string, path: string): unknown {
+  try {
+    return JSON.parse(raw)
+  } catch (err) {
+    throw new Error(`${path}: not valid JSON -- ${(err as Error).message}`)
+  }
 }
 
 /**
@@ -140,15 +137,11 @@ async function ensureMediaAsset(
   }
 
   const sourcePath = join(MEDIA_DIR, filename)
-  let bytes: Buffer
-
-  try {
-    bytes = await readFile(sourcePath)
-  } catch (err) {
+  const bytes = await readFile(sourcePath).catch((err: unknown) => {
     throw new Error(
       `${filename}: referenced media not found at ${sourcePath} -- ${(err as Error).message}`,
     )
-  }
+  })
 
   const checksum = createHash("sha256").update(bytes).digest("hex")
   const mediaRoot = resolve(process.env.MEDIA_ROOT ?? "/media")

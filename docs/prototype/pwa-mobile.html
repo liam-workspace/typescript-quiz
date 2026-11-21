@@ -1,0 +1,882 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#ffffff" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<title>Primary Practice PWA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Nunito:wght@400;600;700;800&display=swap" />
+<style>
+  /* Device palette — ported from the production app (packages/app/src/index.css). Light-only by design. */
+  :root {
+    --ink:#1c2530; --ink-2:#4b5966; --faint:#8d9aa6; --paper:#fff; --surface:#f4f7f9; --line:#dfe6ec;
+    --teal:#0f6e78; --teal-d:#0b5a63; --teal-bg:#e4f1f2; --clay:#a8622f; --clay-bg:#f8ede4;
+    --good:#1f7a43; --good-bg:#e6f4eb; --bad:#b53a34; --bad-bg:#faeae9; --amber:#e8a33d; --amber-bg:#fdf3df;
+    --ph:min(844px, calc(100dvh - 32px)); --pw:390px;
+    --font:"Nunito", ui-rounded, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;font-family:var(--font);color:var(--ink);background:#dde4ea;font-size:16px;line-height:1.4;-webkit-text-size-adjust:100%}
+  button,input,select{font:inherit;color:inherit}
+  button{cursor:pointer}
+  h1,h2,h3,p{margin:0}
+  :focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+  [tabindex="-1"]:focus{outline:none} /* programmatic focus targets (headings, main) only */
+  .sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+  /* ───── Desktop stage: notes + phone frame ───── */
+  .stage{min-height:100dvh;display:flex;gap:40px;align-items:center;justify-content:center;padding:16px}
+  .notes{width:340px;max-height:calc(100dvh - 32px);overflow:auto;padding:4px 4px 4px 0;font-size:14px}
+  .notes h1{font-size:22px;font-weight:800;line-height:1.2}
+  .notes .tag{display:inline-block;margin:8px 0 12px;padding:2px 10px;border-radius:99px;background:var(--teal);color:#fff;font-size:12px;font-weight:800;letter-spacing:.04em}
+  .notes h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin:18px 0 6px;font-weight:800}
+  .notes ol,.notes ul{margin:0;padding-left:20px;color:var(--ink)}
+  .notes li{margin:4px 0}
+  .notes details{margin-top:14px;background:rgba(255,255,255,.55);border-radius:10px;padding:8px 12px}
+  .notes summary{cursor:pointer;font-weight:800}
+
+  .phone{position:relative;width:var(--pw);height:var(--ph);background:var(--paper);border-radius:44px;border:10px solid #10161c;box-shadow:0 30px 60px rgba(16,22,28,.35);display:flex;flex-direction:column;overflow:hidden;isolation:isolate}
+  .ch-status{flex:none;height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;font-weight:800;font-size:15px;background:var(--paper)}
+  .ch-browser{flex:none;height:46px;display:flex;align-items:center;gap:8px;padding:0 12px;background:var(--surface);border-bottom:1px solid var(--line)}
+  .ch-browser .url{flex:1;text-align:center;background:#e6ecf1;border-radius:10px;padding:6px;font-size:13px;font-weight:700;color:var(--ink-2)}
+  .homebar{flex:none;height:22px;display:grid;place-items:center;background:var(--paper)}
+  .homebar i{display:block;width:120px;height:5px;border-radius:9px;background:#10161c}
+  .viewport{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+  .scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;background:var(--surface)}
+  .scrim{position:absolute;inset:0;background:rgba(16,22,28,.45);opacity:0;pointer-events:none;transition:opacity .2s;z-index:30}
+  .phone.scrimmed .scrim{opacity:1}
+
+  @media (max-width:900px){.notes{display:none}}
+  @media (max-width:560px){
+    body{background:var(--paper)}
+    .stage{padding:0;display:block;min-height:0}
+    .ch-status,.ch-browser,.homebar{display:none}
+    .phone{--ph:100dvh;--pw:100vw;width:100%;height:100dvh;border:0;border-radius:0;box-shadow:none}
+  }
+
+  /* ───── App chrome ───── */
+  .appbar{display:flex;align-items:center;gap:10px;min-height:56px;padding:8px 14px;padding-top:max(8px, env(safe-area-inset-top));background:var(--paper);border-bottom:1px solid var(--line)}
+  .brand{font-weight:800;font-size:17px;color:var(--teal)}
+  .grow{flex:1}
+  .avatar{width:32px;height:32px;border-radius:50%;background:var(--teal);color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px}
+  .iconbtn{width:44px;height:44px;border:0;border-radius:12px;background:transparent;display:grid;place-items:center;color:var(--ink)}
+  .iconbtn:active{background:var(--surface)}
+  svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  svg.i.sm{width:16px;height:16px}
+
+  .page{padding:18px 16px 24px}
+  .page h1{font-size:24px;font-weight:800;line-height:1.2}
+  .sub{color:var(--ink-2);margin-top:4px;font-size:15px}
+  .eyebrow{font-size:12px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2)}
+
+  .tabbar{display:grid;grid-template-columns:repeat(3,1fr);background:var(--paper);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+  .tabbar a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px 8px;min-height:60px;text-decoration:none;color:var(--ink-2);font-size:12px;font-weight:700;position:relative}
+  .tabbar a[aria-current="page"]{color:var(--teal)}
+  .tabbar a[aria-current="page"]::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;border-radius:0 0 3px 3px;background:var(--teal)}
+  .actionbar{display:flex;gap:10px;align-items:center;padding:10px 14px;padding-bottom:max(10px, env(safe-area-inset-bottom));background:var(--paper);border-top:1px solid var(--line)}
+  .actionbar .btn{flex:1}
+
+  /* ───── Controls ───── */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:10px 18px;border-radius:14px;border:2px solid var(--teal);background:var(--teal);color:#fff;font-weight:800;font-size:16px;text-decoration:none;text-align:center}
+  .btn:hover{background:var(--teal-d)}
+  .btn.secondary{background:var(--paper);color:var(--teal)}
+  .btn.secondary:hover{background:var(--teal-bg)}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--teal)}
+  .btn.danger{background:var(--bad);border-color:var(--bad)}
+  .btn.sm{min-height:44px;padding:6px 14px;font-size:14px}
+  .btn.block{width:100%}
+  .btn[disabled],.btn[aria-disabled="true"]{background:#e8edf1;border-color:#e8edf1;color:#5d6a76;cursor:not-allowed}
+  .btn[aria-busy="true"]{position:relative}
+  .btn[aria-busy="true"]::after{content:"";width:16px;height:16px;border-radius:50%;border:3px solid currentColor;border-right-color:transparent;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .reason{font-size:13px;color:var(--ink-2);margin-top:6px}
+
+  .card{background:var(--paper);border:1.5px solid var(--line);border-radius:16px;padding:14px}
+  .card.hl{border-color:var(--teal)}
+  .stack>*+*{margin-top:12px}
+  .row{display:flex;align-items:center;gap:12px}
+  .row.top{align-items:flex-start}
+  .meta{font-size:13.5px;color:var(--ink-2);margin-top:2px}
+  .chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:99px;font-size:12.5px;font-weight:800;background:var(--surface);color:var(--ink-2);border:1px solid var(--line)}
+  .chip.teal{background:var(--teal-bg);color:var(--teal-d);border-color:transparent}
+  .chip.good{background:var(--good-bg);color:var(--good);border-color:transparent}
+  .chip.bad{background:var(--bad-bg);color:var(--bad);border-color:transparent}
+  .chip.warn{background:var(--amber-bg);color:#7a4d00;border-color:transparent}
+  .chip.clay{background:var(--clay-bg);color:var(--clay);border-color:transparent}
+  .ticon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:var(--teal-bg);color:var(--teal);flex:none}
+  .ticon.math{background:var(--clay-bg);color:var(--clay)}
+  .card h2{font-size:16.5px;font-weight:800}
+  .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+
+  .seg{display:flex;gap:6px;margin:16px 0 12px}
+  .seg button{flex:1;min-height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--paper);font-weight:800;color:var(--ink-2)}
+  .seg button[aria-pressed="true"]{background:var(--teal);border-color:var(--teal);color:#fff}
+
+  .banner{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;font-size:14px;font-weight:600}
+  .banner.off{background:#2b3540;color:#fff}
+  .banner.upd{background:var(--teal-bg);color:var(--teal-d)}
+  .banner .btn{min-height:36px;padding:2px 12px;font-size:13px;border-radius:10px}
+  .install{background:linear-gradient(0deg,var(--teal-bg),var(--teal-bg));border-color:transparent}
+  .install p{font-size:14px;color:var(--ink-2);margin:2px 0 0}
+
+  dl.stats{display:flex;gap:28px;margin:18px 0 0}
+  dl.stats dt{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2)}
+  dl.stats dd{margin:0;font-weight:800;font-size:20px;font-variant-numeric:tabular-nums}
+
+  /* skeleton */
+  .sk{height:96px;border-radius:16px;background:linear-gradient(90deg,#e6ecf1 25%,#f0f4f7 50%,#e6ecf1 75%);background-size:200% 100%;animation:sh 1.2s infinite linear}
+  @keyframes sh{to{background-position:-200% 0}}
+
+  /* sign in */
+  .hero{min-height:100%;display:flex;flex-direction:column;justify-content:center;padding:32px 24px;background:var(--paper);text-align:center;gap:14px}
+  .logo{width:84px;height:84px;margin:0 auto;border-radius:24px;background:var(--teal);color:#fff;display:grid;place-items:center;font-weight:800;font-size:40px;box-shadow:0 8px 20px rgba(15,110,120,.3)}
+  .hero h1{font-size:28px;font-weight:800}
+  .alert{background:var(--bad-bg);color:var(--bad);border-radius:12px;padding:10px 12px;font-weight:700;font-size:14px;text-align:left}
+
+  /* ───── Runner ───── */
+  .runtop{background:var(--paper);border-bottom:1px solid var(--line);padding:6px 10px 0;padding-top:max(6px, env(safe-area-inset-top))}
+  .runtop .row{min-height:48px}
+  .timer{font-family:var(--mono);font-weight:600;font-size:17px;padding:4px 10px;border-radius:10px;background:var(--surface);display:inline-flex;gap:6px;align-items:center}
+  .timer.low{background:var(--bad-bg);color:var(--bad)}
+  .save{font-size:12.5px;font-weight:800;display:inline-flex;gap:4px;align-items:center;color:var(--ink-2)}
+  .save[data-s="pending"]{color:#7a4d00}
+  .progress{height:5px;background:var(--line);margin:4px -10px 0}
+  .progress i{display:block;height:100%;background:var(--teal);transition:width .25s}
+  .qmeta{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:800;color:var(--ink-2);padding:8px 2px 8px}
+  .qtitle{font-size:20px;font-weight:800;line-height:1.3;margin:2px 0 4px}
+  .hint{font-size:14px;color:var(--ink-2);margin-bottom:10px}
+  fieldset{border:0;margin:0;padding:0;min-width:0}
+  legend{padding:0;width:100%}
+  .choices{display:grid;gap:10px;margin-top:10px}
+  .choice{position:relative;display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 14px;background:var(--paper);border:2px solid var(--line);border-radius:16px;font-size:17px;font-weight:700;cursor:pointer}
+  .choice input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
+  .choice .letter{width:32px;height:32px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font-weight:800;font-size:14px;flex:none;border:1.5px solid var(--line)}
+  .choice:has(input:checked){border-color:var(--teal);background:var(--teal-bg)}
+  .choice:has(input:checked) .letter{background:var(--teal);color:#fff;border-color:var(--teal)}
+  .choice:has(input:focus-visible){outline:3px solid var(--teal);outline-offset:2px}
+  .choice:has(input:disabled){opacity:.6;cursor:not-allowed;background:#f1f4f6}
+  .choice.rv-correct{border-color:var(--good);background:var(--good-bg)}
+  .choice.rv-wrong{border-color:var(--bad);background:var(--bad-bg)}
+  .choice .tag{margin-left:auto;font-size:12px;font-weight:800;white-space:nowrap}
+  .choice.rv-correct .tag{color:var(--good)} .choice.rv-wrong .tag{color:var(--bad)}
+  details.passage{background:var(--paper);border:1.5px solid var(--line);border-radius:16px;margin-bottom:14px}
+  details.passage summary{min-height:48px;display:flex;align-items:center;gap:8px;padding:0 14px;font-weight:800;cursor:pointer;list-style:none}
+  details.passage summary::-webkit-details-marker{display:none}
+  details.passage p{padding:0 14px 14px;font-size:17px;line-height:1.6}
+  .audio{background:var(--paper);border:1.5px solid var(--line);border-radius:16px;padding:16px;text-align:center;margin-bottom:14px}
+  .audio .scene{font-size:46px;line-height:1;margin-bottom:8px}
+  .bar{height:10px;border-radius:9px;background:var(--line);overflow:hidden;margin:12px 0 6px}
+  .bar i{display:block;height:100%;width:0;background:var(--clay)}
+  .audio .btn{width:100%}
+  .eq{display:inline-flex;gap:3px;align-items:flex-end;height:16px}
+  .eq b{width:4px;background:currentColor;border-radius:2px;animation:eq .8s infinite ease-in-out}
+  .eq b:nth-child(2){animation-delay:.2s}.eq b:nth-child(3){animation-delay:.4s}
+  @keyframes eq{0%,100%{height:4px}50%{height:16px}}
+
+  .cells{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px;margin:8px 0 14px}
+  .cell{min-height:52px;border-radius:12px;border:2px solid var(--line);background:var(--paper);font-weight:800;font-size:16px;display:grid;place-items:center;position:relative}
+  .cell[data-s="answered"]{background:var(--teal);border-color:var(--teal);color:#fff}
+  .cell[data-s="current"]{border-color:var(--clay);box-shadow:0 0 0 3px var(--clay-bg);color:var(--clay)}
+  .cell[data-s="correct"]{background:var(--good-bg);border-color:var(--good);color:var(--good)}
+  .cell[data-s="wrong"]{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+  .cell[data-s="blank"][data-mode="review"]{border-style:dashed}
+  .cell .m{position:absolute;right:3px;top:1px;font-size:10px}
+  span.cell{opacity:.8}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:6px}
+  .legend i{display:inline-block;width:14px;height:14px;border-radius:5px;border:2px solid var(--line);vertical-align:-2px;margin-right:5px}
+  .legend i[data-s="answered"]{background:var(--teal);border-color:var(--teal)}
+  .legend i[data-s="current"]{border-color:var(--clay)}
+  .legend i[data-s="correct"]{background:var(--good-bg);border-color:var(--good)}
+  .legend i[data-s="wrong"]{background:var(--bad-bg);border-color:var(--bad)}
+
+  .rules{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:10px}
+  .rules li{display:flex;gap:12px;align-items:flex-start;background:var(--paper);border:1.5px solid var(--line);border-radius:14px;padding:12px 14px;font-weight:700}
+  .rules svg{color:var(--clay);margin-top:1px}
+
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+  .tile{background:var(--paper);border:1.5px solid var(--line);border-radius:16px;padding:14px;text-align:center}
+  .tile b{display:block;font-size:30px;font-weight:800;font-variant-numeric:tabular-nums}
+  .tile span{font-size:13px;font-weight:700;color:var(--ink-2)}
+  .notice{background:var(--amber-bg);color:#5c3a00;border-radius:12px;padding:10px 12px;font-weight:700;font-size:14px;margin-top:12px}
+  .ringwrap{display:grid;place-items:center;margin:8px 0 6px}
+  .ring{width:170px;height:170px;position:relative}
+  .ring svg{width:170px;height:170px;transform:rotate(-90deg)}
+  .ring circle{fill:none;stroke-width:14}
+  .ring .bg{stroke:var(--line)} .ring .fg{stroke:var(--teal);stroke-linecap:round;transition:stroke-dashoffset .8s}
+  .ring div{position:absolute;inset:0;display:grid;place-items:center;text-align:center;font-size:38px;font-weight:800}
+  .ring small{display:block;font-size:13px;color:var(--ink-2);font-weight:700}
+  .breakdown{display:grid;gap:8px;margin-top:14px}
+  .breakdown .card{display:flex;align-items:center;gap:10px;padding:10px 14px;font-weight:700}
+  .breakdown b{margin-left:auto;font-variant-numeric:tabular-nums}
+  .frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.15;font-size:.85em;margin:0 3px}
+  .frac>span:first-child{border-bottom:2px solid currentColor;padding:0 5px}
+  .explain{background:var(--teal-bg);border-radius:14px;padding:12px 14px;margin-top:14px;font-size:15px}
+  .explain b{display:block;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--teal-d);margin-bottom:2px}
+
+  /* list rows (profile) */
+  .list{background:var(--paper);border:1.5px solid var(--line);border-radius:16px;overflow:hidden}
+  .list>*+*{border-top:1px solid var(--line)}
+  .li{display:flex;align-items:center;gap:12px;min-height:60px;padding:8px 14px;width:100%;background:none;border:0;text-align:left}
+  .li .t{flex:1;font-weight:800}
+  .li .t small{display:block;font-weight:600;color:var(--ink-2);font-size:13px}
+  .switch{position:relative;width:52px;height:32px;flex:none}
+  .switch input{position:absolute;inset:0;width:100%;height:100%;opacity:0;margin:0;cursor:pointer}
+  .switch i{position:absolute;inset:0;border-radius:99px;background:#b7c2cb;transition:background .15s}
+  .switch i::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:transform .15s}
+  .switch input:checked+i{background:var(--teal)}
+  .switch input:checked+i::after{transform:translateX(20px)}
+  .switch input:focus-visible+i{outline:3px solid var(--teal);outline-offset:2px}
+  .switch input:disabled{cursor:not-allowed} .switch input:disabled+i{opacity:.5}
+  .section-h{margin:22px 2px 8px}
+  .demo{background:#fff8e6;border:1.5px dashed var(--amber);border-radius:16px;padding:12px 14px;margin-top:22px;font-size:14px}
+  .demo h2{font-size:13px;letter-spacing:.07em;text-transform:uppercase;font-weight:800;color:#7a4d00;margin-bottom:6px}
+  .demo .ctl{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;font-weight:700}
+  .demo select{min-height:40px;border-radius:10px;border:1.5px solid var(--line);padding:0 8px;background:#fff}
+  .demo .btn{margin-top:6px}
+  .controls-profile{display:none}
+  @media (max-width:560px){.controls-profile{display:block}}
+  .notes .demo{margin-top:16px}
+
+  /* dialog sheet */
+  dialog.sheet{margin:0;padding:0;border:0;position:fixed;inset:auto auto calc((100dvh - var(--ph))/2) 50%;transform:translateX(-50%);width:var(--pw);max-width:none;max-height:calc(var(--ph) * .86);background:var(--paper);color:var(--ink);border-radius:24px 24px 34px 34px;box-shadow:0 -8px 30px rgba(0,0,0,.2);overflow:auto;animation:up .22s ease-out}
+  dialog.sheet::backdrop{background:transparent}
+  @keyframes up{from{transform:translate(-50%,28px);opacity:0}}
+  @media (max-width:560px){dialog.sheet{inset:auto auto 0 50%;border-radius:24px 24px 0 0}}
+  .sheet-in{padding:6px 18px calc(18px + env(safe-area-inset-bottom))}
+  .grab{width:44px;height:5px;border-radius:9px;background:var(--line);margin:8px auto 4px}
+  .sheet-h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .sheet-h h2{flex:1;font-size:20px;font-weight:800}
+  .steps{padding-left:0;list-style:none;display:grid;gap:10px;margin:12px 0}
+  .steps li{display:flex;gap:12px;align-items:center;background:var(--surface);border-radius:14px;padding:10px 12px;font-weight:700}
+  .steps .n{width:28px;height:28px;border-radius:50%;background:var(--teal);color:#fff;display:grid;place-items:center;font-weight:800;flex:none}
+  .btnrow{display:grid;gap:10px;margin-top:14px}
+
+  .toast{position:absolute;left:12px;right:12px;bottom:84px;z-index:40;background:#1c2530;color:#fff;padding:12px 14px;border-radius:14px;font-weight:700;font-size:14px;display:flex;gap:10px;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,.3);animation:up2 .2s ease-out}
+  @keyframes up2{from{transform:translateY(10px);opacity:0}}
+  .splash{position:absolute;inset:0;z-index:50;background:var(--teal);color:#fff;display:grid;place-content:center;justify-items:center;gap:14px;transition:opacity .35s}
+  .splash[hidden]{display:none}
+  .splash.out{opacity:0}
+  .splash .logo{background:#fff;color:var(--teal);box-shadow:none}
+  .splash b{font-size:22px}
+
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.001s!important;animation-iteration-count:1!important;transition-duration:.001s!important}
+    .sk{animation:none}
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <aside class="notes" aria-label="Prototype notes">
+    <h1>Primary Practice as an installable mobile PWA</h1>
+    <span class="tag">CLICKABLE PROTOTYPE</span>
+    <p>Student side of the quiz app, redesigned phone-first and wired for the things a PWA adds: install, offline use, safe saving, and update handling. Clock, saving and scoring are simulated in the browser.</p>
+    <h2>Try this</h2>
+    <ol>
+      <li>Sign in, then tap <b>Install</b> on the home screen banner.</li>
+      <li>On <b>Practice Test 3</b> tap <b>Save offline</b>, then switch the network to offline below.</li>
+      <li>Start the test, play a recording, answer, and watch the save indicator queue answers.</li>
+      <li>Go back online: the queue flushes. Then finish the reading section and hand in.</li>
+      <li>Open the result, review answers, and check History and Profile.</li>
+      <li>Use <b>Simulate new version</b> during a test: the update waits until you finish.</li>
+    </ol>
+    <div id="ctl-desktop"></div>
+    <details>
+      <summary>Left out on purpose</summary>
+      <ul>
+        <li>Admin console (stays desktop-first).</li>
+        <li>Real auth, audio, server timers and grading.</li>
+        <li>Language picker, Library empty state, paging.</li>
+        <li>Real service worker, manifest and web push.</li>
+      </ul>
+    </details>
+  </aside>
+
+  <div class="phone" id="phone">
+    <div class="ch-status" id="ch-status" aria-hidden="true"><span>9:41</span><span>●●●● 5G ▮</span></div>
+    <div class="ch-browser" id="ch-browser" aria-hidden="true"><span>AA</span><span class="url">🔒 quiz.icovn.me</span><span>↻</span></div>
+    <div class="viewport">
+      <div id="top"></div>
+      <main class="scroll" id="body" tabindex="-1"></main>
+      <div id="bottom"></div>
+      <div class="scrim" id="scrim"></div>
+      <div id="toast-host"></div>
+    </div>
+    <div class="homebar" aria-hidden="true"><i></i></div>
+    <div class="splash" id="splash" hidden><div class="logo" aria-hidden="true">P</div><b>Primary Practice</b></div>
+  </div>
+</div>
+<div class="sr" id="live" role="status" aria-live="polite"></div>
+<dialog class="sheet" id="sheet" aria-labelledby="sh-t"></dialog>
+
+<script>
+"use strict"
+/* ───────────────────────── Content ───────────────────────── */
+const fr=(n,d)=>`<span class="frac"><span>${n}</span><span>${d}</span></span>`
+const BANK={
+  listening:{label:"Listening",icon:"headphones",minutes:10,forward:true,
+    rules:["Each recording plays once.","You cannot pause or rewind.","You cannot return to a question you have passed.","Put your headphones on now."],
+    questions:[
+      {id:"L1",scene:"🎒",prompt:"Where is Mia's bag?",choices:["On her desk","Under the bench","In the gym","On the bus"],correct:[1],explain:"Mia: “Oh no, my bag!” Teacher: “Look under the bench by the door.”"},
+      {id:"L2",scene:"🍽️",prompt:"What does Ben want for lunch?",choices:["An apple","A sandwich","Rice","Soup"],correct:[1],explain:"Ben says: “I'm hungry. Can I have a sandwich, please?”"},
+      {id:"L3",scene:"⏰",prompt:"What time does the class start?",choices:["8:15","8:30","9:00","9:15"],correct:[1],explain:"“Class starts at eight thirty, so don't be late.”"},
+      {id:"L4",scene:"🦒",prompt:"Which animal did the boy see at the zoo?",choices:["🐘 Elephant","🦒 Giraffe","🐒 Monkey","🦁 Lion"],correct:[1],explain:"“It had a very long neck. It was a giraffe!”"}]},
+  reading:{label:"Reading",icon:"book",minutes:12,forward:false,
+    rules:["Read the passage, then answer each question.","You can move between questions.","Some questions have more than one answer.","You can change an answer until you hand in."],
+    passage:"Tom has a small garden behind his house. In spring, he plants tomato seeds, carrot seeds and bean seeds. Every morning he waters the garden with a blue can. After many weeks, the plants grow tall. Tom picks a tiny tomato and shares it with his sister.",
+    questions:[
+      {id:"R1",prompt:"What does Tom plant in spring?",choices:["Seeds","Shoes","Stones","Books"],correct:[0],explain:"The passage says: “In spring, he plants … seeds.”"},
+      {id:"R2",prompt:"How does Tom water the garden?",choices:["With a blue can","With a hose","With a cup","Only rain"],correct:[0],explain:"“Every morning he waters the garden with a blue can.”"},
+      {id:"R3",multi:true,prompt:"Which seeds does Tom plant?",choices:["Tomato","Carrot","Banana","Bean"],correct:[0,1,3],explain:"Tom plants tomato, carrot and bean seeds. There are no banana seeds."},
+      {id:"R4",prompt:"What does Tom do with the tiny tomato?",choices:["Eats it alone","Shares it with his sister","Gives it to a bird","Plants it again"],correct:[1],explain:"“Tom … shares it with his sister.”"}]},
+  math:{label:"Math",icon:"calc",minutes:8,forward:false,
+    rules:["Work out each answer in your head or on paper.","You can move between questions.","You can change an answer until you hand in."],
+    questions:[
+      {id:"M1",prompt:`What is ${fr(1,2)} + ${fr(1,4)} ?`,choices:[fr(3,4),fr(2,6),fr(1,6),fr(2,4)],correct:[0],explain:`${fr(1,2)} is the same as ${fr(2,4)}. Then ${fr(2,4)} + ${fr(1,4)} = ${fr(3,4)}.`},
+      {id:"M2",prompt:"A rectangle is 6 cm long and 4 cm wide. What is its area?",choices:["10 cm²","24 cm²","20 cm²","48 cm²"],correct:[1],explain:"Area = length × width = 6 × 4 = 24 cm²."},
+      {id:"M3",prompt:"Which shape has 5 sides?",choices:["Triangle","Square","Pentagon","Hexagon"],correct:[2],explain:"“Penta” means five. A pentagon has 5 sides."}]}
+}
+const TESTS=[
+  {id:"t3",title:"Practice Test 3",level:"Step 1",sections:["listening","reading"],mb:18},
+  {id:"t2",title:"Practice Test 2",level:"Step 1",sections:["listening","reading"],mb:17},
+  {id:"t4",title:"Practice Test 1",level:"Step 2",sections:["listening","reading"],mb:21},
+  {id:"m1",title:"Fractions & Shapes",level:"Math",sections:["math"],mb:3}
+]
+const test=id=>TESTS.find(t=>t.id===id)
+const qsOf=t=>t.sections.flatMap(k=>BANK[k].questions.map(q=>({...q,sec:k})))
+const mins=t=>t.sections.reduce((n,k)=>n+BANK[k].minutes,0)
+
+/* ───────────────────────── State ───────────────────────── */
+const KEY="quiz-pwa-proto-v1"
+const seed=()=>[
+  {id:"a1",testId:"t2",n:1,status:"expired",at:"2026-11-14T16:40:00",answers:{L1:[1],L2:[1],L3:[0],L4:[1],R1:[0],R3:[0,1]}},
+  {id:"a2",testId:"t2",n:2,status:"submitted",at:"2026-11-18T17:05:00",answers:{L1:[1],L2:[1],L3:[1],L4:[1],R1:[0],R2:[0],R3:[0,1,3],R4:[0]}}]
+const fresh=()=>({user:null,installed:false,installDismissed:false,platform:/iPhone|iPad|iPod/.test(navigator.userAgent)?"ios":"android",
+  outcome:"success",failNext:false,update:false,version:"4.1.0",notif:"off",dl:{},attempts:seed(),active:null,queue:0,seq:3,timeup:null})
+let S=fresh()
+try{const raw=localStorage.getItem(KEY);if(raw)S={...fresh(),...JSON.parse(raw)}}catch{}
+const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch{}}
+/* transient, never persisted */
+const T={online:true,save:"saved",playing:null,fail:{},libLoading:false,libLoaded:false,signing:false,signErr:false,handing:false,
+  filter:"all",dlProg:{},starting:false,warned:false,splashDone:false}
+
+/* ───────────────────────── Helpers ───────────────────────── */
+const $=(s,r=document)=>r.querySelector(s)
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))
+const P={
+  home:'<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+  clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  user:'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',x:'<path d="M18 6 6 18M6 6l12 12"/>',minus:'<path d="M5 12h14"/>',
+  download:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/>',
+  back:'<path d="M19 12H5M12 19l-7-7 7-7"/>',grid:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
+  headphones:'<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>',
+  play:'<path d="M6 4l14 8-14 8z"/>',wifioff:'<path d="M12 20h.01M8.5 16.4a5 5 0 0 1 7 0M2 8.8a15 15 0 0 1 4.2-2.6M22 8.8a15 15 0 0 0-10-3.8M5 12.9a10 10 0 0 1 5.2-2.7M19 12.9a10 10 0 0 0-1.6-1.3M2 2l20 20"/>',
+  share:'<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13"/>',plus:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 8v8M8 12h8"/>',
+  bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a2 2 0 0 0 3.4 0"/>',chev:'<path d="m9 18 6-6-6-6"/>',
+  trash:'<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  book:'<path d="M2 4h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+  calc:'<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/>',
+  refresh:'<path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/>',logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+  more:'<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>',lock:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  cloud:'<path d="M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 1 1 0 9z"/>',alert:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>'
+}
+const ic=(n,c="")=>`<svg class="i ${c}" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`
+const fmt=s=>{s=Math.max(0,Math.ceil(s));return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
+const date=iso=>new Date(iso).toLocaleDateString("en-US",{month:"short",day:"numeric"})
+const live=m=>{const l=$("#live");l.textContent="";setTimeout(()=>l.textContent=m,30)}
+let toastT
+function toast(m,icon="check"){const h=$("#toast-host");h.innerHTML=`<div class="toast" role="status">${ic(icon)}<span>${esc(m)}</span></div>`;clearTimeout(toastT);toastT=setTimeout(()=>h.innerHTML="",3800)}
+const sameSet=(a,b)=>a.length===b.length&&[...a].sort().every((v,i)=>v===[...b].sort()[i])
+const qState=(q,ans)=>{const a=(ans||{})[q.id]||[];return !a.length?"blank":sameSet(a,q.correct)?"correct":"wrong"}
+function score(att){const qs=qsOf(test(att.testId));const st=qs.map(q=>qState(q,att.answers))
+  const c=st.filter(s=>s==="correct").length,w=st.filter(s=>s==="wrong").length,b=st.filter(s=>s==="blank").length
+  return {c,w,b,total:qs.length,pct:Math.round(100*c/qs.length),qs,st}}
+const finished=()=>S.attempts
+const attOf=id=>S.attempts.find(a=>a.id===id)
+const best=id=>Math.max(0,...S.attempts.filter(a=>a.testId===id).map(a=>score(a).pct))
+
+/* active attempt helpers */
+function cur(){const A=S.active;if(!A)return null;const t=test(A.testId),key=t.sections[A.secIdx];return {A,t,key,sec:BANK[key],qs:BANK[key].questions,q:BANK[key].questions[A.qi]}}
+const isAns=(A,q)=>((A.answers[q.id]||[]).length>0)
+const secLeft=A=>A.endAt?(A.endAt-Date.now())/1000:0
+
+/* ───────────────────────── Routing ───────────────────────── */
+const go=p=>{if(location.hash==="#"+p)render("title");else location.hash=p}
+const route=()=>{const h=(location.hash||"").slice(1);return h||"/library"}
+function guard(r){
+  const base=r.split("/")[1]
+  if(!S.user&&base!=="signin")return "/signin"
+  if(S.user&&base==="signin")return "/library"
+  if(["rules","run","handin"].includes(base)&&!S.active)return "/library"
+  if(base==="run"&&S.active?.phase!=="run")return "/rules"
+  if(base==="rules"&&S.active?.phase==="run")return "/run"
+  if(base==="timeup"&&!S.timeup)return "/library"
+  return null
+}
+
+/* ───────────────────────── Views ───────────────────────── */
+function banners(){
+  const r=route().split("/")[1],inRun=["run","rules","handin"].includes(r);let h=""
+  if(!T.online)h+=`<div class="banner off" role="status">${ic("wifioff")}<span>You're offline. ${inRun?`Keep answering — your answers are saved on this phone and will be sent when you reconnect.`:`Showing what is saved on this phone.`}${S.queue?` <b>Waiting to be sent: ${S.queue}</b>`:""}</span></div>`
+  if(S.update&&S.user){h+=inRun
+    ?`<div class="banner upd" role="status">${ic("refresh")}<span>A new version is ready. It will install after you finish this test.</span></div>`
+    :`<div class="banner upd" role="status">${ic("refresh")}<span class="grow">A new version is ready.</span><button class="btn sm" data-act="apply-update" data-fk="upd">Refresh</button></div>`}
+  return h
+}
+const appbar=(left,right="")=>`<header class="appbar">${left}<span class="grow"></span>${right}</header>`
+const tabs=cur=>`<nav class="tabbar" aria-label="Main">${[["library","Library","home"],["history","History","clock"],["profile","Profile","user"]].map(([k,l,i])=>`<a href="#/${k}" ${cur===k?'aria-current="page"':""} data-fk="tab-${k}">${ic(i)}${l}</a>`).join("")}</nav>`
+const initial=()=>esc((S.user?.name||"?")[0])
+
+function vSignin(){
+  return {top:"",bottom:"",body:`<div class="hero"><div class="logo" aria-hidden="true">P</div>
+    <h1 data-title tabindex="-1">Primary Practice</h1>
+    <p class="sub">Listening and reading practice tests for TOEFL Primary, Steps 1 and 2.</p>
+    ${T.signErr?`<p class="alert" role="alert">Sign-in could not start. Please try again.</p>`:""}
+    <button class="btn block" data-act="signin" data-fk="signin" ${T.signing?'aria-busy="true" disabled':""}>${T.signing?"Signing in…":"Sign in"}</button>
+    <p class="reason">You will be taken to auth.icovn.me to sign in, then brought straight back here.</p></div>`}
+}
+function vNoAccess(){
+  return {top:"",bottom:"",body:`<div class="hero"><div class="logo" aria-hidden="true" style="background:var(--clay)">${ic("lock")}</div>
+    <h1 data-title tabindex="-1" style="font-size:22px">This account does not have access to Quiz yet.</h1>
+    <p class="sub">Ask an administrator to give this account access, or sign out and use a different account.</p>
+    <button class="btn block" data-act="signout-now" data-fk="so">${ic("logout")} Sign out</button></div>`}
+}
+function testCard(t){
+  const A=S.active,inProg=A&&A.testId===t.id,done=S.attempts.filter(a=>a.testId===t.id)
+  const dl=S.dl[t.id]==="ready",prog=T.dlProg[t.id]
+  const blocked=!inProg&&!!A
+  const offBlock=!T.online&&!dl&&!inProg
+  const secTxt=t.sections.map(k=>`${BANK[k].label} ${BANK[k].questions.length}`).join(" · ")
+  const isMath=t.sections[0]==="math"
+  let acts="",reason=""
+  if(inProg){acts=`<a class="btn" href="#/${A.phase==="run"?"run":"rules"}" data-fk="go-${t.id}">Continue</a>`}
+  else{
+    const dis=blocked||offBlock
+    if(done.length){acts+=`<a class="btn secondary" href="#/result/${done[done.length-1].id}" data-fk="res-${t.id}">See result</a>`}
+    acts+=`<button class="btn ${done.length?"secondary":""}" data-act="start" data-id="${t.id}" data-fk="st-${t.id}" ${dis?'disabled aria-describedby="r-'+t.id+'"':""} ${T.starting===t.id?'aria-busy="true"':""}>${done.length?"Try again":"Start test"}</button>`
+    if(blocked)reason=`Finish ${esc(test(A.testId).title)} first.`
+    else if(offBlock)reason=`Needs a connection. Save it for offline use while you're online.`
+  }
+  const dlBtn=dl?`<span class="chip good">${ic("check","sm")} Available offline</span>`
+    :prog!==undefined?`<span class="chip teal" role="status">Saving… ${prog}%</span>`
+    :`<button class="btn sm secondary" data-act="dl" data-id="${t.id}" data-fk="dl-${t.id}" aria-label="Save ${esc(t.title)} for offline use" ${T.online?"":"disabled"}>${ic("download","sm")} Save offline · ${t.mb} MB</button>`
+  return `<article class="card ${inProg||!done.length&&!blocked?"hl":""}" aria-labelledby="tt-${t.id}">
+    <div class="row top"><span class="ticon ${isMath?"math":""}">${ic(isMath?"calc":"headphones")}</span>
+      <div class="grow"><h2 id="tt-${t.id}">${esc(t.title)}</h2><p class="meta">${t.level} · ${secTxt} · ${mins(t)} min</p>
+      <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${inProg?`<span class="chip clay">In progress · ${BANK[cur().key].label}</span>`:""}${done.length?`<span class="chip teal">Best ${best(t.id)}%</span>`:""}</div></div></div>
+    <div class="actions">${acts}</div>${reason?`<p class="reason" id="r-${t.id}">${reason}</p>`:""}
+    <div class="actions" style="margin-top:8px">${inProg?"":dlBtn}</div></article>`
+}
+function vLibrary(){
+  const f=T.filter
+  const list=TESTS.filter(t=>{const d=S.attempts.some(a=>a.testId===t.id);return f==="all"||(f==="done"?d:!d||S.active?.testId===t.id)})
+  const att=S.attempts,avg=att.length?Math.round(att.reduce((n,a)=>n+score(a).pct,0)/att.length):0,bst=att.length?Math.max(...att.map(a=>score(a).pct)):0
+  const showInstall=!S.installed&&!S.installDismissed
+  const body=`<div class="page"><h1 data-title tabindex="-1">Welcome back, ${esc(S.user.name)}</h1>
+   <p class="sub">${(n=>n===0?"You're all caught up.":n===1?"You have one test waiting.":`You have ${n} tests waiting.`)(TESTS.length-new Set(att.map(a=>a.testId)).size)}</p>
+   ${showInstall?`<section class="card install" style="margin-top:16px" aria-labelledby="inst-h"><h2 id="inst-h">Add Primary Practice to your home screen</h2>
+     <p>Opens full screen, keeps your tests ready offline, and never loses an answer.</p>
+     <div class="actions"><button class="btn sm" data-act="install" data-fk="inst">${ic("plus","sm")} Install</button><button class="btn sm ghost" data-act="install-dismiss" data-fk="inst-x">Not now</button></div></section>`:""}
+   <div class="seg" role="group" aria-label="Filter tests">${[["all","All"],["todo","To do"],["done","Done"]].map(([k,l])=>`<button data-act="filter" data-v="${k}" data-fk="f-${k}" aria-pressed="${f===k}">${l}</button>`).join("")}</div>
+   ${T.libLoading?`<div class="stack" aria-busy="true" role="status"><span class="sr">Loading tests</span><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>`
+     :list.length?`<div class="stack">${list.map(testCard).join("")}</div>`:`<p class="card" role="status" style="text-align:center;border-style:dashed;color:var(--ink-2);font-weight:700">Nothing here yet.</p>`}
+   <dl class="stats"><div><dt>Attempts</dt><dd>${att.length}</dd></div><div><dt>Average</dt><dd>${avg}%</dd></div><div><dt>Best</dt><dd>${bst}%</dd></div></dl></div>`
+  return {top:appbar(`<span class="brand">Primary Practice</span>`,`<span class="avatar" aria-hidden="true">${initial()}</span>`)+banners(),body,bottom:tabs("library")}
+}
+function vHistory(){
+  const rows=[...S.attempts].sort((a,b)=>b.at.localeCompare(a.at))
+  const body=`<div class="page"><h1 data-title tabindex="-1">Attempt history</h1><p class="sub">Every test you have finished, newest first.</p>
+   <ul class="stack" style="list-style:none;padding:0;margin-top:16px">${rows.map(a=>{const s=score(a),t=test(a.testId)
+     return `<li class="card"><div class="row top"><div class="grow"><h2>${esc(t.title)} · Attempt ${a.n}</h2><p class="meta">${date(a.at)} · ${t.level}</p>
+       <div style="margin-top:8px">${a.status==="submitted"?`<span class="chip good">${ic("check","sm")} Handed in</span>`:`<span class="chip warn">${ic("clock","sm")} Time ran out</span>`}</div></div>
+       <b style="font-size:24px;font-variant-numeric:tabular-nums">${s.pct}%</b></div>
+       <div class="actions"><a class="btn sm secondary" href="#/review/${a.id}/1" data-fk="rv-${a.id}">Review answers</a><a class="btn sm ghost" href="#/result/${a.id}" data-fk="rs-${a.id}">Result</a></div></li>`}).join("")}</ul></div>`
+  return {top:appbar(`<span class="brand">Your attempts</span>`)+banners(),body,bottom:tabs("history")}
+}
+function controlsHtml(p){
+  return `<section class="demo" aria-labelledby="demo-h-${p}"><h2 id="demo-h-${p}">Prototype controls</h2>
+  <label class="ctl"><span>Network</span><span class="row" style="gap:8px"><span>${T.online?"Online":"Offline"}</span><span class="switch"><input type="checkbox" role="switch" data-ctl="online" data-fk="${p}-on" ${T.online?"checked":""} aria-label="Network online"><i></i></span></span></label>
+  <label class="ctl"><span>Device</span><select data-ctl="platform" data-fk="${p}-pf"><option value="android" ${S.platform==="android"?"selected":""}>Android / Chrome</option><option value="ios" ${S.platform==="ios"?"selected":""}>iPhone / Safari</option></select></label>
+  <label class="ctl"><span>Next sign-in</span><select data-ctl="outcome" data-fk="${p}-oc"><option value="success" ${S.outcome==="success"?"selected":""}>Succeeds</option><option value="noaccess" ${S.outcome==="noaccess"?"selected":""}>No access</option><option value="error" ${S.outcome==="error"?"selected":""}>Fails to start</option></select></label>
+  <label class="ctl"><span>Next recording fails</span><span class="switch"><input type="checkbox" role="switch" data-ctl="failNext" data-fk="${p}-fn" ${S.failNext?"checked":""} aria-label="Next recording fails to load"><i></i></span></label>
+  <button class="btn sm secondary block" data-act="demo-update" data-fk="${p}-up">Simulate new version</button>
+  <button class="btn sm secondary block" data-act="demo-clock" data-fk="${p}-ck" ${S.active?.phase==="run"?"":'disabled aria-describedby="ck-r-'+p+'"'}>Leave 15 seconds on the clock</button>
+  ${S.active?.phase==="run"?"":`<p class="reason" id="ck-r-${p}">Start a test section first.</p>`}
+  <button class="btn sm ghost block" data-act="demo-reset" data-fk="${p}-rs">Reset demo</button></section>`
+}
+function vProfile(){
+  const ios=S.platform==="ios"
+  const reminderBlock=S.notif==="denied"?"Blocked in your browser settings.":(ios&&!S.installed?"On iPhone, install the app first to turn reminders on.":"")
+  const storage=TESTS.filter(t=>S.dl[t.id]==="ready")
+  const body=`<div class="page"><h1 data-title tabindex="-1">Profile</h1>
+   <div class="row" style="margin:14px 0"><span class="avatar" style="width:52px;height:52px;font-size:22px" aria-hidden="true">${initial()}</span><div><b style="font-size:18px">${esc(S.user.name)}</b><p class="meta">Signed in with auth.icovn.me</p></div></div>
+   <h2 class="eyebrow section-h">App</h2>
+   <div class="list"><div class="li"><span class="ticon">${ic("plus")}</span><div class="t">Home screen app<small>${S.installed?"Installed — running as an app":"Not installed"}</small></div>
+     ${S.installed?`<span class="chip good">${ic("check","sm")} Installed</span>`:`<button class="btn sm secondary" data-act="install" data-fk="p-inst">Install</button>`}</div>
+    <div class="li"><span class="ticon">${ic("bell")}</span><div class="t">Practice reminders<small id="rem-s">${reminderBlock||(S.notif==="on"?"Daily at 4:30 pm":"Off")}</small></div>
+     <span class="switch"><input type="checkbox" role="switch" data-ctl="notif" data-fk="p-notif" aria-label="Practice reminders" aria-describedby="rem-s" ${S.notif==="on"?"checked":""} ${reminderBlock?"disabled":""}><i></i></span></div>
+    <div class="li"><span class="ticon">${ic("refresh")}</span><div class="t">Version<small>${S.version}${S.update?" · update ready":" · up to date"}</small></div>${S.update?`<button class="btn sm" data-act="apply-update" data-fk="p-upd">Refresh</button>`:""}</div></div>
+   <h2 class="eyebrow section-h">Saved for offline</h2>
+   <div class="list">${storage.length?storage.map(t=>`<div class="li"><span class="ticon">${ic("cloud")}</span><div class="t">${esc(t.title)}<small>${t.level} · ${t.mb} MB</small></div><button class="iconbtn" data-act="rm-dl" data-id="${t.id}" data-fk="rm-${t.id}" aria-label="Remove ${esc(t.title)} from this phone">${ic("trash")}</button></div>`).join("")
+     :`<div class="li"><div class="t"><small>Nothing saved yet. Use “Save offline” on a test while you're online.</small></div></div>`}</div>
+   <button class="btn secondary block" style="margin-top:22px" data-act="signout" data-fk="p-so">${ic("logout")} Sign out</button>
+   <div class="controls-profile">${controlsHtml("pc")}</div></div>`
+  return {top:appbar(`<span class="brand">Profile</span>`)+banners(),body,bottom:tabs("profile")}
+}
+
+/* rules */
+function vRules(){
+  const {A,t,key,sec}=cur()
+  const n=A.secIdx+1
+  const body=`<div class="page"><p class="eyebrow">${esc(t.title)} · Attempt ${A.n}</p><h1 data-title tabindex="-1" style="margin-top:4px">Before you begin: ${sec.label}</h1>
+   <p class="sub">${sec.questions.length} questions · ${sec.minutes} minutes${t.sections.length>1?` · section ${n} of ${t.sections.length}`:""}</p>
+   <ul class="rules">${sec.rules.map(r=>`<li>${ic(key==="listening"?"headphones":"check")}<span>${r}</span></li>`).join("")}</ul>
+   <p class="reason" style="margin-top:14px">The clock starts when you tap I'm ready${A.secIdx?"":" and keeps running if you leave"}.</p></div>`
+  const bottom=`<div class="actionbar"><a class="btn secondary" href="#/library" data-fk="lv" style="flex:0 0 auto">Leave</a>
+   <button class="btn" data-act="ready" data-fk="ready" ${T.starting==="ready"?'aria-busy="true" disabled':""}>${T.starting==="ready"?"Starting…":"I'm ready"}</button></div>`
+  return {top:appbar(`<a class="iconbtn" href="#/library" aria-label="Back to library" data-fk="bk">${ic("back")}</a><span class="brand">Primary Practice</span>`)+banners(),body,bottom}
+}
+/* run */
+function choiceHtml(q,A,locked){
+  const sel=A.answers[q.id]||[]
+  return q.choices.map((c,i)=>`<label class="choice"><input type="${q.multi?"checkbox":"radio"}" name="ans" value="${i}" data-ans data-fk="c${i}" ${sel.includes(i)?"checked":""} ${locked?"disabled":""}><span class="letter" aria-hidden="true">${"ABCD"[i]}</span><span>${c}</span></label>`).join("")
+}
+function saveChip(){
+  const m={saved:["check","Saved"],saving:["refresh","Saving…"],pending:["wifioff",`Waiting to send: ${S.queue}`],failed:["alert","Did not save"]}[T.save]
+  return `<span class="save" data-save data-s="${T.save}">${ic(m[0],"sm")}${m[1]}</span>`
+}
+function vRun(){
+  const {A,t,key,sec,qs,q}=cur()
+  const total=qs.length,last=A.qi===total-1,lastSec=A.secIdx===t.sections.length-1
+  const left=secLeft(A)
+  const used=!!A.used?.[q.id],playing=T.playing?.qid===q.id,failed=!!T.fail[q.id]
+  const heard=used&&!playing&&!failed
+  const lock=key==="listening"&&!heard
+  const answered=qs.filter(x=>isAns(A,x)).length
+  let media=""
+  if(key==="reading"&&q===qs[0]||key==="reading")media=`<details class="passage" ${A.qi===0?"open":""}><summary>${ic("book")} Passage 1 · questions 1–${total}</summary><p>${esc(sec.passage)}</p></details>`
+  if(key==="listening")media=`<section class="audio" aria-label="Recording">
+    <div class="scene" aria-hidden="true">${used&&!failed?(playing?"🔊":"✅"):failed?"⚠️":"🎧"}</div>
+    <button class="btn ${used?"secondary":""}" data-act="play" data-fk="play" ${used?"disabled":""} aria-describedby="plr">${playing?`<span class="eq" aria-hidden="true"><b></b><b></b><b></b></span> Playing…`:used?(failed?"No plays left":"Played"):`${ic("play")} Play recording`}</button>
+    <div class="bar" aria-hidden="true"><i data-aprog style="width:${heard?100:0}%"></i></div>
+    <p class="reason" id="plr" style="margin:0">${failed?`The recording didn't load, and there are no plays left for this question.`:playing?"You cannot pause or rewind.":used?"Answer now. You cannot come back to this question.":"1 play left. It cannot be paused."}</p></section>`
+  const legend=key==="listening"&&!heard&&!failed?`<p class="hint">Play the recording to unlock the answers.</p>`:q.multi?`<p class="hint">Select all that apply.</p>`:""
+  const body=`<div class="page" style="padding-top:12px"><div class="qmeta"><span>${sec.label} · Question ${A.qi+1} of ${total}</span></div>${media}
+    <fieldset><legend><h1 class="qtitle" id="qh" data-qtitle tabindex="-1">${q.prompt}</h1></legend>${legend}
+    <div class="choices" ${q.multi?'role="group"':'role="radiogroup"'} aria-labelledby="qh">${choiceHtml(q,A,lock)}</div></fieldset></div>`
+  const top=`<div class="runtop"><div class="row">
+    <button class="iconbtn" data-act="run-menu" data-fk="menu" aria-label="Menu">${ic("more")}</button>
+    <span class="chip clay">${ic(sec.icon,"sm")} ${sec.label}</span><span class="grow"></span>${saveChip()}
+    <span class="timer ${left<=60?"low":""}" role="timer" aria-label="Time remaining" data-timer>${left<=60?ic("clock","sm"):""}<span data-tt>${fmt(left)}</span></span></div>
+    <div class="progress" role="progressbar" aria-label="Section progress" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${answered}"><i style="width:${100*answered/total}%"></i></div></div>`+banners()
+  const nextLabel=!last?"Next":(lastSec?"Hand in":`Finish ${sec.label}`)
+  const bottom=`<div class="actionbar">
+    ${sec.forward?"":`<button class="btn secondary" data-act="prev" data-fk="prev" aria-label="Previous question" style="flex:0 0 56px" ${A.qi===0?"disabled":""}>${ic("back")}</button>`}
+    <button class="btn secondary" data-act="navigator" data-fk="nav" style="flex:0 0 auto" aria-label="Question navigator, ${answered} of ${total} answered">${ic("grid")} ${answered}/${total}</button>
+    <button class="btn" data-act="next" data-fk="next" ${playing?'disabled aria-describedby="plr"':""}>${nextLabel}</button></div>`
+  return {top,body,bottom}
+}
+function vHandin(){
+  const {A,t}=cur()
+  const qs=qsOf(t),ans=qs.filter(q=>(A.answers[q.id]||[]).length).length,blank=qs.length-ans
+  const {sec,qs:sq}=cur()
+  const blanks=sq.map((q,i)=>isAns(A,q)?null:i+1).filter(Boolean)
+  const left=secLeft(A)
+  const off=!T.online
+  const body=`<div class="page"><h1 data-title tabindex="-1">Hand in your test?</h1><p class="sub">Once you hand in you cannot change your answers.</p>
+   <div class="tiles"><div class="tile"><b>${ans}</b><span>Answered</span></div><div class="tile"><b style="color:${blank?"var(--clay)":"inherit"}">${blank}</b><span>Not answered</span></div></div>
+   ${blanks.length?`<p class="notice" role="status">${blanks.length===1?"Question":"Questions"} ${blanks.join(", ")} ${blanks.length===1?"is":"are"} still blank.</p>`:""}
+   <p class="reason" style="margin-top:12px">You have ${Math.max(1,Math.floor(left/60))} minute${left>=120?"s":""} left if you want to go back.</p>
+   ${off?`<p class="notice" role="alert">${ic("wifioff","sm")} Handing in needs a connection. Your answers are safe on this phone — reconnect and try again.</p>`:""}</div>`
+  const bottom=`<div class="actionbar" style="flex-direction:column;align-items:stretch"><button class="btn danger" data-act="confirm-handin" data-fk="hi" ${off||T.handing?"disabled":""} ${T.handing?'aria-busy="true"':""}>${T.handing?"Handing in…":"Hand in"}</button>
+   <button class="btn secondary" data-act="keep" data-fk="keep" ${T.handing?"disabled":""}>Keep working</button></div>`
+  return {top:appbar(`<span class="brand">Hand in</span>`)+banners(),body,bottom}
+}
+function vTimeup(){
+  const U=S.timeup,att=U.attemptId?attOf(U.attemptId):null
+  if(U.kind==="section"){
+    const next=BANK[test(S.active.testId).sections[S.active.secIdx+1]].label
+    return {top:appbar(`<span class="brand">Time's up</span>`),bottom:`<div class="actionbar"><button class="btn" data-act="tu-next" data-fk="tu">Continue to ${next}</button></div>`,
+      body:`<div class="hero" style="background:transparent"><div class="logo" style="background:var(--clay)" aria-hidden="true">${ic("clock")}</div><h1 data-title tabindex="-1">Time's up</h1><p class="sub">This section's time ran out. Your answers were kept.</p></div>`}
+  }
+  const s=score(att)
+  return {top:appbar(`<span class="brand">Time's up</span>`),bottom:`<div class="actionbar"><a class="btn" href="#/result/${att.id}" data-fk="tu">See your result</a></div>`,
+    body:`<div class="page" style="text-align:center"><div class="logo" style="background:var(--clay);margin:20px auto" aria-hidden="true">${ic("clock")}</div><h1 data-title tabindex="-1">Time is up</h1>
+    <p class="sub">Your test was handed in automatically. Everything saved before time ran out has been kept and marked.</p>
+    <div class="tiles"><div class="tile"><b>${s.total-s.b}</b><span>Answered</span></div><div class="tile"><b>${s.b}</b><span>Left blank</span></div></div></div>`}
+}
+function vResult(id){
+  const att=attOf(id);if(!att)return vLibrary()
+  const s=score(att),t=test(att.testId)
+  const others=S.attempts.filter(a=>a.testId===att.testId&&a.id!==att.id).map(a=>score(a).pct)
+  const pb=others.length&&s.pct>Math.max(...others)
+  const C=2*Math.PI*70,off=C*(1-s.pct/100)
+  const head=s.pct>=80?"Well done!":s.pct>=50?"Good effort!":"Keep practising!"
+  const per=t.sections.map(k=>{const ids=BANK[k].questions.map(q=>q.id);const c=s.qs.filter((q,i)=>ids.includes(q.id)&&s.st[i]==="correct").length;return [BANK[k].label,c,ids.length,BANK[k].icon]})
+  const body=`<div class="page" style="text-align:center"><p class="eyebrow">${esc(t.title)} · Attempt ${att.n}${att.status==="expired"?" · Time ran out":""}</p>
+    <h1 data-title tabindex="-1" style="margin-top:4px">${head}</h1>
+    <div class="ringwrap"><div class="ring"><svg viewBox="0 0 170 170" aria-hidden="true"><circle class="bg" cx="85" cy="85" r="70"/><circle class="fg" cx="85" cy="85" r="70" stroke-dasharray="${C}" stroke-dashoffset="${off}"/></svg><div><span>${s.pct}%<small>${s.c} / ${s.total}</small></span></div></div></div>
+    ${pb?`<p><span class="chip good">${ic("check","sm")} Your best score so far.</span></p>`:""}
+    <p class="sub" style="margin-top:8px">${s.c} correct · ${s.w} wrong · ${s.b} left blank</p>
+    <div class="breakdown" style="text-align:left">${per.map(([l,c,n,i])=>`<div class="card">${ic(i)} ${l}<b>${c} / ${n}</b></div>`).join("")}</div>
+    <p class="reason" style="margin-top:14px">${esc(t.title)}. This is a practice score, not an official TOEFL Primary scaled score.</p></div>`
+  const bottom=`<div class="actionbar"><a class="btn secondary" href="#/library" data-fk="bl">Back to library</a><a class="btn" href="#/review/${att.id}/1" data-fk="ra">Review answers</a></div>`
+  return {top:appbar(`<a class="iconbtn" href="#/library" aria-label="Back to library" data-fk="bk">${ic("back")}</a><span class="brand">Result</span>`)+banners(),body,bottom}
+}
+function vReview(id,n){
+  const att=attOf(id);if(!att)return vLibrary()
+  const s=score(att),i=Math.min(Math.max(+n,1),s.total)-1,q=s.qs[i],st=s.st[i],sel=att.answers[q.id]||[]
+  const lab={correct:["good","check","Correct"],wrong:["bad","x","Wrong"],blank:["warn","minus","Left blank"]}[st]
+  const choices=q.choices.map((c,k)=>{const mine=sel.includes(k),ok=q.correct.includes(k)
+    const cls=ok?"rv-correct":mine?"rv-wrong":"",tag=ok?(mine?"Your answer · correct":"Correct answer"):mine?"Your answer · incorrect":""
+    return `<div class="choice ${cls}"><span class="letter" aria-hidden="true">${"ABCD"[k]}</span><span>${c}</span>${tag?`<span class="tag">${ok?ic("check","sm"):ic("x","sm")} ${tag}</span>`:""}</div>`}).join("")
+  const body=`<div class="page" style="padding-top:12px"><div class="qmeta"><span>Question ${i+1} of ${s.total}</span><span class="chip ${lab[0]}">${ic(lab[1],"sm")} ${lab[2]}</span></div>
+    ${q.sec==="reading"?`<details class="passage"><summary>${ic("book")} Passage</summary><p>${esc(BANK.reading.passage)}</p></details>`:""}
+    <h1 class="qtitle" data-title tabindex="-1" id="qh">${q.prompt}</h1>${q.multi?`<p class="hint">Select all that apply.</p>`:""}
+    ${st==="blank"?`<p class="notice" role="status">Question ${i+1} was left blank.</p>`:""}
+    <div class="choices" role="group" aria-label="Answer choices">${choices}</div>
+    <div class="explain"><b>${q.sec==="listening"?"What was said":"Worked solution"}</b>${q.explain}</div></div>`
+  const bottom=`<div class="actionbar"><a class="btn secondary" style="flex:0 0 56px" aria-label="Previous question" ${i===0?'aria-disabled="true" tabindex="-1"':`href="#/review/${id}/${i}"`} data-fk="rp">${ic("back")}</a>
+    <button class="btn secondary" style="flex:0 0 auto" data-act="rv-jump" data-id="${id}" data-n="${i+1}" data-fk="rj">${ic("grid")} Jump</button>
+    <a class="btn" ${i===s.total-1?'aria-disabled="true" tabindex="-1"':`href="#/review/${id}/${i+2}"`} data-fk="rn">Next</a></div>`
+  return {top:appbar(`<a class="iconbtn" href="#/result/${id}" aria-label="Back to result" data-fk="bk">${ic("back")}</a><span class="brand">Review</span>`),body,bottom}
+}
+
+/* ───────────────────────── Render ───────────────────────── */
+function views(r){
+  const p=r.split("/")
+  switch(p[1]){
+    case"signin":return S.outcome==="noaccess"&&T.noAccess?vNoAccess():vSignin()
+    case"noaccess":return vNoAccess()
+    case"library":return vLibrary()
+    case"history":return vHistory()
+    case"profile":return vProfile()
+    case"rules":return vRules()
+    case"run":return vRun()
+    case"handin":return vHandin()
+    case"timeup":return vTimeup()
+    case"result":return vResult(p[2])
+    case"review":return vReview(p[2],p[3])
+    default:return vLibrary()
+  }
+}
+function render(mode="keep"){
+  let r=route();const g=guard(r);if(g){if(location.hash!=="#"+g){location.replace("#"+g);return}r=g}
+  if(r==="/run"&&expiredCheck())return
+  const ae=document.activeElement,fk=ae&&ae.dataset&&ae.dataset.fk
+  const v=views(r)
+  $("#top").innerHTML=v.top||"";$("#body").innerHTML=v.body;$("#bottom").innerHTML=v.bottom||""
+  const dsk=$("#ctl-desktop");if(dsk)dsk.innerHTML=controlsHtml("dc")
+  const standalone=S.installed
+  $("#ch-browser").style.display=standalone?"none":""
+  document.querySelector('meta[name="theme-color"]').content="#ffffff"
+  if(mode==="title"){$("#body").scrollTop=0;const t=$("[data-title]");if(t)t.focus({preventScroll:true});else $("#body").focus({preventScroll:true})}
+  else if(mode==="q"){const t=$("[data-qtitle]");if(t)t.focus({preventScroll:true})}
+  else if(fk){const el=document.querySelector(`[data-fk="${fk}"]`);if(el&&!el.disabled)el.focus({preventScroll:true})}
+  if(r==="/library"&&!T.libLoaded){T.libLoaded=true;T.libLoading=true;setTimeout(()=>{T.libLoading=false;if(route()==="/library")render("keep")},900)}
+  persist()
+}
+window.addEventListener("hashchange",()=>render("title"))
+
+/* ───────────────────────── Sheets ───────────────────────── */
+const sheet=$("#sheet"),phone=$("#phone")
+function openSheet(title,html){
+  sheet.innerHTML=`<div class="sheet-in"><div class="grab" aria-hidden="true"></div><div class="sheet-h"><h2 id="sh-t">${title}</h2><button class="iconbtn" data-act="close-sheet" aria-label="Close">${ic("x")}</button></div>${html}</div>`
+  placeSheet();sheet.showModal();phone.classList.add("scrimmed")
+}
+/* A modal <dialog> lives in the top layer, so it is positioned against the window; pin it to the phone's inner rect. */
+function placeSheet(){
+  const r=phone.getBoundingClientRect(),l=r.left+phone.clientLeft,w=phone.clientWidth
+  sheet.style.width=w+"px";sheet.style.left=(l+w/2)+"px";sheet.style.bottom=(innerHeight-r.bottom+phone.clientTop)+"px"
+  sheet.style.maxHeight=(phone.clientHeight*.86)+"px"
+}
+addEventListener("resize",()=>{if(sheet.open)placeSheet()})
+sheet.addEventListener("close",()=>phone.classList.remove("scrimmed"))
+sheet.addEventListener("click",e=>{if(e.target===sheet)sheet.close()})
+const closeSheet=()=>{if(sheet.open)sheet.close()}
+
+function navSheet(){
+  const {A,t,key,sec,qs}=cur()
+  const body=t.sections.map((k,si)=>{const S2=BANK[k],here=si===A.secIdx
+    const cells=S2.questions.map((q,i)=>{const st=here&&i===A.qi?"current":(A.answers[q.id]||[]).length?"answered":"blank";const lbl=`Question ${i+1}, ${st==="current"?"you are here":st==="answered"?"answered":"not answered"}`
+      return here&&!S2.forward?`<button class="cell" data-s="${st}" data-act="jump" data-i="${i}" aria-label="${lbl}" ${st==="current"?'aria-current="true"':""}>${i+1}</button>`
+        :`<span class="cell" data-s="${st}" role="img" aria-label="${lbl}">${i+1}</span>`})
+    return `<h3 class="eyebrow" style="margin-top:10px">${S2.label}${here?"":si<A.secIdx?" · finished":" · not started"}</h3><div class="cells">${cells.join("")}</div>`}).join("")
+  openSheet("Questions",`<p class="hint" style="margin:0">${qs.filter(q=>isAns(A,q)).length} of ${qs.length} answered</p>${body}
+    <div class="legend"><span><i data-s="answered"></i>Answered</span><span><i data-s="current"></i>You are here</span><span><i></i>Not answered</span></div>
+    ${sec.forward?`<p class="reason">This section runs forward only. The navigator shows where you are but cannot move you.</p>`:""}`)
+}
+
+/* ───────────────────────── Actions ───────────────────────── */
+function setSave(s){T.save=s;document.querySelectorAll("[data-save]").forEach(el=>el.outerHTML=saveChip())}
+function recordAnswer(){
+  if(T.online){setSave("saving");setTimeout(()=>{if(T.online)setSave("saved")},450)}
+  else{S.queue++;setSave("pending");live(`Saved on this phone. Waiting to be sent: ${S.queue}.`);const b=$("#top .banner.off");if(b)$("#top").innerHTML=cur()?vRun().top:$("#top").innerHTML}
+  persist()
+}
+function setOnline(v){
+  T.online=v
+  if(v&&S.queue>0){const n=S.queue;setSave("saving");live("Back online. Sending saved answers.");setTimeout(()=>{S.queue=0;setSave("saved");toast(`Back online — ${n} answer${n>1?"s":""} sent.`,"cloud");render("keep")},900)}
+  else if(!v){live("You are offline. Answers will be saved on this phone.");if(T.save==="saving")setSave("saved")}
+  render("keep")
+}
+function finalize(status){
+  const A=S.active;const id="a"+(S.seq++)
+  S.attempts.push({id,testId:A.testId,n:A.n,status,at:new Date().toISOString(),answers:A.answers})
+  S.active=null;persist();return id
+}
+function expiredCheck(){
+  const c=cur();if(!c||c.A.phase!=="run")return false
+  if(secLeft(c.A)>0)return false
+  expire();return true
+}
+function expire(){
+  const {A,t}=cur();closeSheet()
+  if(A.secIdx<t.sections.length-1){S.timeup={kind:"section"};live("Time's up for this section.")}
+  else{const id=finalize("expired");S.timeup={kind:"attempt",attemptId:id};live("Time's up. Your test was handed in.")}
+  persist();go("/timeup")
+}
+function startPlay(){
+  const {A,q}=cur();if(T.playing||A.used?.[q.id])return
+  A.used=A.used||{};A.used[q.id]=1;persist()
+  if(S.failNext){S.failNext=false;T.playing={qid:q.id,start:Date.now()};render("keep")
+    setTimeout(()=>{T.fail[q.id]=true;T.playing=null;persist();live("The recording didn't load, and there are no plays left.");render("keep")},1200);return}
+  T.playing={qid:q.id,start:Date.now()};live("Playing recording. It cannot be paused.");render("keep")
+  const iv=setInterval(()=>{
+    const p=Math.min(1,(Date.now()-T.playing.start)/5000);const el=$("[data-aprog]");if(el)el.style.width=100*p+"%"
+    if(p>=1){clearInterval(iv);T.playing=null;live("Recording finished. You can answer now.");if(route()==="/run")render("keep")}
+  },100)
+}
+function startAttempt(id){
+  if(S.active)return
+  const n=S.attempts.filter(a=>a.testId===id).length+1
+  S.active={id:"cur",testId:id,n,secIdx:0,qi:0,phase:"rules",endAt:null,answers:{},used:{}}
+  go("/rules")
+}
+function installDone(){
+  S.installed=true;closeSheet();persist()
+  const sp=$("#splash");sp.hidden=false;sp.classList.remove("out")
+  setTimeout(()=>{sp.classList.add("out");setTimeout(()=>{sp.hidden=true},350);render("keep");toast("Installed. Open it from your home screen.","check")},900)
+}
+function dlStart(id){
+  if(!T.online||T.dlProg[id]!==undefined)return
+  T.dlProg[id]=0;render("keep")
+  const iv=setInterval(()=>{
+    if(!T.online){clearInterval(iv);delete T.dlProg[id];toast("Save paused — you're offline. Try again when connected.","wifioff");render("keep");return}
+    T.dlProg[id]+=20
+    if(T.dlProg[id]>=100){clearInterval(iv);delete T.dlProg[id];S.dl[id]="ready";toast(`${test(id).title} is saved for offline use.`,"cloud");live("Saved for offline use.")}
+    render("keep")
+  },350)
+}
+
+document.addEventListener("click",e=>{
+  const el=e.target.closest("[data-act]");if(!el||el.disabled)return
+  const a=el.dataset.act,id=el.dataset.id
+  switch(a){
+    case"close-sheet":closeSheet();break
+    case"filter":T.filter=el.dataset.v;render("keep");break
+    case"signin":{
+      T.signing=true;T.signErr=false;render("keep");live("Signing in")
+      setTimeout(()=>{T.signing=false
+        if(S.outcome==="error"){T.signErr=true;render("title");return}
+        if(S.outcome==="noaccess"){T.noAccess=true;S.user=null;go("/noaccess");return}
+        S.user={name:"Minh Anh"};T.libLoaded=false;go("/library")},1000);break}
+    case"signout":
+      openSheet("Sign out?",`<p>You will need to sign in again. Tests saved for offline use stay on this phone.</p><div class="btnrow"><button class="btn danger" data-act="signout-now" data-fk="so2">Sign out</button><button class="btn secondary" data-act="close-sheet" data-fk="so3">Cancel</button></div>`);break
+    case"signout-now":closeSheet();S.user=null;S.active=null;T.noAccess=false;persist();go("/signin");break
+    case"install":
+      if(S.platform==="ios")openSheet("Add to Home Screen",`<p class="hint">Safari installs apps from the Share menu.</p><ol class="steps"><li><span class="n">1</span><span>Tap the Share button ${ic("share","sm")} in Safari's toolbar</span></li><li><span class="n">2</span><span>Choose <b>Add to Home Screen</b> ${ic("plus","sm")}</span></li><li><span class="n">3</span><span>Tap <b>Add</b> and open Primary Practice from your home screen</span></li></ol><div class="btnrow"><button class="btn" data-act="install-done" data-fk="ins">I've added it</button><button class="btn ghost" data-act="close-sheet" data-fk="inc">Close</button></div>`)
+      else openSheet("Install app?",`<div class="row" style="margin:6px 0 4px"><span class="logo" style="width:52px;height:52px;border-radius:14px;font-size:24px" aria-hidden="true">P</span><div><b>Primary Practice</b><p class="meta">quiz.icovn.me</p></div></div><p class="hint">This is Chrome's own install prompt, shown here so you can see the moment.</p><div class="btnrow"><button class="btn" data-act="install-done" data-fk="ins">Install</button><button class="btn secondary" data-act="close-sheet" data-fk="inc">Cancel</button></div>`)
+      break
+    case"install-done":installDone();break
+    case"install-dismiss":S.installDismissed=true;render("keep");break
+    case"dl":dlStart(id);break
+    case"rm-dl":delete S.dl[id];toast(`${test(id).title} removed from this phone.`,"trash");render("keep");break
+    case"start":
+      if(!T.online&&S.dl[id]!=="ready")break
+      T.starting=id;render("keep");setTimeout(()=>{T.starting=false;startAttempt(id)},500);break
+    case"ready":{
+      T.starting="ready";render("keep")
+      setTimeout(()=>{T.starting=false;const A=S.active;A.phase="run";A.qi=0;A.endAt=Date.now()+BANK[cur().key].minutes*60000;persist();T.warned=false;go("/run")},600);break}
+    case"play":startPlay();break
+    case"prev":{const A=S.active;if(A.qi>0){A.qi--;render("q")}break}
+    case"next":{
+      const {A,t,sec,qs}=cur()
+      if(A.qi<qs.length-1){A.qi++;render("q");break}
+      if(A.secIdx<t.sections.length-1)openSheet(`Finish ${sec.label}?`,`<p>${qs.filter(q=>!isAns(A,q)).length?`${qs.filter(q=>!isAns(A,q)).length} question(s) are still blank. `:""}You cannot come back to this section.</p><div class="btnrow"><button class="btn" data-act="finish-sec" data-fk="fs">Finish ${sec.label}</button><button class="btn secondary" data-act="close-sheet" data-fk="fk">Keep working</button></div>`)
+      else go("/handin");break}
+    case"finish-sec":{closeSheet();const A=S.active;A.secIdx++;A.qi=0;A.phase="rules";A.endAt=null;T.playing=null;persist();go("/rules");break}
+    case"navigator":navSheet();break
+    case"jump":{S.active.qi=+el.dataset.i;closeSheet();render("q");break}
+    case"run-menu":openSheet("Menu",`<p class="hint">The clock keeps running while you are away.</p><div class="btnrow"><a class="btn secondary" href="#/library" data-act="close-sheet" data-fk="m1">Leave test</a><button class="btn ghost" data-act="close-sheet" data-fk="m2">Back to the test</button></div>`);break
+    case"keep":history.length>1?go("/run"):go("/run");break
+    case"confirm-handin":{
+      if(!T.online||T.handing)break
+      T.handing=true;render("keep");live("Handing in")
+      setTimeout(()=>{T.handing=false;const id=finalize("submitted");go("/result/"+id)},1000);break}
+    case"tu-next":{const A=S.active;A.secIdx++;A.qi=0;A.phase="rules";A.endAt=null;S.timeup=null;persist();go("/rules");break}
+    case"rv-jump":{
+      const att=attOf(id),s=score(att)
+      const cells=s.qs.map((q,i)=>{const st=s.st[i];const word={correct:"correct",wrong:"wrong",blank:"left blank"}[st];const m={correct:"✓",wrong:"✕",blank:"–"}[st]
+        return `<a class="cell" data-s="${st}" data-mode="review" href="#/review/${id}/${i+1}" data-act="close-sheet" aria-label="Question ${i+1}: ${word}" ${i+1===+el.dataset.n?'aria-current="true"':""}>${i+1}<span class="m" aria-hidden="true">${m}</span></a>`}).join("")
+      openSheet("Jump to a question",`<p class="hint">Tap any question to see your answer.</p><div class="cells">${cells}</div><div class="legend"><span><i data-s="correct"></i>Correct</span><span><i data-s="wrong"></i>Wrong</span><span><i></i>Left blank</span></div>`);break}
+    case"apply-update":
+      S.update=false;S.version="4.2.0";persist();{const sp=$("#splash");sp.hidden=false;sp.classList.remove("out");setTimeout(()=>{sp.classList.add("out");setTimeout(()=>sp.hidden=true,350);render("keep");toast("Updated to version 4.2.0.","refresh")},700)};break
+    case"demo-update":S.update=true;persist();render("keep");live("A new version is ready.");break
+    case"demo-clock":{const A=S.active;if(A?.phase==="run"){A.endAt=Date.now()+15000;T.warned=false;persist();render("keep");toast("15 seconds left on the clock.","clock")}break}
+    case"demo-reset":try{localStorage.removeItem(KEY)}catch{};location.hash="";location.reload();break
+  }
+})
+document.addEventListener("change",e=>{
+  const el=e.target
+  if(el.matches("[data-ans]")){
+    const {A,q}=cur();const sel=q.multi?[...document.querySelectorAll("[data-ans]:checked")].map(x=>+x.value):[+el.value]
+    A.answers[q.id]=sel;recordAnswer()
+    const p=$(".progress");if(p){const n=cur().qs.filter(x=>isAns(A,x)).length;p.firstElementChild.style.width=100*n/cur().qs.length+"%";p.setAttribute("aria-valuenow",n)}
+    const nb=$('[data-act="navigator"]');if(nb){const n=cur().qs.filter(x=>isAns(A,x)).length;nb.innerHTML=`${ic("grid")} ${n}/${cur().qs.length}`}
+    return
+  }
+  const c=el.dataset?.ctl;if(!c)return
+  if(c==="online")setOnline(el.checked)
+  else if(c==="platform"){S.platform=el.value;persist();render("keep")}
+  else if(c==="outcome"){S.outcome=el.value;T.noAccess=false;persist();render("keep")}
+  else if(c==="failNext"){S.failNext=el.checked;persist();render("keep")}
+  else if(c==="notif"){
+    if(el.checked){el.checked=false;openSheet("Allow reminders?",`<p class="hint">Primary Practice would like to send a short reminder to practise each afternoon. This is the browser's permission prompt.</p><div class="btnrow"><button class="btn" data-act="notif-yes" data-fk="ny">Allow</button><button class="btn secondary" data-act="notif-no" data-fk="nn">Don't allow</button></div>`)}
+    else{S.notif="off";persist();render("keep");toast("Reminders turned off.","bell")}}
+})
+document.addEventListener("click",e=>{
+  const a=e.target.closest("[data-act]")?.dataset.act
+  if(a==="notif-yes"){S.notif="on";closeSheet();persist();render("keep");toast("Reminders turned on.","bell")}
+  if(a==="notif-no"){S.notif="denied";closeSheet();persist();render("keep");toast("Reminders blocked.","bell")}
+})
+
+/* clock tick */
+setInterval(()=>{
+  const c=cur();if(!c||c.A.phase!=="run")return
+  const left=secLeft(c.A)
+  if(left<=0){if(route()==="/run"||route()==="/handin")expire();return}
+  document.querySelectorAll("[data-tt]").forEach(n=>n.textContent=fmt(left))
+  const tm=$("[data-timer]");if(tm&&left<=60&&!tm.classList.contains("low")){tm.classList.add("low");tm.insertAdjacentHTML("afterbegin",ic("clock","sm"))}
+  if(left<=60&&!T.warned){T.warned=true;live("One minute left.")}
+},1000)
+
+/* boot */
+;(function(){
+  if(!location.hash&&S.user)location.replace("#/library")
+  if(!location.hash&&!S.user)location.replace("#/signin")
+  const sp=$("#splash");sp.hidden=false
+  setTimeout(()=>{sp.classList.add("out");setTimeout(()=>sp.hidden=true,350)},600)
+  render("title")
+})()
+</script>
+</body>
+</html>

@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react"
 import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
 import { defineConfig } from "vite"
-import { VitePWA } from "vite-plugin-pwa"
+import { VitePWA as pwaPlugin } from "vite-plugin-pwa"
 import { pwaOptions } from "./pwa.config.js"
 
 const { version } = createRequire(import.meta.url)("../../package.json") as {
@@ -25,7 +25,7 @@ export default defineConfig({
     }),
     react(),
     tailwindcss(),
-    VitePWA(pwaOptions),
+    pwaPlugin(pwaOptions),
   ],
   resolve: {
     alias: {

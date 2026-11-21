@@ -13,6 +13,7 @@ import { CLOCK, REQUEST_POOL } from "../../src/database/tokens.js"
 import { FailedWriteCaptureFilter } from "../../src/durability/failed-write-capture.filter.js"
 import { createRawBodyJsonMiddleware } from "../../src/http/raw-body-json.middleware.js"
 import { SpaFallbackFilter } from "../../src/spa/spa-fallback.filter.js"
+import { spaStaticHeaders } from "../../src/spa/static-headers.js"
 import { ZodBodyValidationPipe } from "../../src/validation/zod-body-validation.pipe.js"
 import {
   createFaultInjectingPool,
@@ -118,7 +119,14 @@ export async function createTestApp(
 
   if (spaRoot && existsSync(spaRoot)) {
     const server = http.getHttpAdapter().getInstance() as Express
-    server.use(express.static(spaRoot, { index: false }))
+    server.use(
+      express.static(spaRoot, {
+        index: false,
+        setHeaders: (res, filePath) => {
+          spaStaticHeaders(res, filePath, spaRoot)
+        },
+      }),
+    )
   }
 
   // Mirror main.ts. Without this the suite would assert paths production

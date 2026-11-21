@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
-import { pwaOptions } from "../pwa.config.js"
+import { isCacheableApiRequest, pwaOptions } from "../pwa.config.js"
 
 const appRoot = process.cwd()
 
@@ -62,12 +62,6 @@ describe("pwaOptions registration and caching", () => {
     expect(pwaOptions.injectRegister).toBe(false)
   })
 
-  it("does not inherit the preset's blanket /api runtime cache", () => {
-    const workbox = pwaOptions.workbox as { runtimeCaching?: unknown[] }
-
-    expect(workbox.runtimeCaching).toEqual([])
-  })
-
   it("precaches the shell including fonts and the manifest", () => {
     const workbox = pwaOptions.workbox as {
       globPatterns: string[]
@@ -92,5 +86,104 @@ describe("index.html", () => {
     expect(html).toContain('content="default"')
     expect(html).toContain('rel="apple-touch-icon"')
     expect(html).toContain('rel="icon"')
+  })
+})
+
+interface RequestLike {
+  readonly method: string
+  readonly headers: { has(name: string): boolean }
+}
+
+function check(
+  path: string,
+  request: RequestLike = { method: "GET", headers: new Headers() },
+): boolean {
+  return isCacheableApiRequest({
+    url: new URL(path, "https://quiz.example"),
+    request,
+  })
+}
+
+describe("isCacheableApiRequest (the only API data the worker may keep)", () => {
+  it.each([
+    "/api/tests",
+    "/api/tests?cursor=abc",
+    "/api/me",
+    "/api/attempts?limit=20",
+    "/api/attempts/3f1c/result",
+    "/api/attempts/3f1c/review",
+  ])("caches %s", (path) => {
+    expect(check(path)).toBe(true)
+  })
+
+  it.each([
+    "/api/tests/practice-1",
+    "/api/tests/practice-1/offline-bundle",
+    "/api/attempts/3f1c",
+    "/api/attempts/3f1c/position",
+    "/api/attempts/3f1c/responses",
+    "/api/attempts/3f1c/stimuli/s1/play",
+    "/api/attempts/3f1c/submit",
+    "/api/session",
+    "/api/media/q1.mp3?exp=1&sig=ab",
+    "/api/admin/overview",
+    "/assets/index-abc.js",
+  ])("never caches %s", (path) => {
+    expect(check(path)).toBe(false)
+  })
+
+  it("never caches a non-GET or a Range request", () => {
+    expect(check("/api/me", { method: "POST", headers: new Headers() })).toBe(
+      false,
+    )
+    expect(
+      check("/api/me", {
+        method: "GET",
+        headers: new Headers({ range: "bytes=0-9" }),
+      }),
+    ).toBe(false)
+  })
+})
+
+describe("workbox policy", () => {
+  const workbox = pwaOptions.workbox as {
+    runtimeCaching: Array<{
+      urlPattern: unknown
+      handler: string
+      options: {
+        cacheName: string
+        networkTimeoutSeconds: number
+        expiration: { maxEntries: number; maxAgeSeconds: number }
+        cacheableResponse: { statuses: number[] }
+      }
+    }>
+    navigateFallbackDenylist: RegExp[]
+  }
+
+  it("has exactly one runtime route: NetworkFirst, 4 s timeout, 60 entries, 7 days, 200s only", () => {
+    expect(workbox.runtimeCaching).toHaveLength(1)
+
+    const [route] = workbox.runtimeCaching
+
+    expect(route.urlPattern).toBe(isCacheableApiRequest)
+    expect(route.handler).toBe("NetworkFirst")
+    expect(route.options.cacheName).toBe("pp-api-v1")
+    expect(route.options.networkTimeoutSeconds).toBe(4)
+    expect(route.options.expiration).toEqual({
+      maxEntries: 60,
+      maxAgeSeconds: 7 * 24 * 60 * 60,
+    })
+    expect(route.options.cacheableResponse).toEqual({ statuses: [200] })
+  })
+
+  it("keeps /api, /media and /health out of the navigation fallback", () => {
+    const denied = (path: string) =>
+      workbox.navigateFallbackDenylist.some((pattern) => pattern.test(path))
+
+    expect(denied("/api/tests")).toBe(true)
+    expect(denied("/media/x.mp3")).toBe(true)
+    expect(denied("/health")).toBe(true)
+    expect(denied("/history")).toBe(false)
+    expect(denied("/callback")).toBe(false)
   })
 })

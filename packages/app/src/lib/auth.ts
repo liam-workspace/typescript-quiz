@@ -4,6 +4,7 @@ import {
   type AuthClientConfig,
 } from "@liam-workspace/auth-client"
 import { SIGN_IN_PATH } from "./authPaths.js"
+import { purgeClientCaches, purgeIfSubjectChanged } from "./pwa/purge.js"
 import { savePostSignInRedirect } from "./postSignInRedirect.js"
 import { establishSession } from "./session-api.js"
 import { tokenStore } from "./tokenStore.js"
@@ -204,7 +205,11 @@ export async function completeSignIn(code: string): Promise<SessionResult> {
   await getAuthClient().handleCallback(callbackUrl.toString())
 
   try {
-    return await establishSession()
+    const session = await establishSession()
+
+    await purgeIfSubjectChanged(session.id)
+
+    return session
   } catch (error) {
     // `handleCallback` has already stored the tokens. If the session call is
     // then refused (`403 role_not_granted`) or fails, leaving them behind
@@ -224,6 +229,8 @@ export function signOut(): void {
   } else {
     tokenStore.clear()
   }
+
+  void purgeClientCaches()
 }
 
 /**

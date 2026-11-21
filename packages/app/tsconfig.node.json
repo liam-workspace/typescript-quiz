@@ -23,6 +23,7 @@
   "include": [
     "vite.config.ts",
     "vitest.config.ts",
-    "test/dev-auth-prod-build.test.ts"
+    "test/dev-auth-prod-build.test.ts",
+    "test/pwa-build.test.ts"
   ]
 }

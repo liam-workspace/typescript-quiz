@@ -7,6 +7,22 @@ import {
 import { AllExceptionsFilter } from "@liam-workspace/node-nest-common"
 import type { Request, Response } from "express"
 
+const PWA_FILE = /^\/(?:sw\.js|manifest\.webmanifest|workbox-[\w-]+\.js)$/u
+
+/**
+ * A missing worker/manifest must be a real 404: answering `/sw.js` with
+ * index.html makes the browser reject registration with a MIME error that
+ * is far harder to diagnose than a plain 404.
+ */
+export function shouldServeSpaShell(method: string, path: string): boolean {
+  return (
+    method === "GET" &&
+    !path.startsWith("/api/") &&
+    !path.startsWith("/media/") &&
+    !PWA_FILE.test(path)
+  )
+}
+
 /**
  * Serves the built SPA's `index.html` for any GET request that doesn't match
  * a route under `/api` or `/media`.
@@ -53,14 +69,14 @@ export class SpaFallbackFilter implements ExceptionFilter {
     const req = ctx.getRequest<Request>()
     const res = ctx.getResponse<Response>()
 
-    const servesSpa =
-      req.method === "GET" &&
-      !req.path.startsWith("/api/") &&
-      !req.path.startsWith("/media/")
+    const servesSpa = shouldServeSpaShell(req.method, req.path)
 
     if (servesSpa) {
       // Keep hidden ancestors (e.g. .worktrees) outside dotfile checks.
-      res.sendFile("index.html", { root: this.spaRoot })
+      res.sendFile("index.html", {
+        root: this.spaRoot,
+        headers: { "Cache-Control": "no-cache" },
+      })
 
       return
     }

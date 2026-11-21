@@ -12,6 +12,7 @@ import { CLOCK, REQUEST_POOL } from "./database/tokens.js"
 import { FailedWriteCaptureFilter } from "./durability/failed-write-capture.filter.js"
 import { createRawBodyJsonMiddleware } from "./http/raw-body-json.middleware.js"
 import { SpaFallbackFilter } from "./spa/spa-fallback.filter.js"
+import { spaStaticHeaders } from "./spa/static-headers.js"
 import { ZodBodyValidationPipe } from "./validation/zod-body-validation.pipe.js"
 
 async function bootstrap(): Promise<void> {
@@ -34,7 +35,14 @@ async function bootstrap(): Promise<void> {
   // competes with any `/api` or `/health` route Nest registers later.
   if (spaRoot && existsSync(spaRoot)) {
     const server = app.getHttpAdapter().getInstance() as Express
-    server.use(express.static(spaRoot, { index: false }))
+    server.use(
+      express.static(spaRoot, {
+        index: false,
+        setHeaders: (res, filePath) => {
+          spaStaticHeaders(res, filePath, spaRoot)
+        },
+      }),
+    )
   }
 
   // The contract (openapi.yaml) declares `servers: [{ url: /api }]`, so every operation in

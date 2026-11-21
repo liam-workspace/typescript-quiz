@@ -18,6 +18,13 @@ vi.mock("@liam-workspace/auth-client", () => ({
 
 vi.mock("./session-api.js", () => ({ establishSession }))
 
+const { purgeClientCaches, purgeIfSubjectChanged } = vi.hoisted(() => ({
+  purgeClientCaches: vi.fn(() => Promise.resolve()),
+  purgeIfSubjectChanged: vi.fn(() => Promise.resolve()),
+}))
+
+vi.mock("./pwa/purge.js", () => ({ purgeClientCaches, purgeIfSubjectChanged }))
+
 describe("completeSignIn", () => {
   beforeEach(() => {
     vi.resetModules()
@@ -57,5 +64,22 @@ describe("completeSignIn", () => {
     // HandleCallback had already stored them: without this, a reload opens the
     // library with a token whose account has no student profile.
     expect(clientSignOut).toHaveBeenCalledTimes(1)
+  })
+
+  it("checks for a student change using the established session's id", async () => {
+    establishSession.mockResolvedValue({ id: "student-b", created: false })
+    const { completeSignIn } = await import("./auth.js")
+
+    await completeSignIn("code")
+
+    expect(purgeIfSubjectChanged).toHaveBeenCalledWith("student-b")
+  })
+
+  it("purges client caches on sign-out", async () => {
+    const { signOut } = await import("./auth.js")
+
+    signOut()
+
+    expect(purgeClientCaches).toHaveBeenCalledTimes(1)
   })
 })

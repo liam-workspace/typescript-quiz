@@ -21,6 +21,11 @@ export function tabForPath(pathname: string): ShellTab | null {
   return path === "/profile" ? "profile" : null
 }
 
+/** The run screen renders its own in-test offline banner. */
+export function isRunPath(pathname: string): boolean {
+  return /^\/attempts\/[^/]+\/run\/?$/u.test(pathname)
+}
+
 export function isAttemptPath(pathname: string): boolean {
   return pathname.startsWith("/attempts/")
 }

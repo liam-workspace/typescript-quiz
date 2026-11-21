@@ -8,7 +8,7 @@ import {
   createRoute,
   createRouter,
 } from "@tanstack/react-router"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
 import { networkStore } from "../lib/network.js"
 import { pendingCountStore } from "../lib/pending-count.js"
@@ -88,6 +88,16 @@ async function renderAt(path: string) {
       }),
       createRoute({
         getParentRoute: () => rootRoute,
+        path: "/attempts/$attemptId/result",
+        component: page("result page"),
+      }),
+      createRoute({
+        getParentRoute: () => rootRoute,
+        path: "/attempts/$attemptId/sections/$sectionId/rules",
+        component: page("rules page"),
+      }),
+      createRoute({
+        getParentRoute: () => rootRoute,
         path: "/admin",
         component: page("admin page"),
       }),
@@ -104,6 +114,7 @@ async function renderAt(path: string) {
 describe("AppLayout chrome", () => {
   afterEach(() => {
     cleanup()
+    vi.restoreAllMocks()
     networkStore.setOnlineForTests(true)
     pendingCountStore.set(0)
   })
@@ -155,7 +166,7 @@ describe("AppLayout chrome", () => {
     expect(screen.getByText("Waiting to be sent: 2")).toBeInTheDocument()
   })
 
-  it("leaves the offline banner to the run screen on /attempts/*", async () => {
+  it("leaves the offline banner to the run screen on the run route", async () => {
     networkStore.setOnlineForTests(false)
     await renderAt("/attempts/a1/run")
 
@@ -163,6 +174,19 @@ describe("AppLayout chrome", () => {
       screen.queryByText(/Showing what is saved on this phone/u),
     ).not.toBeInTheDocument()
   })
+
+  it.each(["/attempts/a1/result", "/attempts/a1/sections/s1/rules"])(
+    "shows the browsing offline banner on %s",
+    async (path) => {
+      networkStore.setOnlineForTests(false)
+      await renderAt(path)
+
+      expect(screen.getByTestId("offline-banner")).toHaveAttribute(
+        "data-variant",
+        "browsing",
+      )
+    },
+  )
 
   it("announces going offline and coming back through one polite live region", async () => {
     await renderAt("/")
@@ -179,7 +203,9 @@ describe("AppLayout chrome", () => {
   })
 
   it("shows a ready update with Refresh normally, and the deferred wording with no button during a test", async () => {
-    pwaStore.setUpdateReady(() => Promise.resolve())
+    const ready = { ...pwaStore.getSnapshot(), updateReady: true }
+
+    vi.spyOn(pwaStore, "getSnapshot").mockReturnValue(ready)
     await renderAt("/")
 
     expect(screen.getByRole("button", { name: "Refresh" })).toBeInTheDocument()

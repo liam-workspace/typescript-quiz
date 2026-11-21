@@ -17,6 +17,7 @@ import { pwaStore } from "../lib/pwa/pwa-store.js"
 import {
   TAB_HREF,
   isAttemptPath,
+  isRunPath,
   tabForPath,
   type ShellTab,
 } from "../lib/shell-routes.js"
@@ -121,7 +122,7 @@ export function AppLayout() {
     <>
       <Splash visible={splashVisible} />
       <AppShell column={!admin} withTabBar={tab !== null}>
-        {!admin && !network.online && !inAttempt ? (
+        {!admin && !network.online && !isRunPath(pathname) ? (
           <OfflineBanner variant="browsing" pendingCount={pending} />
         ) : null}
         {!admin && pwa.updateReady ? (

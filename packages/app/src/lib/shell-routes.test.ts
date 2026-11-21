@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { TAB_HREF, isAttemptPath, tabForPath } from "./shell-routes.js"
+import {
+  TAB_HREF,
+  isAttemptPath,
+  isRunPath,
+  tabForPath,
+} from "./shell-routes.js"
 
 describe("tabForPath", () => {
   it.each([
@@ -39,5 +44,15 @@ describe("TAB_HREF", () => {
       history: "/history",
       profile: "/profile",
     })
+  })
+})
+
+describe("isRunPath", () => {
+  it("is true only for the run route", () => {
+    expect(isRunPath("/attempts/a1/run")).toBe(true)
+    expect(isRunPath("/attempts/a1/run/")).toBe(true)
+    expect(isRunPath("/attempts/a1/result")).toBe(false)
+    expect(isRunPath("/attempts/a1/sections/s1/rules")).toBe(false)
+    expect(isRunPath("/history")).toBe(false)
   })
 })

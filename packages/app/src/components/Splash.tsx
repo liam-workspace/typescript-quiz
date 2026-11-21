@@ -1,6 +1,7 @@
 import type { JSX } from "react"
 import { useTranslation } from "react-i18next"
 
+// The logo mark, not translatable copy; leave it out of i18n sweeps.
 const BRAND_INITIAL = "P"
 
 export interface SplashProps {

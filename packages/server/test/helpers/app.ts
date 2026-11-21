@@ -148,6 +148,13 @@ export async function createTestApp(
   )
   http.useGlobalFilters(...filters)
   await http.init()
+  // Supertest otherwise calls listen(0) on the wildcard address and then
+  // connects to 127.0.0.1:<port>. On macOS another process (Docker Desktop's
+  // port forwarder, other local servers) can hold the same port number on a
+  // narrower address, and the wildcard bind still succeeds, so the request is
+  // answered by that process (stray 400/401/404 or a socket hang-up). Listening
+  // on loopback ourselves makes the kernel pick a port nobody else holds there.
+  await http.listen(0, "127.0.0.1")
 
   return {
     http,

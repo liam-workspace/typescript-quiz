@@ -80,8 +80,6 @@ describe("admin routes", () => {
         return Promise.resolve()
       },
     })
-    // Concurrent supertest requests need a listener that stays open until teardown.
-    await app.http.listen(0, "127.0.0.1")
   })
 
   afterAll(async () => {

@@ -6,7 +6,7 @@ import type { MathProblemSpec } from "@pp/common"
 import { runner } from "node-pg-migrate"
 import type pg from "pg"
 import { fileURLToPath } from "node:url"
-import { assert, expect, it } from "vitest"
+import { assert, expect, it, vi } from "vitest"
 import {
   claimQueuedGenerationRequest,
   completeGenerationRequest,
@@ -23,6 +23,10 @@ import {
 } from "../src/admin.js"
 import { migrateToLatest } from "../src/migrate.js"
 import { withDatabase } from "./helpers/database.js"
+
+// Each case rebuilds the shared schema before exercising the repository.
+// Allow migrations to finish before the next case resets that schema.
+vi.setConfig({ testTimeout: 30_000 })
 
 const request = {
   parameters: { count: 1 },

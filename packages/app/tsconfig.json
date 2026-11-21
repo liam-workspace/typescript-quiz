@@ -14,7 +14,7 @@
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["vite/client", "vitest/globals"],
+    "types": ["vite/client", "vite-plugin-pwa/client", "vitest/globals"],
     "skipLibCheck": true,
     "strict": true,
     "noUnusedLocals": true,
@@ -27,5 +27,5 @@
   // Spawns a real `vite build` via `node:child_process` -- a Node-context
   // file like `vite.config.ts`/`vitest.config.ts`, not a browser one, so
   // it lives under tsconfig.node.json's ["node"] types instead.
-  "exclude": ["test/dev-auth-prod-build.test.ts"]
+  "exclude": ["test/dev-auth-prod-build.test.ts", "test/pwa-build.test.ts"]
 }

@@ -299,5 +299,22 @@
   "sectionRules.clockNoteFirst": "Le chrono démarre quand tu touches « Je suis prêt » et continue si tu pars.",
   "sectionRules.clockNoteNext": "Le chrono démarre quand tu touches « Je suis prêt ».",
   "sectionRules.leave": "Quitter",
-  "sectionRules.starting": "Démarrage…"
+  "sectionRules.starting": "Démarrage…",
+  "runner.finishSectionButton": "Terminer {{section}}",
+  "runner.finishSectionTitle": "Terminer {{section}} ?",
+  "runner.finishSectionBlank_one": "{{count}} question est encore vide. Tu ne pourras pas revenir à cette partie.",
+  "runner.finishSectionBlank_other": "{{count}} questions sont encore vides. Tu ne pourras pas revenir à cette partie.",
+  "runner.finishSectionNoBlank": "Tu ne pourras pas revenir à cette partie.",
+  "runner.backToTest": "Retour au test",
+  "runner.oneMinuteLeft": "Il reste une minute.",
+  "runner.sectionProgress": "Progression de la partie",
+  "navigator.sectionFinished": "{{section}} · terminée",
+  "navigator.sectionNotStarted": "{{section}} · pas commencée",
+  "navigator.questionLabelWithStatus": "Question {{ordinal}}, {{status}}",
+  "navigator.statusCurrent": "tu es ici",
+  "navigator.statusAnswered": "réponse donnée",
+  "navigator.statusBlank": "sans réponse",
+  "navigator.statusLeftBlank": "laissée vide",
+  "navigator.statusCorrect": "juste",
+  "navigator.statusIncorrect": "fausse"
 }

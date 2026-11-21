@@ -299,5 +299,22 @@
   "sectionRules.clockNoteFirst": "El reloj empieza cuando tocas «Estoy listo» y sigue corriendo si te vas.",
   "sectionRules.clockNoteNext": "El reloj empieza cuando tocas «Estoy listo».",
   "sectionRules.leave": "Salir",
-  "sectionRules.starting": "Empezando…"
+  "sectionRules.starting": "Empezando…",
+  "runner.finishSectionButton": "Terminar {{section}}",
+  "runner.finishSectionTitle": "¿Terminar {{section}}?",
+  "runner.finishSectionBlank_one": "Queda {{count}} pregunta en blanco. No podrás volver a esta sección.",
+  "runner.finishSectionBlank_other": "Quedan {{count}} preguntas en blanco. No podrás volver a esta sección.",
+  "runner.finishSectionNoBlank": "No podrás volver a esta sección.",
+  "runner.backToTest": "Volver a la prueba",
+  "runner.oneMinuteLeft": "Queda un minuto.",
+  "runner.sectionProgress": "Progreso de la sección",
+  "navigator.sectionFinished": "{{section}} · terminada",
+  "navigator.sectionNotStarted": "{{section}} · sin empezar",
+  "navigator.questionLabelWithStatus": "Pregunta {{ordinal}}, {{status}}",
+  "navigator.statusCurrent": "estás aquí",
+  "navigator.statusAnswered": "respondida",
+  "navigator.statusBlank": "sin responder",
+  "navigator.statusLeftBlank": "en blanco",
+  "navigator.statusCorrect": "correcta",
+  "navigator.statusIncorrect": "incorrecta"
 }

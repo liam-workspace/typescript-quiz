@@ -299,5 +299,22 @@
   "sectionRules.clockNoteFirst": "The clock starts when you tap I'm ready and keeps running if you leave.",
   "sectionRules.clockNoteNext": "The clock starts when you tap I'm ready.",
   "sectionRules.leave": "Leave",
-  "sectionRules.starting": "Starting…"
+  "sectionRules.starting": "Starting…",
+  "runner.finishSectionButton": "Finish {{section}}",
+  "runner.finishSectionTitle": "Finish {{section}}?",
+  "runner.finishSectionBlank_one": "{{count}} question is still blank. You cannot come back to this section.",
+  "runner.finishSectionBlank_other": "{{count}} questions are still blank. You cannot come back to this section.",
+  "runner.finishSectionNoBlank": "You cannot come back to this section.",
+  "runner.backToTest": "Back to the test",
+  "runner.oneMinuteLeft": "One minute left.",
+  "runner.sectionProgress": "Section progress",
+  "navigator.sectionFinished": "{{section}} · finished",
+  "navigator.sectionNotStarted": "{{section}} · not started",
+  "navigator.questionLabelWithStatus": "Question {{ordinal}}, {{status}}",
+  "navigator.statusCurrent": "you are here",
+  "navigator.statusAnswered": "answered",
+  "navigator.statusBlank": "not answered",
+  "navigator.statusLeftBlank": "left blank",
+  "navigator.statusCorrect": "correct",
+  "navigator.statusIncorrect": "wrong"
 }

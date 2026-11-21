@@ -8,19 +8,21 @@ import {
 import { createFileRoute } from "@tanstack/react-router"
 import { useEffect, useRef, useState, type JSX } from "react"
 import { useTranslation } from "react-i18next"
-import { AppMenu, type MenuStudent } from "../components/AppMenu.js"
+import { FinishSectionSheet } from "../components/FinishSectionSheet.js"
 import { ListeningRunner } from "../components/ListeningRunner.js"
 import { OfflineBanner } from "../components/OfflineBanner.js"
 import { QuestionNavigator } from "../components/QuestionNavigator.js"
 import { ReadingRunner } from "../components/ReadingRunner.js"
-import { SaveState, type SaveStateProps } from "../components/SaveState.js"
+import {
+  RunActionBar,
+  type RunPrimaryAction,
+} from "../components/RunActionBar.js"
+import { RunMenuSheet } from "../components/RunMenuSheet.js"
+import { RunTopBar } from "../components/RunTopBar.js"
+import type { SaveStateProps } from "../components/SaveState.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
 import { ApiError } from "../lib/api-client.js"
-import {
-  createServerCountdown,
-  formatCountdown,
-  type TimeSource,
-} from "../lib/countdown.js"
+import { createServerCountdown, type TimeSource } from "../lib/countdown.js"
 import {
   claimPlay,
   finishSection,
@@ -109,6 +111,16 @@ type PlayState =
   // exactly like any other replay.
   | { readonly status: "failed" }
 
+/**
+ * Who is signed in, as the loader fetches it (`GET /me`). The run screen no
+ * longer shows it -- its menu is a "Leave test" sheet -- but the loader still
+ * returns it, so the type stays here rather than in the retired AppMenu.
+ */
+export interface RunStudent {
+  readonly displayName: string
+  readonly email: string
+}
+
 interface ExpiredState {
   readonly kind: "section" | "attempt"
   readonly resultUrl: string | null
@@ -118,7 +130,7 @@ export interface RunScreenProps {
   readonly attemptId: string
   readonly envelope: RunnerEnvelope
   readonly queue: AnswerQueue
-  readonly student?: MenuStudent
+  readonly student?: RunStudent
   readonly navigate: (path: string, state?: TimeUpNavigationState) => void
   readonly now?: TimeSource
   readonly flushScheduler?: Scheduler
@@ -128,13 +140,12 @@ export interface TimeUpNavigationState {
   readonly attempt: FinalizedAttempt
 }
 
-type RunnerPanel = "menu" | "navigator" | null
+type RunnerPanel = "menu" | "navigator" | "finish" | null
 
 export function RunScreen({
   attemptId,
   envelope,
   queue,
-  student,
   navigate,
   now = Date.now,
   flushScheduler = defaultScheduler,
@@ -174,7 +185,6 @@ export function RunScreen({
   >({})
   const [expired, setExpired] = useState<ExpiredState | null>(null)
   const [panel, setPanel] = useState<RunnerPanel>(null)
-  const previousPanelRef = useRef<RunnerPanel>(null)
   const menuTriggerRef = useRef<HTMLButtonElement>(null)
   const navigatorTriggerRef = useRef<HTMLButtonElement>(null)
   const [finishingSection, setFinishingSection] = useState(false)
@@ -203,18 +213,22 @@ export function RunScreen({
   })
   const [retryableFlushFailure, setRetryableFlushFailure] = useState(false)
 
-  useEffect(() => {
-    const previousPanel = previousPanelRef.current
-    previousPanelRef.current = panel
+  // A new question moves focus to its title (prototype `data-qtitle`), so a
+  // screen reader starts reading the new question rather than staying on
+  // Next. Skipped on first render: arriving on the screen is not a move.
+  const firstQuestionRender = useRef(true)
 
-    if (panel !== null || previousPanel === null) {
+  useEffect(() => {
+    if (firstQuestionRender.current) {
+      firstQuestionRender.current = false
+
       return
     }
 
-    const trigger =
-      previousPanel === "menu" ? menuTriggerRef : navigatorTriggerRef
-    trigger.current?.focus()
-  }, [panel])
+    document
+      .querySelector<HTMLElement>("[data-qtitle]")
+      ?.focus({ preventScroll: true })
+  }, [currentQuestionId])
 
   // Constructed once per mount, tied to this attempt's `queue` prop (opened
   // once by the route loader, not re-opened on every render) -- the lazy
@@ -500,6 +514,11 @@ export function RunScreen({
   }
 
   const { question, stimulus } = currentEntry
+  // Progress is per section (prototype `vRun`: answered / section total).
+  const answeredInSection = entries.filter(
+    (entry) => (responses.get(entry.question.id)?.length ?? 0) > 0,
+  ).length
+  const sectionLabel = t(`runner.sectionChip.${section.type}`)
   const existingResponse = responses.get(question.id)
   const selectedChoiceIds = existingResponse ?? []
   // `allowAnswerChange: false` means "your answer is final once given". For
@@ -772,10 +791,14 @@ export function RunScreen({
 
         if (error.problem.type === "section_expired") {
           setExpired({ kind: "section", resultUrl: null })
+          // The confirm sheet's question is moot once the section is over.
+          setPanel(null)
 
           return
         }
 
+        // Any other failure leaves the confirm sheet open: its alert is the
+        // feedback, and its button is the retry.
         setSectionTransitionFailed(true)
       })
   }
@@ -909,147 +932,90 @@ export function RunScreen({
     return null
   }
 
-  return (
-    <div className="device-page runner-shell" data-panel={panel ?? undefined}>
-      <header className="app-bar relative z-[40]">
-        <button
-          ref={menuTriggerRef}
-          type="button"
-          aria-label={t("menu.openLabel")}
-          aria-expanded={panel === "menu"}
-          className="runner-panel-trigger runner-menu-trigger hover:bg-teal-bg size-11 touch-manipulation rounded-md text-xl font-bold select-none"
-          onClick={() => {
-            setPanel((current) => (current === "menu" ? null : "menu"))
-          }}
-        >
-          <span aria-hidden="true">☰</span>
-        </button>
-        <span
-          className={`section-chip section-chip--${section.type}`}
-          data-section={section.type}
-        >
-          {t(`runner.sectionChip.${section.type}`)}
-        </span>
-        <span className="grow" />
-        <SaveState {...saveState} />
-        {remainingMs !== null ? (
-          <span
-            aria-label={t("runner.timeRemaining")}
-            className={`timer text-sm font-bold ${
-              // Five minutes gives a child a calm, useful warning without
-              // making the majority of a short practice section feel urgent.
-              remainingMs < 5 * 60 * 1_000 ? "text-amber" : "text-ink-2"
-            }`}
-          >
-            {formatCountdown(remainingMs)}
-          </span>
-        ) : null}
-      </header>
+  let primary: RunPrimaryAction | null = null
 
-      <main className="device-main runner-main mx-auto w-full max-w-4xl">
+  if (!expired) {
+    if (nextEntry) {
+      primary = { kind: "next", label: t("runner.next"), disabled: false }
+    } else if (nextSection) {
+      primary = {
+        kind: "finish",
+        label: t("runner.finishSectionButton", { section: sectionLabel }),
+        disabled: finishingSection,
+      }
+    } else {
+      primary = { kind: "handIn", label: t("runner.handIn"), disabled: false }
+    }
+  }
+
+  const handlePrimary = (): void => {
+    if (nextEntry) {
+      handleNext()
+    } else if (nextSection) {
+      setPanel("finish")
+    } else {
+      navigate(`/attempts/${attemptId}/hand-in`)
+    }
+  }
+
+  // Radix requests closing for Escape, overlay and close-button interactions;
+  // opening is exclusively driven by our triggers. Only close if `which` is
+  // still the active panel: a delayed dismiss from one sheet must not clobber
+  // a newer one.
+  const closePanel =
+    (which: Exclude<RunnerPanel, null>) =>
+    (next: boolean): void => {
+      if (!next) {
+        setPanel((current) => (current === which ? null : current))
+      }
+    }
+
+  return (
+    <div className="m-page runner-shell" data-panel={panel ?? undefined}>
+      <RunTopBar
+        sectionType={section.type}
+        saveState={saveState}
+        remainingMs={remainingMs}
+        answered={answeredInSection}
+        total={entries.length}
+        menuExpanded={panel === "menu"}
+        menuTriggerRef={menuTriggerRef}
+        onOpenMenu={() => {
+          setPanel((current) => (current === "menu" ? null : "menu"))
+        }}
+      />
+
+      <main className="m-body m-run-body">
         {retryableFlushFailure && saveState.state === "pending" ? (
           <OfflineBanner pendingCount={saveState.pendingCount} />
         ) : null}
 
         {runner}
 
-        {!nextEntry ? (
-          <div className="device-card text-ink-2 mt-4 flex flex-wrap items-center justify-between gap-3">
-            <span className="text-sm font-semibold">
-              {nextSection
-                ? t("runner.sectionComplete")
-                : t("runner.testComplete")}
-            </span>
-            <button
-              type="button"
-              className="device-button"
-              disabled={finishingSection}
-              onClick={() => {
-                if (nextSection) {
-                  handleFinishSection()
-                } else {
-                  navigate(`/attempts/${attemptId}/hand-in`)
-                }
-              }}
-            >
-              {nextSection
-                ? t("runner.continueToSection", {
-                    section: t(`runner.sectionChip.${nextSection.type}`),
-                  })
-                : t("runner.finishTest")}
-            </button>
-          </div>
-        ) : null}
-        {sectionTransitionFailed ? (
-          <p role="alert" className="text-bad mt-3 text-sm">
+        {sectionTransitionFailed && panel !== "finish" ? (
+          <p role="alert" className="m-alert mt-3">
             {t("runner.sectionTransitionError")}
           </p>
         ) : null}
       </main>
 
-      <footer className="device-footer sticky bottom-0 z-[40] flex-wrap">
-        {!expired && previousEntry ? (
-          <button
-            type="button"
-            className="device-button"
-            data-variant="ghost"
-            onClick={handlePrevious}
-          >
-            {t("runner.previous")}
-          </button>
-        ) : null}
-        <button
-          ref={navigatorTriggerRef}
-          type="button"
-          aria-label={t("navigator.openLabel")}
-          aria-expanded={panel === "navigator"}
-          className="nav-toggle runner-panel-trigger runner-navigator-trigger hover:border-teal border-line bg-paper inline-flex size-11 touch-manipulation items-center justify-center gap-2 rounded-lg border text-sm font-bold select-none sm:w-auto sm:px-3"
-          onClick={() => {
-            setPanel((current) =>
-              current === "navigator" ? null : "navigator",
-            )
-          }}
-        >
-          <span aria-hidden="true">▦</span>
-          <span className="hidden sm:inline">
-            {t("navigator.progressSubtitle", {
-              answered: responses.size,
-              total: envelope.questionCount,
-            })}
-          </span>
-        </button>
-        <span className="grow" />
-        {!expired ? (
-          <button
-            type="button"
-            className="device-button"
-            data-variant="ghost"
-            onClick={() => {
-              navigate(`/attempts/${attemptId}/hand-in`)
-            }}
-          >
-            {t("runner.handIn")}
-          </button>
-        ) : null}
-        {!expired && nextEntry ? (
-          <button type="button" className="device-button" onClick={handleNext}>
-            {t("runner.next")}
-          </button>
-        ) : null}
-      </footer>
-
-      <AppMenu
-        open={panel === "menu"}
-        onOpenChange={(next) => {
-          // Radix requests closing for Escape, overlay and close-button
-          // interactions. Opening is exclusively driven by our triggers.
-          // Only close if this is still the active panel: a delayed dismiss
-          // from the menu must not clobber a direct switch to the navigator.
-          if (!next) {
-            setPanel((current) => (current === "menu" ? null : current))
-          }
+      <RunActionBar
+        showPrevious={!expired && previousEntry !== undefined}
+        onPrevious={handlePrevious}
+        answered={answeredInSection}
+        total={entries.length}
+        navigatorExpanded={panel === "navigator"}
+        navigatorTriggerRef={navigatorTriggerRef}
+        onOpenNavigator={() => {
+          setPanel((current) => (current === "navigator" ? null : "navigator"))
         }}
-        inTest
+        primary={primary}
+        onPrimary={handlePrimary}
+      />
+
+      <RunMenuSheet
+        open={panel === "menu"}
+        onOpenChange={closePanel("menu")}
         // The attempt's clock does not start with the attempt: openapi.yaml
         // is explicit that `startedAt` and `expiresAt` "stay null until the
         // first section entry". Hardcoding this told a child "the clock
@@ -1057,35 +1023,28 @@ export function RunScreen({
         // anything -- false, and exactly the sort of thing that would stop
         // a child leaving a test they had not begun.
         clockStarted={envelope.expiresAt !== null}
-        student={student}
-        onGoLibrary={() => {
+        onLeave={() => {
           navigate("/")
         }}
-        onGoHistory={() => {
-          navigate("/history")
-        }}
-        onLeaveTest={() => {
-          navigate("/")
-        }}
-        onOpenNavigator={() => setPanel("navigator")}
         returnFocusRef={menuTriggerRef}
-        onSignOut={() => {
-          navigate("/")
-        }}
+      />
+      {/* No returnFocusRef: BottomSheet falls back to Radix's default, the
+          element focused when it opened -- the action bar's Finish button. */}
+      <FinishSectionSheet
+        open={panel === "finish"}
+        onOpenChange={closePanel("finish")}
+        sectionLabel={sectionLabel}
+        blankCount={entries.length - answeredInSection}
+        busy={finishingSection}
+        failed={sectionTransitionFailed}
+        onConfirm={handleFinishSection}
       />
       <QuestionNavigator
         open={panel === "navigator"}
-        onOpenChange={(next) => {
-          // See AppMenu's matching guards: Sheet never owns the open action,
-          // and a stale close must not dismiss the newly selected panel.
-          if (!next) {
-            setPanel((current) => (current === "navigator" ? null : current))
-          }
-        }}
+        onOpenChange={closePanel("navigator")}
         source={navigatorSource}
-        answeredCount={responses.size}
-        totalCount={envelope.questionCount}
-        onOpenMenu={() => setPanel("menu")}
+        answeredCount={answeredInSection}
+        totalCount={entries.length}
         returnFocusRef={navigatorTriggerRef}
         onNavigate={handleNavigatorNavigate}
       />
@@ -1105,7 +1064,7 @@ export function RunScreen({
  */
 export async function loadRunScreenData(attemptId: string): Promise<{
   envelope: RunnerEnvelope
-  student: MenuStudent | undefined
+  student: RunStudent | undefined
 }> {
   const [envelope, student] = await Promise.all([
     getRunnerEnvelope(attemptId),
@@ -1125,7 +1084,7 @@ export async function loadRunScreenData(attemptId: string): Promise<{
  */
 export async function loadRunRouteData(attemptId: string): Promise<{
   envelope: RunnerEnvelope
-  student: MenuStudent | undefined
+  student: RunStudent | undefined
   queue: AnswerQueue
 }> {
   try {

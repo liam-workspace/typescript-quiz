@@ -253,76 +253,78 @@
 
   /* A navigator cell. Five states, five looks -- see the note above. */
   .np-cell {
+    position: relative;
     display: grid;
+    min-height: 52px;
     place-items: center;
-    font: inherit;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    border-radius: 7px;
-    border: 1.5px solid var(--color-line);
+    border: 2px solid var(--color-line);
+    border-radius: 12px;
     background: var(--color-paper);
-    color: var(--color-ink-2);
+    color: var(--color-ink);
     cursor: pointer;
+    font: inherit;
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
     touch-action: manipulation;
   }
-  .np-cell:hover:not(:disabled) {
-    border-color: var(--color-teal);
-  }
   .np-cell:disabled {
-    cursor: not-allowed;
-    opacity: 0.55;
+    cursor: default;
+    opacity: 0.8;
   }
   .np-cell[data-status="answered"] {
-    background: var(--color-teal-bg);
     border-color: var(--color-teal);
-    color: var(--color-teal);
+    background: var(--color-teal);
+    color: #fff;
   }
   .np-cell[data-status="current"] {
-    background: var(--color-amber);
-    border-color: var(--color-amber);
-    color: #4a3208;
+    border-color: var(--color-clay);
+    box-shadow: 0 0 0 3px var(--color-clay-bg);
+    color: var(--color-clay);
   }
   .np-cell[data-status="correct"] {
-    background: var(--color-good-bg);
     border-color: var(--color-good);
+    background: var(--color-good-bg);
     color: var(--color-good);
   }
   .np-cell[data-status="incorrect"] {
-    background: var(--color-bad-bg);
     border-color: var(--color-bad);
+    background: var(--color-bad-bg);
     color: var(--color-bad);
   }
   .np-cell[data-status="blank"] {
-    background: var(--color-surface);
     border-style: dashed;
   }
-
-  /* The navigator's legend swatch: the same five states at glyph size. */
+  .np-mark {
+    position: absolute;
+    top: 1px;
+    right: 4px;
+    font-size: 10px;
+  }
   .np-key {
-    width: 11px;
-    height: 11px;
-    border-radius: 3px;
-    border: 1.5px solid var(--color-line);
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--color-line);
+    border-radius: 5px;
   }
   .np-key[data-status="answered"] {
-    background: var(--color-teal-bg);
     border-color: var(--color-teal);
+    background: var(--color-teal);
   }
   .np-key[data-status="current"] {
-    background: var(--color-amber);
-    border-color: var(--color-amber);
-  }
-  .np-key[data-status="blank"] {
-    background: var(--color-surface);
-    border-style: dashed;
+    border-color: var(--color-clay);
   }
   .np-key[data-status="correct"] {
-    background: var(--color-good-bg);
     border-color: var(--color-good);
+    background: var(--color-good-bg);
   }
   .np-key[data-status="incorrect"] {
-    background: var(--color-bad-bg);
     border-color: var(--color-bad);
+    background: var(--color-bad-bg);
+  }
+  .np-key[data-status="blank"] {
+    border-style: dashed;
   }
 
   /* Progress pips along the runner chrome. */
@@ -1684,5 +1686,61 @@
   .m-rules svg {
     margin-top: 1px;
     color: var(--color-clay);
+  }
+
+  /* ───── Run chrome — prototype vRun top bar / action bar ───── */
+  .m-runtop {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-paper);
+    padding: 6px 10px 0;
+    /* Sticky at the viewport edge, under a translucent iOS status bar. */
+    padding-top: max(6px, env(safe-area-inset-top));
+  }
+  .m-runtop .m-row {
+    min-height: 48px;
+    gap: 8px;
+  }
+  .m-timer {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 10px;
+    background: var(--color-surface);
+    padding: 4px 10px;
+    font-family: var(--font-mono);
+    font-size: 17px;
+    font-weight: 600;
+  }
+  .m-timer[data-low="true"] {
+    background: var(--color-bad-bg);
+    color: var(--color-bad);
+  }
+  .m-progress {
+    height: 5px;
+    margin: 4px -10px 0;
+    background: var(--color-line);
+  }
+  .m-progress > i {
+    display: block;
+    height: 100%;
+    background: var(--color-teal);
+    transition: width 0.25s;
+  }
+  .m-actionbar[data-sticky="true"] {
+    position: sticky;
+    bottom: 0;
+    z-index: 40;
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  .m-run-body {
+    padding-top: 12px;
+  }
+  .m-sheet-actions {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
   }
 }

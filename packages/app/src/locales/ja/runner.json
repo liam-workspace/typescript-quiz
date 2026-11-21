@@ -289,5 +289,21 @@
   "sectionRules.clockNoteFirst": "「準備ができました」をタップすると時間が始まり、離れても時間は進みます。",
   "sectionRules.clockNoteNext": "「準備ができました」をタップすると時間が始まります。",
   "sectionRules.leave": "離れる",
-  "sectionRules.starting": "開始中…"
+  "sectionRules.starting": "開始中…",
+  "runner.finishSectionButton": "{{section}}を終える",
+  "runner.finishSectionTitle": "{{section}}を終えますか？",
+  "runner.finishSectionBlank": "{{count}}問がまだ空欄です。このセクションには戻れません。",
+  "runner.finishSectionNoBlank": "このセクションには戻れません。",
+  "runner.backToTest": "テストに戻る",
+  "runner.oneMinuteLeft": "あと1分です。",
+  "runner.sectionProgress": "セクションの進み具合",
+  "navigator.sectionFinished": "{{section}} · 終了",
+  "navigator.sectionNotStarted": "{{section}} · 未開始",
+  "navigator.questionLabelWithStatus": "問題{{ordinal}}、{{status}}",
+  "navigator.statusCurrent": "いまここ",
+  "navigator.statusAnswered": "解答済み",
+  "navigator.statusBlank": "未解答",
+  "navigator.statusLeftBlank": "空欄",
+  "navigator.statusCorrect": "正解",
+  "navigator.statusIncorrect": "不正解"
 }

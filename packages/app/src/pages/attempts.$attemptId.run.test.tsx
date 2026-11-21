@@ -124,6 +124,18 @@ const finishWasCalled = (): void => {
   expect(mockFinishSection).toHaveBeenCalledOnce()
 }
 
+/**
+ * Hoisted rather than inlined into `waitFor` (callback-nesting depth, as
+ * above): the finish-section confirm lands on the next section's rules.
+ */
+function navigatedToReadingRules(navigate: ReturnType<typeof vi.fn>) {
+  return (): void => {
+    expect(navigate).toHaveBeenCalledWith(
+      "/attempts/attempt-1/sections/section-reading/rules",
+    )
+  }
+}
+
 class TestClock {
   public reads = 0
   private currentMs: number
@@ -696,17 +708,21 @@ describe("RunScreen", () => {
   it("renders the prototype runner shell with route-owned bottom actions", () => {
     renderRunScreen()
 
-    expect(screen.getByRole("banner")).toHaveClass("app-bar", "z-[40]")
-    expect(screen.getByRole("main")).toHaveClass("device-main", "runner-main")
-    expect(screen.getByRole("contentinfo")).toHaveClass(
-      "device-footer",
-      "z-[40]",
+    expect(screen.getByRole("banner")).toHaveClass("m-runtop")
+    expect(screen.getByRole("main")).toHaveClass("m-body", "m-run-body")
+    expect(screen.getByRole("contentinfo")).toHaveClass("m-actionbar")
+    expect(screen.getByRole("contentinfo")).toHaveAttribute(
+      "data-sticky",
+      "true",
     )
     expect(
       screen.queryByRole("button", { name: "Previous" }),
     ).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Next" })).toBeEnabled()
-    expect(screen.getByRole("button", { name: "Hand in" })).toBeEnabled()
+    // Hand in lives on the last question of the last section only now.
+    expect(
+      screen.queryByRole("button", { name: "Hand in" }),
+    ).not.toBeInTheDocument()
   })
 
   it("renders math prompts and choices as formulas without a passage label", () => {
@@ -802,25 +818,28 @@ describe("RunScreen", () => {
       expect(screen.getByLabelText("Time remaining")).toHaveTextContent("24:59")
     })
 
-    it("switches from the normal treatment to a calm at-risk treatment below five minutes", () => {
+    it("switches to the low treatment, with an icon and one announcement, at one minute", () => {
       const clock = new TestClock(Date.parse("2026-08-28T11:00:00.000Z"))
       renderRunScreen(
         {
           ...listeningEnvelope,
-          expiresAt: "2026-08-28T10:05:01.000Z",
+          expiresAt: "2026-08-28T10:01:01.000Z",
           serverTime: "2026-08-28T10:00:00.000Z",
         },
         undefined,
         clock.read.bind(clock),
       )
 
-      const timer = screen.getByLabelText("Time remaining")
-      expect(timer.className).toContain("text-ink-2")
-      expect(timer.className).not.toContain("text-amber")
+      const timer = screen.getByRole("timer", { name: "Time remaining" })
+      expect(timer).not.toHaveAttribute("data-low")
+      expect(timer.querySelector("svg")).toBeNull()
+      expect(screen.queryByText("One minute left.")).not.toBeInTheDocument()
 
       advanceClock(clock, 2_000)
 
-      expect(timer.className).toContain("text-amber")
+      expect(timer).toHaveAttribute("data-low", "true")
+      expect(timer.querySelector("svg")).not.toBeNull()
+      expect(screen.getByText("One minute left.")).toBeInTheDocument()
     })
 
     it("stops reading the clock after the runner unmounts", () => {
@@ -943,7 +962,7 @@ describe("RunScreen", () => {
       expect(screen.getByRole("dialog", { name: "Menu" })).toBeInTheDocument()
     })
 
-    it("switches directly between modal panels using controls inside the active sheet", async () => {
+    it("keeps exactly one modal panel open at a time", async () => {
       renderRunScreen()
 
       const menuTrigger = screen.getByRole("button", { name: "Open menu" })
@@ -956,30 +975,18 @@ describe("RunScreen", () => {
         "runner-panel-trigger",
         "runner-menu-trigger",
       )
+      expect(screen.getAllByRole("dialog")).toHaveLength(1)
 
+      await userEvent.keyboard("{Escape}")
       await userEvent.click(
-        within(screen.getByRole("dialog", { name: "Menu" })).getByRole(
-          "button",
-          { name: "Open the question navigator" },
-        ),
+        screen.getByRole("button", { name: "Open the question navigator" }),
       )
 
+      expect(runner).toHaveAttribute("data-panel", "navigator")
       expect(screen.getAllByRole("dialog")).toHaveLength(1)
       expect(
         screen.getByRole("dialog", { name: "Questions" }),
       ).toBeInTheDocument()
-      expect(runner).toHaveAttribute("data-panel", "navigator")
-
-      await userEvent.click(
-        within(screen.getByRole("dialog", { name: "Questions" })).getByRole(
-          "button",
-          { name: "Open menu" },
-        ),
-      )
-
-      expect(screen.getAllByRole("dialog")).toHaveLength(1)
-      expect(screen.getByRole("dialog", { name: "Menu" })).toBeInTheDocument()
-      expect(runner).toHaveAttribute("data-panel", "menu")
     })
 
     it("makes the runner landmarks inaccessible while a modal panel is open", async () => {
@@ -1000,7 +1007,7 @@ describe("RunScreen", () => {
         screen.queryByRole("button", { name: "Play recording" }),
       ).not.toBeInTheDocument()
       expect(
-        screen.queryByRole("button", { name: "Hand in" }),
+        screen.queryByRole("button", { name: "Next" }),
       ).not.toBeInTheDocument()
     })
 
@@ -1027,14 +1034,85 @@ describe("RunScreen", () => {
     it("uses 44px touch targets for both runner-chrome triggers", () => {
       renderRunScreen()
 
-      expect(
-        screen.getByRole("button", { name: "Open menu" }).className,
-      ).toContain("size-11")
+      // `.m-iconbtn` is 44×44 and `.m-btn` has a 48px min-height
+      // (src/index.css); jsdom applies no CSS, so the classes are the proxy.
+      expect(screen.getByRole("button", { name: "Open menu" })).toHaveClass(
+        "m-iconbtn",
+      )
       expect(
         screen.getByRole("button", {
           name: "Open the question navigator",
-        }).className,
-      ).toContain("size-11")
+        }),
+      ).toHaveClass("m-btn")
+    })
+
+    it("offers Finish <Section> on the last question of a non-final section and confirms in a sheet", async () => {
+      const user = userEvent.setup()
+
+      mockSetPosition.mockResolvedValue(undefined)
+      mockFinishSection.mockImplementation(finishWithAppliedRemainder)
+      const { navigate } = renderRunScreen(sectionBoundaryEnvelope)
+
+      await user.click(screen.getByRole("button", { name: "Finish Listening" }))
+
+      const dialog = screen.getByRole("dialog", { name: "Finish Listening?" })
+
+      expect(
+        within(dialog).getByText(/You cannot come back to this section\./),
+      ).toBeInTheDocument()
+      expect(mockFinishSection).not.toHaveBeenCalled()
+
+      await user.click(
+        within(dialog).getByRole("button", { name: "Finish Listening" }),
+      )
+
+      await waitFor(finishWasCalled)
+      await waitFor(navigatedToReadingRules(navigate))
+    })
+
+    it("offers Hand in on the last question of the last section and goes to the hand-in route", async () => {
+      const user = userEvent.setup()
+      const { navigate } = renderRunScreen({
+        ...readingEnvelope,
+        currentQuestionId: "q-r4",
+      })
+
+      await user.click(screen.getByRole("button", { name: "Hand in" }))
+
+      expect(navigate).toHaveBeenCalledWith("/attempts/attempt-1/hand-in")
+    })
+
+    it("has no Hand in button before the last question", () => {
+      renderRunScreen()
+
+      expect(screen.queryByRole("button", { name: "Hand in" })).toBeNull()
+      expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument()
+    })
+
+    it("leaves the test from the Menu sheet", async () => {
+      const user = userEvent.setup()
+      const { navigate } = renderRunScreen()
+
+      await user.click(screen.getByRole("button", { name: "Open menu" }))
+      await user.click(
+        within(screen.getByRole("dialog", { name: "Menu" })).getByRole(
+          "button",
+          { name: "Leave test" },
+        ),
+      )
+
+      expect(navigate).toHaveBeenCalledWith("/")
+    })
+
+    it("shows per-section progress in the action bar and top bar", () => {
+      renderRunScreen()
+
+      expect(
+        screen.getByRole("button", { name: "Open the question navigator" }),
+      ).toHaveTextContent("0/2")
+      expect(
+        screen.getByRole("progressbar", { name: "Section progress" }),
+      ).toHaveAttribute("aria-valuemax", "2")
     })
 
     it("never writes position when a disabled forward-only cell is clicked", async () => {
@@ -1045,7 +1123,9 @@ describe("RunScreen", () => {
           name: "Open the question navigator",
         }),
       )
-      await userEvent.click(screen.getByRole("button", { name: "Question 4" }))
+      await userEvent.click(
+        screen.getByRole("button", { name: /^Question 4,/ }),
+      )
 
       expect(mockSetPosition).not.toHaveBeenCalled()
     })
@@ -1059,7 +1139,9 @@ describe("RunScreen", () => {
           name: "Open the question navigator",
         }),
       )
-      await userEvent.click(screen.getByRole("button", { name: "Question 7" }))
+      await userEvent.click(
+        screen.getByRole("button", { name: /^Question 7,/ }),
+      )
 
       await waitFor(positionWasWritten)
 
@@ -1751,14 +1833,14 @@ describe("RunScreen", () => {
       })
 
       expect(
-        screen.queryByRole("button", { name: "Continue to Reading" }),
+        screen.queryByRole("button", { name: "Finish Listening" }),
       ).not.toBeInTheDocument()
 
       cleanup()
       renderRunScreen(sectionBoundaryEnvelope)
 
       expect(
-        screen.getByRole("button", { name: "Continue to Reading" }),
+        screen.getByRole("button", { name: "Finish Listening" }),
       ).toBeInTheDocument()
     })
 
@@ -1768,8 +1850,11 @@ describe("RunScreen", () => {
       const user = userEvent.setup()
 
       await user.click(screen.getByRole("radio", { name: "School" }))
+      await user.click(screen.getByRole("button", { name: "Finish Listening" }))
       await user.click(
-        screen.getByRole("button", { name: "Continue to Reading" }),
+        within(
+          screen.getByRole("dialog", { name: "Finish Listening?" }),
+        ).getByRole("button", { name: "Finish Listening" }),
       )
 
       await waitFor(finishWasCalled)
@@ -1793,6 +1878,60 @@ describe("RunScreen", () => {
       ).resolves.toEqual([])
     })
 
+    it("keeps the confirm sheet open with an alert when finishing fails, and retries from it", async () => {
+      mockFinishSection
+        .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+        .mockImplementationOnce(finishWithAppliedRemainder)
+      const { navigate } = renderRunScreen(sectionBoundaryEnvelope)
+      const user = userEvent.setup()
+
+      await user.click(screen.getByRole("button", { name: "Finish Listening" }))
+      const dialog = screen.getByRole("dialog", { name: "Finish Listening?" })
+      await user.click(
+        within(dialog).getByRole("button", { name: "Finish Listening" }),
+      )
+
+      expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+        "The next section could not be opened.",
+      )
+      expect(navigate).not.toHaveBeenCalled()
+
+      const confirm = within(dialog).getByRole("button", {
+        name: "Finish Listening",
+      })
+      expect(confirm).toBeEnabled()
+      await user.click(confirm)
+
+      await waitFor(navigatedToReadingRules(navigate))
+    })
+
+    it("closes the confirm sheet and shows the expired state when the section ran out", async () => {
+      mockFinishSection.mockRejectedValue(
+        new ApiError({
+          type: "section_expired",
+          title: "The section's clock ran out.",
+          status: 410,
+        }),
+      )
+      renderRunScreen(sectionBoundaryEnvelope)
+      const user = userEvent.setup()
+
+      await user.click(screen.getByRole("button", { name: "Finish Listening" }))
+      await user.click(
+        within(
+          screen.getByRole("dialog", { name: "Finish Listening?" }),
+        ).getByRole("button", { name: "Finish Listening" }),
+      )
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "This section's time ran out.",
+      )
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole("button", { name: "Finish Listening" }),
+      ).not.toBeInTheDocument()
+    })
+
     it("offers hand-in instead of a nonexistent next section on the final question", async () => {
       const finalEnvelope: RunnerEnvelope = {
         ...readingEnvelope,
@@ -1801,10 +1940,10 @@ describe("RunScreen", () => {
       const { navigate } = renderRunScreen(finalEnvelope)
 
       expect(
-        screen.queryByRole("button", { name: "Continue to Reading" }),
+        screen.queryByRole("button", { name: /^Finish / }),
       ).not.toBeInTheDocument()
 
-      await userEvent.click(screen.getByRole("button", { name: "Finish test" }))
+      await userEvent.click(screen.getByRole("button", { name: "Hand in" }))
 
       expect(mockFinishSection).not.toHaveBeenCalled()
       expect(navigate).toHaveBeenCalledExactlyOnceWith(
@@ -2074,9 +2213,16 @@ describe("RunScreen", () => {
     })
 
     it("navigates to the hand-in dialog when Hand in is tapped", async () => {
+      mockSetPosition.mockResolvedValue(undefined)
+      const user = userEvent.setup()
       const { navigate } = renderRunScreen(readingEnvelope)
 
-      await userEvent.click(screen.getByRole("button", { name: "Hand in" }))
+      // Hand in is the last question's primary action: q-r2 → q-r3 → q-r4.
+      await user.click(screen.getByRole("button", { name: "Next" }))
+      await screen.findByText("What time does the library open?")
+      await user.click(screen.getByRole("button", { name: "Next" }))
+      await screen.findByText("What kind of building is it?")
+      await user.click(screen.getByRole("button", { name: "Hand in" }))
 
       expect(navigate).toHaveBeenCalledWith(expect.stringContaining("/hand-in"))
     })

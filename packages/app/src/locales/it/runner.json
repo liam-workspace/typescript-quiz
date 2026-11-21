@@ -299,5 +299,22 @@
   "sectionRules.clockNoteFirst": "Il timer parte quando tocchi «Sono pronto» e continua anche se esci.",
   "sectionRules.clockNoteNext": "Il timer parte quando tocchi «Sono pronto».",
   "sectionRules.leave": "Esci",
-  "sectionRules.starting": "Avvio…"
+  "sectionRules.starting": "Avvio…",
+  "runner.finishSectionButton": "Termina {{section}}",
+  "runner.finishSectionTitle": "Terminare {{section}}?",
+  "runner.finishSectionBlank_one": "{{count}} domanda è ancora vuota. Non potrai tornare a questa parte.",
+  "runner.finishSectionBlank_other": "{{count}} domande sono ancora vuote. Non potrai tornare a questa parte.",
+  "runner.finishSectionNoBlank": "Non potrai tornare a questa parte.",
+  "runner.backToTest": "Torna al test",
+  "runner.oneMinuteLeft": "Manca un minuto.",
+  "runner.sectionProgress": "Avanzamento della parte",
+  "navigator.sectionFinished": "{{section}} · finita",
+  "navigator.sectionNotStarted": "{{section}} · non iniziata",
+  "navigator.questionLabelWithStatus": "Domanda {{ordinal}}, {{status}}",
+  "navigator.statusCurrent": "sei qui",
+  "navigator.statusAnswered": "con risposta",
+  "navigator.statusBlank": "senza risposta",
+  "navigator.statusLeftBlank": "lasciata vuota",
+  "navigator.statusCorrect": "corretta",
+  "navigator.statusIncorrect": "sbagliata"
 }

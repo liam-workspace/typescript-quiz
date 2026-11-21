@@ -299,5 +299,22 @@
   "sectionRules.clockNoteFirst": "Die Uhr startet, wenn du auf „Ich bin bereit“ tippst, und läuft weiter, wenn du gehst.",
   "sectionRules.clockNoteNext": "Die Uhr startet, wenn du auf „Ich bin bereit“ tippst.",
   "sectionRules.leave": "Verlassen",
-  "sectionRules.starting": "Startet…"
+  "sectionRules.starting": "Startet…",
+  "runner.finishSectionButton": "{{section}} beenden",
+  "runner.finishSectionTitle": "{{section}} beenden?",
+  "runner.finishSectionBlank_one": "{{count}} Frage ist noch leer. Du kannst nicht zu diesem Teil zurückkehren.",
+  "runner.finishSectionBlank_other": "{{count}} Fragen sind noch leer. Du kannst nicht zu diesem Teil zurückkehren.",
+  "runner.finishSectionNoBlank": "Du kannst nicht zu diesem Teil zurückkehren.",
+  "runner.backToTest": "Zurück zum Test",
+  "runner.oneMinuteLeft": "Noch eine Minute.",
+  "runner.sectionProgress": "Fortschritt im Teil",
+  "navigator.sectionFinished": "{{section}} · beendet",
+  "navigator.sectionNotStarted": "{{section}} · noch nicht begonnen",
+  "navigator.questionLabelWithStatus": "Frage {{ordinal}}, {{status}}",
+  "navigator.statusCurrent": "du bist hier",
+  "navigator.statusAnswered": "beantwortet",
+  "navigator.statusBlank": "nicht beantwortet",
+  "navigator.statusLeftBlank": "leer gelassen",
+  "navigator.statusCorrect": "richtig",
+  "navigator.statusIncorrect": "falsch"
 }

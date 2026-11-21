@@ -138,6 +138,27 @@
  * state is a defect, and both have already been exactly that.
  */
 @layer components {
+  .lang-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .lang-btn {
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 12px;
+    border: 1.5px solid var(--color-line);
+    background: var(--color-paper);
+    font-weight: 800;
+    color: var(--color-ink-2);
+    cursor: pointer;
+  }
+  .lang-btn[aria-pressed="true"] {
+    background: var(--color-teal);
+    border-color: var(--color-teal);
+    color: #fff;
+  }
   .app-shell {
     min-height: calc(
       100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)

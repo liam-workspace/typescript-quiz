@@ -216,5 +216,22 @@
   "brief.error": "No se pudo cargar la información de la prueba. Inténtalo de nuevo.",
   "brief.backToLibrary": "Volver a la biblioteca de tests",
   "notFound.message": "Esa página no está aquí.",
-  "notFound.goToHistory": "Ver tus intentos"
+  "notFound.goToHistory": "Ver tus intentos",
+  "tabs.nav": "Main",
+  "tabs.library": "Library",
+  "tabs.history": "History",
+  "tabs.profile": "Profile",
+  "pwa.sheet.close": "Close",
+  "pwa.install.title": "Add Primary Practice to your home screen",
+  "pwa.install.body": "Opens full screen, keeps your tests ready offline, and never loses an answer.",
+  "pwa.install.button": "Install",
+  "pwa.install.notNow": "Not now",
+  "pwa.update.ready": "A new version is ready.",
+  "pwa.update.refresh": "Refresh",
+  "pwa.update.deferred": "A new version is ready. It will install after you finish this test.",
+  "pwa.offline.browsing": "You're offline. Showing what is saved on this phone.",
+  "pwa.offline.inTest": "You're offline. Keep answering — your answers are saved on this phone and will be sent when you reconnect.",
+  "pwa.offline.waiting": "Waiting to be sent: {{count}}",
+  "pwa.live.offline": "You are offline. Answers will be saved on this phone.",
+  "pwa.live.online": "Back online."
 }

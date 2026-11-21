@@ -126,6 +126,11 @@ it.each<[string, Partial<CandidatePresentation>]>([
     },
   ],
   ["blank solution", { solutionBlocks: [textBlock(" \t ")] }],
+  ["Braille blank solution", { solutionBlocks: [textBlock("\u2800")] }],
+  [
+    "Hangul fillers in an otherwise blank solution",
+    { solutionBlocks: [textBlock("\u115f\u1160\u3164\uffa0")] },
+  ],
   [
     "spacing-only solution formula",
     { solutionBlocks: [mathBlock("{}\\quad")] },
@@ -133,6 +138,32 @@ it.each<[string, Partial<CandidatePresentation>]>([
   [
     "phantom solution formula",
     { solutionBlocks: [mathBlock("\\phantom{42}")] },
+  ],
+  [
+    "mixed-case transparent solution formula",
+    { solutionBlocks: [mathBlock("\\textcolor{Transparent}{42}")] },
+  ],
+  [
+    "uppercase transparent nested solution formula",
+    { solutionBlocks: [mathBlock("\\textcolor{TRANSPARENT}{\\frac{6}{8}}")] },
+  ],
+  [
+    "transparent color inherited by a solution glyph",
+    {
+      solutionBlocks: [
+        mathBlock(
+          "\\textcolor{Transparent}{\\frac{1}{\\textcolor{Inherit}{2}}}",
+        ),
+      ],
+    },
+  ],
+  [
+    "transparent short hex solution formula",
+    { solutionBlocks: [mathBlock("\\textcolor{#aBc0}{42}")] },
+  ],
+  [
+    "transparent long hex solution formula",
+    { solutionBlocks: [mathBlock("\\textcolor{#aBcDeF00}{42}")] },
   ],
 ])(
   "refuses approved content with %s before writing a draft",
@@ -152,16 +183,32 @@ it.each<[string, Partial<CandidatePresentation>]>([
   },
 )
 
-it("imports renderable nested TeX in the reviewed prompt, choices and worked solution", async () => {
-  await withDatabase(async (pool) => {
-    const candidate = await approvedImport(pool, {
-      ...reviewedPresentation,
-      solutionBlocks: [mathBlock("\\frac{6}{8}=\\frac{3}{4}")],
+it.each<[string, CandidatePresentation["solutionBlocks"]]>([
+  ["nested TeX", [mathBlock("\\frac{6}{8}=\\frac{3}{4}")]],
+  [
+    "visible math within transparent math",
+    [mathBlock("\\textcolor{Transparent}{\\frac{1}{\\textcolor{Blue}{2}}}")],
+  ],
+  [
+    "visible text alongside blank characters",
+    [textBlock("\u2800\u3164Divide both terms by two.")],
+  ],
+])(
+  "imports a reviewed solution containing %s",
+  async (_label, solutionBlocks) => {
+    await withDatabase(async (pool) => {
+      const candidate = await approvedImport(pool, {
+        ...reviewedPresentation,
+        solutionBlocks,
+      })
+      const draft = await candidate.submit()
+      expect(draft.versionId).toBeTruthy()
+      expect(
+        (await pool.query("SELECT solution_blocks FROM question_math")).rows,
+      ).toEqual([{ solution_blocks: solutionBlocks }])
     })
-    const draft = await candidate.submit()
-    expect(draft.versionId).toBeTruthy()
-  })
-})
+  },
+)
 
 it("keeps a historical published solution hidden after a request policy change", async () => {
   await withDatabase(async (pool, { databaseUrl }) => {

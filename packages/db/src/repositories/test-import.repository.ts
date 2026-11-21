@@ -212,13 +212,50 @@ export class InvalidMathCandidateImportError extends Error {
 const unsafeCommand =
   /\\(?:href|url|includegraphics|htmlClass|htmlId|htmlStyle|htmlData|def|gdef|edef|xdef|let|futurelet|newcommand|renewcommand|providecommand|global)(?![a-z])/u
 const meaningfulText = /[\p{L}\p{N}\p{S}]/u
+// Braille Pattern Blank is a symbol and is not Unicode whitespace or ignorable.
+const blankCharacters =
+  /[\p{White_Space}\p{Default_Ignorable_Code_Point}\u2800]/gu
+const transparentColor = /^(?:transparent|#[\da-f]{3}0|#[\da-f]{6}00)$/iu
+const inheritedColor = /^(?:currentcolor|inherit|revert|unset)$/iu
+
+function hasVisibleText(text: string): boolean {
+  return meaningfulText.test(text.replace(blankCharacters, ""))
+}
+
+function hasVisibleMathGlyph(markup: string): boolean {
+  // KaTeX includes the source in MathML annotations, even for spacing-only TeX.
+  const html = markup.slice(markup.indexOf("</math>") + "</math>".length)
+  const transparentSpans: boolean[] = []
+
+  for (const [token, attributes, glyph] of html.matchAll(
+    /<\/span>|<span\b([^<>]*)>|<[^>]*>|([^<]+)/gu,
+  )) {
+    const parentTransparent = transparentSpans.at(-1) ?? false
+
+    if (token.startsWith("<span")) {
+      const style = /\sstyle="([^"]*)"/u.exec(attributes)?.[1] ?? ""
+      const color = /(?:^|;)\s*color\s*:\s*([^;]+)/iu.exec(style)?.[1].trim()
+      transparentSpans.push(
+        color && !inheritedColor.test(color)
+          ? transparentColor.test(color)
+          : parentTransparent,
+      )
+    } else if (token === "</span>") {
+      transparentSpans.pop()
+    } else if (glyph && !parentTransparent && hasVisibleText(glyph)) {
+      return true
+    }
+  }
+
+  return false
+}
 
 function hasReviewedContent(blocks: ContentBlock[]): boolean {
   let meaningful = false
 
   for (const block of blocks) {
     if (block.kind === "text") {
-      meaningful ||= meaningfulText.test(block.value)
+      meaningful ||= hasVisibleText(block.value)
 
       continue
     }
@@ -239,21 +276,7 @@ function hasReviewedContent(blocks: ContentBlock[]): boolean {
         maxSize: 10,
         output: "htmlAndMathml",
       })
-      // Only visible glyphs count. KaTeX includes the source verbatim in
-      // MathML annotations, even for formulas containing nothing but spacing.
-      const html = markup.slice(markup.indexOf("</math>") + "</math>".length)
-      for (const [, attributes, glyph] of html.matchAll(
-        /<span\b([^<>]*)>([^<>]+)<\/span>/gu,
-      )) {
-        if (
-          !attributes.includes("color:transparent;") &&
-          meaningfulText.test(glyph)
-        ) {
-          meaningful = true
-
-          break
-        }
-      }
+      meaningful ||= hasVisibleMathGlyph(markup)
     } catch {
       return false
     }

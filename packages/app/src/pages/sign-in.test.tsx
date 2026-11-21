@@ -22,15 +22,33 @@ describe("SignInScreen", () => {
     ).toBeInTheDocument()
   })
 
-  it("uses the centered device sign-in hierarchy and a provider-neutral secondary button", () => {
-    render(<SignInScreen onSignIn={vi.fn()} starting={false} />)
-
-    expect(screen.getByRole("main")).toHaveClass("center-main")
-    expect(screen.getByRole("button")).toHaveClass("device-button")
-    expect(screen.getByRole("button")).toHaveAttribute(
-      "data-variant",
-      "secondary",
+  it("uses the mobile hero: logo tile, title focus target, full-width primary button", () => {
+    const { container } = render(
+      <SignInScreen onSignIn={vi.fn()} starting={false} />,
     )
+
+    expect(container.querySelector(".m-hero")).not.toBeNull()
+    expect(container.querySelector(".m-logo")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    )
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Primary Practice" }),
+    ).toHaveAttribute("tabindex", "-1")
+
+    const button = screen.getByRole("button", { name: "Sign in" })
+
+    expect(button).toHaveClass("m-btn")
+    expect(button).toHaveAttribute("data-block", "true")
+  })
+
+  it("shows the failure as an alert and leaves the button usable", () => {
+    render(<SignInScreen onSignIn={vi.fn()} starting={false} failed />)
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Sign-in could not start. Please try again.",
+    )
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled()
   })
 
   it("renders exactly one sign-in button whose copy names no provider", () => {

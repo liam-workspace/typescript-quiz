@@ -532,6 +532,30 @@ describe("test library page", () => {
     },
   )
 
+  it("renders the no-access state as a hero with a lock tile and Sign out", () => {
+    const { container } = render(
+      <LibraryRouteError
+        error={
+          new ApiError({
+            type: "student_not_provisioned",
+            title: "No access",
+            status: 404,
+          })
+        }
+      />,
+    )
+
+    expect(container.querySelector(".m-hero")).not.toBeNull()
+    expect(
+      screen.getByText("This account does not have access to Quiz yet."),
+    ).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Sign out" })).toHaveAttribute(
+      "href",
+      "/sign-in",
+    )
+    expect(screen.queryByRole("link", { name: "Try again" })).toBeNull()
+  })
+
   it("clears the stored session when Sign out is chosen", async () => {
     const user = userEvent.setup()
 

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { useRef, useState, useSyncExternalStore, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { InstallCard } from "../components/Banners.js"
+import { Icon } from "../components/Icon.js"
 import { InstallSheet } from "../components/InstallSheet.js"
 import { LibraryFilter } from "../components/LibraryFilter.js"
 import { LibrarySkeleton } from "../components/LibrarySkeleton.js"
@@ -36,9 +37,6 @@ export async function loadLibrary(): Promise<LibraryData> {
 
   return { initialPage, student }
 }
-
-const primaryActionClass = "device-button whitespace-nowrap"
-const secondaryActionClass = "device-button whitespace-nowrap"
 
 export interface LibraryScreenProps {
   readonly initialPage: TestCatalogPage
@@ -314,37 +312,37 @@ export function LibraryRouteError({ error }: LibraryRouteErrorProps) {
   }
 
   return (
-    <div className="device-page">
-      <main className="center-main">
-        <div className="device-card max-w-xl">
-          <p role="alert">{t(message)}</p>
-          {noAccess ? (
-            <p className="text-ink-2 mt-2 text-sm">
-              {t("library.noAccess.detail")}
-            </p>
-          ) : null}
-          {/* Every error state gets a way out. Plain links, not router calls:
-              this component also renders where there is no router (tests, the
-              route's own error boundary), and a full navigation is what a
-              retry or a fresh sign-in wants anyway. */}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {unauthorized || noAccess ? null : (
-              <a href="/" className={primaryActionClass}>
-                {t("library.errorRetry")}
-              </a>
-            )}
-            <a
-              href={SIGN_IN_PATH}
-              className={secondaryActionClass}
-              data-variant="secondary"
-              onClick={() => {
-                signOut()
-              }}
-            >
-              {t("menu.signOut")}
-            </a>
-          </div>
+    <div className="m-page">
+      <main className="m-hero">
+        <div className="m-logo" data-tone="clay" aria-hidden="true">
+          <Icon name="lock" />
         </div>
+        <h1 className="m-title" tabIndex={-1} data-page-title role="alert">
+          {t(message)}
+        </h1>
+        {noAccess ? (
+          <p className="m-sub">{t("library.noAccess.detail")}</p>
+        ) : null}
+        {/* Every error state gets a way out. Plain links, not router calls:
+            this component also renders where there is no router (tests, the
+            route's own error boundary), and a full navigation is what a
+            retry or a fresh sign-in wants anyway. */}
+        {unauthorized || noAccess ? null : (
+          <a href="/" className="m-btn" data-block="true">
+            {t("library.errorRetry")}
+          </a>
+        )}
+        <a
+          href={SIGN_IN_PATH}
+          className="m-btn"
+          data-variant={unauthorized || noAccess ? undefined : "secondary"}
+          data-block="true"
+          onClick={() => {
+            signOut()
+          }}
+        >
+          <Icon name="logout" /> {t("menu.signOut")}
+        </a>
       </main>
     </div>
   )

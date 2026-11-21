@@ -9,7 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@liam-workspace/node-auth-server": "^0.5.2",
+    "@liam-workspace/node-auth-server": "^0.5.3",
     "@liam-workspace/node-config": "^0.1.0",
     "@liam-workspace/node-logger": "^0.1.0",
     "@liam-workspace/node-nest-common": "^0.1.1",

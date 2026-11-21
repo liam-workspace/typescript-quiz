@@ -196,8 +196,8 @@ importers:
   packages/server:
     dependencies:
       '@liam-workspace/node-auth-server':
-        specifier: ^0.5.2
-        version: 0.5.2
+        specifier: ^0.5.3
+        version: 0.5.3
       '@liam-workspace/node-config':
         specifier: ^0.1.0
         version: 0.1.0
@@ -538,8 +538,8 @@ packages:
       react: ^19.0.0
       react-dom: ^19.0.0
 
-  '@liam-workspace/node-auth-server@0.5.2':
-    resolution: {integrity: sha512-sCWZ5ekJDNl1k8sVw+ey+TM+OyG/RRRLAE/V0hFDoQqzWurKAPuQ9ZtsGaJxSEP1D2C+nsQQKtTqN1lduxP5Fw==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-auth-server/0.5.2/38f9d0ce998ffc1d151ca71a5cc18b3d8f53f1e5}
+  '@liam-workspace/node-auth-server@0.5.3':
+    resolution: {integrity: sha512-V8B5meoer7N8TVAChYAlbofUXDJdpcdnQjXExrJMND9rnSkikAhQPQBuXsfdnklgMY2JkM0KZCZxyV3PnzMkqg==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-auth-server/0.5.3/da0f70997b7d54e9f90280a0434d97378f8f0245}
 
   '@liam-workspace/node-config@0.1.0':
     resolution: {integrity: sha512-ULuIu7TpFIpGwlArqbe0k1h6QshiXTrW0cEc6q7OWjFYaoMPGxqfeLuR2Ql6Bc3KZupw7B2UdIy+BZ6PHeJl2g==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-config/0.1.0/86e17fbad5c1e48ef95083da9995c9b5c23258d7}
@@ -4493,7 +4493,7 @@ snapshots:
       - '@types/react'
       - '@types/react-dom'
 
-  '@liam-workspace/node-auth-server@0.5.2':
+  '@liam-workspace/node-auth-server@0.5.3':
     dependencies:
       '@liam-workspace/node-webauthn': 0.1.1
       jose: 6.2.9

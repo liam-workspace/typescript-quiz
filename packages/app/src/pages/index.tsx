@@ -317,9 +317,16 @@ export function LibraryRouteError({ error }: LibraryRouteErrorProps) {
         <div className="m-logo" data-tone="clay" aria-hidden="true">
           <Icon name="lock" />
         </div>
-        <h1 className="m-title" tabIndex={-1} data-page-title role="alert">
-          {t(message)}
-        </h1>
+        <div role="alert">
+          <h1
+            className="m-title"
+            tabIndex={-1}
+            data-page-title
+            data-size={noAccess ? "long" : undefined}
+          >
+            {t(message)}
+          </h1>
+        </div>
         {noAccess ? (
           <p className="m-sub">{t("library.noAccess.detail")}</p>
         ) : null}

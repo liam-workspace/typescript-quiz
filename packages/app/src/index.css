@@ -1504,7 +1504,7 @@
   .m-chip[data-tone="bad"] {
     border-color: transparent;
     background: var(--color-bad-bg);
-    color: #b53a34;
+    color: var(--color-bad);
   }
   .m-chip[data-tone="warn"] {
     border-color: transparent;
@@ -1651,6 +1651,9 @@
   }
   .m-hero .m-title {
     font-size: 28px;
+  }
+  .m-hero .m-title[data-size="long"] {
+    font-size: 22px;
   }
   .m-alert {
     border-radius: 12px;

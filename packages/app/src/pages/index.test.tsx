@@ -547,6 +547,9 @@ describe("test library page", () => {
 
     expect(container.querySelector(".m-hero")).not.toBeNull()
     expect(
+      within(screen.getByRole("alert")).getByRole("heading", { level: 1 }),
+    ).toHaveAttribute("tabindex", "-1")
+    expect(
       screen.getByText("This account does not have access to Quiz yet."),
     ).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Sign out" })).toHaveAttribute(

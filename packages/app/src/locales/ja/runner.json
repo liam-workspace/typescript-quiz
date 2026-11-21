@@ -273,5 +273,15 @@
   "profile.signOut": "サインアウト",
   "profile.signOutConfirm.title": "サインアウトしますか？",
   "profile.signOutConfirm.body": "もう一度サインインが必要です。オフライン用に保存したテストはこの端末から削除されます。",
-  "profile.signOutConfirm.cancel": "キャンセル"
+  "profile.signOutConfirm.cancel": "キャンセル",
+  "library.filter.label": "テストを絞り込む",
+  "library.filter.all": "すべて",
+  "library.filter.todo": "これから",
+  "library.filter.done": "終わった",
+  "library.caughtUp": "全部終わりました。",
+  "library.statusInProgress": "途中 · {{section}}",
+  "library.statusBest": "ベスト {{percentage}}%",
+  "library.blockedByActive": "先に「{{title}}」を終わらせましょう。",
+  "library.filterEmpty": "まだありません。",
+  "library.skeletonLabel": "テストを読み込み中"
 }

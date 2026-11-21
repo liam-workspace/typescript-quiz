@@ -283,5 +283,15 @@
   "profile.signOut": "Esci",
   "profile.signOutConfirm.title": "Uscire?",
   "profile.signOutConfirm.body": "Dovrai accedere di nuovo. I test salvati offline verranno rimossi da questo telefono.",
-  "profile.signOutConfirm.cancel": "Annulla"
+  "profile.signOutConfirm.cancel": "Annulla",
+  "library.filter.label": "Filtra i test",
+  "library.filter.all": "Tutti",
+  "library.filter.todo": "Da fare",
+  "library.filter.done": "Fatti",
+  "library.caughtUp": "Sei in pari con tutto.",
+  "library.statusInProgress": "In corso · {{section}}",
+  "library.statusBest": "Migliore {{percentage}}%",
+  "library.blockedByActive": "Finisci prima {{title}}.",
+  "library.filterEmpty": "Qui non c’è ancora niente.",
+  "library.skeletonLabel": "Caricamento dei test"
 }

@@ -283,5 +283,15 @@
   "profile.signOut": "Abmelden",
   "profile.signOutConfirm.title": "Abmelden?",
   "profile.signOutConfirm.body": "Du musst dich erneut anmelden. Offline gespeicherte Tests werden von diesem Telefon entfernt.",
-  "profile.signOutConfirm.cancel": "Abbrechen"
+  "profile.signOutConfirm.cancel": "Abbrechen",
+  "library.filter.label": "Tests filtern",
+  "library.filter.all": "Alle",
+  "library.filter.todo": "Offen",
+  "library.filter.done": "Erledigt",
+  "library.caughtUp": "Du bist auf dem neuesten Stand.",
+  "library.statusInProgress": "Läuft · {{section}}",
+  "library.statusBest": "Beste {{percentage}} %",
+  "library.blockedByActive": "Beende zuerst {{title}}.",
+  "library.filterEmpty": "Hier ist noch nichts.",
+  "library.skeletonLabel": "Tests werden geladen"
 }

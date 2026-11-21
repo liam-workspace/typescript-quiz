@@ -1,24 +1,15 @@
-import { createFileRoute, defaultStringifySearch } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiError } from "../lib/api-client.js"
 import { startAttempt } from "../lib/attempts-api.js"
-import type { AttemptStart, TestBrief } from "../lib/api-types.js"
+import type { TestBrief } from "../lib/api-types.js"
 import { getTest } from "../lib/catalog-api.js"
+import { firstSectionOf, sectionRulesPath } from "../lib/start-test.js"
 
 export interface TestBriefScreenProps {
   readonly brief: TestBrief
   readonly navigate: (path: string) => void
-}
-
-function sectionRulesPath(attempt: AttemptStart, sectionId: string): string {
-  const search = attempt.finalizedPriorAttempt
-    ? defaultStringifySearch({
-        finalizedPriorAttempt: attempt.finalizedPriorAttempt,
-      })
-    : ""
-
-  return `/attempts/${attempt.id}/sections/${sectionId}/rules${search}`
 }
 
 export function TestBriefScreen({ brief, navigate }: TestBriefScreenProps) {
@@ -28,13 +19,7 @@ export function TestBriefScreen({ brief, navigate }: TestBriefScreenProps) {
   const [startFailed, setStartFailed] = useState(false)
   const durationMinutes = Math.round(brief.durationSeconds / 60)
   const attemptNumber = brief.attemptCount + 1
-  const firstSection = brief.sections.reduce<
-    TestBrief["sections"][number] | undefined
-  >(
-    (first, section) =>
-      !first || section.ordinal < first.ordinal ? section : first,
-    undefined,
-  )
+  const firstSection = firstSectionOf(brief)
   const step = t(
     brief.level === "primary-step-1" ? "library.step.1" : "library.step.2",
   )

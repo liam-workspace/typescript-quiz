@@ -283,5 +283,15 @@
   "profile.signOut": "Se déconnecter",
   "profile.signOutConfirm.title": "Se déconnecter ?",
   "profile.signOutConfirm.body": "Tu devras te reconnecter. Les tests enregistrés hors connexion seront supprimés de ce téléphone.",
-  "profile.signOutConfirm.cancel": "Annuler"
+  "profile.signOutConfirm.cancel": "Annuler",
+  "library.filter.label": "Filtrer les tests",
+  "library.filter.all": "Tous",
+  "library.filter.todo": "À faire",
+  "library.filter.done": "Terminés",
+  "library.caughtUp": "Tu es à jour.",
+  "library.statusInProgress": "En cours · {{section}}",
+  "library.statusBest": "Meilleur {{percentage}} %",
+  "library.blockedByActive": "Termine d’abord {{title}}.",
+  "library.filterEmpty": "Rien ici pour le moment.",
+  "library.skeletonLabel": "Chargement des tests"
 }

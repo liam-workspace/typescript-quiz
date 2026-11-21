@@ -283,5 +283,15 @@
   "profile.signOut": "Sign out",
   "profile.signOutConfirm.title": "Sign out?",
   "profile.signOutConfirm.body": "You will need to sign in again. Tests saved for offline use will be removed from this phone.",
-  "profile.signOutConfirm.cancel": "Cancel"
+  "profile.signOutConfirm.cancel": "Cancel",
+  "library.filter.label": "Filter tests",
+  "library.filter.all": "All",
+  "library.filter.todo": "To do",
+  "library.filter.done": "Done",
+  "library.caughtUp": "You're all caught up.",
+  "library.statusInProgress": "In progress · {{section}}",
+  "library.statusBest": "Best {{percentage}}%",
+  "library.blockedByActive": "Finish {{title}} first.",
+  "library.filterEmpty": "Nothing here yet.",
+  "library.skeletonLabel": "Loading tests"
 }

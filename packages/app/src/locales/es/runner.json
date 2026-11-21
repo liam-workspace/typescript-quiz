@@ -283,5 +283,15 @@
   "profile.signOut": "Cerrar sesión",
   "profile.signOutConfirm.title": "¿Cerrar sesión?",
   "profile.signOutConfirm.body": "Tendrás que iniciar sesión de nuevo. Las pruebas guardadas sin conexión se quitarán de este teléfono.",
-  "profile.signOutConfirm.cancel": "Cancelar"
+  "profile.signOutConfirm.cancel": "Cancelar",
+  "library.filter.label": "Filtrar pruebas",
+  "library.filter.all": "Todas",
+  "library.filter.todo": "Pendientes",
+  "library.filter.done": "Hechas",
+  "library.caughtUp": "¡Estás al día!",
+  "library.statusInProgress": "En curso · {{section}}",
+  "library.statusBest": "Mejor {{percentage}} %",
+  "library.blockedByActive": "Termina primero {{title}}.",
+  "library.filterEmpty": "Aquí todavía no hay nada.",
+  "library.skeletonLabel": "Cargando pruebas"
 }

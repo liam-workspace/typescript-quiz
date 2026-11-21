@@ -1,4 +1,4 @@
-import { useId, type JSX } from "react"
+import { useId, type JSX, type Ref } from "react"
 import { useTranslation } from "react-i18next"
 import { Icon } from "./Icon.js"
 
@@ -72,12 +72,15 @@ export function UpdateBanner({
 export interface InstallCardProps {
   readonly onInstall: () => void
   readonly onDismiss: () => void
+  /** Lets the host return focus to Install when its sheet closes. */
+  readonly installRef?: Ref<HTMLButtonElement>
 }
 
 /** Prototype `vLibrary()` → `section.card.install`. */
 export function InstallCard({
   onInstall,
   onDismiss,
+  installRef,
 }: InstallCardProps): JSX.Element {
   const { t } = useTranslation("runner")
   const headingId = useId()
@@ -89,7 +92,12 @@ export function InstallCard({
       </h2>
       <p>{t("pwa.install.body")}</p>
       <div className="actions">
-        <button type="button" className="btn sm" onClick={onInstall}>
+        <button
+          ref={installRef}
+          type="button"
+          className="btn sm"
+          onClick={onInstall}
+        >
           <Icon name="plus" small /> {t("pwa.install.button")}
         </button>
         <button type="button" className="btn sm ghost" onClick={onDismiss}>

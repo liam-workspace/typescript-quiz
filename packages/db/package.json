@@ -29,6 +29,7 @@
     "@liam-workspace/node-config": "^0.1.0",
     "@liam-workspace/node-postgres": "^0.4.0",
     "@pp/common": "workspace:*",
+    "katex": "^0.19.1",
     "node-pg-migrate": "^7.9.0",
     "pg": "^8.13.0"
   },

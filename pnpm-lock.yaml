@@ -84,6 +84,9 @@ importers:
       i18next-browser-languagedetector:
         specifier: ^8.2.1
         version: 8.2.1
+      katex:
+        specifier: ^0.19.1
+        version: 0.19.1
       radix-ui:
         specifier: ^1.6.7
         version: 1.6.7(@types/react-dom@19.2.3(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -164,6 +167,9 @@ importers:
       '@pp/common':
         specifier: workspace:*
         version: link:../common
+      katex:
+        specifier: ^0.19.1
+        version: 0.19.1
       node-pg-migrate:
         specifier: ^7.9.0
         version: 7.9.1(@types/pg@8.23.1)(pg@8.23.0)
@@ -190,8 +196,8 @@ importers:
   packages/server:
     dependencies:
       '@liam-workspace/node-auth-server':
-        specifier: ^0.5.2
-        version: 0.5.2
+        specifier: ^0.5.3
+        version: 0.5.3
       '@liam-workspace/node-config':
         specifier: ^0.1.0
         version: 0.1.0
@@ -532,8 +538,8 @@ packages:
       react: ^19.0.0
       react-dom: ^19.0.0
 
-  '@liam-workspace/node-auth-server@0.5.2':
-    resolution: {integrity: sha512-sCWZ5ekJDNl1k8sVw+ey+TM+OyG/RRRLAE/V0hFDoQqzWurKAPuQ9ZtsGaJxSEP1D2C+nsQQKtTqN1lduxP5Fw==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-auth-server/0.5.2/38f9d0ce998ffc1d151ca71a5cc18b3d8f53f1e5}
+  '@liam-workspace/node-auth-server@0.5.3':
+    resolution: {integrity: sha512-V8B5meoer7N8TVAChYAlbofUXDJdpcdnQjXExrJMND9rnSkikAhQPQBuXsfdnklgMY2JkM0KZCZxyV3PnzMkqg==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-auth-server/0.5.3/da0f70997b7d54e9f90280a0434d97378f8f0245}
 
   '@liam-workspace/node-config@0.1.0':
     resolution: {integrity: sha512-ULuIu7TpFIpGwlArqbe0k1h6QshiXTrW0cEc6q7OWjFYaoMPGxqfeLuR2Ql6Bc3KZupw7B2UdIy+BZ6PHeJl2g==, tarball: https://npm.pkg.github.com/download/@liam-workspace/node-config/0.1.0/86e17fbad5c1e48ef95083da9995c9b5c23258d7}
@@ -2285,6 +2291,10 @@ packages:
     resolution: {integrity: sha512-FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg==}
     engines: {node: '>= 0.8'}
 
+  commander@15.1.0:
+    resolution: {integrity: sha512-cgnQ88TRrWcC7pVq46RzJVRMktu3W2RcbnoidnfBsl1bmDCBwJS/udcIZpKoCrbAYYaCqsz1yZCVIgbIaU3ddQ==}
+    engines: {node: '>=22.12.0'}
+
   component-emitter@1.3.1:
     resolution: {integrity: sha512-T0+barUSQRTUQASh8bx02dl+DhF54GtIDY13Y3m9oWTklKbb3Wv974meRpeZ3lp1JpLVECWWNHC4vaG2XHXouQ==}
 
@@ -2864,6 +2874,10 @@ packages:
   json5@2.2.3:
     resolution: {integrity: sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==}
     engines: {node: '>=6'}
+    hasBin: true
+
+  katex@0.19.1:
+    resolution: {integrity: sha512-jG8uKntjSEcm2EpQOh0XturpPuuC9r3Sq5HLHdsFdWZT27E672SF19QEi+of0/YeOy15lDgRhKvr5614uRrEfA==}
     hasBin: true
 
   keyv@4.5.4:
@@ -4479,7 +4493,7 @@ snapshots:
       - '@types/react'
       - '@types/react-dom'
 
-  '@liam-workspace/node-auth-server@0.5.2':
+  '@liam-workspace/node-auth-server@0.5.3':
     dependencies:
       '@liam-workspace/node-webauthn': 0.1.1
       jose: 6.2.9
@@ -6228,6 +6242,8 @@ snapshots:
     dependencies:
       delayed-stream: 1.0.0
 
+  commander@15.1.0: {}
+
   component-emitter@1.3.1: {}
 
   compress-commons@6.0.2:
@@ -6823,6 +6839,10 @@ snapshots:
   json-stable-stringify-without-jsonify@1.0.1: {}
 
   json5@2.2.3: {}
+
+  katex@0.19.1:
+    dependencies:
+      commander: 15.1.0
 
   keyv@4.5.4:
     dependencies:

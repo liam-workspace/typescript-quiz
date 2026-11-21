@@ -26,7 +26,7 @@ BEGIN;
 -- adding it there (or the reverse) is the drift these types exist to
 -- make visible.
 
-CREATE TYPE section_type   AS ENUM ('listening', 'reading', 'vocabulary', 'grammar');
+CREATE TYPE section_type   AS ENUM ('listening', 'reading', 'vocabulary', 'grammar', 'math');
 CREATE TYPE nav_mode       AS ENUM ('free', 'forward_only');
 CREATE TYPE stimulus_type  AS ENUM ('audio', 'passage', 'image', 'mixed');
 CREATE TYPE question_type  AS ENUM ('single_choice', 'multi_choice');
@@ -237,6 +237,7 @@ CREATE TABLE question (
     question_key       text          NOT NULL,
     ordinal            integer       NOT NULL,      -- position within the whole test
     prompt             text          NOT NULL,
+    prompt_blocks      jsonb,
     type               question_type NOT NULL,
     points             integer       NOT NULL,
 
@@ -259,10 +260,15 @@ CREATE TABLE choice (
     question_id  uuid    NOT NULL REFERENCES question (id) ON DELETE CASCADE,
     ordinal      integer NOT NULL,
     label        text    NOT NULL,
+    label_blocks jsonb,
+    image_svg    text,
     is_correct   boolean NOT NULL,
 
     CONSTRAINT choice_ordinal_positive CHECK (ordinal > 0),
     CONSTRAINT choice_label_not_blank  CHECK (length(btrim(label)) > 0),
+    CONSTRAINT choice_image_svg_shape CHECK (
+        image_svg IS NULL OR (btrim(image_svg) ILIKE '<svg%' AND length(image_svg) <= 20000)
+    ),
     CONSTRAINT choice_unique_ordinal   UNIQUE (question_id, ordinal),
     -- discriminator so response_choice can prove a choice belongs to the
     -- question it was selected for
@@ -541,6 +547,30 @@ CREATE TABLE stimulus_play (
 
 
 -- =====================================================================
+--  ADMIN AUDIT
+-- =====================================================================
+
+-- Audit identity comes from the admin's OIDC subject, independently of a
+-- student profile. Resource identifiers are text so records can name both
+-- UUID-backed resources and external resources. No foreign keys: history
+-- must survive resource deletion. Updates and deletes are rejected below.
+CREATE TABLE admin_audit_log (
+    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    admin_subject  text        NOT NULL,
+    action         text        NOT NULL,
+    resource_type  text        NOT NULL,
+    resource_id    text        NOT NULL,
+    metadata       jsonb       NOT NULL DEFAULT '{}'::jsonb,
+    created_at     timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT admin_audit_admin_subject_not_blank CHECK (length(btrim(admin_subject)) > 0),
+    CONSTRAINT admin_audit_action_not_blank        CHECK (length(btrim(action)) > 0),
+    CONSTRAINT admin_audit_resource_type_not_blank CHECK (length(btrim(resource_type)) > 0),
+    CONSTRAINT admin_audit_resource_id_not_blank   CHECK (length(btrim(resource_id)) > 0)
+);
+
+
+-- =====================================================================
 --  DURABILITY
 -- =====================================================================
 
@@ -577,7 +607,21 @@ CREATE INDEX failed_write_pending_idx  ON failed_write (received_at DESC, id) WH
 --  IMMUTABILITY
 --  A published version and every row beneath it are frozen. Without this
 --  an author could edit a question after a child had been scored on it.
+--  Admin audit records are append-only, regardless of publication state.
 -- =====================================================================
+
+CREATE OR REPLACE FUNCTION reject_admin_audit_change() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'admin audit records are immutable (attempted %)', TG_OP
+        USING ERRCODE = 'restrict_violation';
+END;
+$$;
+
+CREATE TRIGGER admin_audit_log_immutable
+    BEFORE UPDATE OR DELETE ON admin_audit_log
+    FOR EACH ROW EXECUTE FUNCTION reject_admin_audit_change();
+
 
 CREATE OR REPLACE FUNCTION reject_published_content_change() RETURNS trigger
 LANGUAGE plpgsql AS $$
@@ -786,3 +830,204 @@ CREATE OR REPLACE VIEW publication_violation AS
 -- first place and never reaches publication.
 
 COMMIT;
+
+
+-- Math generation workflow records are mutable and never student-visible.
+CREATE TABLE math_problem_template (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name text NOT NULL,
+    version text NOT NULL,
+    family text NOT NULL,
+    parameters jsonb NOT NULL DEFAULT '{}'::jsonb,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (name, version)
+);
+
+CREATE TABLE ai_generation_request (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    template_id uuid REFERENCES math_problem_template (id) ON DELETE RESTRICT,
+    parameters jsonb NOT NULL,
+    provider text NOT NULL,
+    model text NOT NULL,
+    prompt_template_version text NOT NULL,
+    seed text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    status text NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'processing', 'completed')),
+    claim_token uuid,
+    lease_expires_at timestamptz,
+    CONSTRAINT ai_generation_request_lease CHECK (
+        (status = 'processing' AND claim_token IS NOT NULL AND lease_expires_at IS NOT NULL)
+        OR (status <> 'processing' AND claim_token IS NULL AND lease_expires_at IS NULL)
+    )
+);
+
+CREATE INDEX ai_generation_request_pending_idx ON ai_generation_request (created_at, id)
+    WHERE status <> 'completed';
+
+-- Rebuild the verified MathAst fields. Provider annotations, including fields
+-- attached to nested operands, are evidence only and do not identify the math.
+CREATE FUNCTION math_candidate_expression(node jsonb, depth integer DEFAULT 0) RETURNS jsonb
+LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE AS $$
+DECLARE
+    kind text := node->>'kind';
+    lhs jsonb;
+    rhs jsonb;
+BEGIN
+    IF depth > 32 THEN
+        RETURN NULL;
+    END IF;
+    CASE
+        WHEN kind = 'integer' AND jsonb_typeof(node->'value') = 'number' THEN
+            RETURN jsonb_build_object('kind', kind, 'value', trim_scale((node->>'value')::numeric));
+        WHEN kind = 'fraction' AND jsonb_typeof(node->'numerator') = 'number'
+                               AND jsonb_typeof(node->'denominator') = 'number' THEN
+            RETURN jsonb_build_object('kind', kind, 'numerator', trim_scale((node->>'numerator')::numeric),
+                                      'denominator', trim_scale((node->>'denominator')::numeric));
+        WHEN kind = 'variable' AND jsonb_typeof(node->'name') = 'string' THEN
+            RETURN jsonb_build_object('kind', kind, 'name', node->'name');
+        WHEN kind IN ('add', 'subtract', 'multiply', 'divide', 'power', 'equation') THEN
+            lhs := math_candidate_expression(node->'left', depth + 1);
+            rhs := math_candidate_expression(node->'right', depth + 1);
+            IF lhs IS NOT NULL AND rhs IS NOT NULL THEN
+                RETURN jsonb_build_object('kind', kind, 'left', lhs, 'right', rhs);
+            END IF;
+        ELSE RETURN NULL;
+    END CASE;
+    RETURN NULL;
+END;
+$$;
+
+CREATE FUNCTION math_candidate_content_hash(spec jsonb) RETURNS text
+LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
+    SELECT encode(sha256(convert_to(jsonb_build_array(spec->'family', expression)::text, 'UTF8')), 'hex')
+      FROM math_candidate_expression(spec->'expression') expression
+     WHERE expression IS NOT NULL AND spec->>'family' IN
+           ('fraction_addition', 'percentage_of_quantity', 'ratio', 'linear_equation');
+$$;
+
+CREATE TABLE ai_generation_candidate (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    request_id uuid NOT NULL REFERENCES ai_generation_request (id) ON DELETE RESTRICT,
+    canonical_spec jsonb NOT NULL,
+    content_hash text NOT NULL UNIQUE CHECK (length(btrim(content_hash)) > 0),
+    approved_content_hash text,
+    -- Historical rows and failed outcomes can lack a validated presentation.
+    prompt_blocks jsonb CHECK (jsonb_typeof(prompt_blocks) = 'array'),
+    choices jsonb CHECK (jsonb_typeof(choices) = 'array'),
+    solution_blocks jsonb CHECK (jsonb_typeof(solution_blocks) = 'array'),
+    CONSTRAINT ai_generation_candidate_presentation CHECK (
+        num_nonnulls(prompt_blocks, choices, solution_blocks) IN (0, 3)
+    ),
+    raw_response jsonb,
+    validator_reports jsonb,
+    status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'in_review', 'approved', 'rejected', 'regeneration_requested')),
+    reviewer_subject text,
+    reviewed_at timestamptz,
+    test_version_id uuid REFERENCES test_version (id) ON DELETE RESTRICT,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE FUNCTION enforce_math_candidate_transition() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        IF NEW.status <> 'draft' THEN
+            RAISE EXCEPTION 'invalid candidate status transition to %', NEW.status USING ERRCODE = 'check_violation';
+        END IF;
+    ELSIF NEW.status <> OLD.status AND NOT (
+        (OLD.status = 'draft' AND NEW.status IN ('in_review', 'rejected')) OR
+        (OLD.status = 'in_review' AND NEW.status IN ('approved', 'rejected', 'regeneration_requested')) OR
+        (OLD.status = 'regeneration_requested' AND NEW.status = 'draft')
+    ) THEN
+        RAISE EXCEPTION 'invalid candidate status transition from % to %', OLD.status, NEW.status USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER ai_generation_candidate_transition
+    BEFORE INSERT OR UPDATE OF status ON ai_generation_candidate
+    FOR EACH ROW EXECUTE FUNCTION enforce_math_candidate_transition();
+
+-- Review decisions are written by both the standalone repository and the HTTP
+-- audit transaction. Enforce ownership and release rejected problems for both.
+CREATE FUNCTION apply_math_candidate_review_identity() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.status = 'rejected' THEN
+        NEW.content_hash := 'failure:' || NEW.id::text;
+    ELSIF NEW.status = 'approved' AND NEW.validator_reports #> '{validation,valid}' = 'true'::jsonb
+          AND NEW.content_hash IS DISTINCT FROM math_candidate_content_hash(NEW.canonical_spec) THEN
+        RAISE EXCEPTION 'candidate does not own its canonical math identity' USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER ai_generation_candidate_review_identity
+    BEFORE UPDATE OF status ON ai_generation_candidate
+    FOR EACH ROW WHEN (OLD.status IS DISTINCT FROM NEW.status)
+    EXECUTE FUNCTION apply_math_candidate_review_identity();
+
+-- The deduplication hash identifies the expression. Approval also covers the
+-- source, full spec, rendered choices, prompt, and solution the reviewer saw.
+CREATE FUNCTION math_candidate_review_hash(c ai_generation_candidate) RETURNS text
+LANGUAGE sql STABLE STRICT PARALLEL SAFE AS $$
+    SELECT encode(sha256(convert_to(jsonb_build_array(c.request_id, c.canonical_spec,
+           c.prompt_blocks, c.choices, c.solution_blocks)::text, 'UTF8')), 'hex');
+$$;
+
+CREATE FUNCTION record_math_candidate_approval() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    NEW.approved_content_hash := math_candidate_review_hash(NEW);
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER ai_generation_candidate_approval
+    BEFORE UPDATE OF status ON ai_generation_candidate
+    FOR EACH ROW WHEN (NEW.status = 'approved' AND OLD.status IS DISTINCT FROM NEW.status)
+    EXECUTE FUNCTION record_math_candidate_approval();
+
+CREATE TABLE question_math (
+    question_id uuid PRIMARY KEY REFERENCES question (id) ON DELETE CASCADE,
+    source_candidate_id uuid REFERENCES ai_generation_candidate (id) ON DELETE RESTRICT,
+    canonical_spec jsonb NOT NULL,
+    answer_spec jsonb NOT NULL,
+    solution_blocks jsonb NOT NULL,
+    after_test_solution_hash bytea,
+    verification_version text NOT NULL,
+    content_hash text NOT NULL
+);
+
+-- Check both parents on UPDATE to prevent moving metadata into or out of a
+-- published version by changing question_id.
+CREATE FUNCTION reject_published_math_change() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM question q JOIN test_version tv ON tv.id = q.test_version_id
+        WHERE tv.published_at IS NOT NULL AND
+          (q.id = CASE WHEN TG_OP <> 'INSERT' THEN OLD.question_id END OR
+           q.id = CASE WHEN TG_OP <> 'DELETE' THEN NEW.question_id END)
+    ) THEN
+        RAISE EXCEPTION 'math content belongs to a published version and is immutable (% on %)', TG_OP, TG_TABLE_NAME
+            USING ERRCODE = 'restrict_violation';
+    END IF;
+    RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+CREATE TRIGGER question_math_immutable
+    BEFORE INSERT OR UPDATE OR DELETE ON question_math
+    FOR EACH ROW EXECUTE FUNCTION reject_published_math_change();
+
+CREATE FUNCTION math_question_solution_hash(q question, solution jsonb) RETURNS bytea
+LANGUAGE sql STABLE STRICT PARALLEL SAFE AS $$
+    SELECT sha256(convert_to(jsonb_build_array(q.prompt, q.prompt_blocks, q.type,
+               (SELECT jsonb_agg(jsonb_build_array(c.label, c.label_blocks, c.image_svg, c.is_correct)
+                                 ORDER BY c.ordinal) FROM choice c WHERE c.question_id = q.id),
+               solution)::text, 'UTF8'));
+$$;

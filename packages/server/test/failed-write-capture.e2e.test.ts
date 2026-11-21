@@ -69,7 +69,7 @@ describe("FailedWriteCaptureFilter + ZodBodyValidationPipe", () => {
       ),
     )
     pool = moduleRef.get(REQUEST_POOL)
-    await nestApp.listen(0)
+    await nestApp.listen(0, "127.0.0.1")
     url = await nestApp.getUrl()
     app = nestApp
   })

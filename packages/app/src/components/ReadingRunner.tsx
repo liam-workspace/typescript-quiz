@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next"
 import type { RunnerQuestion, StimulusWire } from "../lib/api-types.js"
 import { ChoiceList } from "./ChoiceList.js"
 import type { QuestionPip } from "./ListeningRunner.js"
+import { MathContent } from "./MathContent.js"
 import { QuestionMedia } from "./QuestionMedia.js"
 
 // Mirrors ListeningExpiredState (ListeningRunner.tsx) exactly -- see that
@@ -41,7 +42,7 @@ export interface ReadingRunnerProps {
   // 1-based position of the group within the section, and the ordinals of
   // the first/last question in that group. Computed by the page from
   // `section.groups`, not by this component.
-  readonly passageOrdinal: number
+  readonly passageOrdinal: number | null
   readonly passageFirstOrdinal: number
   readonly passageLastOrdinal: number
   // Every currently-selected choice id for the CURRENT question -- length 0
@@ -129,13 +130,15 @@ export function ReadingRunner({
             </span>
           ))}
         </div>
-        <p className="text-faint text-xs font-semibold">
-          {t("reading.passageQuestions", {
-            passageNumber: passageOrdinal,
-            first: passageFirstOrdinal,
-            last: passageLastOrdinal,
-          })}
-        </p>
+        {passageOrdinal !== null ? (
+          <p className="text-faint text-xs font-semibold">
+            {t("reading.passageQuestions", {
+              passageNumber: passageOrdinal,
+              first: passageFirstOrdinal,
+              last: passageLastOrdinal,
+            })}
+          </p>
+        ) : null}
       </div>
 
       {stimulus ? (
@@ -146,7 +149,13 @@ export function ReadingRunner({
         />
       ) : null}
 
-      <p className="question-prompt">{question.prompt}</p>
+      <p className="question-prompt">
+        {question.promptBlocks?.length ? (
+          <MathContent blocks={question.promptBlocks} />
+        ) : (
+          question.prompt
+        )}
+      </p>
       <ChoiceList
         choices={question.choices}
         questionType={question.type}

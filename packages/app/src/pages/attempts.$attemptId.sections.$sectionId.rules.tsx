@@ -5,7 +5,7 @@ import { z } from "zod"
 import { ApiError } from "../lib/api-client.js"
 import { enterSection, getRunnerEnvelope } from "../lib/attempts-api.js"
 import { sameOriginPath } from "../lib/same-origin-path.js"
-import type { FinalizedAttempt } from "../lib/api-types.js"
+import type { FinalizedAttempt, SectionType } from "../lib/api-types.js"
 
 // The section-rules screen ("secintro" in the prototype) is the last thing a
 // student sees before the clock starts: `POST .../enter` is what sets
@@ -50,7 +50,7 @@ type EnterOutcome =
 export interface SectionRulesScreenProps {
   readonly attemptId: string
   readonly sectionId: string
-  readonly sectionType: "listening" | "reading" | "vocabulary" | "grammar"
+  readonly sectionType: SectionType
   readonly title: string
   readonly testTitle: string
   readonly attemptNumber: number

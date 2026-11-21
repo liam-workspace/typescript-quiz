@@ -19,6 +19,8 @@
 import {
   exportTestDocument,
   importTestDocument,
+  importApprovedMathCandidates,
+  InvalidMathCandidateImportError,
 } from "./repositories/test-import.repository.js"
 import {
   DraftNotFoundError,
@@ -31,14 +33,87 @@ import {
   type MediaAssetRow,
   type MediaKind,
 } from "./repositories/media.repository.js"
+import {
+  listAdminLearners,
+  listAdminQuestions,
+  listAdminResults,
+  listAdminTests,
+  loadAdminAttemptDetail,
+  loadAdminOverview,
+  loadAdminResultRollups,
+  loadAdminTestDetail,
+} from "./repositories/admin-read.repository.js"
+import {
+  AmbiguousDraftTextError,
+  DraftQuestionNotFoundError,
+  InvalidDraftChoicesError,
+  PublishedVersionMutationError,
+  patchDraftQuestion,
+} from "./repositories/admin-draft.repository.js"
 
-export type { PublishViolation, MediaAssetRow, MediaKind }
+import {
+  CandidateReviewError,
+  claimQueuedGenerationRequest,
+  completeGenerationRequest,
+  createGenerationRequest,
+  insertGenerationCandidate,
+  listCandidates,
+  listGenerationRequests,
+  loadCandidateDetail,
+  renewGenerationClaim,
+  reviewCandidate,
+  type CandidateDetail,
+  type CandidatePresentation,
+  type GenerationClaim,
+  type CandidateSummary,
+  type GenerationCandidateInput,
+  type GenerationRequest,
+  type GenerationRequestInput,
+} from "./repositories/math-generation.repository.js"
+
+export type {
+  PublishViolation,
+  MediaAssetRow,
+  MediaKind,
+  CandidateDetail,
+  CandidatePresentation,
+  GenerationClaim,
+  CandidateSummary,
+  GenerationCandidateInput,
+  GenerationRequest,
+  GenerationRequestInput,
+}
 
 export {
+  CandidateReviewError,
+  claimQueuedGenerationRequest,
+  completeGenerationRequest,
+  createGenerationRequest,
+  insertGenerationCandidate,
+  listCandidates,
+  listGenerationRequests,
+  loadCandidateDetail,
+  renewGenerationClaim,
+  reviewCandidate,
+  AmbiguousDraftTextError,
   DraftNotFoundError,
+  DraftQuestionNotFoundError,
+  InvalidDraftChoicesError,
+  PublishedVersionMutationError,
   exportTestDocument,
   importTestDocument,
+  importApprovedMathCandidates,
+  InvalidMathCandidateImportError,
   publishDraftVersion,
   recordMediaAsset,
   resolveVersionId,
+  listAdminLearners,
+  listAdminQuestions,
+  listAdminResults,
+  listAdminTests,
+  loadAdminAttemptDetail,
+  loadAdminOverview,
+  loadAdminResultRollups,
+  loadAdminTestDetail,
+  patchDraftQuestion,
 }

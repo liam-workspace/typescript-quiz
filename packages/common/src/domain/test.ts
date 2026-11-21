@@ -6,7 +6,14 @@ import type {
   StimulusId,
 } from "./ids.js"
 
-export type SectionType = "listening" | "reading" | "vocabulary" | "grammar"
+import type { ContentBlock } from "../interchange/test-document.js"
+
+export type SectionType =
+  | "listening"
+  | "reading"
+  | "vocabulary"
+  | "grammar"
+  | "math"
 
 export type NavigationMode = "free" | "forward_only"
 
@@ -24,6 +31,7 @@ export interface Playback {
 export interface RunnerChoice {
   id: ChoiceId
   label: string
+  labelBlocks?: ContentBlock[]
   // Inline <svg> markup, not a URL: the source pictograms use
   // `stroke="currentColor"` to inherit `.choice`'s ink/selected colour,
   // which only works rendered into the DOM directly.
@@ -35,6 +43,7 @@ export interface RunnerQuestion {
   ordinal: number
   type: QuestionType
   prompt: string
+  promptBlocks?: ContentBlock[]
   choices: RunnerChoice[]
 }
 

@@ -43,7 +43,7 @@ describe("raw-body JSON middleware", () => {
     }).compile()
     app = moduleRef.createNestApplication({ bodyParser: false })
     app.use(createRawBodyJsonMiddleware(MAX_BYTES))
-    await app.listen(0)
+    await app.listen(0, "127.0.0.1")
     url = await app.getUrl()
   })
 

@@ -1,3 +1,4 @@
+import { MathContent } from "./MathContent.js"
 import { Checkbox, RadioGroup } from "radix-ui"
 import { useTranslation } from "react-i18next"
 import type { QuestionType, RunnerChoice } from "../lib/api-types.js"
@@ -86,7 +87,11 @@ function MultiChoiceList({
               <Checkbox.Indicator className="block size-2.5 rounded-[1px] bg-white" />
             </Checkbox.Root>
             {choice.imageSvg ? <ChoiceImage svg={choice.imageSvg} /> : null}
-            {choice.label}
+            {choice.labelBlocks?.length ? (
+              <MathContent blocks={choice.labelBlocks} />
+            ) : (
+              choice.label
+            )}
           </label>
         ))}
       </div>
@@ -120,7 +125,11 @@ function SingleChoiceList({
               <RadioGroup.Indicator className="block size-1.5 rounded-full bg-white" />
             </RadioGroup.Item>
             {choice.imageSvg ? <ChoiceImage svg={choice.imageSvg} /> : null}
-            {choice.label}
+            {choice.labelBlocks?.length ? (
+              <MathContent blocks={choice.labelBlocks} />
+            ) : (
+              choice.label
+            )}
           </label>
         ))}
       </RadioGroup.Root>

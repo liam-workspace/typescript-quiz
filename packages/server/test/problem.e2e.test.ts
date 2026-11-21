@@ -73,7 +73,7 @@ describe("ProblemExceptionFilter", () => {
     // Mirrors main.ts's global registration -- the negative test needs the
     // REAL AllExceptionsFilter shape, not Nest's own bare default.
     nestApp.useGlobalFilters(new AllExceptionsFilter())
-    await nestApp.listen(0)
+    await nestApp.listen(0, "127.0.0.1")
     url = await nestApp.getUrl()
     app = nestApp
   })

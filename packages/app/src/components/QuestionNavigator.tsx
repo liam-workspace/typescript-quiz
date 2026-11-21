@@ -1,4 +1,7 @@
-import { DialogDescription, DialogTitle } from "@liam-workspace/browser-react-ui"
+import {
+  DialogDescription,
+  DialogTitle,
+} from "@liam-workspace/browser-react-ui"
 import { useRef, type JSX, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
 import {
@@ -39,6 +42,7 @@ const SECTION_LABEL_KEY: Record<SectionKind, string> = {
   reading: "navigator.sectionReading",
   vocabulary: "navigator.sectionVocabulary",
   grammar: "navigator.sectionGrammar",
+  math: "library.section.math",
   other: "navigator.sectionOther",
 }
 

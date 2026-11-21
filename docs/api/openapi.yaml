@@ -13,8 +13,8 @@ info:
     in a student response is consumed by one — usually rendered, sometimes control state the
     client acts on (`created`, `retryable`, `nextCursor`).
 
-    The ADMIN routes have no prototype screens; the authoring editor is a later spec. They are
-    here because v1 needs a way to get tests into the database and media onto disk.
+    Admin routes support draft authoring, publication, math generation and review,
+    learner and results reporting, and operational diagnostics.
 
     ## Identity
     Every route requires `Authorization: Bearer <jwt>`, verified against the JWKS at
@@ -55,6 +55,8 @@ info:
     and then refuse with 410.
 
     ## What never reaches a student early
+    Runner questions and choices expose only display blocks. The curriculum brief controls whether
+    the finished review includes the approved worked solution. Missing or hidden policies omit it.
     On STUDENT routes, `choice.isCorrect` appears only via `/review`, which refuses an attempt
     still running. Admin routes are a different audience: `GET /admin/tests/{testId}/export`
     returns the full `TestDocument` including `isCorrect`, because exporting an answer key is its
@@ -698,6 +700,470 @@ paths:
         "409": { $ref: "#/components/responses/StillRunning" }
 
   # ───────────────────────────────────────────────────────────── Admin ──
+  /admin/overview:
+    get:
+      tags: [Admin]
+      operationId: getAdminOverview
+      summary: Get test, attempt and learner counts
+      responses:
+        "200":
+          description: Get test, attempt and learner counts.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminOverview" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+  /admin/tests:
+    get:
+      tags: [Admin]
+      operationId: listAdminTests
+      summary: List tests and publication status
+      parameters:
+        - { $ref: "#/components/parameters/AdminLimit" }
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/AdminSearch" }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, published, archived]
+      responses:
+        "200":
+          description: List tests and publication status.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AdminTestSummary" }
+                  nextCursor:
+                    type: [string, "null"]
+        "400":
+          description: Invalid query parameters (invalid_query) or an invalid pagination cursor (bad_cursor).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+  /admin/tests/{testId}:
+    get:
+      tags: [Admin]
+      operationId: getAdminTest
+      summary: Read a test and its sections
+      parameters:
+        - name: testId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Read a test and its sections.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminTestDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+        "404":
+          description: Unknown or malformed test ID (test_not_found).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  /admin/questions:
+    get:
+      tags: [Admin]
+      operationId: listAdminQuestions
+      summary: List questions with answer keys
+      parameters:
+        - { $ref: "#/components/parameters/AdminLimit" }
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/AdminSearch" }
+        - { $ref: "#/components/parameters/AdminTestFilterId" }
+      responses:
+        "200":
+          description: List questions with answer keys.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AdminQuestion" }
+                  nextCursor:
+                    type: [string, "null"]
+        "400":
+          description: Invalid query parameters (invalid_query) or an invalid pagination cursor (bad_cursor).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+  /admin/drafts/{versionId}/questions/{questionId}:
+    patch:
+      tags: [Admin]
+      operationId: patchDraftQuestion
+      summary: Edit a draft question
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: questionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DraftQuestionPatch" }
+      responses:
+        "200":
+          description: Edit a draft question.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminQuestion" }
+        "400":
+          description: Invalid patch (invalid_draft_question_patch) or changed choice IDs (invalid_draft_choices).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+        "404":
+          description: Unknown version or question (draft_question_not_found).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: Published content (published_version_immutable) or ambiguous rich text (ambiguous_draft_text).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  /admin/results:
+    get:
+      tags: [Admin]
+      operationId: listAdminResults
+      summary: List completed attempts
+      parameters:
+        - { $ref: "#/components/parameters/AdminLimit" }
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/AdminTestFilterId" }
+        - name: learnerId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: List completed attempts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AdminResultSummary" }
+                  nextCursor:
+                    type: [string, "null"]
+        "400":
+          description: Invalid query parameters (invalid_query) or an invalid pagination cursor (bad_cursor).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+  /admin/results/rollups:
+    get:
+      tags: [Admin]
+      operationId: getAdminResultRollups
+      summary: Aggregate completed attempts by test, version, section and question
+      parameters:
+        - { $ref: "#/components/parameters/AdminLimit" }
+        - { $ref: "#/components/parameters/AdminTestFilterId" }
+      responses:
+        "200":
+          description: Aggregate completed attempts by test, version, section and question.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminResultRollups" }
+        "400":
+          description: Invalid filters or limit (invalid_query).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+  /admin/results/attempts/{id}:
+    get:
+      tags: [Admin]
+      operationId: getAdminAttempt
+      summary: Read an audited attempt detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Read an audited attempt detail.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminAttemptDetail" }
+          headers:
+            Cache-Control:
+              schema: { const: no-store }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+        "404":
+          description: Unknown or unfinished attempt (attempt_not_found).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  /admin/learners:
+    get:
+      tags: [Admin]
+      operationId: listAdminLearners
+      summary: List learners with attempt counts
+      parameters:
+        - { $ref: "#/components/parameters/AdminLimit" }
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/AdminSearch" }
+      responses:
+        "200":
+          description: List learners with attempt counts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/AdminLearnerSummary" }
+                  nextCursor:
+                    type: [string, "null"]
+        "400":
+          description: Invalid query parameters (invalid_query) or an invalid pagination cursor (bad_cursor).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+  /admin/math/generation-requests:
+    post:
+      tags: [Admin]
+      operationId: createMathGenerationRequest
+      summary: Queue a constrained math generation batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MathGenerationInput" }
+      responses:
+        "202":
+          description: Queue a constrained math generation batch.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requestId, status, candidatesUrl]
+                properties:
+                  requestId: { type: string, format: uuid }
+                  status: { const: queued }
+                  candidatesUrl: { type: string }
+        "400":
+          description: Invalid template, count or curriculum brief (invalid_math_request).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+    get:
+      tags: [Admin]
+      operationId: listMathGenerationRequests
+      summary: List math generation requests
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: cursor
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: List math generation requests.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/MathRequest" }
+                  nextCursor:
+                    type: [string, "null"]
+        "400":
+          description: Invalid pagination (invalid_math_request).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+  /admin/math/generation-requests/{id}/candidates:
+    get:
+      tags: [Admin]
+      operationId: listMathCandidates
+      summary: List candidates for a batch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: List candidates for a batch.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MathCandidate" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+        "404":
+          description: Unknown or malformed request ID (generation_request_not_found).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  /admin/math/candidates/{id}:
+    get:
+      tags: [Admin]
+      operationId: getMathCandidate
+      summary: Inspect a math candidate
+      description: Requesting includeAudit=true adds audit.rawResponse and records the admin access.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: includeAudit
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Inspect a math candidate.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MathCandidateDetail" }
+          headers:
+            Cache-Control:
+              schema: { const: no-store }
+        "400":
+          description: Invalid detail query (invalid_math_request).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+        "404":
+          description: Unknown or malformed candidate ID (math_candidate_not_found).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  /admin/math/candidates/{id}/review:
+    patch:
+      tags: [Admin]
+      operationId: reviewMathCandidate
+      summary: Approve or reject a math candidate
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision:
+                  type: string
+                  enum: [approved, rejected]
+                reason: { type: string, minLength: 1, maxLength: 2000 }
+              additionalProperties: false
+      responses:
+        "200":
+          description: Approve or reject a math candidate.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MathCandidateDetail" }
+        "400":
+          description: Invalid decision or reason (invalid_math_request).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+        "404":
+          description: Unknown candidate (math_candidate_not_found).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: Ineligible candidate transition (invalid_candidate_transition).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  /admin/math/imports:
+    post:
+      tags: [Admin]
+      operationId: importMathCandidates
+      summary: Import approved candidates into a draft test
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [candidateIds, slug, title, durationSeconds]
+              properties:
+                candidateIds:
+                  type: array
+                  items: { type: string, format: uuid }
+                  minItems: 1
+                  uniqueItems: true
+                title: { type: string, minLength: 1 }
+                slug: { type: string, minLength: 1 }
+                durationSeconds:
+                  { type: integer, minimum: 1, maximum: 2147483647 }
+                level: { $ref: "#/components/schemas/StudentLevel" }
+              additionalProperties: false
+      responses:
+        "201":
+          description: Import approved candidates into a draft test.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportResult" }
+        "400":
+          description: Invalid metadata or candidate selection (invalid_math_import).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AdminOnly" }
+        "409":
+          description: Missing, ineligible, changed or already imported candidates (invalid_candidate_selection).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
   /admin/failed-writes:
     get:
       tags: [Admin]
@@ -757,13 +1223,7 @@ paths:
           description: Test and draft version created.
           content:
             application/json:
-              schema:
-                type: object
-                required: [testId, versionId, version]
-                properties:
-                  testId: { type: string }
-                  versionId: { type: string }
-                  version: { type: integer }
+              schema: { $ref: "#/components/schemas/ImportResult" }
         "400":
           description: The document failed validation — captured as a `failed_write`.
           content:
@@ -919,6 +1379,19 @@ components:
       description: Issued by auth.icovn.me; verified against its JWKS.
 
   parameters:
+    AdminLimit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    AdminSearch:
+      name: search
+      in: query
+      schema: { type: string, maxLength: 200 }
+    AdminTestFilterId:
+      name: testId
+      in: query
+      schema: { type: string, format: uuid }
+
     AttemptId:
       name: id
       in: path
@@ -1211,9 +1684,411 @@ components:
             - { $ref: "#/components/schemas/AttemptRef" }
             - { type: "null" }
 
+    ContentBlock:
+      oneOf:
+        - type: object
+          required: [kind, value]
+          properties:
+            kind: { const: text }
+            value: { type: string }
+          additionalProperties: false
+        - type: object
+          required: [kind, tex, display]
+          properties:
+            kind: { const: math }
+            tex: { type: string }
+            display: { type: boolean }
+          additionalProperties: false
+    AdminOverview:
+      type: object
+      required: [tests, attempts, learners]
+      properties:
+        tests:
+          type: object
+          required: [total, drafts, published]
+          properties:
+            total: { type: integer }
+            drafts: { type: integer }
+            published: { type: integer }
+        attempts:
+          type: object
+          required: [total, inProgress, completed]
+          properties:
+            total: { type: integer }
+            inProgress: { type: integer }
+            completed: { type: integer }
+        learners:
+          type: object
+          required: [total]
+          properties:
+            total: { type: integer }
+    AdminTestSummary:
+      type: object
+      required: [id, title, status, currentVersionId, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        status:
+          type: string
+          enum: [draft, published, archived]
+        currentVersionId:
+          type: [string, "null"]
+          format: uuid
+        updatedAt: { type: string, format: date-time }
+    AdminTestDetail:
+      allOf:
+        - { $ref: "#/components/schemas/AdminTestSummary" }
+        - type: object
+          required: [versionId, description, durationSeconds, sections]
+          properties:
+            versionId: { type: string, format: uuid }
+            description:
+              type: [string, "null"]
+            durationSeconds: { type: integer }
+            sections:
+              type: array
+              items:
+                type: object
+                required: [id, title, questionCount]
+                properties:
+                  id: { type: string, format: uuid }
+                  title: { type: string }
+                  questionCount: { type: integer }
+    AdminQuestion:
+      type: object
+      required: [id, prompt, choices]
+      properties:
+        id: { type: string, format: uuid }
+        prompt: { type: string }
+        choices:
+          type: array
+          items:
+            type: object
+            required: [id, label, isCorrect]
+            properties:
+              id: { type: string, format: uuid }
+              label: { type: string }
+              isCorrect: { type: boolean }
+    DraftQuestionPatch:
+      type: object
+      properties:
+        prompt: { type: string, minLength: 1, maxLength: 20000 }
+        choices:
+          type: array
+          items:
+            type: object
+            required: [id, label, isCorrect]
+            properties:
+              id: { type: string, minLength: 1 }
+              label: { type: string, minLength: 1, maxLength: 2000 }
+              isCorrect: { type: boolean }
+            additionalProperties: false
+          minItems: 2
+          maxItems: 100
+      additionalProperties: false
+      minProperties: 1
+    AdminResultSummary:
+      type: object
+      required:
+        [attemptId, testId, testTitle, learnerId, score, maxScore, completedAt]
+      properties:
+        attemptId: { type: string, format: uuid }
+        testId: { type: string, format: uuid }
+        testTitle: { type: string }
+        learnerId: { type: string, format: uuid }
+        score: { type: integer }
+        maxScore: { type: integer }
+        completedAt: { type: string, format: date-time }
+    AdminAttemptDetail:
+      allOf:
+        - { $ref: "#/components/schemas/AdminResultSummary" }
+        - type: object
+          required: [learnerName, answers]
+          properties:
+            learnerName: { type: string }
+            answers:
+              type: array
+              items:
+                type: object
+                required: [questionId, response, score, maxScore]
+                properties:
+                  questionId: { type: string, format: uuid }
+                  response:
+                    type: object
+                    required: [selectedChoiceIds]
+                    properties:
+                      selectedChoiceIds:
+                        type: array
+                        items: { type: string, format: uuid }
+                  score: { type: integer }
+                  maxScore: { type: integer }
+    AdminResultRollup:
+      type: object
+      required:
+        [id, label, attemptCount, score, maxScore, answeredCount, correctCount]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+        attemptCount: { type: integer }
+        score: { type: integer }
+        maxScore: { type: integer }
+        answeredCount: { type: integer }
+        correctCount: { type: integer }
+    AdminResultRollups:
+      type: object
+      required: [tests, versions, sections, questions]
+      properties:
+        tests:
+          type: array
+          items: { $ref: "#/components/schemas/AdminResultRollup" }
+        versions:
+          type: array
+          items: { $ref: "#/components/schemas/AdminResultRollup" }
+        sections:
+          type: array
+          items: { $ref: "#/components/schemas/AdminResultRollup" }
+        questions:
+          type: array
+          items: { $ref: "#/components/schemas/AdminResultRollup" }
+    AdminLearnerSummary:
+      type: object
+      required: [id, displayName, email, attemptCount, lastAttemptAt]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string }
+        email: { type: string }
+        attemptCount: { type: integer }
+        lastAttemptAt:
+          type: [string, "null"]
+          format: date-time
+    MathGenerationInput:
+      type: object
+      required: [templateCode, count, curriculumBrief]
+      properties:
+        templateCode:
+          type: string
+          enum: [fraction-addition-v1, percentage-of-quantity-v1]
+        count: { type: integer, minimum: 1, maximum: 20 }
+        curriculumBrief:
+          type: object
+          required: [level, objectiveTags, language, difficulty, solutionPolicy]
+          properties:
+            level: { $ref: "#/components/schemas/StudentLevel" }
+            objectiveTags:
+              type: array
+              items: { type: string, pattern: "^[a-z0-9][a-z0-9:-]{0,79}$" }
+              minItems: 1
+              maxItems: 10
+            language: { const: en }
+            difficulty: { const: introductory }
+            solutionPolicy:
+              type: string
+              enum: [after_test, hidden]
+          additionalProperties: false
+      additionalProperties: false
+    MathRequest:
+      type: object
+      required:
+        [
+          id,
+          templateId,
+          provider,
+          model,
+          promptTemplateVersion,
+          seed,
+          parameters,
+          createdAt,
+          status,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        templateId:
+          type: [string, "null"]
+          format: uuid
+        provider: { type: string }
+        model: { type: string }
+        promptTemplateVersion: { type: string }
+        seed: { type: string }
+        parameters: { type: object }
+        createdAt: { type: string, format: date-time }
+        status:
+          type: string
+          enum: [queued, processing, completed]
+    MathCandidate:
+      type: object
+      required:
+        [
+          id,
+          requestId,
+          status,
+          promptBlocks,
+          choices,
+          solutionBlocks,
+          contentHash,
+          validation,
+          reviewReason,
+          reviewerSubject,
+          reviewedAt,
+          testVersionId,
+          createdAt,
+        ]
+      properties:
+        id: { type: string, format: uuid }
+        requestId: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [draft, in_review, approved, rejected, regeneration_requested]
+        promptBlocks:
+          anyOf:
+            - type: array
+              items: { $ref: "#/components/schemas/ContentBlock" }
+            - { type: "null" }
+        choices:
+          anyOf:
+            - type: array
+              items:
+                type: object
+                required: [label, labelBlocks, isCorrect]
+                properties:
+                  label: { type: string }
+                  labelBlocks:
+                    type: array
+                    items: { $ref: "#/components/schemas/ContentBlock" }
+                  isCorrect: { type: boolean }
+            - { type: "null" }
+        solutionBlocks:
+          anyOf:
+            - type: array
+              items: { $ref: "#/components/schemas/ContentBlock" }
+            - { type: "null" }
+        contentHash: { type: string }
+        validation:
+          anyOf:
+            - type: object
+              required: [source, valid, errors]
+              properties:
+                source:
+                  type: string
+                  enum: [provider, math, presentation, duplicate]
+                valid: { type: boolean }
+                errors:
+                  type: array
+                  items: { type: string }
+                duplicateContentHash: { type: string }
+            - { type: "null" }
+        reviewReason:
+          type: [string, "null"]
+        reviewerSubject:
+          type: [string, "null"]
+        reviewedAt:
+          type: [string, "null"]
+          format: date-time
+        testVersionId:
+          type: [string, "null"]
+          format: uuid
+        createdAt: { type: string, format: date-time }
+    MathAnswer:
+      type: object
+      required: [kind, numerator, denominator]
+      properties:
+        kind:
+          type: string
+          enum: [integer, rational]
+        numerator: { type: integer }
+        denominator: { type: integer }
+    MathExpression:
+      oneOf:
+        - type: object
+          required: [kind, value]
+          properties:
+            kind: { const: integer }
+            value: { type: integer }
+        - type: object
+          required: [kind, numerator, denominator]
+          properties:
+            kind: { const: fraction }
+            numerator: { type: integer }
+            denominator: { type: integer }
+        - type: object
+          required: [kind, name]
+          properties:
+            kind: { const: variable }
+            name: { type: string }
+        - type: object
+          required: [kind, left, right]
+          properties:
+            kind:
+              type: string
+              enum: [add, subtract, multiply, divide, power, equation]
+            left: { $ref: "#/components/schemas/MathExpression" }
+            right: { $ref: "#/components/schemas/MathExpression" }
+    MathProblemSpec:
+      type: object
+      required: [family, seed, variables, expression, answer, constraints]
+      properties:
+        family:
+          type: string
+          enum:
+            [fraction_addition, percentage_of_quantity, ratio, linear_equation]
+        seed: { type: string }
+        variables:
+          type: object
+          additionalProperties: { type: integer }
+        expression: { $ref: "#/components/schemas/MathExpression" }
+        answer: { $ref: "#/components/schemas/MathAnswer" }
+        constraints:
+          type: object
+          required: [min, max, nonNegative]
+          properties:
+            min: { type: integer }
+            max: { type: integer }
+            nonNegative: { type: boolean }
+        choices:
+          type: array
+          items:
+            type: object
+            required: [answer, isCorrect]
+            properties:
+              answer: { $ref: "#/components/schemas/MathAnswer" }
+              isCorrect: { type: boolean }
+    MathCandidateDetail:
+      allOf:
+        - { $ref: "#/components/schemas/MathCandidate" }
+        - type: object
+          required: [canonicalSpec, provenance]
+          properties:
+            canonicalSpec:
+              anyOf:
+                - { $ref: "#/components/schemas/MathProblemSpec" }
+                - { type: "null" }
+            provenance:
+              type: object
+              required:
+                [templateId, provider, model, promptTemplateVersion, seed]
+              properties:
+                templateId:
+                  type: [string, "null"]
+                  format: uuid
+                provider: { type: string }
+                model: { type: string }
+                promptTemplateVersion: { type: string }
+                seed: { type: string }
+            audit:
+              type: object
+              required: [rawResponse]
+              properties:
+                rawResponse: {}
+    ImportResult:
+      type: object
+      required: [testId, versionId, version]
+      properties:
+        testId: { type: string, format: uuid }
+        versionId: { type: string, format: uuid }
+        version: { type: integer }
+
     SectionType:
       type: string
-      enum: [listening, reading, vocabulary, grammar]
+      enum: [listening, reading, vocabulary, grammar, math]
 
     NavigationMode:
       type: string
@@ -1402,6 +2277,8 @@ components:
       properties:
         id: { type: string }
         label: { type: string }
+        labelBlocks:
+          { type: array, items: { $ref: "#/components/schemas/ContentBlock" } }
         imageSvg:
           type: string
           description: |
@@ -1417,6 +2294,8 @@ components:
         ordinal: { type: integer }
         type: { $ref: "#/components/schemas/QuestionType" }
         prompt: { type: string }
+        promptBlocks:
+          { type: array, items: { $ref: "#/components/schemas/ContentBlock" } }
         choices:
           type: array
           items: { $ref: "#/components/schemas/Choice" }
@@ -1862,6 +2741,8 @@ components:
       properties:
         id: { type: string }
         label: { type: string }
+        labelBlocks:
+          { type: array, items: { $ref: "#/components/schemas/ContentBlock" } }
         isCorrect: { type: boolean }
         selected: { type: boolean }
         imageSvg:
@@ -1882,8 +2763,14 @@ components:
           description: |
             Carried rather than inferred. Without it a client can only guess a section's kind
             from the ORDER items arrive in, which holds for a two-section test in the expected
-            sequence and nothing else — and this enum has four values.
+            sequence.
         prompt: { type: string }
+        promptBlocks:
+          { type: array, items: { $ref: "#/components/schemas/ContentBlock" } }
+        solutionBlocks:
+          type: array
+          description: Approved worked solution from the frozen question, present only on completed review when after_test was selected.
+          items: { $ref: "#/components/schemas/ContentBlock" }
         outcome: { type: string, enum: [correct, incorrect, unanswered] }
         stimulus:
           oneOf:
@@ -2048,6 +2935,12 @@ components:
                             type: string
                             description: Stable across versions, so item history survives a re-publish.
                           prompt: { type: string }
+                          promptBlocks:
+                            {
+                              type: array,
+                              items:
+                                { $ref: "#/components/schemas/ContentBlock" },
+                            }
                           type: { $ref: "#/components/schemas/QuestionType" }
                           points: { type: integer }
                           tags:
@@ -2061,6 +2954,14 @@ components:
                               required: [label, isCorrect]
                               properties:
                                 label: { type: string }
+                                labelBlocks:
+                                  {
+                                    type: array,
+                                    items:
+                                      {
+                                        $ref: "#/components/schemas/ContentBlock",
+                                      },
+                                  }
                                 isCorrect: { type: boolean }
                                 imageSvg:
                                   type: string

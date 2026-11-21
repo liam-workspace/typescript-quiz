@@ -7,7 +7,7 @@ import {
   UseFilters,
   UseGuards,
 } from "@nestjs/common"
-import type { GradeResult } from "@pp/common"
+import type { ContentBlock, GradeResult } from "@pp/common"
 import type { ReviewItem, ReviewStimulus } from "@pp/db/scoring"
 import { CurrentStudent } from "../auth/current-student.decorator.js"
 import { JwksGuard } from "../auth/jwks.guard.js"
@@ -48,6 +48,7 @@ function toAttemptResultView(result: ReadyAttemptResult): AttemptResultView {
 interface ReviewChoiceView {
   id: string
   label: string
+  labelBlocks?: ContentBlock[]
   isCorrect: boolean
   selected: boolean
   imageSvg?: string
@@ -59,6 +60,8 @@ interface ReviewItemView {
   sectionId: string
   sectionType: ReviewItem["sectionType"]
   prompt: string
+  promptBlocks?: ContentBlock[]
+  solutionBlocks?: ContentBlock[]
   outcome: "correct" | "incorrect" | "unanswered"
   stimulus?: ReviewStimulus
   choices: ReviewChoiceView[]
@@ -76,11 +79,14 @@ function toReviewItemView(item: ReviewItem): ReviewItemView {
     sectionId: item.sectionId,
     sectionType: item.sectionType,
     prompt: item.prompt,
+    ...(item.promptBlocks ? { promptBlocks: item.promptBlocks } : {}),
+    ...(item.solutionBlocks ? { solutionBlocks: item.solutionBlocks } : {}),
     outcome: item.outcome,
     ...(item.stimulus ? { stimulus: { ...item.stimulus } } : {}),
     choices: item.choices.map((choice) => ({
       id: choice.id,
       label: choice.label,
+      ...(choice.labelBlocks ? { labelBlocks: choice.labelBlocks } : {}),
       isCorrect: choice.isCorrect,
       selected: choice.selected,
       ...(choice.imageSvg ? { imageSvg: choice.imageSvg } : {}),

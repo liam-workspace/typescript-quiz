@@ -11,3 +11,7 @@ export * from "./interchange/test-document.js"
 export * from "./domain/clock.js"
 
 export * from "./rules.js"
+
+export * from "./admin-contract.js"
+
+export * from "./math/verify.js"

@@ -3,11 +3,44 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { resolve, sep } from "node:path"
 import { withTransaction, type PgPool } from "@liam-workspace/node-postgres"
 import { HttpStatus, Inject, Injectable } from "@nestjs/common"
-import { testDocumentSchema, type Clock, type TestDocument } from "@pp/common"
 import {
+  adminPaginationSchema,
+  adminTestFilterSchema,
+  draftQuestionPatchSchema,
+  testDocumentSchema,
+  type AdminAttemptDetail,
+  type AdminLearnerPage,
+  type AdminOverview,
+  type AdminQuestion,
+  type AdminQuestionPage,
+  type AdminResultPage,
+  type AdminResultRollups,
+  type AdminTestDetail,
+  type AdminTestPage,
+  type Clock,
+  type TestDocument,
+} from "@pp/common"
+import { InvalidCursorError } from "@pp/db"
+import { z } from "zod"
+import {
+  AmbiguousDraftTextError,
   DraftNotFoundError,
+  DraftQuestionNotFoundError,
+  InvalidDraftChoicesError,
+  PublishedVersionMutationError,
   exportTestDocument,
   importTestDocument,
+  importApprovedMathCandidates,
+  InvalidMathCandidateImportError,
+  listAdminLearners,
+  listAdminQuestions,
+  listAdminResults,
+  listAdminTests,
+  loadAdminAttemptDetail,
+  loadAdminOverview,
+  loadAdminResultRollups,
+  loadAdminTestDetail,
+  patchDraftQuestion,
   publishDraftVersion,
   recordMediaAsset,
   resolveVersionId,
@@ -15,8 +48,28 @@ import {
   type MediaKind,
 } from "@pp/db/admin"
 import { ProblemException } from "../attempts/problem.exception.js"
-import { CLOCK, JOB_POOL } from "../database/tokens.js"
+import { CLOCK, JOB_POOL, REQUEST_POOL } from "../database/tokens.js"
 import { loadServerConfig } from "../config.js"
+
+const mathImportText = z
+  .string()
+  .trim()
+  .min(1)
+  .refine((value) => value.isWellFormed() && !value.includes("\0"))
+
+const mathImportSchema = z.strictObject({
+  candidateIds: z
+    .array(z.uuid())
+    .min(1)
+    .refine(
+      (ids) => new Set(ids.map((id) => id.toLowerCase())).size === ids.length,
+      "Select each candidate only once",
+    ),
+  title: mathImportText,
+  slug: mathImportText,
+  durationSeconds: testDocumentSchema.shape.durationSeconds.max(2147483647),
+  level: testDocumentSchema.shape.level,
+})
 
 export interface ImportResult {
   testId: string
@@ -177,12 +230,237 @@ function parseVersion(raw: string | undefined): number | undefined {
   return Number.isInteger(value) && value > 0 ? value : UNRESOLVABLE_VERSION
 }
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const pageQueryShape = {
+  limit: z
+    .string()
+    .regex(/^\d+$/)
+    .transform(Number)
+    .pipe(adminPaginationSchema.shape.limit)
+    .default(20),
+  cursor: adminPaginationSchema.shape.cursor.default(null),
+}
+const testQuerySchema = adminTestFilterSchema.extend(pageQueryShape)
+const questionQuerySchema = adminTestFilterSchema
+  .pick({ search: true })
+  .extend({
+    ...pageQueryShape,
+    testId: z.string().regex(UUID_PATTERN).optional(),
+  })
+
+const resultQuerySchema = z.strictObject({
+  ...pageQueryShape,
+  testId: z.string().regex(UUID_PATTERN).optional(),
+  learnerId: z.string().regex(UUID_PATTERN).optional(),
+})
+const rollupQuerySchema = resultQuerySchema.pick({ limit: true, testId: true })
+const learnerQuerySchema = adminTestFilterSchema
+  .pick({ search: true })
+  .extend(pageQueryShape)
+
+function parseAdminQuery<T>(schema: z.ZodType<T>, query: unknown): T {
+  const parsed = schema.safeParse(query)
+
+  if (!parsed.success) {
+    throw new ProblemException({
+      type: "invalid_query",
+      title: "The query parameters failed validation.",
+      status: HttpStatus.BAD_REQUEST,
+      issues: parsed.error.issues,
+    })
+  }
+
+  return parsed.data
+}
+
+async function readAdminPage<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read()
+  } catch (error) {
+    if (error instanceof InvalidCursorError) {
+      throw new ProblemException({
+        type: "bad_cursor",
+        title: "The cursor could not be decoded.",
+        status: HttpStatus.BAD_REQUEST,
+      })
+    }
+
+    throw error
+  }
+}
+
+function testNotFound(): ProblemException {
+  return new ProblemException({
+    type: "test_not_found",
+    title: "No such test exists.",
+    status: HttpStatus.NOT_FOUND,
+  })
+}
+
 @Injectable()
 export class AdminService {
   constructor(
     @Inject(JOB_POOL) private readonly pool: PgPool,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(REQUEST_POOL) private readonly readPool: PgPool,
   ) {}
+
+  overview(): Promise<AdminOverview> {
+    return loadAdminOverview(this.readPool, {})
+  }
+
+  listTests(query: Record<string, unknown>): Promise<AdminTestPage> {
+    const parsed = parseAdminQuery(testQuerySchema, query)
+
+    return readAdminPage(() => listAdminTests(this.readPool, parsed))
+  }
+
+  async testDetail(testId: string): Promise<AdminTestDetail> {
+    if (!UUID_PATTERN.test(testId)) {
+      throw testNotFound()
+    }
+
+    const detail = await loadAdminTestDetail(this.readPool, testId)
+
+    if (!detail) {
+      throw testNotFound()
+    }
+
+    return detail
+  }
+
+  listQuestions(query: Record<string, unknown>): Promise<AdminQuestionPage> {
+    const parsed = parseAdminQuery(questionQuerySchema, query)
+
+    return readAdminPage(() => listAdminQuestions(this.readPool, parsed))
+  }
+
+  async patchDraftQuestion(
+    versionId: string,
+    questionId: string,
+    body: unknown,
+    adminSubject: string,
+  ): Promise<AdminQuestion> {
+    if (!UUID_PATTERN.test(versionId) || !UUID_PATTERN.test(questionId)) {
+      throw new ProblemException({
+        type: "draft_question_not_found",
+        title: "No such draft question exists in this version.",
+        status: HttpStatus.NOT_FOUND,
+      })
+    }
+
+    const parsed = draftQuestionPatchSchema.safeParse(body)
+
+    if (!parsed.success) {
+      throw new ProblemException({
+        type: "invalid_draft_question_patch",
+        title: "The draft question patch failed validation.",
+        status: HttpStatus.BAD_REQUEST,
+        issues: parsed.error.issues,
+      })
+    }
+
+    const question = await patchDraftQuestion(this.readPool, {
+      versionId,
+      questionId,
+      patch: parsed.data,
+    }).catch((error: unknown) => {
+      if (error instanceof DraftQuestionNotFoundError) {
+        throw new ProblemException({
+          type: "draft_question_not_found",
+          title: "No such draft question exists in this version.",
+          status: HttpStatus.NOT_FOUND,
+        })
+      }
+
+      if (error instanceof PublishedVersionMutationError) {
+        throw new ProblemException({
+          type: "published_version_immutable",
+          title: "Published versions cannot be edited.",
+          status: HttpStatus.CONFLICT,
+        })
+      }
+
+      if (error instanceof AmbiguousDraftTextError) {
+        throw new ProblemException({
+          type: "ambiguous_draft_text",
+          title:
+            "Flat editing cannot safely modify rich content with multiple text blocks.",
+          status: HttpStatus.CONFLICT,
+        })
+      }
+
+      if (error instanceof InvalidDraftChoicesError) {
+        throw new ProblemException({
+          type: "invalid_draft_choices",
+          title: "Choices must retain the question's existing choice IDs.",
+          status: HttpStatus.BAD_REQUEST,
+        })
+      }
+
+      throw error
+    })
+
+    // The repository transaction has committed. Await the append before
+    // returning success; an audit failure returns 500 but cannot undo the edit.
+    await this.readPool.query(
+      `INSERT INTO admin_audit_log
+         (admin_subject, action, resource_type, resource_id, metadata)
+       VALUES ($1, 'draft_question_updated', 'question', $2, $3::jsonb)`,
+      [adminSubject, questionId, JSON.stringify({ versionId })],
+    )
+
+    return question
+  }
+
+  listResults(query: Record<string, unknown>): Promise<AdminResultPage> {
+    const parsed = parseAdminQuery(resultQuerySchema, query)
+
+    return readAdminPage(() => listAdminResults(this.readPool, parsed))
+  }
+
+  resultRollups(query: Record<string, unknown>): Promise<AdminResultRollups> {
+    return loadAdminResultRollups(
+      this.readPool,
+      parseAdminQuery(rollupQuerySchema, query),
+    )
+  }
+
+  async attemptDetail(
+    attemptId: string,
+    adminSubject: string,
+  ): Promise<AdminAttemptDetail> {
+    const detail = UUID_PATTERN.test(attemptId)
+      ? await loadAdminAttemptDetail(this.readPool, attemptId)
+      : null
+
+    if (!detail) {
+      throw new ProblemException({
+        type: "attempt_not_found",
+        title: "No such completed attempt exists.",
+        status: HttpStatus.NOT_FOUND,
+      })
+    }
+
+    // Await the immutable audit append before disclosing the retrieved answers.
+    // A failed append fails the request; denied/missing reads never reach it.
+    await this.readPool.query(
+      `INSERT INTO admin_audit_log
+         (admin_subject, action, resource_type, resource_id)
+       VALUES ($1, 'attempt_detail_viewed', 'attempt', $2)`,
+      [adminSubject, attemptId],
+    )
+
+    return detail
+  }
+
+  listLearners(query: Record<string, unknown>): Promise<AdminLearnerPage> {
+    const parsed = parseAdminQuery(learnerQuerySchema, query)
+
+    return readAdminPage(() => listAdminLearners(this.readPool, parsed))
+  }
 
   /**
    * `JOB_POOL`, not `REQUEST_POOL`: a 40-question import is exactly the long
@@ -202,6 +480,39 @@ export class AdminService {
     }
 
     return importTestDocument(this.pool, parsed.data)
+  }
+
+  async importApprovedMathCandidates(
+    body: unknown,
+    adminSubject: string,
+  ): Promise<ImportResult> {
+    const parsed = mathImportSchema.safeParse(body)
+
+    if (!parsed.success) {
+      throw new ProblemException({
+        type: "invalid_math_import",
+        title: "The math import request failed validation.",
+        status: HttpStatus.BAD_REQUEST,
+        issues: parsed.error.issues,
+      })
+    }
+
+    try {
+      return await importApprovedMathCandidates(this.pool, {
+        ...parsed.data,
+        adminSubject,
+      })
+    } catch (error) {
+      if (error instanceof InvalidMathCandidateImportError) {
+        throw new ProblemException({
+          type: "invalid_candidate_selection",
+          title: error.message,
+          status: HttpStatus.CONFLICT,
+        })
+      }
+
+      throw error
+    }
   }
 
   async publish(testId: string): Promise<PublishResult> {

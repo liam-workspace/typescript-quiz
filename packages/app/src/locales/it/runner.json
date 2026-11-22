@@ -325,5 +325,7 @@
   "listening.playsLeftHint_other": "{{count}} ascolti rimasti. Non si possono mettere in pausa.",
   "listening.answerNow": "Rispondi ora. Non potrai tornare a questa domanda.",
   "listening.unlockHint": "Ascolta la registrazione per sbloccare le risposte.",
-  "listening.recordingLabel": "Registrazione"
+  "listening.recordingLabel": "Registrazione",
+  "handIn.offlineBlocked": "Per consegnare serve una connessione. Le tue risposte sono al sicuro su questo telefono: riconnettiti e riprova.",
+  "handIn.handingIn": "Consegna in corso…"
 }

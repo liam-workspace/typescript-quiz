@@ -325,5 +325,7 @@
   "listening.playsLeftHint_other": "Quedan {{count}} reproducciones. No se pueden pausar.",
   "listening.answerNow": "Responde ahora. No podrás volver a esta pregunta.",
   "listening.unlockHint": "Reproduce la grabación para desbloquear las respuestas.",
-  "listening.recordingLabel": "Grabación"
+  "listening.recordingLabel": "Grabación",
+  "handIn.offlineBlocked": "Para entregar necesitas conexión. Tus respuestas están a salvo en este teléfono: vuelve a conectarte e inténtalo de nuevo.",
+  "handIn.handingIn": "Entregando…"
 }

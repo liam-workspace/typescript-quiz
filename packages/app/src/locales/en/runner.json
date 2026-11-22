@@ -325,5 +325,7 @@
   "listening.playsLeftHint_other": "{{count}} plays left. They cannot be paused.",
   "listening.answerNow": "Answer now. You cannot come back to this question.",
   "listening.unlockHint": "Play the recording to unlock the answers.",
-  "listening.recordingLabel": "Recording"
+  "listening.recordingLabel": "Recording",
+  "handIn.offlineBlocked": "Handing in needs a connection. Your answers are safe on this phone — reconnect and try again.",
+  "handIn.handingIn": "Handing in…"
 }

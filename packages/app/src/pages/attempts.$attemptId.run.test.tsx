@@ -1967,7 +1967,7 @@ describe("RunScreen", () => {
       await waitFor(navigatedToReadingRules(navigate))
     })
 
-    it("closes the confirm sheet and shows the expired state when the section ran out", async () => {
+    it("closes the confirm sheet and shows the time-up view with a Continue action when the section ran out", async () => {
       mockFinishSection.mockRejectedValue(
         new ApiError({
           type: "section_expired",
@@ -1975,7 +1975,7 @@ describe("RunScreen", () => {
           status: 410,
         }),
       )
-      renderRunScreen(sectionBoundaryEnvelope)
+      const { navigate } = renderRunScreen(sectionBoundaryEnvelope)
       const user = userEvent.setup()
 
       await user.click(screen.getByRole("button", { name: "Finish Listening" }))
@@ -1988,10 +1988,24 @@ describe("RunScreen", () => {
       expect(await screen.findByRole("alert")).toHaveTextContent(
         "This section's time ran out.",
       )
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Time's up" }),
+      ).toHaveAttribute("tabindex", "-1")
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
       expect(
         screen.queryByRole("button", { name: "Finish Listening" }),
       ).not.toBeInTheDocument()
+
+      // Last question of the section: the server's finishSection never
+      // raises section_expired on success, so this view is the way out.
+      await user.click(
+        screen.getByRole("button", { name: "Continue to Reading" }),
+      )
+
+      expect(navigate).toHaveBeenCalledExactlyOnceWith(
+        "/attempts/attempt-1/sections/section-reading/rules",
+      )
+      expect(mockFinishSection).toHaveBeenCalledOnce()
     })
 
     it("offers hand-in instead of a nonexistent next section on the final question", async () => {
@@ -2204,7 +2218,42 @@ describe("RunScreen", () => {
   // finalizes it and carries the finalized attempt). Before this task,
   // QuestionMedia swallowed the rejection and the student saw nothing.
   describe("a claimPlay 410 surfaces an actionable expired state, not silence", () => {
-    it("shows the section-expired message on a 410 section_expired", async () => {
+    it("shows the time-up view with a Continue button when a section expires and another follows", async () => {
+      mockClaimPlay.mockRejectedValue(
+        new ApiError({
+          type: "section_expired",
+          title: "The section's clock ran out.",
+          status: 410,
+        }),
+      )
+      const user = userEvent.setup()
+      const { navigate } = renderRunScreen({
+        ...unplayedListeningEnvelope,
+        sections: [
+          ...unplayedListeningEnvelope.sections,
+          sectionBoundaryEnvelope.sections[1],
+        ],
+      })
+
+      await user.click(screen.getByRole("button", { name: "Play recording" }))
+
+      expect(
+        await screen.findByRole("heading", { name: "Time's up" }),
+      ).toBeInTheDocument()
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "This section's time ran out.",
+      )
+
+      await user.click(
+        screen.getByRole("button", { name: "Continue to Reading" }),
+      )
+
+      expect(navigate).toHaveBeenCalledWith(
+        "/attempts/attempt-1/sections/section-reading/rules",
+      )
+    })
+
+    it("offers Hand in from the time-up view when the last section expires", async () => {
       mockClaimPlay.mockRejectedValue(
         new ApiError({
           type: "section_expired",
@@ -2214,7 +2263,7 @@ describe("RunScreen", () => {
       )
       const user = userEvent.setup()
 
-      renderRunScreen(unplayedListeningEnvelope)
+      const { navigate } = renderRunScreen(unplayedListeningEnvelope)
 
       await user.click(screen.getByRole("button", { name: "Play recording" }))
 
@@ -2222,8 +2271,12 @@ describe("RunScreen", () => {
         "This section's time ran out.",
       )
       expect(
-        screen.queryAllByRole("button", { name: /previous|next|hand in/i }),
+        screen.queryAllByRole("button", { name: /previous|next/i }),
       ).toHaveLength(0)
+
+      await user.click(screen.getByRole("button", { name: "Hand in" }))
+
+      expect(navigate).toHaveBeenCalledWith("/attempts/attempt-1/hand-in")
     })
 
     it("moves to time-up with the finalized attempt on a 410 attempt_expired", async () => {
@@ -2394,7 +2447,7 @@ describe("RunScreen", () => {
         "This section's time ran out.",
       )
       expect(
-        screen.queryAllByRole("button", { name: /previous|next|hand in/i }),
+        screen.queryAllByRole("button", { name: /previous|next/i }),
       ).toHaveLength(0)
     })
   })

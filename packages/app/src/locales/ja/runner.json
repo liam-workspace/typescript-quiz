@@ -313,5 +313,7 @@
   "listening.playsLeftHint": "残り{{count}}回再生できます。一時停止はできません。",
   "listening.answerNow": "いま答えましょう。この問題には戻れません。",
   "listening.unlockHint": "録音を再生すると答えが選べます。",
-  "listening.recordingLabel": "録音"
+  "listening.recordingLabel": "録音",
+  "handIn.offlineBlocked": "提出にはインターネット接続が必要です。解答はこの端末に安全に保存されています。接続してからもう一度お試しください。",
+  "handIn.handingIn": "提出中…"
 }

@@ -325,5 +325,7 @@
   "listening.playsLeftHint_other": "{{count}} écoutes restantes. On ne peut pas les mettre en pause.",
   "listening.answerNow": "Réponds maintenant. Tu ne pourras pas revenir à cette question.",
   "listening.unlockHint": "Écoute l’enregistrement pour débloquer les réponses.",
-  "listening.recordingLabel": "Enregistrement"
+  "listening.recordingLabel": "Enregistrement",
+  "handIn.offlineBlocked": "Pour rendre ton test, il faut une connexion. Tes réponses sont en sécurité sur ce téléphone : reconnecte-toi et réessaie.",
+  "handIn.handingIn": "Envoi en cours…"
 }

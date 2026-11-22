@@ -65,7 +65,7 @@ describe("attempt time-up page", () => {
     ).toHaveAttribute("href", "/attempts/attempt-1/result?source=expiry")
   })
 
-  it("uses the time-up screen hierarchy for the finalized answer summary", () => {
+  it("renders the shared time-up view with a low clock and tiles", () => {
     render(
       <TimeUpScreen
         data={{
@@ -78,20 +78,16 @@ describe("attempt time-up page", () => {
     )
 
     expect(screen.getByText("Practice Test 04").closest("header")).toHaveClass(
-      "app-bar",
+      "m-appbar",
     )
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Time is up" }),
-    ).toHaveClass("screen-title")
-    expect(screen.getByText("00:00")).toHaveClass("timer", "timer-low")
-    expect(screen.getByText("Answered").parentElement).toHaveClass(
-      "summary-row",
+    expect(screen.getByLabelText("Time remaining")).toHaveAttribute(
+      "data-low",
+      "true",
     )
-    expect(screen.getByText("Answered").closest("section")).toHaveClass(
-      "device-card",
-    )
+    expect(screen.getByText("Answered").nextSibling).toHaveTextContent("38")
+    expect(screen.getByText("Left blank").nextSibling).toHaveTextContent("2")
     expect(screen.getByRole("link", { name: "See your result" })).toHaveClass(
-      "device-button",
+      "m-btn",
     )
   })
 

@@ -6,8 +6,10 @@ import {
   CardTitle,
 } from "@liam-workspace/browser-react-ui"
 import { createFileRoute } from "@tanstack/react-router"
-import { useEffect, useState } from "react"
+import { useEffect, useId, useState, useSyncExternalStore } from "react"
 import { useTranslation } from "react-i18next"
+import { Icon } from "../components/Icon.js"
+import { TimeUpView } from "../components/TimeUpView.js"
 import { ApiError } from "../lib/api-client.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
 import {
@@ -20,6 +22,7 @@ import {
   buildSubmitRemainder,
   reconcileFinalFlush,
 } from "../lib/lifecycleFlush.js"
+import { networkStore } from "../lib/network.js"
 import { sameOriginPath } from "../lib/same-origin-path.js"
 import type { RunnerEnvelope } from "../lib/api-types.js"
 
@@ -98,6 +101,12 @@ export function HandInScreen({
   // answers to save" notice below); it never disables anything.
   const [pendingCount, setPendingCount] = useState<number | null>(null)
   const [outcome, setOutcome] = useState<Outcome>({ status: "idle" })
+  const offlineReasonId = useId()
+  const { online } = useSyncExternalStore(
+    (listener) => networkStore.subscribe(listener),
+    () => networkStore.getSnapshot(),
+    () => networkStore.getSnapshot(),
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -205,130 +214,126 @@ export function HandInScreen({
   // the same condition, rather than inventing a hand-in-specific string.
   if (outcome.status === "attemptExpired") {
     return (
-      <div className="device-page">
-        <header className="app-bar">
-          <span className="app-brand">{envelope.testTitle}</span>
-          <span className="grow" />
-          <span className="timer timer-low text-clay text-sm font-bold">
-            00:00
-          </span>
-        </header>
-        <main className="center-main">
-          <h1 className="screen-title">{t("sectionRules.expired.title")}</h1>
-          <p className="screen-subtitle max-w-[40ch]">
-            {t("sectionRules.expired.attemptMessage")}
-          </p>
-          {outcome.summary ? (
-            <section className="device-card mt-[15px] w-full max-w-[340px] text-left">
-              <div className="summary-row flex items-center justify-between gap-4 py-1 text-sm">
-                <span>{t("handIn.answered")}</span>
-                <strong className="tabular-nums">
-                  {outcome.summary.answeredCount}
-                </strong>
-              </div>
-              <div className="summary-row text-ink-2 flex items-center justify-between gap-4 py-1 text-sm">
-                <span>{t("timeUp.leftBlank")}</span>
-                <strong className="tabular-nums">
-                  {outcome.summary.unansweredCount}
-                </strong>
-              </div>
-            </section>
-          ) : null}
-          {outcome.resultUrl ? (
-            <a href={outcome.resultUrl} className="device-button mt-[18px]">
-              {t("sectionRules.expired.viewResult")}
-            </a>
-          ) : null}
-        </main>
-      </div>
+      <TimeUpView
+        title={envelope.testTitle}
+        heading={t("sectionRules.expired.title")}
+        message={t("sectionRules.expired.attemptMessage")}
+        summary={
+          outcome.summary
+            ? {
+                answered: outcome.summary.answeredCount,
+                blank: outcome.summary.unansweredCount,
+              }
+            : null
+        }
+        action={
+          outcome.resultUrl
+            ? {
+                kind: "link",
+                href: outcome.resultUrl,
+                label: t("sectionRules.expired.viewResult"),
+              }
+            : null
+        }
+      />
     )
   }
 
   const unansweredCount = envelope.unansweredOrdinals.length
   const minutesLeft = computeMinutesLeft(envelope)
+  const submitting = outcome.status === "submitting"
   // Not gated on `pendingCount` -- see its declaration above. Submitting
-  // twice concurrently is the only thing this still has to prevent.
-  const disabled = outcome.status === "submitting"
+  // twice concurrently is the only queue-independent thing to prevent; being
+  // offline also blocks it (submit needs the server), with the reason shown.
+  const disabled = submitting || !online
 
   return (
-    <div className="device-page">
-      <header className="app-bar">
-        <span className="app-brand">{envelope.testTitle}</span>
-        <span className="grow" />
-        {minutesLeft !== null ? (
-          <span className="timer text-clay text-sm font-bold">
-            {String(minutesLeft).padStart(2, "0")}:00
-          </span>
-        ) : null}
+    <div className="m-page">
+      <header className="m-appbar">
+        <span className="m-brand truncate">{envelope.testTitle}</span>
       </header>
-      <main className="center-main">
-        <h1 className="screen-title">{t("handIn.title")}</h1>
-        <p className="screen-subtitle max-w-[38ch]">{t("handIn.subtitle")}</p>
-        <section className="device-card mt-[15px] w-full max-w-[360px] text-left">
-          <div className="summary-row flex items-center justify-between gap-4 py-1 text-sm">
+      <main className="m-body">
+        <h1 className="m-title" tabIndex={-1} data-page-title>
+          {t("handIn.title")}
+        </h1>
+        <p className="m-sub">{t("handIn.subtitle")}</p>
+        <div className="m-tiles">
+          <div className="m-tile">
             <span>{t("handIn.answered")}</span>
-            <strong className="tabular-nums">{envelope.answeredCount}</strong>
+            <b>{envelope.answeredCount}</b>
           </div>
-          <div className="summary-row text-bad flex items-center justify-between gap-4 py-1 text-sm">
+          <div
+            className="m-tile"
+            data-tone={unansweredCount > 0 ? "warn" : undefined}
+          >
             <span>{t("handIn.notAnswered")}</span>
-            <strong className="tabular-nums">{unansweredCount}</strong>
+            <b>{unansweredCount}</b>
           </div>
-        </section>
+        </div>
         {unansweredCount > 0 ? (
-          <p className="notice border-amber bg-amber/15 text-ink-2 mt-[14px] max-w-[400px] rounded-[9px] border px-[14px] py-[11px] text-left text-[13.5px] font-semibold">
+          <p className="m-notice" role="status">
             {t("handIn.notice.blankQuestions", {
               count: unansweredCount,
               list: envelope.unansweredOrdinals.join(", "),
             })}
-            {minutesLeft !== null
-              ? ` ${t("handIn.notice.timeLeft", {
-                  count: minutesLeft,
-                  minutes: minutesLeft,
-                })}`
-              : null}
+          </p>
+        ) : null}
+        {minutesLeft !== null ? (
+          <p className="m-reason mt-3">
+            {t("handIn.notice.timeLeft", {
+              count: minutesLeft,
+              minutes: minutesLeft,
+            })}
           </p>
         ) : null}
         {pendingCount !== null && pendingCount > 0 ? (
-          <p
-            role="status"
-            className="notice border-amber bg-amber/15 text-ink-2 mt-[14px] max-w-[400px] rounded-[9px] border px-[14px] py-[11px] text-left text-[13.5px] font-semibold"
-          >
+          <p role="status" className="m-notice">
             {t("handIn.pendingSync")}
           </p>
         ) : null}
+        {online ? null : (
+          <p role="alert" className="m-notice" id={offlineReasonId}>
+            <Icon name="wifioff" small /> {t("handIn.offlineBlocked")}
+          </p>
+        )}
         {outcome.status === "nothingAnswered" ? (
-          <div className="mt-[14px] max-w-[400px] text-left">
+          <div className="mt-3.5">
             <p role="alert" className="text-bad text-sm font-semibold">
               {t("handIn.error.nothingAnswered.title")}
             </p>
-            <p className="screen-subtitle mt-1">
-              {t("handIn.error.nothingAnswered.message")}
-            </p>
+            <p className="m-sub">{t("handIn.error.nothingAnswered.message")}</p>
           </div>
         ) : null}
         {outcome.status === "error" ? (
-          <p role="alert" className="text-bad mt-[14px] text-sm font-semibold">
+          <p role="alert" className="m-alert mt-3.5">
             {t("sectionRules.error.generic")}
           </p>
         ) : null}
       </main>
-      <footer className="device-footer flex-wrap justify-center">
+      <footer
+        className="m-actionbar"
+        style={{ flexDirection: "column", alignItems: "stretch" }}
+      >
         <button
           type="button"
-          className="device-button"
-          data-variant="secondary"
-          onClick={handleKeepWorking}
-        >
-          {t("handIn.keepWorking")}
-        </button>
-        <button
-          type="button"
-          className="device-button"
+          className="m-btn"
+          data-variant="danger"
           data-testid="hand-in-button"
           onClick={handleSubmit}
           disabled={disabled}
+          aria-busy={submitting}
+          aria-describedby={online ? undefined : offlineReasonId}
         >
-          {t("runner.handIn")}
+          {t(submitting ? "handIn.handingIn" : "runner.handIn")}
+        </button>
+        <button
+          type="button"
+          className="m-btn"
+          data-variant="secondary"
+          disabled={submitting}
+          onClick={handleKeepWorking}
+        >
+          {t("handIn.keepWorking")}
         </button>
       </footer>
     </div>

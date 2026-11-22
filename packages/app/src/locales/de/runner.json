@@ -325,5 +325,7 @@
   "listening.playsLeftHint_other": "Noch {{count}} Wiedergaben. Sie können nicht pausiert werden.",
   "listening.answerNow": "Antworte jetzt. Du kannst nicht zu dieser Frage zurückkehren.",
   "listening.unlockHint": "Spiele die Aufnahme ab, um die Antworten freizuschalten.",
-  "listening.recordingLabel": "Aufnahme"
+  "listening.recordingLabel": "Aufnahme",
+  "handIn.offlineBlocked": "Zum Abgeben brauchst du eine Verbindung. Deine Antworten sind sicher auf diesem Gerät – verbinde dich wieder und versuche es erneut.",
+  "handIn.handingIn": "Wird abgegeben…"
 }

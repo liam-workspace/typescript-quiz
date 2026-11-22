@@ -20,6 +20,7 @@ import {
 import { RunMenuSheet } from "../components/RunMenuSheet.js"
 import { isLowTime, RunTopBar } from "../components/RunTopBar.js"
 import type { SaveStateProps } from "../components/SaveState.js"
+import { TimeUpView } from "../components/TimeUpView.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
 import { ApiError } from "../lib/api-client.js"
 import { createServerCountdown, type TimeSource } from "../lib/countdown.js"
@@ -981,6 +982,41 @@ export function RunScreen({
     // No runner is built yet for the remaining section types (vocabulary,
     // grammar) -- out of scope for this plan.
     return null
+  }
+
+  // A section that ran out (`section_expired`) ends the run view: the server
+  // never raises it from `finishSection`, so this screen is the way on --
+  // including from the section's LAST question, where the action bar has no
+  // other primary action once expired. Entering the next section needs no
+  // `finishSection` first: `enterSection` closes an expired-but-unfinished
+  // section lazily (packages/db attempt.repository.ts). The last section has
+  // no next one, so the way on is the hand-in screen (submit, or a 410 that
+  // lands on the attempt time-up view).
+  if (expired?.kind === "section") {
+    return (
+      <TimeUpView
+        title={envelope.testTitle}
+        heading={t("sectionRules.expired.title")}
+        message={t("sectionRules.expired.sectionMessage")}
+        messageRole="alert"
+        summary={null}
+        action={{
+          kind: "button",
+          label: nextSection
+            ? t("runner.continueToSection", {
+                section: t(`runner.sectionChip.${nextSection.type}`),
+              })
+            : t("runner.handIn"),
+          onClick: () => {
+            navigate(
+              nextSection
+                ? `/attempts/${attemptId}/sections/${nextSection.id}/rules`
+                : `/attempts/${attemptId}/hand-in`,
+            )
+          },
+        }}
+      />
+    )
   }
 
   let primary: RunPrimaryAction | null = null

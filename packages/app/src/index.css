@@ -820,6 +820,10 @@
   }
   .li .t {
     flex: 1;
+    /* A flex item never shrinks below its longest word unless told to: without
+     * this a long German title pushes the switch past the 320 px edge. */
+    min-width: 0;
+    overflow-wrap: anywhere;
     font-weight: 800;
   }
   .li .t small {
@@ -856,6 +860,9 @@
   .switch i {
     position: absolute;
     inset: 0;
+    /* The visual track is painted over the input's centre; it must never
+     * catch the tap, or only the 4–6 px ring outside it would toggle. */
+    pointer-events: none;
     border-radius: 99px;
     background: #b7c2cb;
     transition: background 0.15s;
@@ -1169,6 +1176,20 @@
     color: #fff;
     font-size: 14px;
     font-weight: 800;
+  }
+  .m-appbar .m-iconbtn {
+    /* Never shrink below 44 px beside a long brand and section chip. */
+    flex: none;
+  }
+  /* The brand and the chip give way instead, ellipsized on one line, so the
+   * bar never pushes the page wider than 320 px in a long locale. */
+  .m-appbar .m-brand,
+  .m-appbar .section-chip {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .m-iconbtn {
     display: grid;

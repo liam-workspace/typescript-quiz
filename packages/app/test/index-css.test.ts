@@ -17,6 +17,19 @@ describe("index.css (D10, D14, D15)", () => {
     expect(rule("  .switch input")).toMatch(/inset: -6px -4px;/u)
   })
 
+  it("D10: the visible track never catches the tap meant for the input beneath it", () => {
+    expect(rule("  .switch i")).toMatch(/pointer-events: none;/u)
+  })
+
+  it("the app-bar back button keeps its 44 px and the brand and chip give way", () => {
+    expect(rule("  .m-appbar .m-iconbtn")).toMatch(/flex: none;/u)
+    expect(rule("  .m-appbar .m-brand")).toMatch(/text-overflow: ellipsis;/u)
+  })
+
+  it("a list row's title may shrink so the switch stays inside 320 px", () => {
+    expect(rule("  .li .t")).toMatch(/min-width: 0;/u)
+  })
+
   it("D14: a selected choice keeps its selected fill when it is disabled", () => {
     expect(
       rule('  .choice:has(:disabled):has([data-state="checked"])'),

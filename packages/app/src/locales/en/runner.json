@@ -327,5 +327,9 @@
   "listening.unlockHint": "Play the recording to unlock the answers.",
   "listening.recordingLabel": "Recording",
   "handIn.offlineBlocked": "Handing in needs a connection. Your answers are safe on this phone — reconnect and try again.",
-  "handIn.handingIn": "Handing in…"
+  "handIn.handingIn": "Handing in…",
+  "result.headlineGood": "Good effort!",
+  "result.headlineKeepGoing": "Keep practising!",
+  "history.resultLink": "Result",
+  "runner.saveState.pendingShort": "Waiting to send: {{count}}"
 }

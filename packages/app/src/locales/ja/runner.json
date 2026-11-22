@@ -315,5 +315,9 @@
   "listening.unlockHint": "録音を再生すると答えが選べます。",
   "listening.recordingLabel": "録音",
   "handIn.offlineBlocked": "提出にはインターネット接続が必要です。解答はこの端末に安全に保存されています。接続してからもう一度お試しください。",
-  "handIn.handingIn": "提出中…"
+  "handIn.handingIn": "提出中…",
+  "result.headlineGood": "よくがんばりました！",
+  "result.headlineKeepGoing": "もっと練習しましょう！",
+  "history.resultLink": "結果",
+  "runner.saveState.pendingShort": "送信待ち：{{count}}件"
 }

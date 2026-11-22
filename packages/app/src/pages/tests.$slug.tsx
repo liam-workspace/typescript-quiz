@@ -50,7 +50,9 @@ export function TestBriefScreen({ brief, navigate }: TestBriefScreenProps) {
       </header>
 
       <main className="device-main">
-        <h1 className="screen-title">{brief.title}</h1>
+        <h1 className="screen-title" tabIndex={-1} data-page-title>
+          {brief.title}
+        </h1>
         <p className="screen-subtitle mb-4">
           {t("brief.summary", {
             step,

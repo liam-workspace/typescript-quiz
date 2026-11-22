@@ -69,7 +69,7 @@ export function ProfileScreen({
       </header>
 
       <main className="device-main">
-        <h1 className="screen-title" tabIndex={-1}>
+        <h1 className="screen-title" tabIndex={-1} data-page-title>
           {t("profile.title")}
         </h1>
 

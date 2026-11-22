@@ -4,6 +4,7 @@ import type { CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiError } from "../lib/api-client.js"
 import type { AttemptResult, AttemptSectionScore } from "../lib/api-types.js"
+import { Icon, type IconName } from "../components/Icon.js"
 import { getAttemptResult } from "../lib/attempts-api.js"
 
 export async function loadResult(attemptId: string): Promise<AttemptResult> {
@@ -24,34 +25,20 @@ export async function loadResult(attemptId: string): Promise<AttemptResult> {
   }
 }
 
-function scorePercentage(section: AttemptSectionScore): number {
-  if (section.pointsPossible <= 0) {
-    return 0
-  }
-
-  return Math.max(
-    0,
-    Math.min(100, (section.pointsEarned / section.pointsPossible) * 100),
-  )
+const SECTION_ICON: Record<AttemptSectionScore["type"], IconName> = {
+  listening: "headphones",
+  reading: "book",
+  math: "calc",
+  vocabulary: "book",
+  grammar: "book",
 }
 
-function sectionBarColour(type: AttemptSectionScore["type"]): string {
-  switch (type) {
-    case "listening":
-      return "bg-teal"
-
-    case "math":
-      return "bg-ink-2"
-
-    case "reading":
-      return "bg-clay"
-
-    case "vocabulary":
-      return "bg-good"
-
-    case "grammar":
-      return "bg-amber"
+function headlineKey(percentage: number): string {
+  if (percentage >= 80) {
+    return "result.headline"
   }
+
+  return percentage >= 50 ? "result.headlineGood" : "result.headlineKeepGoing"
 }
 
 export interface ResultScreenProps {
@@ -72,85 +59,76 @@ export function ResultScreen({ result }: ResultScreenProps) {
   } as CSSProperties
 
   return (
-    <div className="device-page">
-      <header className="app-bar">
-        <span className="app-brand">{result.test.title}</span>
+    <div className="m-page">
+      <header className="m-appbar">
+        <span className="m-brand">{t("result.scoreLabel")}</span>
       </header>
 
-      <main className="device-main mx-auto grid w-full max-w-4xl flex-1 content-start gap-6">
-        <div className="flex flex-wrap items-center gap-6">
-          <div
-            data-testid="score-ring"
-            className="score-ring mx-auto shrink-0 sm:mx-0"
-            style={ringStyle}
-            aria-label={t("result.scoreLabel")}
-          >
-            <div>
-              <div className="leading-tight">
-                <p className="text-ink text-center text-2xl font-extrabold tracking-tight tabular-nums">
-                  {t("result.percentage", { percentage })}
-                </p>
-                <p className="text-ink-2 text-center text-xs font-bold tabular-nums">
-                  {t("result.fraction", {
-                    earned: score.pointsEarned,
-                    possible: score.pointsPossible,
-                  })}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="min-w-0 flex-1 basis-64">
-            <h1 className="screen-title">{t("result.headline")}</h1>
-            {score.isPersonalBest ? (
-              <p className="screen-subtitle text-teal font-semibold">
-                {t("result.personalBest")}
+      <main className="m-body text-center">
+        <p className="m-eyebrow">
+          {result.test.title}
+          {result.status === "expired"
+            ? ` · ${t("history.status.expired")}`
+            : ""}
+        </p>
+        <h1 className="m-title mt-1" tabIndex={-1} data-page-title>
+          {t(headlineKey(score.percentage))}
+        </h1>
+        <div
+          data-testid="score-ring"
+          className="score-ring mx-auto my-3"
+          style={ringStyle}
+          aria-label={t("result.scoreLabel")}
+        >
+          <div>
+            <div className="leading-tight">
+              <p className="text-ink text-[38px] font-extrabold tabular-nums">
+                {t("result.percentage", { percentage })}
               </p>
-            ) : null}
-            <p className="text-ink-2 mt-2 text-sm">
-              {t("result.summary", {
-                answered: score.answered,
-                correct: score.correct,
-                incorrect: score.incorrect,
-                unanswered: score.unanswered,
-              })}
-            </p>
-
-            <div className="mt-4 space-y-3">
-              {score.sections.map((section) => (
-                <section
-                  key={`${section.type}-${section.title}`}
-                  data-section-type={section.type}
-                >
-                  <div className="text-ink mb-1 flex items-center justify-between gap-4 text-sm font-bold">
-                    <span>{section.title}</span>
-                    <span className="tabular-nums">
-                      {t("result.fraction", {
-                        earned: section.pointsEarned,
-                        possible: section.pointsPossible,
-                      })}
-                    </span>
-                  </div>
-                  <div
-                    role="progressbar"
-                    aria-label={section.title}
-                    aria-valuemin={0}
-                    aria-valuenow={section.pointsEarned}
-                    aria-valuemax={section.pointsPossible}
-                    className="score-bar"
-                  >
-                    <div
-                      className={sectionBarColour(section.type)}
-                      style={{ width: `${scorePercentage(section)}%` }}
-                    />
-                  </div>
-                </section>
-              ))}
+              <p className="text-ink-2 text-[13px] font-bold tabular-nums">
+                {t("result.fraction", {
+                  earned: score.pointsEarned,
+                  possible: score.pointsPossible,
+                })}
+              </p>
             </div>
           </div>
         </div>
-
-        <p className="text-faint text-xs leading-relaxed">
+        {score.isPersonalBest ? (
+          <p>
+            <span className="m-chip" data-tone="good">
+              <Icon name="check" small /> {t("result.personalBest")}
+            </span>
+          </p>
+        ) : null}
+        <p className="m-sub mt-2">
+          {t("result.summary", {
+            answered: score.answered,
+            correct: score.correct,
+            incorrect: score.incorrect,
+            unanswered: score.unanswered,
+          })}
+        </p>
+        <div className="mt-3.5 grid gap-2 text-left">
+          {score.sections.map((section) => (
+            <div
+              key={`${section.type}-${section.title}`}
+              data-testid="breakdown-row"
+              data-section-type={section.type}
+              className="m-card flex items-center gap-2.5 py-2.5 font-bold"
+            >
+              <Icon name={SECTION_ICON[section.type]} />
+              <span>{section.title}</span>
+              <span className="ml-auto tabular-nums">
+                {t("result.fraction", {
+                  earned: section.pointsEarned,
+                  possible: section.pointsPossible,
+                })}
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="m-reason mt-3.5">
           {t("result.practiceNotice", {
             title: result.test.title,
             version: result.test.version,
@@ -158,15 +136,11 @@ export function ResultScreen({ result }: ResultScreenProps) {
         </p>
       </main>
 
-      <footer className="device-footer flex-wrap">
-        <Link className="device-button" data-variant="ghost" to="/">
+      <footer className="m-actionbar">
+        <Link className="m-btn" data-variant="secondary" to="/">
           {t("result.backToLibrary")}
         </Link>
-        <span className="grow" />
-        <a
-          className="device-button"
-          href={`/attempts/${result.attemptId}/review`}
-        >
+        <a className="m-btn" href={`/attempts/${result.attemptId}/review`}>
           {t("result.reviewAnswers")}
         </a>
       </footer>

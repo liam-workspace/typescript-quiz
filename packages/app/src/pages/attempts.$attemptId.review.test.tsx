@@ -9,6 +9,7 @@ import {
   ReviewRouteError,
   ReviewScreen,
   loadReview,
+  reviewSearchSchema,
 } from "./attempts.$attemptId.review.js"
 
 const reviewPayload: ReviewPayload = {
@@ -162,6 +163,7 @@ describe("attempt review page", () => {
   afterEach(async () => {
     cleanup()
     vi.unstubAllGlobals()
+    window.history.replaceState(null, "", "/")
     await i18n.changeLanguage("en")
   })
 
@@ -171,7 +173,9 @@ describe("attempt review page", () => {
   // nothing else, and the section-type enum has four values. Here the
   // FIRST item is a reading question, so a position guess says "Listening"
   // and the carried value says "Reading".
-  it("labels the section from the type the server sends, not from item order", () => {
+  it("labels the section from the type the server sends, not from item order", async () => {
+    const user = userEvent.setup()
+
     render(
       <ReviewScreen
         review={{
@@ -187,8 +191,18 @@ describe("attempt review page", () => {
       />,
     )
 
-    expect(screen.getByText("Reading")).toBeInTheDocument()
-    expect(screen.queryByText("Listening")).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Jump to a question" }))
+
+    const navigator = screen.getByRole("dialog", { name: "Jump to a question" })
+    expect(
+      within(navigator).getByRole("heading", { level: 3, name: "Reading" }),
+    ).toBeInTheDocument()
+    expect(
+      within(navigator).queryByRole("heading", {
+        level: 3,
+        name: "Listening",
+      }),
+    ).not.toBeInTheDocument()
   })
 
   it("renders the worked math solution only when review supplies it", () => {
@@ -199,15 +213,13 @@ describe("attempt review page", () => {
     item.choices[0].labelBlocks = [{ kind: "math", tex: "5", display: false }]
     const { container, rerender } = render(<ReviewScreen review={review} />)
     expect(container.querySelectorAll("math")).toHaveLength(2)
-    expect(
-      screen.queryByRole("heading", { name: "Worked solution" }),
-    ).not.toBeInTheDocument()
+    // By text, not role: jsdom cannot compute accessible names for headings
+    // whose subtree holds MathML (the prompt h1 does here).
+    expect(screen.queryByText("Worked solution")).not.toBeInTheDocument()
     item.solutionBlocks = [{ kind: "math", tex: "2+3=5", display: true }]
     rerender(<ReviewScreen review={review} />)
     expect(container.querySelectorAll("math")).toHaveLength(3)
-    expect(
-      screen.getByRole("heading", { name: "Worked solution" }),
-    ).toBeInTheDocument()
+    expect(screen.getByText("Worked solution").tagName).toBe("H2")
   })
 
   it("uses a neutral section for a legacy review response with no reliable type", async () => {
@@ -222,13 +234,6 @@ describe("attempt review page", () => {
         }}
       />,
     )
-
-    expect(
-      screen.getByText("Other", { selector: "[data-section-type]" }),
-    ).toHaveAttribute("data-section-type", "other")
-    expect(
-      screen.queryByText("RUNNER.SECTIONCHIP.UNDEFINED"),
-    ).not.toBeInTheDocument()
 
     await user.click(screen.getByRole("button", { name: "Jump to a question" }))
 
@@ -267,10 +272,6 @@ describe("attempt review page", () => {
       />,
     )
 
-    expect(
-      screen.getByText("Grammar", { selector: "[data-section-type]" }),
-    ).toHaveAttribute("data-section-type", "grammar")
-
     await user.click(screen.getByRole("button", { name: "Jump to a question" }))
     expect(
       within(screen.getByRole("dialog")).getByRole("heading", {
@@ -280,63 +281,50 @@ describe("attempt review page", () => {
     ).toBeInTheDocument()
   })
 
-  it("renders the vocabulary type from the review contract", () => {
-    render(
-      <ReviewScreen
-        review={{
-          attemptId: "attempt-1",
-          items: [{ ...reviewPayload.items[2], sectionType: "vocabulary" }],
-        }}
-      />,
-    )
+  it.each([
+    { sectionType: "vocabulary" as const, heading: "Vocabulary" },
+    { sectionType: "grammar" as const, heading: "Grammar" },
+  ])(
+    "renders the $sectionType type from the review contract in the jump sheet",
+    async ({ sectionType, heading }) => {
+      const user = userEvent.setup()
 
-    expect(
-      screen.getByText("Vocabulary", { selector: "[data-section-type]" }),
-    ).toHaveAttribute("data-section-type", "vocabulary")
-  })
+      render(
+        <ReviewScreen
+          review={{
+            attemptId: "attempt-1",
+            items: [{ ...reviewPayload.items[2], sectionType }],
+          }}
+        />,
+      )
 
-  it("renders the grammar type from the review contract", () => {
-    render(
-      <ReviewScreen
-        review={{
-          attemptId: "attempt-1",
-          items: [{ ...reviewPayload.items[2], sectionType: "grammar" }],
-        }}
-      />,
-    )
+      await user.click(
+        screen.getByRole("button", { name: "Jump to a question" }),
+      )
+      expect(
+        within(screen.getByRole("dialog")).getByRole("heading", {
+          level: 3,
+          name: heading,
+        }),
+      ).toBeInTheDocument()
+    },
+  )
 
-    expect(
-      screen.getByText("Grammar", { selector: "[data-section-type]" }),
-    ).toHaveAttribute("data-section-type", "grammar")
-  })
-
-  it("compacts and wraps the review app bar for a long French section label", async () => {
+  it("localises the question count in the app's own language", async () => {
     await i18n.changeLanguage("fr")
     render(<ReviewScreen review={reviewPayload} />)
 
-    expect(screen.getByRole("banner")).toHaveClass(
-      "flex-wrap",
-      "sm:flex-nowrap",
-    )
-    expect(
-      screen.getByText("Compréhension orale", {
-        selector: "[data-section-type]",
-      }),
-    ).toHaveClass("min-w-0", "max-w-full")
-    expect(screen.getByText("1 sur 3")).toHaveClass("ml-auto", "shrink-0")
+    expect(screen.getByText("Question 1 sur 3")).toHaveClass("m-qmeta")
   })
 
-  it("uses the prototype review shell, semantic verdicts, and navigator", async () => {
+  it("uses the mobile review shell, semantic verdicts, and navigator", async () => {
     const user = userEvent.setup()
     render(<ReviewScreen review={reviewPayload} />)
 
-    expect(screen.getByRole("banner")).toHaveClass("app-bar")
-    expect(screen.getByRole("main")).toHaveClass("device-main")
-    expect(screen.getByRole("contentinfo")).toHaveClass("device-footer")
-    expect(
-      screen.getByText("Listening", { selector: "[data-section-type]" }),
-    ).toHaveAttribute("data-section-type", "listening")
-    expect(screen.getByText("Question 7")).toHaveClass("question-count")
+    expect(screen.getByRole("banner")).toHaveClass("m-appbar")
+    expect(screen.getByRole("main")).toHaveClass("m-body")
+    expect(screen.getByRole("contentinfo")).toHaveClass("m-actionbar")
+    expect(screen.getByText("Question 1 of 3")).toHaveClass("m-qmeta")
     expect(screen.getByText("Correct")).toHaveAttribute(
       "data-verdict",
       "correct",
@@ -366,15 +354,131 @@ describe("attempt review page", () => {
     )
     expect(navigatorTrigger).toHaveFocus()
 
-    expect(screen.getByRole("link", { name: "← Back to result" })).toHaveClass(
-      "device-button",
+    expect(
+      screen.getByRole("link", { name: "← Back to result" }),
+    ).toHaveAttribute("href", "/attempts/attempt-1/result")
+  })
+
+  it("starts on the question named by initialOrdinal and clamps out-of-range values", () => {
+    const { unmount } = render(
+      <ReviewScreen review={reviewPayload} initialOrdinal={2} />,
     )
-    expect(screen.getByRole("button", { name: "Previous" })).toHaveClass(
-      "device-button",
+
+    expect(screen.getByText("Question 2 of 3")).toBeInTheDocument()
+    unmount()
+
+    render(<ReviewScreen review={reviewPayload} initialOrdinal={999} />)
+    expect(screen.getByText("Question 3 of 3")).toBeInTheDocument()
+  })
+
+  it("keeps ?q= in the address bar in step with the question shown", async () => {
+    const user = userEvent.setup()
+
+    render(<ReviewScreen review={reviewPayload} />)
+    expect(new URL(window.location.href).searchParams.get("q")).toBe("1")
+
+    await user.click(screen.getByRole("button", { name: "Next" }))
+
+    expect(new URL(window.location.href).searchParams.get("q")).toBe("2")
+  })
+
+  // Review Focus #5: whatever the address bar says, a valid question renders
+  // and only a valid q is ever written back.
+  it.each([
+    { raw: "0", shown: "Question 1 of 3", written: "1" },
+    { raw: "-4", shown: "Question 1 of 3", written: "1" },
+    { raw: "abc", shown: "Question 1 of 3", written: "1" },
+    { raw: "1.5", shown: "Question 1 of 3", written: "1" },
+    { raw: "999", shown: "Question 3 of 3", written: "3" },
+  ])(
+    "renders a valid question and writes back a valid q for ?q=$raw",
+    ({ raw, shown, written }) => {
+      const { q } = reviewSearchSchema.parse({ q: raw })
+
+      render(<ReviewScreen review={reviewPayload} initialOrdinal={q} />)
+
+      expect(screen.getByText(shown)).toBeInTheDocument()
+      expect(new URL(window.location.href).searchParams.get("q")).toBe(written)
+    },
+  )
+
+  it("handles a single-question review: both bounds disabled, q stays 1", () => {
+    render(
+      <ReviewScreen
+        review={{ ...reviewPayload, items: [reviewPayload.items[0]] }}
+        initialOrdinal={5}
+      />,
     )
-    expect(screen.getByRole("button", { name: "Next" })).toHaveClass(
-      "device-button",
-    )
+
+    expect(screen.getByText("Question 1 of 1")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled()
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled()
+    expect(new URL(window.location.href).searchParams.get("q")).toBe("1")
+  })
+
+  it("disables Previous on the first question and Next on the last", async () => {
+    const user = userEvent.setup()
+
+    render(<ReviewScreen review={reviewPayload} />)
+    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled()
+
+    await user.click(screen.getByRole("button", { name: "Jump to a question" }))
+
+    const dialog = screen.getByRole("dialog", { name: "Jump to a question" })
+
+    const cells = within(dialog).getAllByRole("button", {
+      name: /^Question \d+,/,
+    })
+
+    await user.click(cells[cells.length - 1])
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled()
+  })
+
+  it("renders lettered choices and an outcome chip with an icon", () => {
+    render(<ReviewScreen review={reviewPayload} />)
+
+    const chip = screen.getByText("Correct").closest(".m-chip")
+
+    expect(chip).not.toBeNull()
+    expect(chip?.querySelector("svg")).not.toBeNull()
+    expect(
+      within(screen.getByRole("list", { name: "Answer choices" })).getAllByRole(
+        "listitem",
+      )[0],
+    ).toHaveTextContent(/^A/)
+  })
+
+  it("puts an icon beside the your-answer and correct-answer markers", async () => {
+    const user = userEvent.setup()
+
+    render(<ReviewScreen review={reviewPayload} />)
+    await user.click(screen.getByRole("button", { name: "Jump to a question" }))
+    await user.click(screen.getByRole("button", { name: /^Question 27,/ }))
+
+    expect(
+      screen.getByText("Your answer · incorrect").querySelector("svg"),
+    ).not.toBeNull()
+    expect(
+      screen.getByText("Correct answer").querySelector("svg"),
+    ).not.toBeNull()
+  })
+
+  it("moves focus to the question heading after navigating", async () => {
+    const user = userEvent.setup()
+
+    render(<ReviewScreen review={reviewPayload} />)
+    expect(document.activeElement).not.toHaveAttribute("data-qtitle")
+
+    await user.click(screen.getByRole("button", { name: "Next" }))
+
+    expect(document.activeElement).toHaveAttribute("data-qtitle")
+  })
+
+  it("validates the q search param: junk falls back to 1", () => {
+    expect(reviewSearchSchema.parse({ q: "abc" }).q).toBe(1)
+    expect(reviewSearchSchema.parse({ q: "0" }).q).toBe(1)
+    expect(reviewSearchSchema.parse({ q: "3" }).q).toBe(3)
+    expect(reviewSearchSchema.parse({}).q).toBe(1)
   })
 
   it("shows a selected correct choice as the student's correct answer", () => {
@@ -563,18 +667,19 @@ describe("attempt review page", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it("labels the first section Listening and the next distinct section Reading", async () => {
+  it("groups the jump sheet by section across the loaded payload", async () => {
     const user = userEvent.setup()
     render(<ReviewScreen review={reviewPayload} />)
 
-    expect(screen.getByText("Listening")).toBeInTheDocument()
-    expect(screen.queryByText("Reading")).not.toBeInTheDocument()
-
     await user.click(screen.getByRole("button", { name: "Jump to a question" }))
-    await user.click(screen.getByRole("button", { name: /^Question 12,/ }))
 
-    expect(screen.getByText("Reading")).toBeInTheDocument()
-    expect(screen.queryByText("Listening")).not.toBeInTheDocument()
+    const navigator = screen.getByRole("dialog", { name: "Jump to a question" })
+    expect(
+      within(navigator).getByRole("heading", { level: 3, name: "Listening" }),
+    ).toBeInTheDocument()
+    expect(
+      within(navigator).getByRole("heading", { level: 3, name: "Reading" }),
+    ).toBeInTheDocument()
   })
 
   it("redirects to the runner when the attempt is still running (409)", async () => {

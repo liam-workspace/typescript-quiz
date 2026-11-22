@@ -327,5 +327,9 @@
   "listening.unlockHint": "Reproduce la grabación para desbloquear las respuestas.",
   "listening.recordingLabel": "Grabación",
   "handIn.offlineBlocked": "Para entregar necesitas conexión. Tus respuestas están a salvo en este teléfono: vuelve a conectarte e inténtalo de nuevo.",
-  "handIn.handingIn": "Entregando…"
+  "handIn.handingIn": "Entregando…",
+  "result.headlineGood": "¡Buen esfuerzo!",
+  "result.headlineKeepGoing": "¡Sigue practicando!",
+  "history.resultLink": "Resultado",
+  "runner.saveState.pendingShort": "Pendiente de enviar: {{count}}"
 }

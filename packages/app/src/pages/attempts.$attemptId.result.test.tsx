@@ -67,7 +67,7 @@ describe("attempt result page", () => {
     vi.unstubAllGlobals()
   })
 
-  it("renders the percentage, fraction, and per-section bars from GET /result", async () => {
+  it("renders the percentage, fraction, and per-section rows from GET /result", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValue(response(bestResult))
@@ -80,15 +80,6 @@ describe("attempt result page", () => {
     expect(fetchMock.mock.calls[0]?.[1]?.method).toBeUndefined()
     expect(screen.getByText("90%")).toBeInTheDocument()
     expect(screen.getByText("36 / 40")).toBeInTheDocument()
-    expect(
-      screen.getByRole("progressbar", { name: "Listening" }),
-    ).toHaveAttribute("aria-valuenow", "18")
-    expect(
-      screen.getByRole("progressbar", { name: "Listening" }),
-    ).toHaveAttribute("aria-valuemax", "20")
-    expect(
-      screen.getByRole("progressbar", { name: "Reading" }),
-    ).toHaveAttribute("aria-valuenow", "18")
     expect(screen.getAllByText("18 / 20")).toHaveLength(2)
     expect(
       screen.getByRole("link", { name: "Back to library" }),
@@ -98,43 +89,69 @@ describe("attempt result page", () => {
     ).toHaveAttribute("href", "/attempts/attempt-1/review")
   })
 
-  it("uses the prototype result shell and API-driven score treatments", () => {
-    renderResult(bestResult)
+  it("uses the mobile result layout: ring, headline band, summary and a breakdown row per section", () => {
+    renderResult({
+      ...bestResult,
+      score: { ...bestResult.score, percentage: 88, isPersonalBest: false },
+    })
 
-    expect(screen.getByRole("banner")).toHaveClass("app-bar")
-    expect(screen.getByRole("main")).toHaveClass("device-main", "content-start")
-    expect(screen.getByRole("contentinfo")).toHaveClass("device-footer")
-    expect(screen.getByRole("heading", { level: 1 })).toHaveClass(
-      "screen-title",
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Well done!" }),
+    ).toHaveAttribute("tabindex", "-1")
+    expect(screen.getByRole("heading", { level: 1 })).toHaveAttribute(
+      "data-page-title",
     )
 
     const scoreRing = screen.getByTestId("score-ring")
     expect(scoreRing).toHaveClass("score-ring")
-    expect(scoreRing).toHaveStyle("--score-pct: 90%")
+    expect(scoreRing).toHaveStyle("--score-pct: 88%")
 
-    const listening = screen.getByText("Listening").closest("section")
-    const reading = screen.getByText("Reading").closest("section")
-    expect(listening).toHaveAttribute("data-section-type", "listening")
-    expect(reading).toHaveAttribute("data-section-type", "reading")
-    expect(screen.getByRole("progressbar", { name: "Listening" })).toHaveClass(
-      "score-bar",
-    )
-    expect(
-      screen.getByRole("progressbar", { name: "Listening" }).firstElementChild,
-    ).toHaveClass("bg-teal")
-    expect(
-      screen.getByRole("progressbar", { name: "Reading" }).firstElementChild,
-    ).toHaveClass("bg-clay")
+    const rows = screen.getAllByTestId("breakdown-row")
+    expect(rows).toHaveLength(bestResult.score.sections.length)
+    expect(rows[0]).toHaveTextContent("Listening")
+    expect(rows[0]).toHaveAttribute("data-section-type", "listening")
+    expect(rows[1]).toHaveAttribute("data-section-type", "reading")
+    expect(screen.queryByRole("progressbar")).toBeNull()
+  })
 
+  it.each([
+    { percentage: 88, headline: "Well done!" },
+    { percentage: 80, headline: "Well done!" },
+    { percentage: 79, headline: "Good effort!" },
+    { percentage: 50, headline: "Good effort!" },
+    { percentage: 49, headline: "Keep practising!" },
+  ])(
+    "headlines $percentage percent as $headline",
+    ({ percentage, headline }) => {
+      renderResult({
+        ...bestResult,
+        score: { ...bestResult.score, percentage },
+      })
+
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+        headline,
+      )
+    },
+  )
+
+  it("marks a result that ended on the clock", () => {
+    renderResult({ ...bestResult, status: "expired" })
+
+    expect(screen.getByText(/Time ran out/)).toBeInTheDocument()
+  })
+
+  it("offers Back to library and Review answers in the action bar", () => {
+    renderResult(bestResult)
+
+    expect(
+      screen.getByRole("link", { name: "Review answers →" }).closest("footer"),
+    ).toHaveClass("m-actionbar")
+    expect(
+      screen.getByRole("link", { name: "Back to library" }),
+    ).toHaveAttribute("href", "/")
     expect(
       screen.getByText(/not an official TOEFL Primary scaled score/i),
-    ).toHaveClass("text-faint")
-    expect(screen.getByRole("link", { name: "Back to library" })).toHaveClass(
-      "device-button",
-    )
-    expect(screen.getByRole("link", { name: "Review answers →" })).toHaveClass(
-      "device-button",
-    )
+    ).toBeInTheDocument()
   })
 
   it("shows a personal-best callout only when isPersonalBest is true", () => {

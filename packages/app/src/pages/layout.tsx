@@ -22,6 +22,7 @@ import {
   type ShellTab,
 } from "../lib/shell-routes.js"
 import { toastStore } from "../lib/toast.js"
+import { usePageTitleFocus } from "../lib/usePageTitleFocus.js"
 
 export interface AppShellProps {
   readonly children?: ReactNode
@@ -79,6 +80,9 @@ export function AppLayout() {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
+  const resolvedPathname = useRouterState({
+    select: (state) => state.resolvedLocation?.pathname ?? "",
+  })
   const network = useSyncExternalStore(
     (listener) => networkStore.subscribe(listener),
     () => networkStore.getSnapshot(),
@@ -98,6 +102,8 @@ export function AppLayout() {
   const splashVisible = useColdStartSplash(pwa.standalone)
   const [announcement, setAnnouncement] = useState("")
   const previousOnline = useRef(network.online)
+
+  usePageTitleFocus(resolvedPathname)
 
   const admin = pathname.startsWith("/admin")
   const tab = admin ? null : tabForPath(pathname)

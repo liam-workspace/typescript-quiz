@@ -1,8 +1,10 @@
 import { Card, CardContent } from "@liam-workspace/browser-react-ui"
 import { createFileRoute, redirect } from "@tanstack/react-router"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { z } from "zod"
 import { choiceLabel } from "../components/ChoiceList.js"
+import { Icon } from "../components/Icon.js"
 import { MathContent } from "../components/MathContent.js"
 import { QuestionNavigator } from "../components/QuestionNavigator.js"
 import { ApiError } from "../lib/api-client.js"
@@ -34,17 +36,28 @@ export async function loadReview(attemptId: string): Promise<ReviewPayload> {
   }
 }
 
-function outcomeClasses(outcome: ReviewItem["outcome"]): string {
-  switch (outcome) {
-    case "correct":
-      return "bg-good-bg text-good"
+export const reviewSearchSchema = z.object({
+  q: z.coerce.number().int().min(1).catch(1),
+})
 
-    case "incorrect":
-      return "bg-bad-bg text-bad"
-
-    case "unanswered":
-      return "bg-surface text-ink-2"
+const OUTCOME_CHIP: Record<
+  ReviewItem["outcome"],
+  {
+    readonly tone: "good" | "bad" | "warn"
+    readonly icon: "check" | "x" | "minus"
   }
+> = {
+  correct: { tone: "good", icon: "check" },
+  incorrect: { tone: "bad", icon: "x" },
+  unanswered: { tone: "warn", icon: "minus" },
+}
+
+function clampIndex(index: number, length: number): number {
+  if (!Number.isFinite(index)) {
+    return 0
+  }
+
+  return Math.min(Math.max(index, 0), Math.max(length - 1, 0))
 }
 
 const sectionTypes = new Set<SectionType>([
@@ -195,8 +208,9 @@ function ReviewChoiceMarker({ choice }: { readonly choice: ReviewChoice }) {
 
     return (
       <span
-        className={`text-xs font-bold ${choice.isCorrect ? "text-good" : "text-bad"}`}
+        className={`inline-flex items-center gap-1 text-xs font-bold ${choice.isCorrect ? "text-good" : "text-bad"}`}
       >
+        <Icon name={choice.isCorrect ? "check" : "x"} small />
         {t(markerKey)}
       </span>
     )
@@ -204,7 +218,8 @@ function ReviewChoiceMarker({ choice }: { readonly choice: ReviewChoice }) {
 
   if (choice.isCorrect) {
     return (
-      <span className="text-good text-xs font-bold">
+      <span className="text-good inline-flex items-center gap-1 text-xs font-bold">
+        <Icon name="check" small />
         {t("review.correctAnswer")}
       </span>
     )
@@ -300,19 +315,44 @@ function navigatorSource(review: ReviewPayload): NavigatorSource {
 
 export interface ReviewScreenProps {
   readonly review: ReviewPayload
+  /** 1-based question to open on; out-of-range values are clamped. */
+  readonly initialOrdinal?: number
 }
 
-export function ReviewScreen({ review }: ReviewScreenProps) {
+export function ReviewScreen({
+  review,
+  initialOrdinal = 1,
+}: ReviewScreenProps) {
   const { t } = useTranslation("runner")
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const [currentIndex, setCurrentIndex] = useState(() =>
+    clampIndex(initialOrdinal - 1, review.items.length),
+  )
   const [navigatorOpen, setNavigatorOpen] = useState(false)
   const navigatorTriggerRef = useRef<HTMLButtonElement>(null)
+  const firstRender = useRef(true)
+
+  useEffect(() => {
+    const url = new URL(window.location.href)
+
+    url.searchParams.set("q", String(currentIndex + 1))
+    window.history.replaceState(window.history.state, "", url)
+
+    if (firstRender.current) {
+      firstRender.current = false
+
+      return
+    }
+
+    document
+      .querySelector<HTMLElement>("[data-qtitle]")
+      ?.focus({ preventScroll: true })
+  }, [currentIndex])
 
   if (review.items.length === 0) {
     return (
-      <div className="device-page">
-        <main className="center-main">
-          <p role="status" className="device-card">
+      <div className="m-page">
+        <main className="m-hero">
+          <p role="status" className="m-card">
             {t("review.empty")}
           </p>
         </main>
@@ -321,45 +361,39 @@ export function ReviewScreen({ review }: ReviewScreenProps) {
   }
 
   const current = review.items[currentIndex]
-
-  // The server says which kind of section this is. It used to be guessed
-  // from the section's POSITION in the item list -- right only for a
-  // two-section test in the expected order, and the enum has four values.
-  const sectionKey = reviewSectionType(current, review.items)
-  const outcome = t(`review.outcome.${current.outcome}`)
+  const chip = OUTCOME_CHIP[current.outcome]
   const atFirst = currentIndex === 0
   const atLast = currentIndex === review.items.length - 1
   const source = navigatorSource(review)
 
   return (
-    <div className="device-page">
-      <header className="app-bar flex-wrap gap-y-1 sm:flex-nowrap">
-        <h1 className="app-brand shrink-0">{t("review.title")}</h1>
-        <span
-          className={`section-chip section-chip--${sectionKey} max-w-full min-w-0`}
-          data-section-type={sectionKey}
+    <div className="m-page">
+      <header className="m-appbar">
+        <a
+          href={`/attempts/${review.attemptId}/result`}
+          className="m-iconbtn"
+          aria-label={t("review.backToResult")}
         >
-          {t(`runner.sectionChip.${sectionKey}`)}
-        </span>
-        <span className="hidden grow sm:block" />
-        <span className="text-ink-2 ml-auto shrink-0 text-sm font-bold tabular-nums">
-          {t("review.position", {
-            current: currentIndex + 1,
-            total: review.items.length,
-          })}
-        </span>
+          <Icon name="back" />
+        </a>
+        <span className="m-brand">{t("review.title")}</span>
       </header>
 
-      <main className="device-main mx-auto w-full max-w-4xl">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <span className="question-count">
-            {t("review.questionLabel", { ordinal: current.ordinal })}
+      <main className="m-body">
+        <div className="m-row mb-2 justify-between">
+          <span className="m-qmeta" style={{ margin: 0 }}>
+            {t("runner.questionCount", {
+              current: currentIndex + 1,
+              total: review.items.length,
+            })}
           </span>
           <span
-            className={`rounded-full px-2.5 py-1 text-xs font-extrabold ${outcomeClasses(current.outcome)}`}
+            className="m-chip"
+            data-tone={chip.tone}
             data-verdict={current.outcome}
           >
-            {outcome}
+            <Icon name={chip.icon} small />
+            {t(`review.outcome.${current.outcome}`)}
           </span>
         </div>
 
@@ -367,62 +401,71 @@ export function ReviewScreen({ review }: ReviewScreenProps) {
           <ReviewStimulusView stimulus={current.stimulus} />
         ) : null}
 
-        <p className="question-prompt mt-0">
+        <h1
+          className="question-prompt"
+          tabIndex={-1}
+          data-qtitle
+          data-page-title
+        >
           {current.promptBlocks?.length ? (
             <MathContent blocks={current.promptBlocks} />
           ) : (
             current.prompt
           )}
-        </p>
-        <ReviewChoiceList choices={current.choices} />
-        {current.solutionBlocks?.length ? (
-          <section className="mt-4">
-            <h2>{t("review.workedSolution")}</h2>
-            <MathContent blocks={current.solutionBlocks} />
-          </section>
-        ) : null}
-
+        </h1>
         {current.outcome === "unanswered" ? (
-          <p className="text-faint mt-3 text-sm font-semibold">
+          <p className="m-notice" role="status">
             {t("review.leftBlankNotice", { ordinal: current.ordinal })}
           </p>
         ) : null}
+        <ReviewChoiceList choices={current.choices} />
+        {current.solutionBlocks?.length ? (
+          <section className="bg-teal-bg mt-3.5 rounded-[14px] px-3.5 py-3">
+            <h2 className="text-teal text-xs font-extrabold tracking-[0.07em] uppercase">
+              {t("review.workedSolution")}
+            </h2>
+            <MathContent blocks={current.solutionBlocks} />
+          </section>
+        ) : null}
       </main>
 
-      <footer className="device-footer sticky bottom-0 z-10 flex-wrap">
-        <a
-          href={`/attempts/${review.attemptId}/result`}
-          className="device-button"
-          data-variant="ghost"
+      <footer className="m-actionbar" data-sticky="true">
+        <button
+          type="button"
+          className="m-btn"
+          data-variant="secondary"
+          aria-label={t("runner.previous")}
+          style={{ flex: "0 0 56px" }}
+          disabled={atFirst}
+          onClick={() => {
+            setCurrentIndex((index) => index - 1)
+          }}
         >
-          {t("review.backToResult")}
-        </a>
+          <Icon name="back" />
+        </button>
         <button
           ref={navigatorTriggerRef}
           type="button"
           aria-expanded={navigatorOpen}
+          aria-haspopup="dialog"
           aria-label={t("review.jumpToQuestion")}
-          className="nav-toggle border-line bg-paper text-ink inline-flex min-h-11 touch-manipulation items-center gap-2 rounded-lg border px-3 text-sm font-bold select-none"
-          onClick={() => setNavigatorOpen((open) => !open)}
+          className="m-btn"
+          data-variant="secondary"
+          style={{ flex: "0 0 auto" }}
+          onClick={() => {
+            setNavigatorOpen((open) => !open)
+          }}
         >
-          <span aria-hidden="true">▦</span>
-          <span>{t("review.jumpToQuestion")}</span>
-        </button>
-        <span className="grow" />
-        <button
-          type="button"
-          className="device-button"
-          data-variant="ghost"
-          disabled={atFirst}
-          onClick={() => setCurrentIndex((index) => index - 1)}
-        >
-          {t("runner.previous")}
+          <Icon name="grid" />
+          <span aria-hidden="true">{t("review.jumpToQuestion")}</span>
         </button>
         <button
           type="button"
-          className="device-button"
+          className="m-btn"
           disabled={atLast}
-          onClick={() => setCurrentIndex((index) => index + 1)}
+          onClick={() => {
+            setCurrentIndex((index) => index + 1)
+          }}
         >
           {t("runner.next")}
         </button>
@@ -473,6 +516,7 @@ export function ReviewRouteError({ error }: ReviewRouteErrorProps) {
 }
 
 export const Route = createFileRoute("/attempts/$attemptId/review")({
+  validateSearch: reviewSearchSchema,
   loader: ({ params }) => loadReview(params.attemptId),
   errorComponent: ReviewRouteError,
   component: RouteComponent,
@@ -480,6 +524,7 @@ export const Route = createFileRoute("/attempts/$attemptId/review")({
 
 function RouteComponent() {
   const review = Route.useLoaderData()
+  const { q } = Route.useSearch()
 
-  return <ReviewScreen review={review} />
+  return <ReviewScreen review={review} initialOrdinal={q} />
 }

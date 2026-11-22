@@ -37,7 +37,10 @@ import type {
   ResponseSnapshotItem,
   RunnerEnvelope,
 } from "../lib/api-types.js"
+import { networkStore } from "../lib/network.js"
+import { pendingCountStore } from "../lib/pending-count.js"
 import { getCurrentStudent } from "../lib/session-api.js"
+import { toastStore } from "../lib/toast.js"
 import {
   loadRunRouteData,
   loadRunScreenData,
@@ -206,6 +209,12 @@ function toAppliedFlushItem(item: { questionId: string }) {
 function offlineBannerHasThreePending(): void {
   expect(screen.getByTestId("offline-banner")).toHaveTextContent(
     "Waiting to be sent: 3",
+  )
+}
+
+function offlineBannerHasOnePending(): void {
+  expect(screen.getByTestId("offline-banner")).toHaveTextContent(
+    "Waiting to be sent: 1",
   )
 }
 
@@ -592,6 +601,8 @@ describe("RunScreen", () => {
 
   afterEach(async () => {
     cleanup()
+    networkStore.setOnlineForTests(true)
+    pendingCountStore.set(0)
     vi.clearAllMocks()
     vi.unstubAllGlobals()
     await getQueue().close()
@@ -1379,6 +1390,25 @@ describe("RunScreen", () => {
     })
   })
 
+  it("shows the in-test offline banner whenever the network store says offline, even with nothing queued", () => {
+    renderRunScreen()
+
+    act(() => {
+      networkStore.setOnlineForTests(false)
+    })
+
+    expect(screen.getByTestId("offline-banner")).toHaveAttribute(
+      "data-variant",
+      "in-test",
+    )
+
+    act(() => {
+      networkStore.setOnlineForTests(true)
+    })
+
+    expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument()
+  })
+
   it("shows retryable queued work with reassurance and clears it after the next successful flush", async () => {
     vi.stubGlobal(
       "fetch",
@@ -1393,19 +1423,14 @@ describe("RunScreen", () => {
     await user.click(screen.getByRole("radio", { name: "A city" }))
 
     const banner = await screen.findByTestId("offline-banner")
-    expect(banner).toHaveAttribute("role", "alert")
-    expect(banner).toHaveClass("offline-notice")
+    expect(banner).toHaveAttribute("data-variant", "in-test")
     expect(screen.getByRole("main")).toContainElement(banner)
-    expect(banner).toHaveTextContent("We can't reach the server right now.")
     expect(banner).toHaveTextContent(
-      "Keep answering — your answers are saved on this iPad and will be sent as soon as the connection is back.",
+      "You're offline. Keep answering — your answers are saved on this phone and will be sent when you reconnect.",
     )
-    expect(
-      screen.getByText(
-        "Keep answering — your answers are saved on this iPad and will be sent as soon as the connection is back.",
-      ),
-    ).not.toHaveClass("text-ink-2")
-    expect(banner).toHaveTextContent("Waiting to be sent: 1")
+    // The banner now also follows the network store, so it can appear a beat
+    // before the queued count reaches it.
+    await waitFor(offlineBannerHasOnePending)
 
     vi.mocked(fetch).mockResolvedValue(
       new Response(
@@ -1747,9 +1772,8 @@ describe("RunScreen", () => {
       })
 
       await user.click(screen.getByRole("radio", { name: "A city" }))
-      expect(await screen.findByTestId("offline-banner")).toHaveTextContent(
-        "Waiting to be sent: 1",
-      )
+      await screen.findByTestId("offline-banner")
+      await waitFor(offlineBannerHasOnePending)
 
       await user.click(screen.getByRole("button", { name: "Next" }))
       await user.click(screen.getByRole("radio", { name: "Nine" }))
@@ -1763,6 +1787,7 @@ describe("RunScreen", () => {
       )
       expect(questionIdsOf(pending)).toEqual(["q-r2", "q-r3", "q-r4"])
       await waitFor(offlineBannerHasThreePending)
+      expect(pendingCountStore.getSnapshot()).toBe(3)
       expect(allVisibleRadiosAreEnabled()).toBe(true)
 
       vi.mocked(fetch).mockClear()
@@ -1778,6 +1803,10 @@ describe("RunScreen", () => {
       window.dispatchEvent(new Event("online"))
 
       await waitFor(offlineBannerIsGone)
+      expect(toastStore.getSnapshot()?.message).toBe(
+        "Back online — 3 answers sent.",
+      )
+      expect(pendingCountStore.getSnapshot()).toBe(0)
 
       expect(fetch).toHaveBeenCalledOnce()
       const [firstFetchCall] = vi.mocked(fetch).mock.calls
@@ -1822,9 +1851,8 @@ describe("RunScreen", () => {
         flushScheduler: resolveScheduledRetry,
       })
 
-      expect(await screen.findByTestId("offline-banner")).toHaveTextContent(
-        "Waiting to be sent: 3",
-      )
+      await screen.findByTestId("offline-banner")
+      await waitFor(offlineBannerHasThreePending)
       await waitFor(cityRadioIsChecked)
 
       await user.click(screen.getByRole("button", { name: "Next" }))

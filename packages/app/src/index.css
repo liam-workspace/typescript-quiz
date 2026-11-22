@@ -558,7 +558,7 @@
   }
   .score-ring {
     display: grid;
-    width: 118px;
+    width: 170px;
     aspect-ratio: 1;
     place-items: center;
     border-radius: 50%;
@@ -574,18 +574,6 @@
     place-items: center;
     border-radius: 50%;
     background: var(--color-paper);
-  }
-  .score-bar {
-    height: 7px;
-    overflow: hidden;
-    border-radius: 4px;
-    background: var(--color-line);
-  }
-  .score-bar > * {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--color-teal);
   }
   .history-table {
     width: 100%;
@@ -628,157 +616,6 @@
   /* Drawer and navigator overlays are genuine modal Radix dialogs. The
    * overlay supplies the scrim/pointer boundary, while padding keeps sheet
    * content and its close control clear of notches in every orientation. */
-  .device-sheet-content {
-    width: min(
-      22rem,
-      calc(
-        100vw - 4rem - env(safe-area-inset-left) - env(safe-area-inset-right)
-      )
-    );
-    max-width: calc(
-      100vw - 4rem - env(safe-area-inset-left) - env(safe-area-inset-right)
-    );
-    gap: 12px;
-    padding-top: calc(18px + env(safe-area-inset-top));
-    padding-bottom: calc(18px + env(safe-area-inset-bottom));
-    background: var(--color-paper);
-  }
-  .device-sheet-content[data-side="left"] {
-    padding-right: 18px;
-    padding-left: calc(18px + env(safe-area-inset-left));
-  }
-  .device-sheet-content[data-side="right"] {
-    padding-right: calc(18px + env(safe-area-inset-right));
-    padding-left: 18px;
-  }
-  .device-sheet-close {
-    top: calc(12px + env(safe-area-inset-top));
-  }
-  .device-sheet-content[data-side="left"] .device-sheet-close {
-    right: 12px;
-  }
-  .device-sheet-content[data-side="right"] .device-sheet-close {
-    right: calc(12px + env(safe-area-inset-right));
-  }
-  .device-drawer-panel,
-  .question-panel {
-    box-shadow: 0 12px 32px rgb(26 41 48 / 0.18);
-    color: var(--color-ink);
-  }
-  .device-drawer-panel [data-slot="dialog-title"],
-  .question-panel [data-slot="dialog-title"] {
-    padding-right: 32px;
-    color: var(--color-ink);
-    font-size: 18px;
-    font-weight: 800;
-  }
-  .device-drawer {
-    display: flex;
-    min-height: 0;
-    flex: 1 1 auto;
-    flex-direction: column;
-    gap: 14px;
-  }
-  .device-drawer-student {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    border-bottom: 1px solid var(--color-line);
-    padding-bottom: 14px;
-  }
-  .device-drawer-avatar {
-    display: grid;
-    width: 36px;
-    height: 36px;
-    flex: none;
-    place-items: center;
-    border-radius: 50%;
-    background: var(--color-teal);
-    color: white;
-    font-weight: 700;
-  }
-  .device-drawer-actions {
-    display: grid;
-    gap: 4px;
-  }
-  .device-drawer-actions button,
-  .device-drawer-sign-out {
-    min-height: 44px;
-    border: 0;
-    border-radius: 8px;
-    padding: 0 12px;
-    background: transparent;
-    color: var(--color-ink);
-    cursor: pointer;
-    font-size: 15px;
-    font-weight: 700;
-    text-align: left;
-    touch-action: manipulation;
-  }
-  .device-drawer-actions button:hover {
-    background: var(--color-surface);
-  }
-  .device-drawer-actions hr {
-    width: 100%;
-    margin: 8px 0;
-    border: 0;
-    border-top: 1px solid var(--color-line);
-  }
-  .device-drawer-actions p {
-    margin: 0;
-    padding: 0 12px;
-    color: var(--color-ink-2);
-    font-size: 12px;
-    line-height: 1.5;
-  }
-  .device-drawer-footer {
-    margin-top: auto;
-    border-top: 1px solid var(--color-line);
-    padding-top: 14px;
-  }
-  .device-drawer-footer > :first-child {
-    margin-bottom: 8px;
-    color: var(--color-faint);
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .device-drawer-languages {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .device-drawer-languages button {
-    width: 44px;
-    height: 44px;
-    border: 1px solid var(--color-line);
-    border-radius: 8px;
-    background: var(--color-paper);
-    color: var(--color-ink-2);
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-  }
-  .device-drawer-languages button[aria-pressed="true"] {
-    border-color: var(--color-teal);
-    background: var(--color-teal-bg);
-    color: var(--color-teal);
-  }
-  .device-drawer-sign-out {
-    width: 100%;
-    margin-top: 8px;
-    background: var(--color-paper);
-    color: var(--color-bad);
-  }
-  .device-drawer-sign-out:hover {
-    background: var(--color-bad-bg);
-  }
-  .question-panel [data-slot="dialog-description"] {
-    color: var(--color-ink-2);
-    font-size: 14px;
-  }
   .question-panel-groups {
     min-height: 0;
     flex: 1 1 auto;
@@ -1876,5 +1713,19 @@
   }
   .m-tile[data-tone="warn"] > b {
     color: var(--color-clay);
+  }
+  .m-save {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--color-ink-2);
+    font-size: 12.5px;
+    font-weight: 800;
+  }
+  .m-save[data-state="pending"] {
+    color: #7a4d00;
+  }
+  .m-save[data-state="failed"] {
+    color: #b53a34;
   }
 }

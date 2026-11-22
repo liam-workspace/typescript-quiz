@@ -129,7 +129,7 @@ export function ReadingRunner({
 
       {media}
 
-      <h1 className="question-prompt" tabIndex={-1} data-qtitle>
+      <h1 className="question-prompt" tabIndex={-1} data-qtitle data-page-title>
         {question.promptBlocks?.length ? (
           <MathContent blocks={question.promptBlocks} />
         ) : (

@@ -327,5 +327,9 @@
   "listening.unlockHint": "Spiele die Aufnahme ab, um die Antworten freizuschalten.",
   "listening.recordingLabel": "Aufnahme",
   "handIn.offlineBlocked": "Zum Abgeben brauchst du eine Verbindung. Deine Antworten sind sicher auf diesem Gerät – verbinde dich wieder und versuche es erneut.",
-  "handIn.handingIn": "Wird abgegeben…"
+  "handIn.handingIn": "Wird abgegeben…",
+  "result.headlineGood": "Gute Leistung!",
+  "result.headlineKeepGoing": "Übe weiter!",
+  "history.resultLink": "Ergebnis",
+  "runner.saveState.pendingShort": "Noch zu senden: {{count}}"
 }

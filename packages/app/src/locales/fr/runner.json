@@ -327,5 +327,9 @@
   "listening.unlockHint": "Écoute l’enregistrement pour débloquer les réponses.",
   "listening.recordingLabel": "Enregistrement",
   "handIn.offlineBlocked": "Pour rendre ton test, il faut une connexion. Tes réponses sont en sécurité sur ce téléphone : reconnecte-toi et réessaie.",
-  "handIn.handingIn": "Envoi en cours…"
+  "handIn.handingIn": "Envoi en cours…",
+  "result.headlineGood": "Bel effort !",
+  "result.headlineKeepGoing": "Continue de t’entraîner !",
+  "history.resultLink": "Résultat",
+  "runner.saveState.pendingShort": "En attente d’envoi : {{count}}"
 }

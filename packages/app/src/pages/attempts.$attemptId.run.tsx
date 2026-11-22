@@ -6,11 +6,17 @@ import {
   CardTitle,
 } from "@liam-workspace/browser-react-ui"
 import { createFileRoute } from "@tanstack/react-router"
-import { useEffect, useRef, useState, type JSX } from "react"
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type JSX,
+} from "react"
 import { useTranslation } from "react-i18next"
 import { FinishSectionSheet } from "../components/FinishSectionSheet.js"
 import { ListeningRunner } from "../components/ListeningRunner.js"
-import { OfflineBanner } from "../components/OfflineBanner.js"
+import { OfflineBanner } from "../components/Banners.js"
 import { QuestionNavigator } from "../components/QuestionNavigator.js"
 import { ReadingRunner } from "../components/ReadingRunner.js"
 import {
@@ -42,8 +48,11 @@ import {
   registerPagehideFlush,
   reconcileFinalFlush,
 } from "../lib/lifecycleFlush.js"
+import { networkStore } from "../lib/network.js"
+import { pendingCountStore } from "../lib/pending-count.js"
 import { getCurrentStudent } from "../lib/session-api.js"
 import { storeTimeUpAttempt } from "../lib/time-up-navigation.js"
+import { toastStore } from "../lib/toast.js"
 import type { NavigatorSource } from "../lib/navigator-state.js"
 import type {
   FinalizedAttempt,
@@ -214,6 +223,11 @@ export function RunScreen({
     state: "saved",
   })
   const [retryableFlushFailure, setRetryableFlushFailure] = useState(false)
+  const { online } = useSyncExternalStore(
+    (listener) => networkStore.subscribe(listener),
+    () => networkStore.getSnapshot(),
+  )
+  const lastPendingRef = useRef(0)
   const lowTimeAnnouncementRef = useRef<HTMLParagraphElement>(null)
 
   // "One minute left." is spoken once, through RunTopBar's live region. An
@@ -371,6 +385,24 @@ export function RunScreen({
 
     setSaveState({ state: result.saveState.status })
   }
+
+  // The shell's browsing banner reads this on every other screen, so it
+  // deliberately survives leaving the run screen until the next flush result.
+  useEffect(() => {
+    pendingCountStore.set(
+      saveState.state === "pending" ? saveState.pendingCount : 0,
+    )
+
+    if (saveState.state === "pending") {
+      lastPendingRef.current = saveState.pendingCount
+    } else if (saveState.state === "saved" && lastPendingRef.current > 0) {
+      toastStore.show(
+        t("toast.backOnline", { count: lastPendingRef.current }),
+        "cloud",
+      )
+      lastPendingRef.current = 0
+    }
+  }, [saveState, t])
 
   // Defect B3 fix: a reload opens the SAME queue the loader's AnswerQueue
   // was already holding answers in (IndexedDB survives the reload; the
@@ -1074,8 +1106,13 @@ export function RunScreen({
       />
 
       <main className="m-body m-run-body">
-        {retryableFlushFailure && saveState.state === "pending" ? (
-          <OfflineBanner pendingCount={saveState.pendingCount} />
+        {!online || (retryableFlushFailure && saveState.state === "pending") ? (
+          <OfflineBanner
+            variant="in-test"
+            pendingCount={
+              saveState.state === "pending" ? saveState.pendingCount : 0
+            }
+          />
         ) : null}
 
         {runner}

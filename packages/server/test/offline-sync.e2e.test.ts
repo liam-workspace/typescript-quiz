@@ -366,44 +366,53 @@ describe("POST /attempts/offline-sync", () => {
     expect(await capturedReasons(attemptId)).toEqual([])
   })
 
-  it("refuses a journal that plays a capped recording twice, creates nothing, and captures it verbatim", async () => {
+  it("refuses ONLY the over-cap play of a journal that plays a capped recording twice: the rest lands, the play is captured, and not counted", async () => {
     const token = await student("sync-playcap")
     const attemptId = randomUUID()
+    const { listening } = f()
+    const { l1 } = questions(f())
     const events = journey(attemptId).slice(0, 3)
     const second: OfflineJournalEvent = {
       eventSeq: 4,
       clientAt: ago(1115),
       type: "play",
-      payload: { stimulusId: f().listening.stimulusId },
+      payload: { stimulusId: listening.stimulusId },
     }
-    const sent = {
-      attemptId,
-      clientSentAt: NOW.toISOString(),
-      events: [...events, second],
+    const answerAfter: OfflineJournalEvent = {
+      eventSeq: 5,
+      clientAt: ago(1110),
+      type: "answer",
+      payload: {
+        sectionId: listening.sectionId,
+        questionId: l1.id,
+        clientInstanceId: attemptId,
+        seq: 1,
+        selectedChoiceIds: [l1.choiceIds[0] ?? ""],
+      },
     }
-    const res = await request(a().http.getHttpServer() as App)
-      .post("/api/attempts/offline-sync")
-      .set("Authorization", `Bearer ${token}`)
-      .send(sent)
-      .expect(409)
-    const problem = res.body as ProblemBody
+    const res = await sync(token, attemptId, [
+      ...events,
+      second,
+      answerAfter,
+    ]).expect(200)
 
-    expect(problem).toMatchObject({
-      type: "offline_play_cap_exceeded",
-      status: 409,
-      retryable: false,
+    expect(res.body as SyncBody).toMatchObject({
+      ackedThrough: 5,
+      applied: 4,
+      rejected: 1,
+      late: 0,
+      answersAcked: 1,
     })
+    expect(await playCount(attemptId)).toBe(1)
+    expect(await capturedReasons(attemptId)).toEqual([
+      "offline_play_cap_exceeded",
+    ])
     expect(
-      await count("SELECT 1 FROM attempt WHERE id = $1", [attemptId]),
-    ).toBe(0)
-
-    const { rows } = await db().query<{ reason: string; raw_body: string }>(
-      "SELECT reason, raw_body FROM failed_write WHERE id = $1",
-      [problem.capturedAs],
-    )
-
-    expect(rows[0]?.reason).toBe("offline_play_cap_exceeded")
-    expect(JSON.parse(rows[0]?.raw_body ?? "null")).toEqual(sent)
+      await count(
+        "SELECT 1 FROM response WHERE attempt_id = $1 AND question_id = $2",
+        [attemptId, l1.id],
+      ),
+    ).toBe(1)
   })
 
   it("records an answer after the section deadline as late, captures it, and does not apply it", async () => {

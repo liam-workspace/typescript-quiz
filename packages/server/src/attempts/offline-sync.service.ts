@@ -54,21 +54,17 @@ export interface OfflineSyncResult {
 type RefusalType =
   | "not_your_attempt"
   | "offline_journal_invalid"
-  | "offline_play_cap_exceeded"
   | "offline_attempt_conflict"
 
 const REFUSAL_STATUS: Record<RefusalType, number> = {
   not_your_attempt: HttpStatus.FORBIDDEN,
   offline_journal_invalid: HttpStatus.UNPROCESSABLE_ENTITY,
-  offline_play_cap_exceeded: HttpStatus.CONFLICT,
   offline_attempt_conflict: HttpStatus.CONFLICT,
 }
 
 const REFUSAL_TITLE: Record<RefusalType, string> = {
   not_your_attempt: "The attempt belongs to another student.",
   offline_journal_invalid: "The offline journal is structurally impossible.",
-  offline_play_cap_exceeded:
-    "The offline journal plays a recording more often than allowed.",
   offline_attempt_conflict: "A live attempt already exists for this test.",
 }
 
@@ -230,9 +226,7 @@ export class OfflineSyncService {
 
     if (!validation.ok) {
       throw new JournalRefusal(
-        validation.code === "offline_play_cap_exceeded"
-          ? "offline_play_cap_exceeded"
-          : "offline_journal_invalid",
+        validation.code,
         validation.reason,
         validation.eventSeq,
       )

@@ -923,7 +923,7 @@ describe("validateJournal — deadlines (late, not applied)", () => {
 })
 
 describe("validateJournal — plays", () => {
-  it("offline_play_cap_exceeded: fails the whole journal when plays exceed the cap", () => {
+  it("rejected play_cap_exceeded: an over-cap play is refused on its own and the rest of the journal lands", () => {
     const events = [
       start(1, 100),
       enter(2, 90, SEC_L),
@@ -931,18 +931,21 @@ describe("validateJournal — plays", () => {
       play(4, 70),
       answer(5, 60, SEC_L, QL1),
     ]
+    const result = validateJournal(events, ctx())
 
-    expect(validateJournal(events, ctx())).toMatchObject({
-      ok: false,
-      code: "offline_play_cap_exceeded",
-      eventSeq: 4,
-    })
+    expect(kinds(result)).toEqual([
+      "apply",
+      "apply",
+      "apply",
+      "rejected:play_cap_exceeded",
+      "apply",
+    ])
   })
 
-  it("offline_play_cap_exceeded: counts plays the server already recorded", () => {
+  it("rejected play_cap_exceeded: plays the server already recorded count against the cap", () => {
     const state = new Map([[SEC_L, openState(90, 600)]])
     const result = validateJournal(
-      [play(1, 70)],
+      [play(1, 70), play(2, 60)],
       ctx({
         attemptExists: true,
         attemptStartedAt: at(90),
@@ -952,10 +955,10 @@ describe("validateJournal — plays", () => {
       }),
     )
 
-    expect(result).toMatchObject({
-      ok: false,
-      code: "offline_play_cap_exceeded",
-    })
+    expect(kinds(result)).toEqual([
+      "rejected:play_cap_exceeded",
+      "rejected:play_cap_exceeded",
+    ])
   })
 
   it("late: a late play is not counted against the cap", () => {

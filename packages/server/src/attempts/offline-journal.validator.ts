@@ -75,6 +75,13 @@ export type RejectionReason =
   | "section_not_entered"
   | "section_already_entered"
   | "navigation_locked"
+  /**
+   * A play beyond the stimulus's cap. Honest clients can produce one (a lost
+   * `POST /play` response, another tab's stale count), so it is refused on
+   * its own -- not counted, captured -- and never costs the student the rest
+   * of their offline work.
+   */
+  | "play_cap_exceeded"
 
 /** Structural defects a genuine client never produces; the whole request is refused. */
 export type InvalidReason =
@@ -103,8 +110,8 @@ export type JournalValidation =
   | { readonly ok: true; readonly planned: readonly PlannedEvent[] }
   | {
       readonly ok: false
-      readonly code: "offline_journal_invalid" | "offline_play_cap_exceeded"
-      readonly reason: InvalidReason | "play_cap_exceeded"
+      readonly code: "offline_journal_invalid"
+      readonly reason: InvalidReason
       readonly eventSeq: number | null
     }
 
@@ -454,12 +461,7 @@ class Replay {
     const used = (this.plays.get(stimulusId) ?? 0) + 1
 
     if (stimulus.maxPlays !== null && used > stimulus.maxPlays) {
-      return {
-        ok: false,
-        code: "offline_play_cap_exceeded",
-        reason: "play_cap_exceeded",
-        eventSeq,
-      }
+      return rejected("play_cap_exceeded")
     }
 
     this.plays.set(stimulusId, used)

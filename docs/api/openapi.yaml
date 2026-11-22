@@ -545,11 +545,13 @@ paths:
         runs at a time, and each sync applies atomically: on any error nothing of it is applied.
 
         Structurally impossible journals (gaps, time running backwards, unknown ids, sections out
-        of order or overlapping, more plays than the cap) are refused as a whole and captured as a
-        `failed_write` (rule 4). Events that arrived after a section or attempt deadline, or after
-        the attempt ended, are `late`; events refused by a navigation or answer rule are
-        `rejected`. Both are captured one by one and never applied, while the rest of the journal
-        still lands. Hand-in is NOT part of the journal: it requires a connection.
+        of order or overlapping) are refused as a whole and captured as a `failed_write` (rule 4).
+        Events that arrived after a section or attempt deadline, or after the attempt ended, are
+        `late`; events refused by a navigation or answer rule, and a `play` beyond the recording's
+        cap (`play_cap_exceeded`: an honest client can produce one when a `POST /play` response is
+        lost), are `rejected`. Both are captured one by one and never applied (a refused play is
+        not counted), while the rest of the journal still lands. Hand-in is NOT part of the
+        journal: it requires a connection.
       requestBody:
         required: true
         content:
@@ -570,9 +572,9 @@ paths:
               schema: { $ref: "#/components/schemas/OfflineSyncProblem" }
         "409":
           description: |
-            `offline_play_cap_exceeded` (the journal plays a capped recording more often than
-            allowed) or `offline_attempt_conflict` (a live attempt already exists for this test).
-            Nothing was applied; the journal is captured.
+            `offline_attempt_conflict`: a live attempt already exists for this test. Nothing was
+            applied; the journal is captured. (A play beyond the cap is NOT a 409: it is one
+            `rejected` event of a 200.)
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/OfflineSyncProblem" }
@@ -2970,7 +2972,7 @@ components:
           description: Events recorded but not applied because a deadline had passed or the attempt had ended.
         rejected:
           type: integer
-          description: Events recorded but not applied because a navigation or answer rule refused them.
+          description: Events recorded but not applied because a navigation or answer rule refused them, or a play exceeded its recording's cap.
         answersAcked:
           type: integer
           description: Answer events applied (or already held) by this call — the "N answers sent" count.
@@ -2994,7 +2996,7 @@ components:
           properties:
             reason:
               type: string
-              description: The specific rule, e.g. `event_seq_not_contiguous`, `version_unavailable`, `play_cap_exceeded`.
+              description: The specific rule, e.g. `event_seq_not_contiguous`, `version_unavailable`.
             eventSeq:
               type: [integer, "null"]
               description: The event that broke the rule, when there is one.

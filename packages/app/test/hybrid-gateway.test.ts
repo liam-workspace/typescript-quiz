@@ -334,6 +334,7 @@ describe("HybridAttemptGateway — answers and hand-in", () => {
         serverKnown: true,
         currentSectionId: "sec-l",
         currentQuestionId: "q-l1",
+        sections: envelopeFor("att-6").sections,
       }),
     )
     await hybrid.noteAnswer("att-6", answer)

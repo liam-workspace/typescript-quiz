@@ -1,4 +1,5 @@
 import type { QueuedAnswer } from "../answerQueue.js"
+import { canAcceptAnswerChange } from "@pp/common"
 import { ApiError } from "../api-client.js"
 import type {
   AttemptStart,
@@ -170,6 +171,56 @@ function checkPosition(
     target.ordinal < current.ordinal
   ) {
     throw problem("navigation_locked", 409)
+  }
+}
+
+/**
+ * Every rule an answer must pass to be APPLIED at replay. A doomed answer is
+ * refused here rather than journaled: the server would record it late or
+ * rejected (and the queue would ack it away), or -- for a question outside
+ * its section -- refuse the whole journal.
+ */
+function checkAnswer(
+  state: LocalAttemptState,
+  answer: Pick<QueuedAnswer, "sectionId" | "questionId" | "selectedChoiceIds">,
+  nowMs: number,
+): void {
+  const section = state.sections.find((s) => s.id === answer.sectionId)
+  const target = findQuestion(state, answer.questionId)
+
+  if (!section || target?.sectionId !== answer.sectionId) {
+    throw problem("not_found", 404)
+  }
+
+  if (!isTicking(section, nowMs)) {
+    throw problem("section_expired", 410)
+  }
+
+  const current =
+    state.currentQuestionId === null
+      ? null
+      : findQuestion(state, state.currentQuestionId)
+
+  if (
+    section.navigation === "forward_only" &&
+    current?.sectionId === section.id &&
+    target.ordinal < current.ordinal
+  ) {
+    throw problem("navigation_locked", 409)
+  }
+
+  const existing = (state.responses ?? []).find(
+    (r) => r.questionId === answer.questionId,
+  )
+
+  if (
+    !canAcceptAnswerChange(
+      section.allowAnswerChange,
+      existing ? existing.selectedChoiceIds : null,
+      answer.selectedChoiceIds,
+    )
+  ) {
+    throw problem("answer_change_not_allowed", 409)
   }
 }
 
@@ -713,11 +764,11 @@ export class LocalAttemptGateway implements AttemptGateway {
   }
 
   async noteAnswer(attemptId: string, answer: QueuedAnswer): Promise<void> {
-    const state = await this.getMine(attemptId)
+    const state = await this.mustGet(attemptId)
+    const nowMs = this.deps.clock.nowMs()
 
-    if (!state || state.finalized) {
-      return
-    }
+    await this.assertLive(state, nowMs)
+    checkAnswer(state, answer, nowMs)
 
     await this.record(
       attemptId,
@@ -733,9 +784,13 @@ export class LocalAttemptGateway implements AttemptGateway {
             ? {}
             : { timeSpentMs: answer.timeSpentMs }),
         },
-        nowMs: this.deps.clock.nowMs(),
+        nowMs,
       },
-      (s) => withResponse(s, responseOf(answer)),
+      (s) => {
+        checkAnswer(s, answer, nowMs)
+
+        return withResponse(s, responseOf(answer))
+      },
     )
   }
 

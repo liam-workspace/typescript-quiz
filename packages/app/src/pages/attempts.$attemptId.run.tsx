@@ -677,8 +677,17 @@ export function RunScreen({
     const recorded = durableWrite.then((queued) =>
       gateway.noteAnswer(attemptId, queued),
     )
+    // An answer the rules REFUSED (an ApiError from the local gateway) is
+    // settled -- there is nothing left to journal, so it must not block
+    // finishing the section. Any other failure still does.
+    const settled = recorded.catch((error: unknown) => {
+      if (!(error instanceof ApiError)) {
+        throw error
+      }
+    })
 
-    pendingAnswerWritesRef.current.add(recorded)
+    settled.catch(() => undefined)
+    pendingAnswerWritesRef.current.add(settled)
 
     void recorded
       .then(() =>
@@ -699,8 +708,9 @@ export function RunScreen({
         // ever actionable enough to interrupt the child with.
         applyFlushResult(result)
       })
-      .catch(() => {
-        // Deliberately not re-thrown, and deliberately not surfaced as UI
+      .catch((error: unknown) => {
+        // A rule refusal is surfaced; anything else is deliberately not
+        // re-thrown, and deliberately not surfaced as UI
         // state (unlike moveToQuestion/handleNavigatorNavigate's own
         // `.catch`, which react to `attempt_expired`/`section_expired`):
         // FlushController already owns retry/backoff internally (see the
@@ -710,10 +720,38 @@ export function RunScreen({
         // hand-in) carries it. Only exists so a rejection here (including a
         // queue closed out from under an in-flight flush, e.g. on unmount)
         // is never left as an unhandled promise rejection.
+        if (error instanceof ApiError) {
+          refuseAnswer(error, question.id)
+        }
       })
       .finally(() => {
-        pendingAnswerWritesRef.current.delete(recorded)
+        pendingAnswerWritesRef.current.delete(settled)
       })
+  }
+
+  // The local gateway refuses an answer the server could never apply
+  // (deadline passed, forward-only lock, a change that is not allowed). It
+  // is the same verdict a terminal server rejection gives: keep the record
+  // out of every future send and say it did not save.
+  const refuseAnswer = (error: ApiError, questionId: string): void => {
+    if (error.problem.type === "attempt_expired" && error.problem.attempt) {
+      navigate(`/attempts/${attemptId}/time-up`, {
+        attempt: error.problem.attempt,
+      })
+
+      return
+    }
+
+    if (error.problem.type === "section_expired") {
+      setExpired({ kind: "section", resultUrl: null })
+
+      return
+    }
+
+    void queue.markTerminalRejection(attemptId, questionId).catch(() => {
+      // The notice below is what matters; the queue may be closing.
+    })
+    addSaveFailedQuestionIds([questionId])
   }
 
   const handleClaimPlay = async (): Promise<void> => {

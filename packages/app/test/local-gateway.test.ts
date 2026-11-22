@@ -63,6 +63,8 @@ async function setup(
   return { journal, now, local, requestSync, owner, deps }
 }
 
+const isAnswer = (type: string): boolean => type === "answer"
+
 const types = async (journal: JournalStore, id = "att-1"): Promise<string[]> =>
   (await journal.eventsAfter(id, 0)).map((e) => e.type)
 
@@ -545,6 +547,91 @@ describe("LocalAttemptGateway — answers, envelope, hydration", () => {
         answeredAt: "2026-11-22T11:00:05.000Z",
       },
     ])
+  })
+
+  describe("noteAnswer refuses an answer the server would never apply (instead of journaling it)", () => {
+    async function inListening() {
+      const ctx = await setup()
+
+      await ctx.local.start("practice-3")
+      await ctx.local.enterSection("att-1", "sec-l")
+
+      return ctx
+    }
+
+    const listeningAnswer = (over: Partial<typeof answer> = {}) => ({
+      ...answer,
+      ...over,
+    })
+
+    it("after the whole-attempt deadline: attempt_expired", async () => {
+      const { local, journal, now } = await inListening()
+
+      await local.finishSection("att-1", "sec-l", {
+        clientInstanceId: "i",
+        responses: [],
+      })
+      await local.enterSection("att-1", "sec-r")
+      now.v = T0 + 1_200_000
+
+      await expect(
+        local.noteAnswer(
+          "att-1",
+          listeningAnswer({ sectionId: "sec-r", questionId: "q-r1" }),
+        ),
+      ).rejects.toMatchObject({ problem: { type: "attempt_expired" } })
+      expect(await types(journal)).not.toContain("answer")
+    })
+
+    it("after the section deadline: section_expired", async () => {
+      const { local, journal, now } = await inListening()
+
+      now.v = T0 + 600_000
+
+      await expect(
+        local.noteAnswer("att-1", listeningAnswer()),
+      ).rejects.toMatchObject({ problem: { type: "section_expired" } })
+      expect(await types(journal)).not.toContain("answer")
+    })
+
+    it("behind the forward-only position: navigation_locked", async () => {
+      const { local, journal } = await inListening()
+
+      await local.setPosition("att-1", "sec-l", "q-l2")
+
+      await expect(
+        local.noteAnswer("att-1", listeningAnswer()),
+      ).rejects.toMatchObject({ problem: { type: "navigation_locked" } })
+      expect(await types(journal)).not.toContain("answer")
+    })
+
+    it("a question that is not in the named section (the server would refuse the WHOLE journal)", async () => {
+      const { local, journal } = await inListening()
+
+      await expect(
+        local.noteAnswer("att-1", listeningAnswer({ questionId: "q-r1" })),
+      ).rejects.toMatchObject({ problem: { status: 404 } })
+      expect(await types(journal)).not.toContain("answer")
+    })
+
+    it("a changed answer where changes are not allowed: answer_change_not_allowed", async () => {
+      const { local, journal } = await inListening()
+
+      await local.noteAnswer("att-1", listeningAnswer())
+      await local.noteAnswer("att-1", listeningAnswer({ seq: 8 }))
+
+      await expect(
+        local.noteAnswer(
+          "att-1",
+          listeningAnswer({ seq: 9, selectedChoiceIds: ["c-l1a"] }),
+        ),
+      ).rejects.toMatchObject({
+        problem: { type: "answer_change_not_allowed", status: 409 },
+      })
+      const journaled = await types(journal)
+
+      expect(journaled.filter(isAnswer)).toHaveLength(2)
+    })
   })
 
   it("loadEnvelope reports local progress and plays used", async () => {

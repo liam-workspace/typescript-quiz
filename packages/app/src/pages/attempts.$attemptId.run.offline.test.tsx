@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
+import { ApiError } from "../lib/api-client.js"
 import {
   OfflineError,
   type AttemptGateway,
@@ -176,5 +177,66 @@ describe("RunScreen offline", () => {
       ["answer", "q-r1"],
       ["finish_section", undefined],
     ])
+  })
+
+  it("an answer the rules refuse shows the didn't-save notice, is never resent, and does not block Finish", async () => {
+    const user = userEvent.setup()
+    const queue = await openQueue()
+    const finishSection = vi.fn<AttemptGateway["finishSection"]>()
+    const base = gatewayThatCannotPlay()
+    const gateway: AttemptGateway = {
+      ...base,
+      noteAnswer: () =>
+        Promise.reject(
+          new ApiError({ type: "navigation_locked", title: "x", status: 409 }),
+        ),
+      finishSection,
+    }
+    const envelope = makeEnvelope("reading")
+    const navigate = vi.fn()
+
+    finishSection.mockResolvedValue({
+      sectionId: "sec-r",
+      status: "finished",
+      nextSectionId: "sec-x",
+      finalFlush: [],
+    })
+    // Reading followed by another section, so it has a Finish button.
+    envelope.sections = [
+      ...envelope.sections.filter((s) => s.id === "sec-r"),
+      { ...envelope.sections[0], id: "sec-x", status: "pending" as const },
+    ]
+
+    render(
+      <RunScreen
+        attemptId="att-1"
+        envelope={envelope}
+        queue={queue}
+        navigate={navigate}
+        gateway={gateway}
+        localOnly
+      />,
+    )
+    await user.click(await screen.findByRole("radio", { name: /a garden/iu }))
+
+    expect(await screen.findByText(/This answer didn't save/u)).toBeVisible()
+    await waitFor(async () => {
+      expect(await queue.terminalRejectionsForAttempt("att-1")).toEqual([
+        "q-r1",
+      ])
+    })
+
+    await user.click(screen.getByRole("button", { name: "Finish Reading" }))
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Finish Reading",
+      }),
+    )
+
+    await waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith(
+        "/attempts/att-1/sections/sec-x/rules",
+      )
+    })
   })
 })

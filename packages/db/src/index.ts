@@ -40,6 +40,12 @@ import {
   type TestCardRow,
 } from "./repositories/catalog.repository.js"
 import {
+  loadOfflineBundle,
+  type OfflineBundleRow,
+  type OfflineBundleSectionRow,
+  type OfflineMediaRow,
+} from "./repositories/offline-bundle.repository.js"
+import {
   insertFailedWrite,
   type FailedWriteRow,
 } from "./repositories/failed-write.repository.js"
@@ -106,6 +112,8 @@ export type { PlayClaimResult }
 
 export type { FailedWriteRow }
 
+export type { OfflineBundleRow, OfflineBundleSectionRow, OfflineMediaRow }
+
 export type { ResponseWriteInput, WriteOutcome }
 
 export type { QuestionSectionInfo }
@@ -120,6 +128,7 @@ export {
   findStudentBySubject,
   listPublishedTests,
   loadTestBrief,
+  loadOfflineBundle,
   loadSectionBrief,
   InvalidCursorError,
   loadOwnedAttempt,

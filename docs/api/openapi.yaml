@@ -208,6 +208,30 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /tests/{slug}/offline-bundle:
+    get:
+      tags: [Catalog]
+      operationId: getOfflineBundle
+      summary: Everything needed to run a test with no network
+      description: |
+        Section rules plus the full runner content (groups, stimuli, questions, choices) and a
+        media manifest. Never carries an answer key. Capped listening audio is listed with a
+        short-lived signed URL valid only for downloading; uncapped media carries its plain URL.
+        The client stores the bytes and enforces the play cap locally; the server audits play
+        counts when the journal is synced (`POST /attempts/offline-sync`).
+        Same access rules as `GET /tests/{slug}`: a student token is required, and an unknown
+        or unpublished slug is a 404 `test_not_found`.
+      parameters:
+        - { $ref: "#/components/parameters/Slug" }
+      responses:
+        "200":
+          description: The offline bundle.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OfflineBundle" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   # ─────────────────────────────────────────────────────────── Attempt ──
   /attempts:
     get:
@@ -1653,9 +1677,11 @@ components:
         [
           id,
           slug,
+          testVersionId,
           title,
           level,
           durationSeconds,
+          mediaBytes,
           sections,
           inProgressAttemptId,
           attemptCount,
@@ -1664,9 +1690,17 @@ components:
       properties:
         id: { type: string }
         slug: { type: string }
+        testVersionId:
+          type: string
+          description: The published version; a saved offline copy is stale when this differs.
         title: { type: string }
         level: { $ref: "#/components/schemas/StudentLevel" }
         durationSeconds: { type: integer }
+        mediaBytes:
+          {
+            type: integer,
+            description: Total bytes of media a saved copy downloads.,
+          }
         sections:
           type: array
           items:
@@ -2143,35 +2177,90 @@ components:
         inProgressAttemptId: { type: [string, "null"] }
         sections:
           type: array
+          items: { $ref: "#/components/schemas/TestBriefSection" }
+
+    TestBriefSection:
+      type: object
+      required:
+        [
+          id,
+          type,
+          title,
+          ordinal,
+          questionCount,
+          durationSeconds,
+          navigation,
+          allowAnswerChange,
+          playback,
+          instructions,
+        ]
+      properties:
+        id: { type: string }
+        type: { $ref: "#/components/schemas/SectionType" }
+        title: { type: string, examples: ["Listening — Part 1"] }
+        ordinal: { type: integer }
+        questionCount: { type: integer }
+        durationSeconds: { type: integer }
+        navigation: { $ref: "#/components/schemas/NavigationMode" }
+        allowAnswerChange: { type: boolean }
+        playback: { $ref: "#/components/schemas/Playback" }
+        instructions:
+          type: array
+          items: { type: string }
+          description: Author-supplied free text rendered on the section-rules screen.
+
+    OfflineMedia:
+      type: object
+      required: [key, stimulusId, kind, mimeType, bytes, capped, url]
+      properties:
+        key:
+          { type: string, description: Stable cache key (the media filename). }
+        stimulusId: { type: string }
+        kind: { $ref: "#/components/schemas/MediaKind" }
+        mimeType: { type: string }
+        bytes: { type: integer }
+        capped:
+          { type: boolean, description: True when the stimulus has a play cap. }
+        url: { type: string }
+
+    OfflineBundle:
+      type: object
+      required:
+        [
+          slug,
+          testVersionId,
+          version,
+          title,
+          level,
+          durationSeconds,
+          sections,
+          media,
+          totalBytes,
+          urlsExpireAt,
+        ]
+      properties:
+        slug: { type: string }
+        testVersionId: { type: string }
+        version: { type: integer }
+        title: { type: string }
+        level: { $ref: "#/components/schemas/StudentLevel" }
+        durationSeconds: { type: integer }
+        sections:
+          type: array
           items:
-            type: object
-            required:
-              [
-                id,
-                type,
-                title,
-                ordinal,
-                questionCount,
-                durationSeconds,
-                navigation,
-                allowAnswerChange,
-                playback,
-                instructions,
-              ]
-            properties:
-              id: { type: string }
-              type: { $ref: "#/components/schemas/SectionType" }
-              title: { type: string, examples: ["Listening — Part 1"] }
-              ordinal: { type: integer }
-              questionCount: { type: integer }
-              durationSeconds: { type: integer }
-              navigation: { $ref: "#/components/schemas/NavigationMode" }
-              allowAnswerChange: { type: boolean }
-              playback: { $ref: "#/components/schemas/Playback" }
-              instructions:
-                type: array
-                items: { type: string }
-                description: Author-supplied free text rendered on the section-rules screen.
+            allOf:
+              - $ref: "#/components/schemas/TestBriefSection"
+              - type: object
+                required: [groups]
+                properties:
+                  groups:
+                    type: array
+                    items: { $ref: "#/components/schemas/QuestionGroup" }
+        media:
+          type: array
+          items: { $ref: "#/components/schemas/OfflineMedia" }
+        totalBytes: { type: integer }
+        urlsExpireAt: { type: string, format: date-time }
 
     AttemptStart:
       type: object

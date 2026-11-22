@@ -4,17 +4,33 @@ import {
   findStudentBySubject,
   InvalidCursorError,
   listPublishedTests,
+  loadOfflineBundle,
   loadTestBrief,
   type ListPublishedTestsResult,
+  type OfflineBundleRow,
   type TestBriefRow,
 } from "@pp/db"
+import type { Clock } from "@pp/common"
 import { ProblemException } from "../attempts/problem.exception.js"
-import { REQUEST_POOL } from "../database/tokens.js"
+import { loadServerConfig } from "../config.js"
+import { CLOCK, REQUEST_POOL } from "../database/tokens.js"
+import { signMediaUrl } from "../media/media-signing.js"
 import { parseLimit } from "../pagination.js"
+
+/** A saved test may be ~20 MB on a slow phone connection: give the download room. */
+const BUNDLE_URL_TTL_MS = 30 * 60 * 1000
+
+export interface OfflineBundleView extends Omit<OfflineBundleRow, "media"> {
+  media: Array<OfflineBundleRow["media"][number] & { url: string }>
+  urlsExpireAt: string
+}
 
 @Injectable()
 export class CatalogService {
-  constructor(@Inject(REQUEST_POOL) private readonly pool: PgPool) {}
+  constructor(
+    @Inject(REQUEST_POOL) private readonly pool: PgPool,
+    @Inject(CLOCK) private readonly clock: Clock,
+  ) {}
 
   async list(
     subjectClaim: string,
@@ -76,5 +92,49 @@ export class CatalogService {
     }
 
     return brief
+  }
+
+  async getOfflineBundle(
+    subjectClaim: string,
+    slug: string,
+  ): Promise<OfflineBundleView> {
+    const student = await findStudentBySubject(this.pool, subjectClaim)
+
+    if (!student) {
+      throw new ProblemException({
+        type: "student_not_provisioned",
+        title: "No student profile exists for this token.",
+        status: HttpStatus.NOT_FOUND,
+      })
+    }
+
+    const row = await loadOfflineBundle(this.pool, {
+      slug,
+      studentId: student.id,
+    })
+
+    if (!row) {
+      throw new ProblemException({
+        type: "test_not_found",
+        title: "No such resource, or it is not published.",
+        status: HttpStatus.NOT_FOUND,
+      })
+    }
+
+    const expiresAt = new Date(this.clock.now().getTime() + BUNDLE_URL_TTL_MS)
+    const { mediaSigningSecret } = loadServerConfig()
+
+    return {
+      ...row,
+      media: row.media.map((item) => ({
+        ...item,
+        // Capped audio is only reachable with a signature; sign it for the
+        // download window. Uncapped media is served unsigned by MediaController.
+        url: item.capped
+          ? signMediaUrl(item.key, expiresAt, mediaSigningSecret)
+          : `/api/media/${item.key}`,
+      })),
+      urlsExpireAt: expiresAt.toISOString(),
+    }
   }
 }

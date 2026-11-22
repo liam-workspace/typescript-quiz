@@ -1,5 +1,6 @@
 import "fake-indexeddb/auto"
 import { describe, expect, it, vi } from "vitest"
+import { LocalClock } from "../src/lib/attempt/local-clock.js"
 import { JournalStore } from "../src/lib/attempt/journal-store.js"
 import { makeLocalState } from "./helpers/local-state-fixture.js"
 
@@ -91,7 +92,7 @@ describe("JournalStore", () => {
     // A stale counter makes the event key collide with an existing event.
     await store.putAttempt(makeLocalState())
     await store.append("att-1", { type: "start", clientAt: at, payload: {} })
-    await store.update("att-1", (s) => ({ ...s, nextEventSeq: 1 }))
+    await store.putAttempt(makeLocalState({ nextEventSeq: 1 }))
 
     await expect(
       store.append(
@@ -99,7 +100,7 @@ describe("JournalStore", () => {
         { type: "play", clientAt: at, payload: {} },
         (s) => ({ ...s, currentQuestionId: "q-changed" }),
       ),
-    ).rejects.toBeDefined()
+    ).rejects.toMatchObject({ name: "ConstraintError" })
 
     const state = await store.getAttempt("att-1")
 
@@ -204,6 +205,60 @@ describe("JournalStore", () => {
       ["att-1", "sub-1"],
       ["att-2", "sub-2"],
     ])
+  })
+
+  it("update cannot rewrite the store-owned event counter", async () => {
+    const store = await JournalStore.open(freshName())
+
+    await store.putAttempt(makeLocalState({ nextEventSeq: 4 }))
+    await store.update("att-1", (s) => ({ ...s, nextEventSeq: 1 }))
+
+    expect((await store.getAttempt("att-1"))?.nextEventSeq).toBe(4)
+  })
+
+  it("append raises the persisted clock mark to the event's clientAt (survives a crash before persist)", async () => {
+    const name = freshName()
+    const store = await JournalStore.open(name)
+    const high = Date.parse("2026-11-22T12:00:00.000Z")
+
+    await store.putAttempt(makeLocalState())
+    await store.append("att-1", {
+      type: "start",
+      clientAt: new Date(high).toISOString(),
+      payload: {},
+    })
+    store.close()
+
+    const reopened = await JournalStore.open(name)
+    const clock = await LocalClock.create({
+      wallNow: () => high - 3_600_000,
+      monoNow: () => 0,
+      loadHighWater: () => reopened.loadClockHighWater(),
+      saveHighWater: (ms) => reopened.saveClockHighWater(ms),
+    })
+
+    expect(clock.nowMs()).toBeGreaterThanOrEqual(high)
+  })
+
+  it("append never lowers the persisted mark", async () => {
+    const store = await JournalStore.open(freshName())
+
+    await store.putAttempt(makeLocalState())
+    await store.saveClockHighWater(Date.parse("2030-01-01T00:00:00.000Z"))
+    await store.append("att-1", { type: "start", clientAt: at, payload: {} })
+
+    expect(await store.loadClockHighWater()).toBe(
+      Date.parse("2030-01-01T00:00:00.000Z"),
+    )
+  })
+
+  it("saveClockHighWater never decreases the stored mark", async () => {
+    const store = await JournalStore.open(freshName())
+
+    await store.saveClockHighWater(2000)
+    await store.saveClockHighWater(1000)
+
+    expect(await store.loadClockHighWater()).toBe(2000)
   })
 
   it("round-trips the clock high-water mark", async () => {

@@ -18,13 +18,24 @@ function promisify<T>(request: IDBRequest<T>): Promise<T> {
 }
 
 function txDone(tx: IDBTransaction): Promise<void> {
-  return new Promise((resolve, reject) => {
+  // A failed request bubbles an `error` event (carrying the specific cause,
+  // e.g. ConstraintError) and then the transaction aborts: report the cause.
+  let cause: DOMException | null = null
+
+  const done = new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve()
-    tx.onerror = () =>
-      reject(tx.error ?? new Error("IndexedDB transaction failed"))
+    tx.onerror = (event) => {
+      cause = (event.target as IDBRequest | null)?.error ?? null
+    }
     tx.onabort = () =>
-      reject(tx.error ?? new Error("IndexedDB transaction aborted"))
+      reject(cause ?? tx.error ?? new Error("IndexedDB transaction aborted"))
   })
+
+  // Rejections are consumed by the caller's `await done`, or deliberately
+  // dropped by `abortQuietly`; never leave one unhandled in between.
+  done.catch(() => undefined)
+
+  return done
 }
 
 function openDb(dbName: string): Promise<IDBDatabase> {
@@ -125,7 +136,11 @@ export class JournalStore {
         return null
       }
 
-      const next = { ...mutate(state), attemptId }
+      const next = {
+        ...mutate(state),
+        attemptId,
+        nextEventSeq: state.nextEventSeq,
+      }
 
       store.put(next)
       await done
@@ -143,7 +158,7 @@ export class JournalStore {
     draft: JournalEventDraft,
     mutate: (s: LocalAttemptState) => LocalAttemptState = (s) => s,
   ): Promise<JournalEventRecord> {
-    const tx = this.db.transaction([ATTEMPTS, EVENTS], "readwrite")
+    const tx = this.db.transaction([ATTEMPTS, EVENTS, META], "readwrite")
     const done = txDone(tx)
 
     try {
@@ -171,8 +186,18 @@ export class JournalStore {
       }
 
       // `add`, not `put`: a colliding key must abort, never overwrite history.
-      tx.objectStore(EVENTS).add(record)
+      const added = promisify(tx.objectStore(EVENTS).add(record))
+
       attempts.put(next)
+      await added
+      // Keep the clock mark >= every journaled clientAt, atomically, so a crash
+      // before `persist()` can never let the next event be stamped lower.
+      const stamped = Date.parse(draft.clientAt)
+
+      if (Number.isFinite(stamped)) {
+        await JournalStore.raiseMark(tx.objectStore(META), stamped)
+      }
+
       await done
       for (const listener of this.listeners) {
         listener()
@@ -271,8 +296,30 @@ export class JournalStore {
     const tx = this.db.transaction(META, "readwrite")
     const done = txDone(tx)
 
-    tx.objectStore(META).put({ key: CLOCK_KEY, value: ms })
-    await done
+    try {
+      await JournalStore.raiseMark(tx.objectStore(META), ms)
+      await done
+    } catch (error) {
+      JournalStore.abortQuietly(tx, done)
+
+      throw error
+    }
+  }
+
+  /** Read-max-write inside the caller's transaction: the mark never decreases. */
+  private static async raiseMark(
+    meta: IDBObjectStore,
+    ms: number,
+  ): Promise<void> {
+    const row = await promisify(
+      meta.get(CLOCK_KEY) as IDBRequest<
+        { key: string; value: number } | undefined
+      >,
+    )
+
+    if (row === undefined || row.value < ms) {
+      meta.put({ key: CLOCK_KEY, value: ms })
+    }
   }
 
   close(): void {

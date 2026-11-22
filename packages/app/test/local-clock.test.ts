@@ -133,4 +133,38 @@ describe("LocalClock", () => {
 
     expect(d.saved.at(-1)).toBe(1_003_000)
   })
+
+  it("rewind then sleep: the sleep after a wall rewind is still counted", async () => {
+    const wall = { v: 1_000_000 }
+    const mono = { v: 0 }
+    const clock = await LocalClock.create(deps(wall, mono))
+
+    wall.v += 1_000
+    mono.v += 1_000
+
+    expect(clock.nowMs()).toBe(1_001_000)
+
+    // Student sets the clock back an hour
+
+    wall.v -= 3_600_000
+    expect(clock.nowMs()).toBe(1_001_000)
+
+    // Phone sleeps 30 min, monotonic paused
+
+    wall.v += 1_800_000
+    mono.v += 1_000
+
+    expect(clock.nowMs()).toBe(1_001_000 + 1_800_000)
+  })
+
+  it("persist swallows a failing save (no unhandled rejection)", async () => {
+    const wall = { v: 1_000_000 }
+    const mono = { v: 0 }
+    const clock = await LocalClock.create({
+      ...deps(wall, mono),
+      saveHighWater: () => Promise.reject(new Error("quota")),
+    })
+
+    await expect(clock.persist()).resolves.toBeUndefined()
+  })
 })

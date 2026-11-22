@@ -10,7 +10,7 @@ export interface LocalClockDeps {
  * journal's claimed times, so all this class can defend is "a student cannot
  * gain time by rewinding the phone's clock".
  *
- * `elapsed = max(monotonic delta, wall delta)` measured from open:
+ * `elapsed += max(monotonic delta, wall delta)` per observation:
  *   - wall set BACKWARDS: ignored, the monotonic clock keeps counting;
  *   - wall jumped FORWARDS (or the device slept while `performance.now()`
  *     paused): trusted, it can only cost the student time;
@@ -19,16 +19,17 @@ export interface LocalClockDeps {
  */
 export class LocalClock {
   private readonly deps: LocalClockDeps
-  private readonly openWall: number
-  private readonly openMono: number
   private readonly base: number
+  private lastWall: number
+  private lastMono: number
+  private elapsed = 0
   private high: number
 
   private constructor(deps: LocalClockDeps, stored: number | null) {
     this.deps = deps
-    this.openWall = deps.wallNow()
-    this.openMono = deps.monoNow()
-    this.base = Math.max(this.openWall, stored ?? 0)
+    this.lastWall = deps.wallNow()
+    this.lastMono = deps.monoNow()
+    this.base = Math.max(this.lastWall, stored ?? 0)
     this.high = this.base
   }
 
@@ -36,19 +37,28 @@ export class LocalClock {
     return new LocalClock(deps, await deps.loadHighWater())
   }
 
+  /**
+   * Elapsed time is accumulated per observation, so a wall rewind never
+   * "banks" a negative delta that would swallow a later sleep.
+   */
   nowMs(): number {
-    const elapsedMono = this.deps.monoNow() - this.openMono
-    const elapsedWall = this.deps.wallNow() - this.openWall
+    const wall = this.deps.wallNow()
+    const mono = this.deps.monoNow()
 
-    this.high = Math.max(
-      this.high,
-      this.base + Math.max(0, elapsedMono, elapsedWall),
-    )
+    this.elapsed += Math.max(0, mono - this.lastMono, wall - this.lastWall)
+    this.lastWall = wall
+    this.lastMono = mono
+    this.high = Math.max(this.high, this.base + this.elapsed)
 
     return this.high
   }
 
-  persist(): Promise<void> {
-    return this.deps.saveHighWater(this.high)
+  /** Best effort: a failed save must never surface as an unhandled rejection. */
+  async persist(): Promise<void> {
+    try {
+      await this.deps.saveHighWater(this.high)
+    } catch {
+      // The next append also raises the stored mark.
+    }
   }
 }

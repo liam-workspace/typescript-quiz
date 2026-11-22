@@ -196,11 +196,18 @@ describe("migration 1017 — down and up again", () => {
         )
       expect((await regclass()).rows[0].t).not.toBeNull()
 
+      // Roll back 1017 and anything applied after it, whatever is newest.
+      const { rows: applied } = await pool.query<{ name: string }>(
+        `SELECT name FROM pp_migrations WHERE name >= $1 ORDER BY name`,
+        ["1017_reminder_subscription"],
+      )
+      expect(applied[0].name).toBe("1017_reminder_subscription")
+
       await runner({
         databaseUrl,
         dir: fileURLToPath(new URL("../migrations", import.meta.url)),
         direction: "down",
-        count: 1,
+        count: applied.length,
         migrationsTable: "pp_migrations",
       })
       expect((await regclass()).rows[0].t).toBeNull()

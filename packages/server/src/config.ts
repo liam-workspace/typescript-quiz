@@ -22,6 +22,8 @@ export interface ServerConfig {
   requestBodyMaxBytes: number
   spaRoot: string | null
   push: PushConfig | null
+  /** Extra push-service host suffixes, on top of the built-in vendors. */
+  pushEndpointHosts: readonly string[]
 }
 
 function required(env: Environment, key: string): string {
@@ -93,5 +95,10 @@ export function loadServerConfig(
     // must not default to a path that doesn't exist.
     spaRoot: env.SPA_ROOT ?? null,
     push: loadPushConfig(env),
+    // Default empty. Only for a push vendor the built-in list lacks.
+    pushEndpointHosts: (env.PUSH_ENDPOINT_HOSTS ?? "")
+      .split(",")
+      .map((host) => host.trim())
+      .filter((host) => host.length > 0),
   }
 }

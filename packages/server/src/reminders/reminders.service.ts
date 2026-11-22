@@ -10,6 +10,15 @@ import { loadServerConfig } from "../config.js"
 import { REQUEST_POOL } from "../database/tokens.js"
 import type { ReminderSubscriptionDto } from "./reminder.dto.js"
 
+function isEndpointConflict(error: unknown): boolean {
+  const { code, constraint } = (error ?? {}) as {
+    code?: unknown
+    constraint?: unknown
+  }
+
+  return code === "23505" && constraint === "reminder_subscription_endpoint_key"
+}
+
 @Injectable()
 export class RemindersService {
   constructor(@Inject(REQUEST_POOL) private readonly pool: PgPool) {}
@@ -36,16 +45,31 @@ export class RemindersService {
       })
     }
 
-    await upsertReminderSubscription(this.pool, {
-      studentId: student.id,
-      endpoint: body.subscription.endpoint,
-      p256dh: body.subscription.keys.p256dh,
-      auth: body.subscription.keys.auth,
-      timezone: body.timezone,
-      locale: body.locale,
-      hour: body.hour,
-      minute: body.minute,
-    })
+    try {
+      await upsertReminderSubscription(this.pool, {
+        studentId: student.id,
+        endpoint: body.subscription.endpoint,
+        p256dh: body.subscription.keys.p256dh,
+        auth: body.subscription.keys.auth,
+        timezone: body.timezone,
+        locale: body.locale,
+        hour: body.hour,
+        minute: body.minute,
+      })
+    } catch (error) {
+      // The repository already retried once; a third concurrent writer for the
+      // same endpoint is a conflict the client may simply repeat, not a fault.
+      if (isEndpointConflict(error)) {
+        throw new ProblemException({
+          type: "reminder_endpoint_conflict",
+          title: "Another sign-in is registering this device. Try again.",
+          status: HttpStatus.CONFLICT,
+          retryable: true,
+        })
+      }
+
+      throw error
+    }
   }
 
   /** Works with push unconfigured: sign-out cleanup must never fail on config. */

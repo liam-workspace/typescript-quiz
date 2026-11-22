@@ -60,6 +60,10 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      # Push endpoints are accepted only from known push services (FCM,
+      # Mozilla, Apple, Windows) on port 443. Comma-separated extra host
+      # suffixes for any other vendor; leave empty otherwise.
+      PUSH_ENDPOINT_HOSTS: ${PUSH_ENDPOINT_HOSTS:-}
     volumes:
       - pp-media:/media
     depends_on:

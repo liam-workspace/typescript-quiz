@@ -161,9 +161,13 @@ paths:
         Stores this student's Web Push subscription (`PushSubscription.toJSON()`) and the local time
         to remind at. One subscription per student: a second PUT replaces the first, and an endpoint
         already held by another student moves to the caller (a shared phone follows whoever
-        subscribed last). Returns `503 reminders_not_configured` when the server has no VAPID keys. The endpoint must be a
-        public `https://` host name (no IP literals, `localhost` or credentials), and a rejected body is
-        never retained in `failed_write`: it carries the subscription secret.
+        subscribed last). Returns `503 reminders_not_configured` when the server has no VAPID keys. The endpoint must be an
+        `https://` URL on an allow-listed push-service host (FCM `fcm.googleapis.com`,
+        `updates.push.services.mozilla.com`, `*.push.apple.com`, `*.notify.windows.com`, plus any
+        suffixes the operator adds with `PUSH_ENDPOINT_HOSTS`), matched on a label boundary, with
+        port 443 or none and no credentials; it is stored in canonical (lower-case) form. Any
+        other host is `400 invalid_body`. A rejected body is never retained in `failed_write`:
+        it carries the subscription secret.
       requestBody:
         required: true
         content:
@@ -180,6 +184,14 @@ paths:
               application/problem+json:
                 { schema: { $ref: "#/components/schemas/Problem" } },
             }
+        "409":
+          description: "`reminder_endpoint_conflict` — another sign-in was registering the same device at that instant; repeat the request."
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
+        "413": { $ref: "#/components/responses/PayloadCaptured" }
         "503":
           description: "`reminders_not_configured` — the server has no VAPID key pair."
           content:

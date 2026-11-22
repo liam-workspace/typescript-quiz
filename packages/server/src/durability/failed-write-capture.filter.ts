@@ -51,7 +51,7 @@ interface JsonResponse {
  * replayable. The request is still recorded (reason, route, size) so the
  * response keeps its `capturedAs` handle.
  */
-const REDACTED_ROUTE = /^\/api\/me\/reminders(?:[/?#]|$)/
+const REDACTED_ROUTE = /^\/api\/me\/reminders(?:[/?#]|$)/i
 const REDACTED_BODY = "[redacted]"
 
 function capturedBody(req: CapturableRequest): string {

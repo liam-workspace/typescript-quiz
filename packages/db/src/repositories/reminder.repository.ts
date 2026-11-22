@@ -55,6 +55,11 @@ export function toReminderRow(row: ReminderDbRow): ReminderSubscriptionRow {
  * statements can only fail the upsert with a unique violation (caller retries
  * by tapping again), never leave two students on one endpoint.
  *
+ * POOL ONLY: the retry below assumes an autocommit connection. On a
+ * transaction client the first unique violation aborts the transaction and the
+ * retry fails with 25P02. A second violation is rethrown as is; the HTTP
+ * service maps it to 409.
+ *
  * `last_sent_on` survives a re-subscribe from the SAME endpoint (toggling the
  * switch must not earn a second reminder today) and resets for a new one.
  */

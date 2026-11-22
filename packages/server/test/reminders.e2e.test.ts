@@ -12,10 +12,12 @@ import {
   vi,
 } from "vitest"
 import { REQUEST_POOL } from "../src/database/tokens.js"
+import { RemindersService } from "../src/reminders/reminders.service.js"
+import { createFaultInjectingPool } from "./helpers/fault-injecting-pool.js"
 import { createTestApp, type TestApp } from "./helpers/app.js"
 
 const SUBSCRIPTION = {
-  endpoint: "https://push.example.test/send/abc123",
+  endpoint: "https://fcm.googleapis.com/send/abc123",
   expirationTime: null,
   keys: {
     p256dh:
@@ -35,6 +37,10 @@ interface Row {
   student_id: string
   endpoint: string
   locale: string
+}
+
+function isReminderInsert(sql: string): boolean {
+  return sql.includes("INSERT INTO reminder_subscription")
 }
 
 describe("PUT/DELETE /api/me/reminders", () => {
@@ -141,11 +147,11 @@ describe("PUT/DELETE /api/me/reminders", () => {
           .send({ ...BODY, subscription: { ...SUBSCRIPTION, endpoint } })
           .expect(204)
 
-      await put("https://push.example.test/send/one")
-      await put("https://push.example.test/send/two")
+      await put("https://fcm.googleapis.com/send/one")
+      await put("https://fcm.googleapis.com/send/two")
 
       expect(await rows()).toMatchObject([
-        { endpoint: "https://push.example.test/send/two" },
+        { endpoint: "https://fcm.googleapis.com/send/two" },
       ])
     })
 
@@ -177,7 +183,7 @@ describe("PUT/DELETE /api/me/reminders", () => {
         {
           subscription: {
             ...SUBSCRIPTION,
-            endpoint: "http://push.example.test/x",
+            endpoint: "http://fcm.googleapis.com/x",
           },
         },
       ],
@@ -217,7 +223,7 @@ describe("PUT/DELETE /api/me/reminders", () => {
         {
           subscription: {
             ...SUBSCRIPTION,
-            endpoint: "https://u:p@push.example.test/x",
+            endpoint: "https://u:p@fcm.googleapis.com/x",
           },
         },
       ],
@@ -240,6 +246,51 @@ describe("PUT/DELETE /api/me/reminders", () => {
         },
       ],
       ["a fractional minute", { minute: 1.5 }],
+      [
+        "an unknown push vendor",
+        {
+          subscription: {
+            ...SUBSCRIPTION,
+            endpoint: "https://push.example.test/send/x",
+          },
+        },
+      ],
+      [
+        "a single-label service name",
+        {
+          subscription: {
+            ...SUBSCRIPTION,
+            endpoint: "https://api:3000/api/admin",
+          },
+        },
+      ],
+      [
+        "a non-443 port",
+        {
+          subscription: {
+            ...SUBSCRIPTION,
+            endpoint: "https://fcm.googleapis.com:8443/send/x",
+          },
+        },
+      ],
+      [
+        "an upper-case non-https scheme",
+        {
+          subscription: {
+            ...SUBSCRIPTION,
+            endpoint: "HTTP://fcm.googleapis.com/send/x",
+          },
+        },
+      ],
+      [
+        "a suffix-attack host",
+        {
+          subscription: {
+            ...SUBSCRIPTION,
+            endpoint: "https://fcm.googleapis.com.evil.test/x",
+          },
+        },
+      ],
     ])("refuses %s with 400 invalid_body", async (_name, patch) => {
       const token = await provisioned("rem-invalid")
 
@@ -251,6 +302,95 @@ describe("PUT/DELETE /api/me/reminders", () => {
 
       expect((res.body as { type: string }).type).toBe("invalid_body")
       expect(await rows()).toHaveLength(0)
+    })
+
+    it("accepts an upper-case scheme and host, stores it canonical, and collapses case variants to one row", async () => {
+      const first = await provisioned("rem-case-1")
+      const second = await provisioned("rem-case-2")
+      const put = (token: string, endpoint: string) =>
+        request(server())
+          .put("/api/me/reminders")
+          .set("Authorization", `Bearer ${token}`)
+          .send({ ...BODY, subscription: { ...SUBSCRIPTION, endpoint } })
+          .expect(204)
+
+      await put(first, "HTTPS://FCM.googleapis.com./send/Abc")
+      expect(await rows()).toMatchObject([
+        { endpoint: "https://fcm.googleapis.com/send/Abc" },
+      ])
+
+      await put(second, "https://fcm.googleapis.com/send/Abc")
+      await put(first, "HTTPS://fcm.GOOGLEAPIS.com/send/Abc")
+
+      const held = await rows()
+      expect(held).toHaveLength(1)
+      expect(held[0].endpoint).toBe("https://fcm.googleapis.com/send/Abc")
+    })
+
+    it.each([
+      "https://fcm.googleapis.com/fcm/send/x",
+      "https://updates.push.services.mozilla.com/wpush/v2/x",
+      "https://web.push.apple.com/x",
+      "https://bn3p.notify.windows.com/w/?token=x",
+    ])("accepts the built-in push vendor %s", async (endpoint) => {
+      const token = await provisioned(`rem-vendor-${endpoint.length}`)
+
+      await request(server())
+        .put("/api/me/reminders")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ ...BODY, subscription: { ...SUBSCRIPTION, endpoint } })
+        .expect(204)
+    })
+
+    it("accepts an extra vendor host from PUSH_ENDPOINT_HOSTS only when configured", async () => {
+      const token = await provisioned("rem-extra-host")
+      const endpoint = "https://push.example.test/send/x"
+      const put = () =>
+        request(server())
+          .put("/api/me/reminders")
+          .set("Authorization", `Bearer ${token}`)
+          .send({ ...BODY, subscription: { ...SUBSCRIPTION, endpoint } })
+
+      await put().expect(400)
+      vi.stubEnv("PUSH_ENDPOINT_HOSTS", "example.test, other.test")
+      await put().expect(204)
+    })
+
+    it("redacts the rejected body of a differently-cased route too", async () => {
+      const token = await provisioned("rem-case-route")
+      await pool().query(`DELETE FROM failed_write`)
+
+      await request(server())
+        .put("/api/ME/Reminders")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ ...BODY, hour: 99 })
+        .expect(400)
+
+      const { rows: captured } = await pool().query<{ raw_body: string }>(
+        `SELECT raw_body FROM failed_write`,
+      )
+      expect(captured).toHaveLength(1)
+      expect(JSON.stringify(captured)).not.toContain(SUBSCRIPTION.keys.auth)
+    })
+
+    it("answers 409 reminder_endpoint_conflict when the endpoint race is lost twice", async () => {
+      await provisioned("rem-conflict")
+      const failing = createFaultInjectingPool(
+        pool(),
+        isReminderInsert,
+        Object.assign(new Error("duplicate"), {
+          code: "23505",
+          constraint: "reminder_subscription_endpoint_key",
+        }),
+      )
+      const service = new RemindersService(failing)
+
+      const outcome = service.save("rem-conflict", BODY as never)
+
+      await expect(outcome).rejects.toMatchObject({
+        status: 409,
+        response: { type: "reminder_endpoint_conflict" },
+      })
     })
 
     it("never keeps a rejected subscription's secrets in failed_write", async () => {
@@ -268,7 +408,7 @@ describe("PUT/DELETE /api/me/reminders", () => {
       )
       expect((res.body as { capturedAs?: string }).capturedAs).toBeDefined()
       expect(JSON.stringify(captured)).not.toContain(SUBSCRIPTION.keys.auth)
-      expect(JSON.stringify(captured)).not.toContain("push.example.test")
+      expect(JSON.stringify(captured)).not.toContain("fcm.googleapis.com")
     })
 
     it("refuses an unparseable or oversized body with a problem, never a 500, and keeps no secrets", async () => {
@@ -336,7 +476,7 @@ describe("PUT/DELETE /api/me/reminders", () => {
           ...BODY,
           subscription: {
             ...SUBSCRIPTION,
-            endpoint: "https://push.example.test/send/other",
+            endpoint: "https://fcm.googleapis.com/send/other",
           },
         })
         .expect(204)
@@ -351,7 +491,7 @@ describe("PUT/DELETE /api/me/reminders", () => {
         .expect(204)
 
       expect(await rows()).toMatchObject([
-        { endpoint: "https://push.example.test/send/other" },
+        { endpoint: "https://fcm.googleapis.com/send/other" },
       ])
     })
   })

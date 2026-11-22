@@ -16,6 +16,12 @@ import { JwksGuard } from "../auth/jwks.guard.js"
 import { ReminderSubscriptionDto } from "./reminder.dto.js"
 import { RemindersService } from "./reminders.service.js"
 
+/**
+ * The body of a PUT here is a credential (the push `auth` secret).
+ * FailedWriteCaptureFilter keeps it out of `failed_write` through a ROUTE
+ * DENYLIST (`REDACTED_ROUTE`): every future secret-bearing route must be added
+ * there too.
+ */
 @Controller("me/reminders")
 @UseGuards(JwksGuard)
 @UseFilters(ProblemExceptionFilter)

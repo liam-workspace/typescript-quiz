@@ -148,6 +148,10 @@ describe("attempt result page", () => {
     expect(
       screen.getByRole("link", { name: "Review answers" }).closest("footer"),
     ).toHaveClass("m-actionbar")
+    // C4: pinned, so Review answers is visible without scrolling at 320×568.
+    expect(
+      screen.getByRole("link", { name: "Review answers" }).closest("footer"),
+    ).toHaveAttribute("data-sticky", "true")
     const backLinks = screen.getAllByRole("link", { name: "Back to library" })
 
     expect(backLinks).toHaveLength(2)

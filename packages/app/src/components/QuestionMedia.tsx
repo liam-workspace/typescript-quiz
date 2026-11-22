@@ -7,6 +7,13 @@ import type {
 } from "../lib/api-types.js"
 import { Icon } from "./Icon.js"
 
+/**
+ * The play card's hint ("You cannot pause or rewind." while playing). The
+ * runner's Next button points at it while it is disabled mid-recording
+ * (prototype `aria-describedby="plr"`).
+ */
+export const PLAY_HINT_ID = "play-hint"
+
 export interface QuestionMediaProps {
   stimulus: StimulusWire
   onClaimPlay: () => Promise<void>
@@ -81,6 +88,7 @@ function AudioCard({
         className="play-button"
         onClick={handlePlay}
         disabled={playing || exhausted}
+        aria-describedby={hint ? PLAY_HINT_ID : undefined}
       >
         {leadingIcon}
         {label}
@@ -92,7 +100,7 @@ function AudioCard({
         />
       </div>
       {hint ? (
-        <p className="m-reason" style={{ margin: 0 }}>
+        <p id={PLAY_HINT_ID} className="m-reason" style={{ margin: 0 }}>
           {hint}
         </p>
       ) : null}

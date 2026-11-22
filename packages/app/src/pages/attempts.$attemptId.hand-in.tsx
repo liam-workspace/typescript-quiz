@@ -343,6 +343,7 @@ export function HandInScreen({
       </main>
       <footer
         className="m-actionbar"
+        data-sticky="true"
         style={{ flexDirection: "column", alignItems: "stretch" }}
       >
         <button

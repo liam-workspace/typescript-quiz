@@ -14,6 +14,7 @@ import { ToastHost } from "../components/ToastHost.js"
 import { networkStore } from "../lib/network.js"
 import { pendingCountStore } from "../lib/pending-count.js"
 import { pwaStore } from "../lib/pwa/pwa-store.js"
+import { SPLASH_SHOWN_KEY } from "../lib/pwa/session-flags.js"
 import {
   TAB_HREF,
   isAttemptPath,
@@ -49,18 +50,49 @@ export function AppShell({
 }
 
 const SPLASH_MS = 600
-let splashShown = false
+// Fallback when sessionStorage is unusable (blocked site data).
+let splashShownThisLoad = false
+
+/**
+ * Every in-app navigation is a full page load, so module memory alone would
+ * replay the splash on every screen change. sessionStorage lasts for the
+ * app's launch: the splash shows at boot (a launch from the home screen) and
+ * after an update, not on each Start / I'm ready / Finish.
+ */
+function splashAlreadyShown(): boolean {
+  if (splashShownThisLoad) {
+    return true
+  }
+
+  try {
+    return window.sessionStorage.getItem(SPLASH_SHOWN_KEY) === "1"
+  } catch {
+    return false
+  }
+}
+
+function markSplashShown(): void {
+  splashShownThisLoad = true
+
+  try {
+    window.sessionStorage.setItem(SPLASH_SHOWN_KEY, "1")
+  } catch {
+    // Module memory still keeps it to once per load.
+  }
+}
 
 /** Cold-start splash, only when launched from the home screen (prototype `#splash`). */
 function useColdStartSplash(standalone: boolean): boolean {
-  const [visible, setVisible] = useState(() => standalone && !splashShown)
+  const [visible, setVisible] = useState(
+    () => standalone && !splashAlreadyShown(),
+  )
 
   useEffect(() => {
     if (!visible) {
       return undefined
     }
 
-    splashShown = true
+    markSplashShown()
 
     const timer = setTimeout(() => {
       setVisible(false)
@@ -108,6 +140,24 @@ export function AppLayout() {
   const admin = pathname.startsWith("/admin")
   const tab = admin ? null : tabForPath(pathname)
   const inAttempt = isAttemptPath(pathname)
+
+  // The update banner is not a live region of its own (spec §7: one
+  // region): say it here, once, when an update becomes ready.
+  const updateWording = pwa.updateReady
+    ? t(inAttempt ? "pwa.update.deferred" : "pwa.update.ready")
+    : null
+
+  const updateAnnounced = useRef(false)
+
+  useEffect(() => {
+    // Once, when it becomes ready: not again on every route change.
+    if (updateWording === null || updateAnnounced.current) {
+      return
+    }
+
+    updateAnnounced.current = true
+    setAnnouncement(updateWording)
+  }, [updateWording])
 
   useEffect(() => {
     if (previousOnline.current === network.online) {

@@ -143,7 +143,7 @@ export function ResultScreen({ result }: ResultScreenProps) {
         </p>
       </main>
 
-      <footer className="m-actionbar">
+      <footer className="m-actionbar" data-sticky="true">
         <Link className="m-btn" data-variant="secondary" to="/">
           {t("result.backToLibrary")}
         </Link>

@@ -6,6 +6,8 @@ export interface RunPrimaryAction {
   readonly kind: "next" | "finish" | "handIn"
   readonly label: string
   readonly disabled: boolean
+  /** Why it is disabled, when something on screen says so. */
+  readonly describedBy?: string
 }
 
 export interface RunActionBarProps {
@@ -69,6 +71,7 @@ export function RunActionBar({
           className="m-btn"
           data-kind={primary.kind}
           disabled={primary.disabled}
+          aria-describedby={primary.describedBy}
           onClick={onPrimary}
         >
           {primary.label}

@@ -101,7 +101,7 @@ export function TimeUpView({
 
 function ActionFooter({ action }: { readonly action: TimeUpAction }) {
   return (
-    <footer className="m-actionbar">
+    <footer className="m-actionbar" data-sticky="true">
       {action.kind === "link" ? (
         <a href={action.href} className="m-btn">
           {action.label}
@@ -121,6 +121,7 @@ function WaitingFooter({ waiting }: { readonly waiting: TimeUpWaiting }) {
   return (
     <footer
       className="m-actionbar"
+      data-sticky="true"
       style={{ flexDirection: "column", alignItems: "stretch" }}
     >
       <button

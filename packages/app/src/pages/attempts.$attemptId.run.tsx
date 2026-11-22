@@ -18,6 +18,7 @@ import { FinishSectionSheet } from "../components/FinishSectionSheet.js"
 import { ListeningRunner } from "../components/ListeningRunner.js"
 import { OfflineBanner } from "../components/Banners.js"
 import { QuestionNavigator } from "../components/QuestionNavigator.js"
+import { PLAY_HINT_ID } from "../components/QuestionMedia.js"
 import { ReadingRunner } from "../components/ReadingRunner.js"
 import {
   RunActionBar,
@@ -1189,18 +1190,26 @@ export function RunScreen({
   }
 
   let primary: RunPrimaryAction | null = null
+  // Moving on while the recording plays would spend the play for nothing --
+  // and in a forward-only section the student could never come back to it
+  // (prototype `vRun`: the primary is disabled while playing).
+  const recordingPlays = playState.status === "granted"
+  const playingLock = recordingPlays
+    ? { disabled: true, describedBy: PLAY_HINT_ID }
+    : { disabled: false }
 
   if (!expired) {
     if (nextEntry) {
-      primary = { kind: "next", label: t("runner.next"), disabled: false }
+      primary = { kind: "next", label: t("runner.next"), ...playingLock }
     } else if (nextSection) {
       primary = {
         kind: "finish",
         label: t("runner.finishSectionButton", { section: sectionLabel }),
-        disabled: finishingSection,
+        ...playingLock,
+        disabled: finishingSection || recordingPlays,
       }
     } else {
-      primary = { kind: "handIn", label: t("runner.handIn"), disabled: false }
+      primary = { kind: "handIn", label: t("runner.handIn"), ...playingLock }
     }
   }
 

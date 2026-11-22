@@ -14,17 +14,21 @@ describe("OfflineBanner", () => {
       "data-variant",
       "browsing",
     )
-    expect(screen.getByRole("status")).toHaveTextContent(
+    expect(screen.getByTestId("offline-banner")).toHaveTextContent(
       "You're offline. Showing what is saved on this phone.",
     )
+    // C5: the layout's one live region announces it; no second region here.
+    expect(screen.queryByRole("status")).not.toBeInTheDocument()
     expect(screen.queryByText(/Waiting to be sent/u)).not.toBeInTheDocument()
   })
 
   it("in-test: tells the student to keep answering and shows the queue", () => {
     render(<OfflineBanner variant="in-test" pendingCount={3} />)
 
-    expect(screen.getByRole("status")).toHaveTextContent("Keep answering")
-    expect(screen.getByRole("status")).toHaveTextContent(
+    expect(screen.getByTestId("offline-banner")).toHaveTextContent(
+      "Keep answering",
+    )
+    expect(screen.getByTestId("offline-banner")).toHaveTextContent(
       "Waiting to be sent: 3",
     )
   })
@@ -37,21 +41,25 @@ describe("UpdateBanner", () => {
     const user = userEvent.setup()
     const onRefresh = vi.fn()
 
-    render(<UpdateBanner deferred={false} onRefresh={onRefresh} />)
-
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "A new version is ready.",
+    const { container } = render(
+      <UpdateBanner deferred={false} onRefresh={onRefresh} />,
     )
+
+    expect(container).toHaveTextContent("A new version is ready.")
+    expect(screen.queryByRole("status")).not.toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Refresh" }))
     expect(onRefresh).toHaveBeenCalledTimes(1)
   })
 
   it("inside a test has no button and says it will install afterwards", () => {
-    render(<UpdateBanner deferred onRefresh={() => undefined} />)
+    const { container } = render(
+      <UpdateBanner deferred onRefresh={() => undefined} />,
+    )
 
-    expect(screen.getByRole("status")).toHaveTextContent(
+    expect(container).toHaveTextContent(
       "It will install after you finish this test.",
     )
+    expect(screen.queryByRole("status")).not.toBeInTheDocument()
     expect(screen.queryByRole("button")).not.toBeInTheDocument()
   })
 })

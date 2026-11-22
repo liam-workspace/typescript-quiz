@@ -235,7 +235,7 @@ export function SectionRulesScreen({
           )}
         </p>
       </main>
-      <div className="m-actionbar">
+      <div className="m-actionbar" data-sticky="true">
         <a
           href="/"
           className="m-btn"

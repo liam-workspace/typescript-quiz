@@ -7,7 +7,11 @@ export interface OfflineBannerProps {
   readonly pendingCount: number
 }
 
-/** Prototype `banners()` → `.banner.off`. */
+/**
+ * Prototype `banners()` → `.banner.off`. Not a live region: the layout's one
+ * polite region announces going offline (spec §7), so a second one here
+ * would only compete with it.
+ */
 export function OfflineBanner({
   variant,
   pendingCount,
@@ -17,7 +21,6 @@ export function OfflineBanner({
   return (
     <div
       className="banner off"
-      role="status"
       data-testid="offline-banner"
       data-variant={variant}
     >
@@ -42,7 +45,10 @@ export interface UpdateBannerProps {
   readonly onRefresh: () => void
 }
 
-/** Prototype `banners()` → `.banner.upd`; `deferred` is the in-test wording with no button. */
+/**
+ * Prototype `banners()` → `.banner.upd`; `deferred` is the in-test wording
+ * with no button. Announced by the layout's live region, not by itself.
+ */
 export function UpdateBanner({
   deferred,
   onRefresh,
@@ -51,7 +57,7 @@ export function UpdateBanner({
 
   if (deferred) {
     return (
-      <div className="banner upd" role="status">
+      <div className="banner upd">
         <Icon name="refresh" />
         <span>{t("pwa.update.deferred")}</span>
       </div>
@@ -59,7 +65,7 @@ export function UpdateBanner({
   }
 
   return (
-    <div className="banner upd" role="status">
+    <div className="banner upd">
       <Icon name="refresh" />
       <span className="grow">{t("pwa.update.ready")}</span>
       <button type="button" className="btn sm" onClick={onRefresh}>

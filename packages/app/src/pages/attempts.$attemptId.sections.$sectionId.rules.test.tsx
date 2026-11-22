@@ -205,6 +205,14 @@ describe("SectionRulesScreen", () => {
     }
   })
 
+  it("pins the action bar so I'm ready is visible without scrolling (C4)", () => {
+    render(<SectionRulesScreen {...baseProps} navigate={vi.fn()} />)
+
+    expect(
+      screen.getByTestId("ready-button").closest(".m-actionbar"),
+    ).toHaveAttribute("data-sticky", "true")
+  })
+
   it("calls enterSection when the ready button is clicked, not on mount", async () => {
     mockEnterSection.mockResolvedValue({
       sectionId: "section-1",

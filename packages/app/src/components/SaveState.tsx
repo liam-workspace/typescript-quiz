@@ -29,7 +29,9 @@ export function SaveState(props: SaveStateProps) {
       className="save-state m-save"
     >
       <Icon name={ICON[props.state]} small />
-      {label}
+      {/* Its own element so the top bar can ellipsize (or, below 360 px,
+          visually hide) it while it stays in the live region. */}
+      <span className="m-save-text">{label}</span>
     </span>
   )
 }

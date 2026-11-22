@@ -122,6 +122,10 @@ describe("HandInScreen", () => {
       expect(
         screen.getByTestId("hand-in-button").closest("footer"),
       ).toHaveClass("m-actionbar")
+      // C4: pinned, so Hand in is visible without scrolling at 320×568.
+      expect(
+        screen.getByTestId("hand-in-button").closest("footer"),
+      ).toHaveAttribute("data-sticky", "true")
     } finally {
       await queue.close()
     }

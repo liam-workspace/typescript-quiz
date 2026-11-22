@@ -2398,6 +2398,36 @@ describe("RunScreen", () => {
     expect(await screen.findByRole("radio", { name: "A dog" })).toBeEnabled()
   })
 
+  it("disables Next while the recording plays, described by the play hint, and enables it when it ends (C2)", async () => {
+    const user = userEvent.setup()
+
+    mockClaimPlay.mockResolvedValue({
+      stimulusId: "stim-1",
+      playsUsed: 1,
+      playsRemaining: 1,
+      mediaUrl: "/api/media/a.mp3",
+      urlExpiresAt: "2026-08-27T09:05:00.000Z",
+    })
+    renderRunScreen(unplayedListeningEnvelope)
+
+    await user.click(screen.getByRole("button", { name: "Play recording" }))
+    await screen.findByRole("button", { name: "Playing…" })
+
+    const next = screen.getByRole("button", { name: "Next" })
+
+    expect(next).toBeDisabled()
+    expect(next).toHaveAccessibleDescription("You cannot pause or rewind.")
+
+    fireEvent.ended(screen.getByTestId("audio-player"))
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Next" })).toBeEnabled()
+    })
+    expect(screen.getByRole("button", { name: "Next" })).not.toHaveAttribute(
+      "aria-describedby",
+    )
+  })
+
   // Defect B: ListeningRunner's `<audio>` had no `onError`, so a stalled or
   // failed media load left `playState` stuck at `{status: "granted"}`
   // forever -- the play button disabled with no recovery, even though the

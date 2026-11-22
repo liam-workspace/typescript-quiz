@@ -32,6 +32,33 @@ describe("TimeUpView", () => {
     expect(
       screen.getByRole("link", { name: "See your result" }),
     ).toHaveAttribute("href", "/attempts/a/result")
+    // C4: the action bar is pinned like the run screen's.
+    expect(
+      screen.getByRole("link", { name: "See your result" }).closest("footer"),
+    ).toHaveAttribute("data-sticky", "true")
+  })
+
+  it("pins the waiting footer too (C4)", () => {
+    render(
+      <TimeUpView
+        heading="Time is up"
+        message="m"
+        summary={null}
+        action={null}
+        waiting={{
+          seeResultLabel: "See your result",
+          reason: "Waiting",
+          checkAgainLabel: "Check again",
+          onCheckAgain: vi.fn(),
+          failed: false,
+          retryMessage: null,
+        }}
+      />,
+    )
+
+    expect(
+      screen.getByRole("button", { name: "See your result" }).closest("footer"),
+    ).toHaveAttribute("data-sticky", "true")
   })
 
   it("omits the tiles when there is no summary and can announce the message as an alert", () => {

@@ -213,11 +213,26 @@ describe("AppLayout chrome", () => {
 
     await renderAt("/attempts/a1/run")
     expect(
-      screen.getByText(/It will install after you finish this test/u),
+      screen.getByText(/It will install after you finish this test/u, {
+        selector: ".banner span",
+      }),
     ).toBeInTheDocument()
     expect(
       screen.queryByRole("button", { name: "Refresh" }),
     ).not.toBeInTheDocument()
+  })
+
+  it("announces a ready update through the layout's live region, since the banner is not a region of its own (C5)", async () => {
+    const ready = { ...pwaStore.getSnapshot(), updateReady: true }
+
+    vi.spyOn(pwaStore, "getSnapshot").mockReturnValue(ready)
+    await renderAt("/")
+
+    expect(
+      await screen.findByText("A new version is ready.", {
+        selector: "[aria-live] *, [aria-live]",
+      }),
+    ).toBeInTheDocument()
   })
 
   it("renders toasts from the toast store", async () => {

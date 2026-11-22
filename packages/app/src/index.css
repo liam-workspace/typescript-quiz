@@ -1431,6 +1431,9 @@
     padding: 10px 14px;
   }
   .m-actionbar > .m-btn {
+    /* min-width 0: a long label ("Terminer Compréhension orale") wraps
+     * inside its button instead of pushing the bar past the screen. */
+    min-width: 0;
     flex: 1;
   }
 
@@ -1527,6 +1530,21 @@
   .m-runtop .m-row {
     min-height: 48px;
     gap: 8px;
+  }
+  /* At 320 px the row must fit without wrapping or scrolling (C1): the menu
+   * button and the clock never shrink (the ⋯ target stays 44×44); the
+   * section chip and the save chip give way, ellipsized, on one line. */
+  .m-runtop .m-iconbtn,
+  .m-timer {
+    flex: none;
+  }
+  .m-runtop .section-chip {
+    display: block;
+    min-width: 0;
+    flex: 0 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .m-timer {
     display: inline-flex;
@@ -1673,11 +1691,22 @@
   }
   .m-save {
     display: inline-flex;
+    min-width: 0;
+    flex: 0 1 auto;
     align-items: center;
     gap: 4px;
     color: var(--color-ink-2);
     font-size: 12.5px;
     font-weight: 800;
+    white-space: nowrap;
+  }
+  .m-save > svg {
+    flex: none;
+  }
+  .m-save-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .m-save[data-state="pending"] {
     color: #7a4d00;
@@ -1690,6 +1719,25 @@
   @media (max-width: 359px) {
     .m-jump-label {
       display: none;
+    }
+    /* The save state's icon says it on the narrowest phones; the text stays
+     * in the live region (visually hidden, not display:none), so it is still
+     * announced. */
+    .m-runtop .m-save {
+      flex: none;
+    }
+    .m-runtop .m-save-text {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .m-actionbar > .m-btn {
+      padding-inline: 12px;
+      font-size: 15px;
+      line-height: 1.2;
     }
   }
 }

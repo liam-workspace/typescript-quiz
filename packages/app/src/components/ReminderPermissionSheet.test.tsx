@@ -83,6 +83,24 @@ describe("ReminderPermissionSheet", () => {
     expect(screen.getByRole("button", { name: "Don't allow" })).toBeDisabled()
   })
 
+  it("ignores Escape while busy (the browser prompt is up)", async () => {
+    const onDecline = vi.fn()
+    const user = userEvent.setup()
+
+    render(
+      <ReminderPermissionSheet
+        open
+        busy
+        onAllow={vi.fn()}
+        onDecline={onDecline}
+      />,
+    )
+
+    await user.keyboard("{Escape}")
+
+    expect(onDecline).not.toHaveBeenCalled()
+  })
+
   it("renders nothing when closed", () => {
     render(
       <ReminderPermissionSheet

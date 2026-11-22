@@ -4,6 +4,7 @@ import {
   ReminderError,
   createReminders,
   iosVersion,
+  tokenSubject,
   unsubscribeOnSignOut,
   urlBase64ToUint8Array,
   type PushEnvironment,
@@ -11,9 +12,14 @@ import {
 } from "../src/lib/reminders.js"
 import { tokenStore } from "../src/lib/tokenStore.js"
 import {
+  fakeJwt,
   fakePushBrowser as fakeBrowser,
+  neverSettles,
   fakeSubscription,
 } from "../src/test/fake-push.js"
+
+const TOKEN_A = fakeJwt("student-a")
+const TOKEN_B = fakeJwt("student-b")
 
 const IPHONE_17 =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1"
@@ -34,7 +40,6 @@ function setup(
     put?: RemindersDeps["put"]
     remove?: RemindersDeps["remove"]
     marker?: string | null
-    student?: string | null
     token?: string | null
   } = {},
 ) {
@@ -61,8 +66,7 @@ function setup(
         marker = value
       },
     },
-    student: () => (over.student === undefined ? "student-a" : over.student),
-    token: () => (over.token === undefined ? "bearer-a" : over.token),
+    token: () => (over.token === undefined ? TOKEN_A : over.token),
     removeWithToken: vi.fn<RemindersDeps["removeWithToken"]>(),
   } satisfies RemindersDeps
 
@@ -147,10 +151,11 @@ describe("reminders.state", () => {
     expect(await setup({ push }).api.state()).toBe("denied")
   })
 
-  it("is on only with granted permission AND a live subscription", async () => {
+  it("is on only with granted permission AND a live subscription made for this account", async () => {
     expect(
       await setup({
         push: fakeBrowser({ permission: "granted", subscribed: true }).push,
+        marker: "student-a",
       }).api.state(),
     ).toBe("on")
     expect(
@@ -165,6 +170,52 @@ describe("reminders.state", () => {
     ).toBe("off")
   })
 
+  it.each([
+    ["no marker (a sign-out whose local unsubscribe never finished)", null],
+    ["a marker for ANOTHER account", "student-b"],
+  ])(
+    "a live subscription with %s is stale: off, and the subscription is dropped",
+    async (_name, marker) => {
+      const browser = fakeBrowser({ permission: "granted", subscribed: true })
+      const { api } = setup({ push: browser.push, marker })
+
+      expect(await api.state()).toBe("off")
+      expect(browser.live()).toBeNull()
+    },
+  )
+
+  it("dropping a stale subscription never throws, even when the browser refuses", async () => {
+    const browser = fakeBrowser({ permission: "granted", subscribed: true })
+    browser.live()?.unsubscribe.mockRejectedValue(new Error("nope"))
+
+    expect(await setup({ push: browser.push }).api.state()).toBe("off")
+  })
+
+  it.each([
+    ["made with an OLD VAPID key", [9, 9, 9]],
+    ["whose options are missing", null],
+  ] as const)(
+    "a subscription %s reads off and is dropped (the push service rejects every send)",
+    async (_name, subscribedKey) => {
+      const browser = fakeBrowser({
+        permission: "granted",
+        subscribed: true,
+        subscribedKey,
+      })
+      const { api } = setup({ push: browser.push, marker: "student-a" })
+
+      expect(await api.state()).toBe("off")
+      expect(browser.live()).toBeNull()
+    },
+  )
+
+  it("a malformed VAPID key reads unsupported instead of throwing", async () => {
+    const { api } = setup({ key: "not*base64" })
+
+    expect(await api.state()).toBe("unsupported")
+    expect(await api.enable()).toBe("unsupported")
+  })
+
   it("reads as off (not a rejection) when the registration cannot be asked", async () => {
     const { push } = fakeBrowser({ permission: "granted" })
     push.getSubscription.mockRejectedValue(new Error("InvalidStateError"))
@@ -174,6 +225,17 @@ describe("reminders.state", () => {
 })
 
 describe("reminders.enable", () => {
+  const warn = vi.fn()
+
+  beforeEach(() => {
+    vi.spyOn(console, "warn").mockImplementation(warn)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    warn.mockReset()
+  })
+
   it("asks permission, subscribes with the VAPID key, then PUTs the subscription", async () => {
     const { api, deps, browser, marker } = setup()
 
@@ -196,6 +258,25 @@ describe("reminders.enable", () => {
     })
     expect(await api.state()).toBe("on")
     expect(marker()).toBe("student-a")
+  })
+
+  it("after a VAPID rotation, re-subscribes with the NEW key and PUTs it", async () => {
+    const browser = fakeBrowser({
+      permission: "granted",
+      subscribed: true,
+      subscribedKey: [9, 9, 9],
+    })
+    const old = browser.live()
+    const { api, deps } = setup({ push: browser.push, marker: "student-a" })
+
+    expect(await api.enable()).toBe("on")
+
+    expect(old?.unsubscribe).toHaveBeenCalledOnce()
+    expect(browser.push.subscribe).toHaveBeenCalledWith(
+      new Uint8Array([1, 0, 1]),
+    )
+    expect(deps.put).toHaveBeenCalledOnce()
+    expect(await api.state()).toBe("on")
   })
 
   it("asks for permission synchronously, inside the tap (Safari drops the prompt otherwise)", () => {
@@ -301,6 +382,10 @@ describe("reminders.enable", () => {
     expect(await api.state()).toBe("unsupported")
     expect(await api.enable()).toBe("unsupported")
     expect(browser.push.subscribe).toHaveBeenCalledTimes(1)
+    // Diagnosable without leaking the endpoint or keys: only the type.
+    expect(warn).toHaveBeenCalledOnce()
+    expect(warn).toHaveBeenCalledWith(expect.any(String), "invalid_body")
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("fcm")
   })
 
   it("a 503 (server has no VAPID keys) leaves the switch off, not unsupported", async () => {
@@ -365,12 +450,13 @@ describe("reminders.disable", () => {
     expect(browser.live()).toBeNull()
   })
 
-  it("reports on (truthfully) when the browser refused to unsubscribe", async () => {
+  it("reads off when the browser refused to unsubscribe: the server row is gone and the marker cleared", async () => {
     const browser = fakeBrowser({ permission: "granted", subscribed: true })
     browser.live()?.unsubscribe.mockRejectedValue(new Error("nope"))
-    const { api } = setup({ push: browser.push })
+    const { api, deps } = setup({ push: browser.push, marker: "student-a" })
 
-    expect(await api.disable()).toBe("on")
+    expect(await api.disable()).toBe("off")
+    expect(deps.remove).toHaveBeenCalledOnce()
   })
 })
 
@@ -384,7 +470,7 @@ describe("reminders sign-out step", () => {
 
     const pending = api.purgeStep()
 
-    expect(deps.removeWithToken).toHaveBeenCalledWith("bearer-a")
+    expect(deps.removeWithToken).toHaveBeenCalledWith(TOKEN_A)
     await pending
     expect(browser.live()).toBeNull()
     expect(marker()).toBeNull()
@@ -403,13 +489,35 @@ describe("reminders sign-out step", () => {
     const { api, deps } = setup({
       push: browser.push,
       marker: "student-a",
-      student: "student-b",
-      token: "bearer-b",
+      token: TOKEN_B,
     })
 
     await api.purgeStep()
 
     expect(deps.removeWithToken).not.toHaveBeenCalled()
+    expect(browser.live()).toBeNull()
+  })
+
+  it("a failed sign-in (B's token stored, signOut before the subject is recorded) never DELETEs B's reminders", async () => {
+    // In completeSignIn's failure branch: marker still names A, the token is B's.
+    const { api, deps } = setup({ marker: "student-a", token: TOKEN_B })
+
+    await api.purgeStep()
+
+    expect(deps.removeWithToken).not.toHaveBeenCalled()
+  })
+
+  it("a sign-out whose local unsubscribe is cut off by the navigation: the same student signing back in reads off", async () => {
+    const browser = fakeBrowser({ permission: "granted", subscribed: true })
+    const { api, deps } = setup({ push: browser.push, marker: "student-a" })
+
+    // The page navigates away before getSubscription → unsubscribe runs.
+    browser.push.getSubscription.mockReturnValueOnce(neverSettles())
+    void api.purgeStep()
+    expect(deps.removeWithToken).toHaveBeenCalledWith(TOKEN_A)
+    expect(browser.live()).not.toBeNull()
+
+    expect(await api.state()).toBe("off")
     expect(browser.live()).toBeNull()
   })
 
@@ -428,8 +536,7 @@ describe("unsubscribeOnSignOut (browser-wired)", () => {
   beforeEach(() => {
     fetchMock.mockReset().mockResolvedValue(new Response(null, { status: 204 }))
     vi.stubGlobal("fetch", fetchMock)
-    tokenStore.set("access_token", "bearer-xyz")
-    localStorage.setItem("pp.last-student", "student-a")
+    tokenStore.set("access_token", TOKEN_A)
     localStorage.setItem("pp.reminders.owner", "student-a")
   })
 
@@ -446,7 +553,7 @@ describe("unsubscribeOnSignOut (browser-wired)", () => {
 
     expect(fetchMock).toHaveBeenCalledWith("/api/me/reminders", {
       method: "DELETE",
-      headers: { authorization: "Bearer bearer-xyz" },
+      headers: { authorization: `Bearer ${TOKEN_A}` },
       keepalive: true,
     })
     expect(localStorage.getItem("pp.reminders.owner")).toBeNull()
@@ -457,5 +564,15 @@ describe("unsubscribeOnSignOut (browser-wired)", () => {
 
     await expect(unsubscribeOnSignOut()).resolves.toBeUndefined()
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe("tokenSubject", () => {
+  it('reads sub from a JWT payload, and "" for anything else', () => {
+    expect(tokenSubject(TOKEN_A)).toBe("student-a")
+    expect(tokenSubject(null)).toBe("")
+    expect(tokenSubject("dev-token")).toBe("")
+    expect(tokenSubject("a.!!!.c")).toBe("")
+    expect(tokenSubject(`a.${btoa('{"sub":42}')}.c`)).toBe("")
   })
 })

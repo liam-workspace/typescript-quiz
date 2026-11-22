@@ -16,10 +16,10 @@ const REVALIDATE = new Set([
 const WORKBOX = /^workbox-[\w-]+\.js$/u
 
 /**
- * Cache policy for the built SPA (spec D1). The worker script, its
- * runtime and imported push handlers, the manifest and the shell are always revalidated — a worker
- * cached for a day would pin students on an old app for a day. Only
- * hashed files under /assets are immutable.
+ * Cache policy for the built SPA (spec D1). The worker script, its runtime
+ * and its imported push handlers, the manifest and the shell are always
+ * revalidated — a worker cached for a day would pin students on an old app
+ * for a day. Only hashed files under /assets are immutable.
  */
 export function spaStaticHeaders(
   res: HeaderSink,

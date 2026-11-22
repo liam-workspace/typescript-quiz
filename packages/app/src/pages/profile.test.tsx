@@ -10,7 +10,7 @@ import {
   type RemindersDeps,
 } from "../lib/reminders.js"
 import { toastStore } from "../lib/toast.js"
-import { fakePushBrowser } from "../test/fake-push.js"
+import { fakeJwt, fakePushBrowser, neverSettles } from "../test/fake-push.js"
 import type { Student } from "../lib/api-types.js"
 import type { PwaSnapshot } from "../lib/pwa/pwa-store.js"
 import { renderWithRouter } from "../test/renderWithRouter.js"
@@ -278,7 +278,8 @@ describe("Profile reminders (integration)", () => {
     } = {},
   ) {
     const browser = over.browser ?? fakePushBrowser()
-    let marker: string | null = null
+    // A pre-existing subscription was made by this student on this browser.
+    let marker: string | null = browser.live() ? "s1" : null
     const deps = {
       snapshot: () => ({
         platform: over.platform ?? "android",
@@ -303,8 +304,7 @@ describe("Profile reminders (integration)", () => {
           marker = value
         },
       },
-      student: () => "s1",
-      token: () => "bearer",
+      token: () => fakeJwt("s1"),
       removeWithToken: vi.fn<RemindersDeps["removeWithToken"]>(),
     } satisfies RemindersDeps
     const api = createReminders(deps)
@@ -464,6 +464,7 @@ describe("Profile reminders (integration)", () => {
 
   it("a push service the server does not allow (400) reads as 'this browser can't', not a generic error", async () => {
     const user = userEvent.setup()
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined)
     const { api, browser } = world({
       put: vi
         .fn<RemindersDeps["put"]>()
@@ -487,6 +488,7 @@ describe("Profile reminders (integration)", () => {
       "This browser can't send reminders.",
       "bell",
     )
+    expect(warn).toHaveBeenCalledOnce()
   })
 
   it.each([
@@ -556,12 +558,12 @@ describe("Profile reminders (integration)", () => {
     expect(browser.live()).toBeNull()
   })
 
-  it("a browser that refuses to unsubscribe keeps the switch on and says so", async () => {
+  it("a browser that refuses to unsubscribe still reads off once the server row is gone", async () => {
     const user = userEvent.setup()
     const browser = fakePushBrowser({ permission: "granted", subscribed: true })
 
     browser.live()?.unsubscribe.mockRejectedValue(new Error("nope"))
-    const { api } = world({ browser })
+    const { api, deps } = world({ browser })
 
     renderWith(api)
     await waitFor(async () => {
@@ -569,11 +571,82 @@ describe("Profile reminders (integration)", () => {
     })
     await user.click(await reminderSwitch())
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Reminders couldn't be turned off. Please try again.",
-    )
-    expect(await reminderSwitch()).toBeChecked()
-    expect(toast).not.toHaveBeenCalled()
+    await waitFor(async () => {
+      expect(await reminderSwitch()).not.toBeChecked()
+    })
+    expect(deps.remove).toHaveBeenCalledOnce()
+    expect(toast).toHaveBeenCalledWith("Reminders turned off.", "bell")
+  })
+
+  it("focus returns to the switch after Allow turns reminders on", async () => {
+    const user = userEvent.setup()
+
+    renderWith(world().api)
+    await turnOn(user)
+
+    await waitFor(async () => {
+      expect(await reminderSwitch()).toBeChecked()
+    })
+    await waitFor(async () => {
+      expect(await reminderSwitch()).toHaveFocus()
+    })
+  })
+
+  it("focus returns to the switch after Don't allow", async () => {
+    const user = userEvent.setup()
+
+    renderWith(world().api)
+    await user.click(await reminderSwitch())
+    await user.click(screen.getByRole("button", { name: "Don't allow" }))
+
+    await waitFor(async () => {
+      expect(await reminderSwitch()).toHaveFocus()
+    })
+  })
+
+  it("focus returns to the row's reason (not <body>) when a denial leaves the switch disabled", async () => {
+    const user = userEvent.setup()
+
+    renderWith(world({ browser: fakePushBrowser({ prompt: "denied" }) }).api)
+    await turnOn(user)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Blocked in your browser settings."),
+      ).toHaveFocus()
+    })
+    expect(await reminderSwitch()).toBeDisabled()
+  })
+
+  it("focus returns to the switch after a failed turn-on (it stays usable)", async () => {
+    const user = userEvent.setup()
+    const { api } = world({
+      put: vi
+        .fn<RemindersDeps["put"]>()
+        .mockRejectedValue(new TypeError("Failed to fetch")),
+    })
+
+    renderWith(api)
+    await turnOn(user)
+
+    await screen.findByRole("alert")
+    await waitFor(async () => {
+      expect(await reminderSwitch()).toHaveFocus()
+    })
+  })
+
+  it("Escape while the browser prompt is up does not close the sheet mid-request", async () => {
+    const user = userEvent.setup()
+    const browser = fakePushBrowser()
+
+    browser.push.requestPermission.mockReturnValue(neverSettles())
+    renderWith(world({ browser }).api)
+    await turnOn(user)
+    await user.keyboard("{Escape}")
+
+    expect(
+      screen.getByRole("dialog", { name: "Allow reminders?" }),
+    ).toBeInTheDocument()
   })
 
   it.each([

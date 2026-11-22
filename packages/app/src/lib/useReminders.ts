@@ -20,7 +20,7 @@ export interface UseRemindersResult {
   /** The last change failed; cleared by the next one. */
   readonly problem: ReminderProblem | null
   readonly sheetOpen: boolean
-  /** The switch's onChange: `true` asks first (sheet), `false` turns off at once. */
+  /** The switch's onChange: `true` asks first (sheet), `false` turns off. */
   readonly toggle: (next: boolean) => void
   readonly allow: () => Promise<void>
   readonly decline: () => void
@@ -147,7 +147,6 @@ export function useReminders(
     try {
       const after = await api.enable()
 
-      setSheetOpen(false)
       await settle(after)
 
       if (after === "on") {
@@ -158,7 +157,6 @@ export function useReminders(
     } catch (error) {
       const reason = error instanceof ReminderError ? error.reason : "failed"
 
-      setSheetOpen(false)
       // The library rolled back any browser subscription; read the truth.
       await settle(null)
 
@@ -169,8 +167,11 @@ export function useReminders(
         setProblem(reason)
       }
     } finally {
+      // Together, in one commit: the sheet returns focus as it closes, and a
+      // switch still disabled by `busy` cannot take it.
       if (alive.current) {
         setBusy(false)
+        setSheetOpen(false)
       }
     }
   }, [api, settle, t])

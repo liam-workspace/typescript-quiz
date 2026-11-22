@@ -102,7 +102,10 @@ worker.addEventListener("notificationclick", function onClick(event) {
       .then(function focusOrOpen(windows) {
         for (const client of windows) {
           if (client.focus) {
-            return client.focus()
+            // A window that cannot be focused (e.g. closing): open one instead.
+            return client.focus().catch(function openInstead() {
+              return worker.clients.openWindow(url)
+            })
           }
         }
 

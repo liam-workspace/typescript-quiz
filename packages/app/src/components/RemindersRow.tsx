@@ -11,6 +11,11 @@ export interface RemindersRowProps {
   readonly problem?: ReminderProblem | null
   readonly onToggle: (next: boolean) => void
   readonly switchRef?: RefObject<HTMLInputElement | null>
+  /**
+   * The status line, focusable from script only: focus lands here when a
+   * sheet closes and the switch is disabled.
+   */
+  readonly statusRef?: RefObject<HTMLElement | null>
 }
 
 const BLOCKED_KEY: Partial<Record<ReminderState, string>> = {
@@ -37,6 +42,7 @@ export function RemindersRow({
   problem = null,
   onToggle,
   switchRef,
+  statusRef,
 }: RemindersRowProps): JSX.Element {
   const { t } = useTranslation("runner")
   const descriptionId = useId()
@@ -52,7 +58,9 @@ export function RemindersRow({
       </span>
       <div className="t">
         {t("profile.reminders.title")}
-        <small id={descriptionId}>{t(description)}</small>
+        <small id={descriptionId} ref={statusRef} tabIndex={-1}>
+          {t(description)}
+        </small>
         {problem ? (
           <small role="alert" className="text-bad">
             {t(PROBLEM_KEY[problem])}

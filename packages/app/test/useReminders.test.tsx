@@ -9,6 +9,14 @@ import {
 import { toastStore } from "../src/lib/toast.js"
 import { useReminders } from "../src/lib/useReminders.js"
 
+function slowState(): Promise<ReminderState> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve("off")
+    }, 20)
+  })
+}
+
 function fakeApi(initial: ReminderState) {
   return {
     state: vi.fn<RemindersApi["state"]>().mockResolvedValue(initial),
@@ -141,6 +149,59 @@ describe("useReminders", () => {
       expect(result.current.busy).toBe(false)
       expect(api.state).toHaveBeenCalled()
       expect(toast).not.toHaveBeenCalled()
+    },
+  )
+
+  it.each([
+    ["succeeds", null],
+    ["fails", new ReminderError("offline")],
+  ] as const)(
+    "when a turn-on %s, the sheet never closes while the switch is still busy (focus could not return to a disabled switch)",
+    async (_name, error) => {
+      const api = fakeApi("off")
+
+      if (error) {
+        api.enable.mockRejectedValue(error)
+      }
+
+      const seen: Array<{ sheetOpen: boolean; busy: boolean }> = []
+      const hook = renderHook(() => {
+        const result = useReminders(api)
+
+        seen.push({ sheetOpen: result.sheetOpen, busy: result.busy })
+
+        return result
+      })
+
+      await waitFor(() => {
+        expect(api.state).toHaveBeenCalled()
+      })
+      act(() => {
+        hook.result.current.toggle(true)
+      })
+      seen.length = 0
+      // Outside act(), so React commits as a browser would: each await in
+      // allow() can land its own commit. The re-read after a failure takes
+      // real time, as a real api.state() does.
+      api.state.mockImplementation(slowState)
+      const reactActEnvironment = globalThis as {
+        IS_REACT_ACT_ENVIRONMENT?: boolean
+      }
+      reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = false
+
+      try {
+        await hook.result.current.allow()
+        await new Promise((resolve) => {
+          setTimeout(resolve, 30)
+        })
+      } finally {
+        reactActEnvironment.IS_REACT_ACT_ENVIRONMENT = true
+      }
+
+      expect(seen.at(-1)).toEqual({ sheetOpen: false, busy: false })
+      expect(seen.filter((render) => !render.sheetOpen && render.busy)).toEqual(
+        [],
+      )
     },
   )
 

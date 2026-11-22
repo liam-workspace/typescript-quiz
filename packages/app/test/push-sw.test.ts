@@ -19,7 +19,6 @@ interface ShownNotification {
 interface FakeWindow {
   readonly url: string
   focus(): Promise<unknown>
-  navigate?(url: string): Promise<unknown>
 }
 
 type Listener = (event: unknown) => void
@@ -31,7 +30,6 @@ function loadWorker(windows: FakeWindow[] = []) {
   const opened: string[] = []
   const matchAllOptions: unknown[] = []
   const self = {
-    location: { origin: "https://quiz.example.test" },
     addEventListener: (type: string, listener: Listener) => {
       listeners.set(type, listener)
     },
@@ -208,6 +206,19 @@ describe("push-sw.js", () => {
     expect(worker.matchAllOptions).toEqual([
       { type: "window", includeUncontrolled: true },
     ])
+  })
+
+  it("opens the app when focusing the open window fails", async () => {
+    const worker = loadWorker([
+      {
+        url: "https://quiz.example.test/",
+        focus: () => Promise.reject(new Error("InvalidAccessError")),
+      },
+    ])
+
+    await worker.click("/history")
+
+    expect(worker.opened).toEqual(["/history"])
   })
 
   it("opens the app at / when no window is open", async () => {

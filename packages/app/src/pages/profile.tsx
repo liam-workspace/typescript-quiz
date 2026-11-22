@@ -85,6 +85,7 @@ export function ProfileScreen({
   const [confirmOpen, setConfirmOpen] = useState(false)
   const signOutTrigger = useRef<HTMLButtonElement>(null)
   const reminderSwitch = useRef<HTMLInputElement>(null)
+  const reminderStatus = useRef<HTMLElement>(null)
   const [language] = (i18n.resolvedLanguage ?? i18n.language).split("-")
 
   return (
@@ -151,6 +152,7 @@ export function ProfileScreen({
             problem={reminderProps.problem}
             onToggle={reminderProps.onToggle}
             switchRef={reminderSwitch}
+            statusRef={reminderStatus}
           />
 
           <div className="li">
@@ -224,6 +226,7 @@ export function ProfileScreen({
         onAllow={reminderProps.onAllow}
         onDecline={reminderProps.onDecline}
         returnFocusRef={reminderSwitch}
+        fallbackFocusRef={reminderStatus}
       />
 
       <BottomSheet

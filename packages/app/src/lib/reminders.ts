@@ -1,7 +1,6 @@
 import i18next from "i18next"
 import { ApiError, apiFetch } from "./api-client.js"
 import { currentAccessToken } from "./auth.js"
-import { lastSignedInStudent } from "./pwa/purge.js"
 import { pwaStore, type PwaPlatform } from "./pwa/pwa-store.js"
 
 export type ReminderState =
@@ -64,11 +63,18 @@ export interface PushEnvironment {
 }
 
 /**
- * "This browser subscribed on behalf of student X." Written on a successful
- * turn-on, so a sign-out only tells the server to drop the subscription when
- * THIS browser holds it: the server keeps one subscription per student, and
- * a blind DELETE from a tablet the student never enabled would silently stop
- * the reminders on their phone.
+ * "This browser subscribed on behalf of the account with this `sub`." Written
+ * on a successful turn-on. Two uses:
+ * - a sign-out only tells the server to drop the subscription when THIS
+ *   browser made it for the token's own account: the server keeps one
+ *   subscription per student, and a blind DELETE from a tablet the student
+ *   never enabled would silently stop the reminders on their phone;
+ * - `state()` only reports "on" for a subscription made for the account that
+ *   is signed in now. Anything else (a sign-out whose local unsubscribe was
+ *   cut short by the navigation, a previous student's leftover) is stale: the
+ *   server holds no row for it, so it is dropped and reads "off".
+ * The `sub` is read from the JWT payload unverified: it only keys this local
+ * marker and is never used to authorise anything.
  */
 export interface SubscriptionMarker {
   get(): string | null
@@ -89,9 +95,7 @@ export interface RemindersDeps {
   timezone(): string
   locale(): string
   marker: SubscriptionMarker
-  /** The signed-in student this browser last saw (`pp.last-student`). */
-  student(): string | null
-  /** Synchronous read of the bearer token, for the sign-out step. */
+  /** Synchronous read of the current bearer token (null without one). */
   token(): string | null
   /** Fire-and-forget server DELETE that survives the page navigating away. */
   removeWithToken(token: string): void
@@ -121,6 +125,72 @@ export function urlBase64ToUint8Array(
   }
 
   return bytes
+}
+
+/** Null for a missing or undecodable key: callers then read "unsupported". */
+function decodeKey(key: string | null): Uint8Array<ArrayBuffer> | null {
+  if (!key) {
+    return null
+  }
+
+  try {
+    const bytes = urlBase64ToUint8Array(key)
+
+    return bytes.length > 0 ? bytes : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The `sub` claim of a JWT, decoded WITHOUT verification -- only ever used as
+ * the local marker's key (see SubscriptionMarker). "" when there is no token
+ * or it is not a JWT (e.g. a dev token), so both sides of a comparison agree.
+ */
+export function tokenSubject(token: string | null): string {
+  try {
+    const payload = token?.split(".")[1]
+
+    if (!payload) {
+      return ""
+    }
+
+    const json: unknown = JSON.parse(
+      new TextDecoder().decode(urlBase64ToUint8Array(payload)),
+    )
+    const sub =
+      json !== null && typeof json === "object" && "sub" in json
+        ? json.sub
+        : undefined
+
+    return typeof sub === "string" ? sub : ""
+  } catch {
+    return ""
+  }
+}
+
+/**
+ * Whether a subscription was made with this application server key. A
+ * subscription without readable options counts as a mismatch: after a VAPID
+ * rotation the push service rejects every send to an old-key subscription.
+ */
+function sameServerKey(
+  subscription: PushSubscription,
+  expected: Uint8Array<ArrayBuffer>,
+): boolean {
+  const options = subscription.options as PushSubscriptionOptions | undefined
+  const actual = options?.applicationServerKey
+
+  if (!actual) {
+    return false
+  }
+
+  const bytes = new Uint8Array(actual)
+
+  return (
+    bytes.length === expected.length &&
+    bytes.every((byte, index) => byte === expected[index])
+  )
 }
 
 /**
@@ -180,11 +250,17 @@ export function createReminders(deps: RemindersDeps): BrowserReminders {
   // a switch that can only fail the same way again.
   let refusedByServer = false
 
-  /** Everything that can be decided without awaiting. */
-  function gate(): ReminderState | PushEnvironment {
-    const { platform, standalone, userAgent } = deps.snapshot()
+  interface Ready {
+    readonly push: PushEnvironment
+    readonly key: Uint8Array<ArrayBuffer>
+  }
 
-    if (!deps.vapidKey() || refusedByServer) {
+  /** Everything that can be decided without awaiting. */
+  function gate(): ReminderState | Ready {
+    const { platform, standalone, userAgent } = deps.snapshot()
+    const key = decodeKey(deps.vapidKey())
+
+    if (!key || refusedByServer) {
       return "unsupported"
     }
 
@@ -207,7 +283,7 @@ export function createReminders(deps: RemindersDeps): BrowserReminders {
       return "unsupported"
     }
 
-    return push.permission() === "denied" ? "denied" : push
+    return push.permission() === "denied" ? "denied" : { push, key }
   }
 
   async function currentSubscription(
@@ -221,26 +297,41 @@ export function createReminders(deps: RemindersDeps): BrowserReminders {
   }
 
   async function state(): Promise<ReminderState> {
-    const push = gate()
+    const ready = gate()
 
-    if (typeof push === "string") {
-      return push
+    if (typeof ready === "string") {
+      return ready
     }
 
+    const { push, key } = ready
     const subscription = await currentSubscription(push)
 
-    return subscription !== null && push.permission() === "granted"
-      ? "on"
-      : "off"
+    if (subscription === null) {
+      return "off"
+    }
+
+    if (
+      deps.marker.get() !== tokenSubject(deps.token()) ||
+      !sameServerKey(subscription, key)
+    ) {
+      // Stale (another account's, an interrupted sign-out's, or an old
+      // VAPID key's): nothing on the server sends to it. Drop it.
+      await dropSubscription(subscription)
+
+      return "off"
+    }
+
+    return push.permission() === "granted" ? "on" : "off"
   }
 
   async function enable(): Promise<ReminderState> {
-    const push = gate()
-    const key = deps.vapidKey()
+    const ready = gate()
 
-    if (typeof push === "string" || !key) {
-      return typeof push === "string" ? push : "unsupported"
+    if (typeof ready === "string") {
+      return ready
     }
+
+    const { push, key } = ready
 
     // No await before this line: Safari only shows the permission prompt
     // while the tap that asked for it still counts as a user gesture.
@@ -260,11 +351,16 @@ export function createReminders(deps: RemindersDeps): BrowserReminders {
       return "off"
     }
 
-    const subscription = await push
-      .subscribe(urlBase64ToUint8Array(key))
-      .catch((error: unknown) => {
-        throw new ReminderError("failed", { cause: error })
-      })
+    // An old-key subscription makes subscribe() throw InvalidStateError.
+    const existing = await currentSubscription(push)
+
+    if (existing && !sameServerKey(existing, key)) {
+      await dropSubscription(existing)
+    }
+
+    const subscription = await push.subscribe(key).catch((error: unknown) => {
+      throw new ReminderError("failed", { cause: error })
+    })
 
     const { endpoint, expirationTime, keys } = subscription.toJSON()
 
@@ -295,12 +391,19 @@ export function createReminders(deps: RemindersDeps): BrowserReminders {
 
       if (reason === "browser-refused") {
         refusedByServer = true
+        // Sticks for this page's lifetime; leave a trace so a server-side
+        // regression (not a foreign push host) is diagnosable. No endpoint,
+        // no keys: only the problem type.
+        console.warn(
+          "Practice reminders: the server refused this push subscription",
+          error instanceof ApiError ? error.problem.type : "unknown",
+        )
       }
 
       throw new ReminderError(reason, { cause: error })
     }
 
-    deps.marker.set(deps.student() ?? "")
+    deps.marker.set(tokenSubject(deps.token()))
 
     return "on"
   }
@@ -325,14 +428,15 @@ export function createReminders(deps: RemindersDeps): BrowserReminders {
 
   function purgeStep(): Promise<void> {
     // Synchronous part first: signOut() clears the token right after the
-    // purge starts. Only the student who subscribed THIS browser has a
-    // server row to drop here; after a different student signs in
-    // (purgeIfSubjectChanged), the marker names the previous one, and the
-    // new token must not delete the new student's other device.
+    // purge starts. The server row is only this browser's to drop when the
+    // marker names the CAPTURED token's own account: after a different
+    // student signs in (purgeIfSubjectChanged, or a failed sign-in's
+    // signOut), the marker names someone else and this token must not delete
+    // its owner's other device.
     const owner = deps.marker.get()
     const token = deps.token()
 
-    if (owner !== null && token !== null && owner === (deps.student() ?? "")) {
+    if (owner !== null && token !== null && owner === tokenSubject(token)) {
       deps.removeWithToken(token)
     }
 
@@ -364,7 +468,10 @@ function browserVapidKey(): string | null {
 
   // `__VITE_VAPID_PUBLIC_KEY__` is the Docker placeholder docker-entrypoint.sh
   // swaps for the real key (or "") at container start.
-  return raw && !raw.startsWith("__VITE_") ? raw : null
+  // A malformed value is treated as no key (state() reads "unsupported").
+  return raw && !raw.startsWith("__VITE_") && /^[\w-]+=*$/u.test(raw)
+    ? raw
+    : null
 }
 
 function rejectAfter(ms: number): Promise<never> {
@@ -451,7 +558,6 @@ const browserReminders = createReminders({
   timezone: () => new Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
   locale: currentLocale,
   marker: browserMarker,
-  student: lastSignedInStudent,
   token: currentAccessToken,
   // A raw keepalive fetch, not apiFetch: apiFetch reads the token when it
   // sends (too late, it is cleared) and redirects to sign-in on a 401.

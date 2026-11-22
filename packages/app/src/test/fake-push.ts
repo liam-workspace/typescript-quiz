@@ -1,13 +1,42 @@
 import { vi } from "vitest"
 import type { PushEnvironment } from "../lib/reminders.js"
 
+/** A promise that never settles: a call the page never sees the end of. */
+export function neverSettles<T>(): Promise<T> {
+  return new Promise<T>(() => {
+    // Never settles, on purpose.
+  })
+}
+
+/** The bytes of the test VAPID key "AQAB". */
+export const TEST_SERVER_KEY = [1, 0, 1] as const
+
+/** An unsigned JWT-shaped token whose payload carries `sub` (tests only). */
+export function fakeJwt(sub: string): string {
+  const payload = btoa(JSON.stringify({ sub }))
+    .replace(/\+/gu, "-")
+    .replace(/\//gu, "_")
+    .replace(/=+$/u, "")
+
+  return `eyJhbGciOiJub25lIn0.${payload}.sig`
+}
+
 export function fakeSubscription(
   overrides: Partial<PushSubscriptionJSON> = {},
+  /** `null` = a subscription whose options are missing. */
+  serverKey: readonly number[] | null = TEST_SERVER_KEY,
 ) {
   const unsubscribe = vi.fn<() => Promise<boolean>>().mockResolvedValue(true)
 
   return {
     unsubscribe,
+    options:
+      serverKey === null
+        ? undefined
+        : {
+            userVisibleOnly: true,
+            applicationServerKey: new Uint8Array(serverKey).buffer,
+          },
     toJSON: () => ({
       endpoint: "https://fcm.googleapis.com/fcm/send/abc",
       expirationTime: null,
@@ -28,12 +57,14 @@ export function fakePushBrowser(
     permission?: NotificationPermission
     prompt?: NotificationPermission
     subscribed?: boolean
+    /** The key the pre-existing subscription was made with. */
+    subscribedKey?: readonly number[] | null
   } = {},
 ) {
   let permission: NotificationPermission = initial.permission ?? "default"
   let live: ReturnType<typeof fakeSubscription> | null = null
-  const issue = () => {
-    const subscription = fakeSubscription()
+  const issue = (serverKey: readonly number[] | null = TEST_SERVER_KEY) => {
+    const subscription = fakeSubscription({}, serverKey)
 
     subscription.unsubscribe.mockImplementation(() => {
       if (live === subscription) {
@@ -48,7 +79,7 @@ export function fakePushBrowser(
   }
 
   if (initial.subscribed) {
-    issue()
+    issue(initial.subscribedKey)
   }
 
   const push = {
@@ -59,10 +90,22 @@ export function fakePushBrowser(
       return Promise.resolve(permission)
     }),
     getSubscription: vi.fn(() => Promise.resolve(live)),
+    // Like PushManager: the same key returns the live subscription, another
+    // key while one is live is an InvalidStateError.
     subscribe: vi.fn((key: Uint8Array<ArrayBuffer>) => {
-      void key
+      if (live === null) {
+        return Promise.resolve(issue([...key]))
+      }
 
-      return Promise.resolve(live ?? issue())
+      const options = live.options as PushSubscriptionOptions | undefined
+      const current = options?.applicationServerKey
+      const same =
+        current instanceof ArrayBuffer &&
+        new Uint8Array(current).join() === [...key].join()
+
+      return same
+        ? Promise.resolve(live)
+        : Promise.reject(new DOMException("key mismatch", "InvalidStateError"))
     }),
   } satisfies PushEnvironment
 

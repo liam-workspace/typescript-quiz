@@ -4,11 +4,13 @@ import { BottomSheet } from "./BottomSheet.js"
 
 export interface ReminderPermissionSheetProps {
   readonly open: boolean
-  /** True while the browser's own permission prompt / subscribe call is in flight. */
+  /** True while the browser's permission prompt / subscribe is in flight. */
   readonly busy: boolean
   readonly onAllow: () => void
   readonly onDecline: () => void
   readonly returnFocusRef?: RefObject<HTMLElement | null>
+  /** Focused on close instead when the switch ended disabled (denied…). */
+  readonly fallbackFocusRef?: RefObject<HTMLElement | null>
 }
 
 /**
@@ -22,6 +24,7 @@ export function ReminderPermissionSheet({
   onAllow,
   onDecline,
   returnFocusRef,
+  fallbackFocusRef,
 }: ReminderPermissionSheetProps): JSX.Element {
   const { t } = useTranslation("runner")
 
@@ -29,13 +32,16 @@ export function ReminderPermissionSheet({
     <BottomSheet
       open={open}
       onOpenChange={(next) => {
-        if (!next) {
+        // While the browser prompt / subscribe is in flight, Escape or the
+        // close button must not pull the sheet out from under it.
+        if (!next && !busy) {
           onDecline()
         }
       }}
       title={t("profile.reminders.permission.title")}
       closeLabel={t("pwa.sheet.close")}
       returnFocusRef={returnFocusRef}
+      fallbackFocusRef={fallbackFocusRef}
     >
       <p className="reason">{t("profile.reminders.permission.body")}</p>
       <div className="btnrow">

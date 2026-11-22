@@ -8,6 +8,8 @@ export interface BottomSheetProps {
   readonly title: string
   readonly closeLabel: string
   readonly returnFocusRef?: RefObject<HTMLElement | null>
+  /** Takes focus on close when the `returnFocusRef` element is disabled. */
+  readonly fallbackFocusRef?: RefObject<HTMLElement | null>
   readonly children: ReactNode
 }
 
@@ -23,6 +25,7 @@ export function BottomSheet({
   title,
   closeLabel,
   returnFocusRef,
+  fallbackFocusRef,
   children,
 }: BottomSheetProps): JSX.Element {
   return (
@@ -33,12 +36,18 @@ export function BottomSheet({
           className="bsheet"
           aria-describedby={undefined}
           onCloseAutoFocus={(event) => {
-            if (!returnFocusRef?.current) {
+            const trigger = returnFocusRef?.current
+            const target =
+              trigger && !trigger.matches(":disabled")
+                ? trigger
+                : fallbackFocusRef?.current
+
+            if (!target) {
               return
             }
 
             event.preventDefault()
-            returnFocusRef.current.focus()
+            target.focus()
           }}
         >
           <div className="bsheet-grab" aria-hidden="true" />

@@ -58,6 +58,42 @@ describe("BottomSheet", () => {
     expect(screen.getByRole("button", { name: "Open sheet" })).toHaveFocus()
   })
 
+  it("returns focus to the fallback when the trigger is disabled by then", async () => {
+    const user = userEvent.setup()
+    const trigger = createRef<HTMLButtonElement>()
+    const fallback = createRef<HTMLParagraphElement>()
+
+    function Disabling() {
+      const [open, setOpen] = useState(true)
+
+      return (
+        <>
+          <button ref={trigger} type="button" disabled={!open}>
+            Trigger
+          </button>
+          <p ref={fallback} tabIndex={-1}>
+            Reason
+          </p>
+          <BottomSheet
+            open={open}
+            onOpenChange={setOpen}
+            title="Sheet"
+            closeLabel="Close"
+            returnFocusRef={trigger}
+            fallbackFocusRef={fallback}
+          >
+            <p>Body</p>
+          </BottomSheet>
+        </>
+      )
+    }
+
+    render(<Disabling />)
+    await user.keyboard("{Escape}")
+
+    expect(screen.getByText("Reason")).toHaveFocus()
+  })
+
   it("closes from the close button", async () => {
     const user = userEvent.setup()
 

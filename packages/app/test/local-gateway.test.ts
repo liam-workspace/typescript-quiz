@@ -78,6 +78,7 @@ function serverEnvelope(id = "srv-1"): RunnerEnvelope {
     questionCount: 3,
     answeredCount: 1,
     unansweredOrdinals: [2, 3],
+    offlineJournalCursor: 0,
     currentSectionId: "sec-l",
     currentQuestionId: "q-l1",
     sections: makeLocalState().sections.map((s) =>
@@ -152,6 +153,61 @@ describe("LocalAttemptGateway — start", () => {
     // ...and the sibling cannot drive the first student's attempt either.
     await expect(sibling.setPosition("att-1", "sec-l", "q-l1")).rejects.toEqual(
       new OfflineError("not_hydrated"),
+    )
+  })
+
+  it("with nobody signed in, starts nothing and mirrors nothing (an unowned attempt would be anybody's)", async () => {
+    const { local, journal, owner } = await setup()
+
+    owner.sub = null
+
+    await expect(local.start("practice-3")).rejects.toEqual(
+      new OfflineError("no_owner"),
+    )
+    await expect(local.hydrate(serverEnvelope())).rejects.toEqual(
+      new OfflineError("no_owner"),
+    )
+    expect(await journal.listAttempts()).toEqual([])
+  })
+
+  it("a row with no recorded owner is nobody's: never resumed, driven or reported", async () => {
+    const { local, journal } = await setup()
+
+    await journal.putAttempt(makeLocalState({ ownerSub: null }))
+
+    await expect(local.setPosition("att-1", "sec-l", "q-l1")).rejects.toEqual(
+      new OfflineError("not_hydrated"),
+    )
+    expect(await local.isLocalOnly("att-1")).toBe(false)
+    expect(await local.getMine("att-1")).toBeNull()
+  })
+
+  it("does not resume an attempt whose journal the server refused", async () => {
+    const { local, journal } = await setup()
+
+    await local.start("practice-3")
+    await journal.update("att-1", (s) => ({
+      ...s,
+      syncError: "offline_journal_invalid",
+    }))
+
+    await expect(local.start("practice-3")).rejects.toEqual(
+      new OfflineError("sync_failed"),
+    )
+  })
+
+  it("does not resume an attempt whose clock ran out: it is finalized and reported as expired", async () => {
+    const { local, journal, now } = await setup()
+
+    await local.start("practice-3")
+    await local.enterSection("att-1", "sec-l")
+    now.v = T0 + 1_200_000
+
+    await expect(local.start("practice-3")).rejects.toMatchObject({
+      problem: { type: "attempt_expired" },
+    })
+    expect((await journal.getAttempt("att-1"))?.finalized?.status).toBe(
+      "expired",
     )
   })
 

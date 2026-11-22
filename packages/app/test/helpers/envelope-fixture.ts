@@ -32,6 +32,7 @@ export function makeEnvelope(
     questionCount: 3,
     answeredCount: 0,
     unansweredOrdinals: [1, 2, 3],
+    offlineJournalCursor: 0,
     currentSectionId: openId,
     currentQuestionId: open === "listening" ? "q-l1" : "q-r1",
     sections: bundle.sections.map((section) => ({

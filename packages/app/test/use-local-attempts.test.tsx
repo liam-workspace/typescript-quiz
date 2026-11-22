@@ -30,6 +30,9 @@ describe("useLocalAttemptIds", () => {
       makeLocalState({ attemptId: "sibling", ownerSub: "sub-2" }),
     )
     await journal.putAttempt(
+      makeLocalState({ attemptId: "unowned", ownerSub: null }),
+    )
+    await journal.putAttempt(
       makeLocalState({
         attemptId: "mine-over",
         finalized: { status: "expired", submittedAt: "x" },

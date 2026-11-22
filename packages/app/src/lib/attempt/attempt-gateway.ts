@@ -16,6 +16,10 @@ export type OfflineReason =
   | "not_saved"
   | "media_missing"
   | "not_hydrated"
+  /** Nobody is signed in on this phone: offline work needs an owner. */
+  | "no_owner"
+  /** The server refused this attempt's journal; it is kept, not continued. */
+  | "sync_failed"
 
 /**
  * Thrown by a gateway for something that needs a connection (or a saved test)

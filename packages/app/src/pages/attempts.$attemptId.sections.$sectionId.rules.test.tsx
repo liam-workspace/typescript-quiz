@@ -91,6 +91,7 @@ describe("SectionRulesScreen", () => {
       questionCount: 20,
       answeredCount: 0,
       unansweredOrdinals: [1],
+      offlineJournalCursor: 0,
       currentSectionId: null,
       currentQuestionId: null,
       sections: [

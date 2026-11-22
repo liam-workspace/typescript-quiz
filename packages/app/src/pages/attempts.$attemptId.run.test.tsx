@@ -279,6 +279,7 @@ const listeningEnvelope: RunnerEnvelope = {
   questionCount: 20,
   answeredCount: 0,
   unansweredOrdinals: [3, 4],
+  offlineJournalCursor: 0,
   currentSectionId: "section-listening",
   currentQuestionId: "q-1",
   sections: [
@@ -349,6 +350,7 @@ const multiChoiceEnvelope: RunnerEnvelope = {
   questionCount: 20,
   answeredCount: 0,
   unansweredOrdinals: [3, 4],
+  offlineJournalCursor: 0,
   currentSectionId: "section-listening",
   currentQuestionId: "q-1",
   sections: [
@@ -430,6 +432,7 @@ const readingEnvelope: RunnerEnvelope = {
   questionCount: 20,
   answeredCount: 0,
   unansweredOrdinals: [5, 6, 7, 8],
+  offlineJournalCursor: 0,
   currentSectionId: "section-reading",
   currentQuestionId: "q-r2",
   sections: [

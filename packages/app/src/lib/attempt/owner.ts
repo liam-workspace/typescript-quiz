@@ -1,4 +1,18 @@
 import { currentAccessToken } from "../auth.js"
+import type { LocalAttemptState } from "./journal-types.js"
+
+/**
+ * Whether `state` belongs to the student `sub`. Fails CLOSED: an attempt
+ * with no recorded owner (or nobody signed in) is nobody's -- never
+ * resumed, counted or synced -- so it can never be sent under the wrong
+ * student (the server would 403 it and the journal would be stuck).
+ */
+export function isOwnedBy(
+  state: Pick<LocalAttemptState, "ownerSub">,
+  sub: string | null,
+): boolean {
+  return sub !== null && state.ownerSub === sub
+}
 
 /**
  * The signed-in student's JWT `sub`, read from the access token WITHOUT

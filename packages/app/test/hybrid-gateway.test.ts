@@ -30,6 +30,7 @@ function envelopeFor(id: string): RunnerEnvelope {
     questionCount: 3,
     answeredCount: 0,
     unansweredOrdinals: [1, 2, 3],
+    offlineJournalCursor: 0,
     currentSectionId: "sec-l",
     currentQuestionId: "q-l1",
     sections: makeLocalState().sections.map((s) =>

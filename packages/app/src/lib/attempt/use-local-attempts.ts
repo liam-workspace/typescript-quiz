@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { currentSubject } from "./owner.js"
+import { currentSubject, isOwnedBy } from "./owner.js"
 import { getAttemptRuntime } from "./runtime.js"
 
 const NONE: ReadonlySet<string> = new Set()
@@ -27,11 +27,7 @@ export function useLocalAttemptIds(): ReadonlySet<string> {
         setIds(
           new Set(
             attempts
-              .filter(
-                (a) =>
-                  (a.ownerSub === null || a.ownerSub === me) &&
-                  a.finalized === null,
-              )
+              .filter((a) => isOwnedBy(a, me) && a.finalized === null)
               .map((a) => a.attemptId),
           ),
         )

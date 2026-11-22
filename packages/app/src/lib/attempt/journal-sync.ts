@@ -4,6 +4,7 @@ import type { Scheduler } from "../flushController.js"
 import { classifyForRetry } from "../retryClassifier.js"
 import type { JournalStore } from "./journal-store.js"
 import type { JournalEventRecord, LocalAttemptState } from "./journal-types.js"
+import { isOwnedBy } from "./owner.js"
 import type { SyncStatusStore } from "./sync-status.js"
 
 /** `POST /attempts/offline-sync` 200 (server `OfflineSyncResult`). */
@@ -114,8 +115,31 @@ const isVerdict = (error: ApiError): boolean =>
   error.problem.status !== 401 &&
   error.problem.status !== 429
 
+/** Set as `syncError` when an acknowledgement does not fit what was sent. */
+export const ACK_MISMATCH = "offline_sync_ack_mismatch"
+
+/**
+ * Defence in depth against a journal numbered below the server's cursor
+ * (the server skips those events yet acknowledges through its cursor):
+ * acting on such an ack would delete unsent events and their answers.
+ *   - an ack BEYOND the last event sent: the server holds history this
+ *     journal does not know about;
+ *   - a first send of new events that the server processed none of.
+ * Either way nothing is deleted or acknowledged, and the sync is failed.
+ */
+function ackContradictsJournal(
+  response: OfflineSyncResponse,
+  sent: { readonly lastSent: number; readonly firstSend: boolean },
+): boolean {
+  const processed = response.applied + response.late + response.rejected
+
+  return (
+    response.ackedThrough > sent.lastSent || (sent.firstSend && processed === 0)
+  )
+}
+
 type Sent =
-  | { kind: "ok"; response: OfflineSyncResponse }
+  | { kind: "ok"; response: OfflineSyncResponse; tries: number }
   | { kind: "offline" }
   | { kind: "terminal"; type: string }
 
@@ -137,7 +161,7 @@ export function createJournalSync(deps: JournalSyncDeps): JournalSync {
   let timer: ReturnType<typeof setTimeout> | undefined = undefined
 
   const isMine = (state: LocalAttemptState): boolean =>
-    state.ownerSub === null || state.ownerSub === deps.currentSub()
+    isOwnedBy(state, deps.currentSub())
 
   async function publish(syncing: boolean): Promise<void> {
     const attempts = (await deps.journal.listAttempts()).filter(isMine)
@@ -192,7 +216,7 @@ export function createJournalSync(deps: JournalSyncDeps): JournalSync {
           events: events.map(toWire),
         })
 
-        return { kind: "ok", response }
+        return { kind: "ok", response, tries: attempt }
       } catch (error) {
         if (error instanceof ApiError && isVerdict(error)) {
           return { kind: "terminal", type: error.problem.type }
@@ -254,6 +278,15 @@ export function createJournalSync(deps: JournalSyncDeps): JournalSync {
         return { kind: "offline" }
       }
 
+      const lastSent = events.at(-1)?.eventSeq ?? 0
+      const sentBefore = state.sentThrough ?? state.syncedThrough
+
+      // eslint-disable-next-line no-await-in-loop
+      await deps.journal.update(attemptId, (s) => ({
+        ...s,
+        sentThrough: Math.max(s.sentThrough ?? 0, lastSent),
+      }))
+
       // eslint-disable-next-line no-await-in-loop
       const sent = await send(attemptId, events)
 
@@ -272,6 +305,23 @@ export function createJournalSync(deps: JournalSyncDeps): JournalSync {
       }
 
       const { response } = sent
+
+      if (
+        ackContradictsJournal(response, {
+          lastSent,
+          // Only a FIRST send can prove the server should have applied
+          // something: a retry may follow a request that landed.
+          firstSend: sent.tries === 1 && sentBefore < lastSent,
+        })
+      ) {
+        // eslint-disable-next-line no-await-in-loop
+        await deps.journal.update(attemptId, (s) => ({
+          ...s,
+          syncError: ACK_MISMATCH,
+        }))
+
+        return { kind: "terminal", type: ACK_MISMATCH }
+      }
 
       // eslint-disable-next-line no-await-in-loop
       await deps.journal.markSynced(attemptId, response.ackedThrough)

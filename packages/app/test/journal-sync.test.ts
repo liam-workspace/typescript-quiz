@@ -384,6 +384,31 @@ describe("createJournalSync", () => {
     ])
   })
 
+  it("never syncs or counts a row with no recorded owner, nor anything while signed out", async () => {
+    const post = vi.fn(echo)
+    const { sync, journal, status, sub } = await setup(post)
+
+    await journal.putAttempt(
+      makeLocalState({ attemptId: "att-unowned", ownerSub: null }),
+    )
+    await journal.append("att-unowned", {
+      type: "start",
+      clientAt: at,
+      payload: { slug: "p3" },
+    })
+    sub.v = null
+    await sync.syncAll()
+
+    expect(post).not.toHaveBeenCalled()
+
+    sub.v = "sub-1"
+    await sync.syncAll()
+
+    expect(sentBodies(post).map((b) => b.attemptId)).toEqual(["att-1"])
+    expect(status.getSnapshot().pendingAttempts).toBe(0)
+    expect(await journal.pendingCount("att-unowned")).toBe(1)
+  })
+
   it("publishes pending counts to the status store", async () => {
     const post = vi.fn(echo)
     const { sync, status, online } = await setup(post, {

@@ -75,6 +75,7 @@ const baseEnvelope: RunnerEnvelope = {
   questionCount: 40,
   answeredCount: 38,
   unansweredOrdinals: [12, 31],
+  offlineJournalCursor: 0,
   currentSectionId: "section-1",
   currentQuestionId: "q-1",
   sections: [],
@@ -599,6 +600,7 @@ describe("HandInScreen", () => {
             ...baseEnvelope,
             answeredCount: 0,
             unansweredOrdinals: [],
+            offlineJournalCursor: 0,
           }}
           queue={queue}
           navigate={navigate}

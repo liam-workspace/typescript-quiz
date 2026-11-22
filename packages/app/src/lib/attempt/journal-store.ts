@@ -153,6 +153,60 @@ export class JournalStore {
     }
   }
 
+  /**
+   * Check-and-write in ONE transaction: `decide` sees the stored state (or
+   * null) and how many of its events are unsynced, and returns the row to
+   * write or null to leave it alone. Nothing can append between the check
+   * and the write, and the store-owned event counter never moves backwards.
+   */
+  async replaceIfSettled(
+    attemptId: string,
+    decide: (
+      existing: LocalAttemptState | null,
+      pending: number,
+    ) => LocalAttemptState | null,
+  ): Promise<LocalAttemptState | null> {
+    const tx = this.db.transaction([ATTEMPTS, EVENTS], "readwrite")
+    const done = txDone(tx)
+
+    try {
+      const attempts = tx.objectStore(ATTEMPTS)
+      const existing =
+        (await promisify(
+          attempts.get(attemptId) as IDBRequest<LocalAttemptState | undefined>,
+        )) ?? null
+      const pending = await promisify(
+        tx
+          .objectStore(EVENTS)
+          .count(eventsRange(attemptId, existing?.syncedThrough ?? 0)),
+      )
+      const decided = decide(existing, pending)
+      const next =
+        decided === null
+          ? null
+          : {
+              ...decided,
+              attemptId,
+              nextEventSeq: Math.max(
+                decided.nextEventSeq,
+                existing?.nextEventSeq ?? 1,
+              ),
+            }
+
+      if (next !== null) {
+        attempts.put(next)
+      }
+
+      await done
+
+      return next
+    } catch (error) {
+      JournalStore.abortQuietly(tx, done)
+
+      throw error
+    }
+  }
+
   async append(
     attemptId: string,
     draft: JournalEventDraft,

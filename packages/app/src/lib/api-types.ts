@@ -283,6 +283,9 @@ export interface RunnerEnvelope {
   currentQuestionId: string | null
   sections: RunnerSection[]
   responses: RecordedResponse[]
+  // The highest offline-journal eventSeq the server has applied (0 when none):
+  // a mirror of this attempt continues its journal at this + 1.
+  offlineJournalCursor: number
 }
 
 export interface OfflineMedia {

@@ -27,6 +27,7 @@ import type { JournalEventDraft, JournalStore } from "./journal-store.js"
 import type { JournalEventType, LocalAttemptState } from "./journal-types.js"
 import { buildLocalEnvelope } from "./local-envelope.js"
 import { toPendingSection } from "./local-sections.js"
+import { isOwnedBy } from "./owner.js"
 
 export interface LocalGatewayDeps {
   readonly journal: JournalStore
@@ -241,30 +242,34 @@ export class LocalAttemptGateway implements AttemptGateway {
   }
 
   async start(slug: string, hint?: StartHint): Promise<AttemptStart> {
+    const owner = this.mustOwner()
     const nowMs = this.deps.clock.nowMs()
     const mine = await this.myAttempts()
     const hinted = hint?.inProgressAttemptId ?? null
+    // The server already has an attempt in progress for this test. A new
+    // offline attempt would be refused at sync (`offline_attempt_conflict`)
+    // and the student's work stranded, so only an attempt this phone already
+    // holds can continue offline.
+    const held =
+      hinted === null
+        ? mine.find((a) => a.slug === slug && a.finalized === null)
+        : mine.find((a) => a.attemptId === hinted)
 
-    if (hinted !== null) {
-      // The server already has an attempt in progress for this test. A new
-      // offline attempt would be refused at sync (`offline_attempt_conflict`)
-      // and the student's work stranded, so only an attempt this phone
-      // already holds can continue offline.
-      const held = mine.find((a) => a.attemptId === hinted)
+    if (hinted !== null && !held) {
+      throw new OfflineError("not_hydrated")
+    }
 
-      if (!held) {
-        throw new OfflineError("not_hydrated")
+    if (held) {
+      // A journal the server refused cannot be continued (nor replaced by a
+      // second attempt the server would also refuse), and one whose clock
+      // ran out is over: say so instead of resuming it.
+      if (held.syncError !== null) {
+        throw new OfflineError("sync_failed")
       }
 
       await this.assertLive(held, nowMs)
 
       return LocalAttemptGateway.startView(held, true, nowMs)
-    }
-
-    const existing = mine.find((a) => a.slug === slug && a.finalized === null)
-
-    if (existing) {
-      return LocalAttemptGateway.startView(existing, true, nowMs)
     }
 
     const bundle = await this.deps.bundles.getBundle(slug)
@@ -280,7 +285,7 @@ export class LocalAttemptGateway implements AttemptGateway {
       testVersionId: bundle.testVersionId,
       title: bundle.title,
       attemptNumber: mine.filter((a) => a.slug === slug).length + 1,
-      ownerSub: this.deps.ownerSub(),
+      ownerSub: owner,
       origin: "offline",
       serverKnown: false,
       createdAt: iso(nowMs),
@@ -322,18 +327,7 @@ export class LocalAttemptGateway implements AttemptGateway {
    * an attempt the server does not know yet), nor another student's.
    */
   async hydrate(envelope: RunnerEnvelope): Promise<void> {
-    const existing = await this.deps.journal.getAttempt(envelope.id)
-
-    if (
-      existing &&
-      (!this.isMine(existing) ||
-        !existing.serverKnown ||
-        existing.syncError !== null ||
-        (await this.deps.journal.pendingCount(envelope.id)) > 0)
-    ) {
-      return
-    }
-
+    const owner = this.mustOwner()
     const nowMs = this.deps.clock.nowMs()
     // Server clock minus local clock, fixed at load: server instants are
     // re-expressed on the local timeline so deadlines are judged by one clock.
@@ -360,37 +354,56 @@ export class LocalAttemptGateway implements AttemptGateway {
       0,
     )
     const attemptExpiresAt = toLocal(envelope.expiresAt)
+    // The server skips every journal event at or below its cursor (and acks
+    // through it): a mirror must continue its journal AFTER it, or its next
+    // events would be acknowledged without ever being applied.
+    const cursor = envelope.offlineJournalCursor
 
-    await this.deps.journal.putAttempt({
-      attemptId: envelope.id,
-      slug: existing?.slug ?? null,
-      testVersionId: existing?.testVersionId ?? null,
-      title: envelope.testTitle,
-      attemptNumber: envelope.attemptNumber,
-      ownerSub: existing?.ownerSub ?? this.deps.ownerSub(),
-      origin: existing?.origin ?? "hydrated",
-      serverKnown: true,
-      createdAt: existing?.createdAt ?? iso(nowMs),
-      versionDurationSeconds,
-      sections,
-      playbackBySection:
-        existing?.playbackBySection ??
-        Object.fromEntries(sections.map((s) => [s.id, playbackOf(s)])),
-      mediaKeyByStimulus: existing?.mediaKeyByStimulus ?? {},
-      attemptStartedAt:
-        attemptExpiresAt === null
+    // Checked and written in one transaction, so nothing appended meanwhile
+    // can be overwritten.
+    await this.deps.journal.replaceIfSettled(
+      envelope.id,
+      (existing, pending) =>
+        existing &&
+        (!isOwnedBy(existing, owner) ||
+          !existing.serverKnown ||
+          existing.syncError !== null ||
+          pending > 0)
           ? null
-          : iso(Date.parse(attemptExpiresAt) - versionDurationSeconds * 1000),
-      attemptExpiresAt,
-      currentSectionId: envelope.currentSectionId,
-      currentQuestionId: envelope.currentQuestionId,
-      playsUsed,
-      nextEventSeq: existing?.nextEventSeq ?? 1,
-      syncedThrough: existing?.syncedThrough ?? 0,
-      finalized: null,
-      syncError: null,
-      responses: envelope.responses,
-    })
+          : {
+              attemptId: envelope.id,
+              slug: existing?.slug ?? null,
+              testVersionId: existing?.testVersionId ?? null,
+              title: envelope.testTitle,
+              attemptNumber: envelope.attemptNumber,
+              ownerSub: owner,
+              origin: existing?.origin ?? "hydrated",
+              serverKnown: true,
+              createdAt: existing?.createdAt ?? iso(nowMs),
+              versionDurationSeconds,
+              sections,
+              playbackBySection:
+                existing?.playbackBySection ??
+                Object.fromEntries(sections.map((s) => [s.id, playbackOf(s)])),
+              mediaKeyByStimulus: existing?.mediaKeyByStimulus ?? {},
+              attemptStartedAt:
+                attemptExpiresAt === null
+                  ? null
+                  : iso(
+                      Date.parse(attemptExpiresAt) -
+                        versionDurationSeconds * 1000,
+                    ),
+              attemptExpiresAt,
+              currentSectionId: envelope.currentSectionId,
+              currentQuestionId: envelope.currentQuestionId,
+              playsUsed,
+              nextEventSeq: Math.max(existing?.nextEventSeq ?? 1, cursor + 1),
+              syncedThrough: Math.max(existing?.syncedThrough ?? 0, cursor),
+              finalized: null,
+              syncError: null,
+              responses: envelope.responses,
+            },
+    )
   }
 
   // ---- mirrors: a remote call succeeded; keep the offline copy current ----
@@ -758,18 +771,27 @@ export class LocalAttemptGateway implements AttemptGateway {
   async getMine(attemptId: string): Promise<LocalAttemptState | null> {
     const state = await this.deps.journal.getAttempt(attemptId)
 
-    return state && this.isMine(state) ? state : null
+    return state && isOwnedBy(state, this.deps.ownerSub()) ? state : null
   }
 
   // ---- internals ----
 
-  private isMine(state: LocalAttemptState): boolean {
-    return state.ownerSub === null || state.ownerSub === this.deps.ownerSub()
+  /** Nothing is created or mirrored without a student to own it. */
+  private mustOwner(): string {
+    const owner = this.deps.ownerSub()
+
+    if (owner === null) {
+      throw new OfflineError("no_owner")
+    }
+
+    return owner
   }
 
   private async myAttempts(): Promise<LocalAttemptState[]> {
+    const me = this.deps.ownerSub()
+
     return (await this.deps.journal.listAttempts()).filter((a) =>
-      this.isMine(a),
+      isOwnedBy(a, me),
     )
   }
 
@@ -788,16 +810,17 @@ export class LocalAttemptGateway implements AttemptGateway {
     attemptId: string,
     mutate: (s: LocalAttemptState) => LocalAttemptState,
   ): Promise<void> {
-    const state = await this.getMine(attemptId)
+    const me = this.deps.ownerSub()
 
-    if (
-      !state?.serverKnown ||
-      (await this.deps.journal.pendingCount(attemptId)) > 0
-    ) {
-      return
-    }
-
-    await this.deps.journal.update(attemptId, mutate)
+    await this.deps.journal.replaceIfSettled(attemptId, (state, pending) =>
+      state &&
+      isOwnedBy(state, me) &&
+      state.serverKnown &&
+      state.syncError === null &&
+      pending === 0
+        ? mutate(state)
+        : null,
+    )
   }
 
   /**

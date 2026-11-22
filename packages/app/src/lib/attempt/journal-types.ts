@@ -52,4 +52,6 @@ export interface LocalAttemptState {
    * AnswerQueue and the journal remain what is sent.
    */
   responses?: RecordedResponse[]
+  /** The highest eventSeq ever put on the wire (a lost response may hide that it landed). */
+  sentThrough?: number
 }

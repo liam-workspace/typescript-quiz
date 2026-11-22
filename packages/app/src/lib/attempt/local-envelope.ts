@@ -83,5 +83,6 @@ export async function buildLocalEnvelope(
     currentQuestionId: state.currentQuestionId,
     sections,
     responses,
+    offlineJournalCursor: state.syncedThrough,
   }
 }

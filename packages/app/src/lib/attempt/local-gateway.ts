@@ -710,7 +710,7 @@ export class LocalAttemptGateway implements AttemptGateway {
   async finishSection(
     attemptId: string,
     sectionId: string,
-    _body: FinishSectionRequest,
+    body: FinishSectionRequest,
   ): Promise<FinishSectionResult> {
     const state = await this.mustGet(attemptId)
     const nowMs = this.deps.clock.nowMs()
@@ -724,8 +724,9 @@ export class LocalAttemptGateway implements AttemptGateway {
       throw problem("not_found", 404)
     }
 
-    // Answers travel as their own journal events (noted before this call),
-    // so there is no remainder to flush here.
+    // Answers normally travel as their own journal events, noted before
+    // this call; `finalFlush` stays empty because the journal sync acks the
+    // queue once the server holds them.
     const done: FinishSectionResult = {
       sectionId,
       status: "finished",
@@ -741,6 +742,8 @@ export class LocalAttemptGateway implements AttemptGateway {
       throw problem("section_not_open", 409)
     }
 
+    await this.journalRemainder(state, sectionId, body)
+
     await this.record(
       attemptId,
       { type: "finish_section", payload: { sectionId }, nowMs },
@@ -755,6 +758,65 @@ export class LocalAttemptGateway implements AttemptGateway {
     )
 
     return done
+  }
+
+  /**
+   * The queue's remainder for this section (`body.responses`) may hold
+   * answers that never reached the journal: tapped while the attempt was
+   * online and synced (only mirrored, the FlushController owned the send)
+   * and the network went before that send landed. Journal them BEFORE the
+   * `finish_section`, or the sync would close the section first and every
+   * later send of them would be refused. Already-journaled ones (same
+   * device seq) are skipped, and an answer the rules refuse is left out.
+   */
+  private async journalRemainder(
+    state: LocalAttemptState,
+    sectionId: string,
+    body: FinishSectionRequest,
+  ): Promise<void> {
+    const remainder = body.responses ?? []
+
+    if (remainder.length === 0) {
+      return
+    }
+
+    const journaled = new Set(
+      (
+        await this.deps.journal.eventsAfter(
+          state.attemptId,
+          state.syncedThrough,
+        )
+      )
+        .filter((e) => e.type === "answer")
+        .map(
+          (e) =>
+            `${String(e.payload.clientInstanceId)}:${String(e.payload.seq)}`,
+        ),
+    )
+
+    for (const item of remainder) {
+      if (journaled.has(`${body.clientInstanceId}:${item.seq}`)) {
+        continue
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      await this.noteAnswer(state.attemptId, {
+        attemptId: state.attemptId,
+        sectionId,
+        questionId: item.questionId,
+        clientInstanceId: body.clientInstanceId,
+        seq: item.seq,
+        selectedChoiceIds: item.selectedChoiceIds,
+        answeredAt: item.answeredAt,
+        timeSpentMs: item.timeSpentMs ?? null,
+        terminalRejection: false,
+      }).catch((error: unknown) => {
+        // A refused answer would be applied nowhere; never let it block the finish.
+        if (!(error instanceof ApiError)) {
+          throw error
+        }
+      })
+    }
   }
 
   // Fixed by the AttemptGateway contract: handing in always needs the server.

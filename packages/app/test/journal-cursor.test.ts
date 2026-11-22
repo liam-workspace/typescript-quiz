@@ -8,7 +8,10 @@ import {
   type OfflineSyncBody,
   type OfflineSyncResponse,
 } from "../src/lib/attempt/journal-sync.js"
+import { HybridAttemptGateway } from "../src/lib/attempt/hybrid-gateway.js"
 import { LocalAttemptGateway } from "../src/lib/attempt/local-gateway.js"
+import { RemoteAttemptGateway } from "../src/lib/attempt/remote-gateway.js"
+import { buildSectionFinishRemainder } from "../src/lib/lifecycleFlush.js"
 import { createSyncStatusStore } from "../src/lib/attempt/sync-status.js"
 import { makeBundle } from "./helpers/bundle-fixture.js"
 import { makeLocalState } from "./helpers/local-state-fixture.js"
@@ -209,5 +212,75 @@ describe("journal cursor of a re-hydrated attempt (no local row, server cursor N
     expect((await sync(post).syncNow("srv-1")).kind).toBe("synced")
     expect(await journal.pendingCount("srv-1")).toBe(0)
     expect((await journal.getAttempt("srv-1"))?.syncError).toBeNull()
+  })
+})
+
+describe("an online answer whose flush never landed, then the network drops", () => {
+  it("finishing the section offline journals the answer BEFORE finish_section, and the sync applies it", async () => {
+    const { journal, queue, local, sync } = await setup()
+    const online = { v: true }
+    const cursor = { v: 0 }
+    const post = cursorServer(cursor)
+    const journalSync = sync(post)
+    const remote = new RemoteAttemptGateway({
+      startAttempt: () => Promise.reject(new TypeError("Failed to fetch")),
+      getRunnerEnvelope: () => Promise.resolve(serverEnvelope(0)),
+      enterSection: () => Promise.reject(new TypeError("Failed to fetch")),
+      setPosition: () => Promise.reject(new TypeError("Failed to fetch")),
+      claimPlay: () => Promise.reject(new TypeError("Failed to fetch")),
+      finishSection: () => Promise.reject(new TypeError("Failed to fetch")),
+      submitAttempt: () => Promise.reject(new TypeError("Failed to fetch")),
+    })
+    const hybrid = new HybridAttemptGateway({
+      remote,
+      local,
+      journal,
+      sync: journalSync,
+      isOnline: () => online.v,
+    })
+
+    await hybrid.loadEnvelope("srv-1")
+
+    // Tapped online: queued and only mirrored (the FlushController owns the
+    // send) -- and that send never lands.
+    const queued = await queue.recordAnswer(
+      {
+        attemptId: "srv-1",
+        sectionId: "sec-l",
+        questionId: "q-l1",
+        selectedChoiceIds: ["c-l1b"],
+        timeSpentMs: null,
+      },
+      new Date(T0),
+    )
+
+    await hybrid.noteAnswer("srv-1", queued)
+    expect(await journal.eventsAfter("srv-1", 0)).toEqual([])
+
+    online.v = false
+    await hybrid.finishSection(
+      "srv-1",
+      "sec-l",
+      await buildSectionFinishRemainder(queue, "srv-1", "sec-l"),
+    )
+
+    const journaled = await journal.eventsAfter("srv-1", 0)
+
+    expect(journaled.map((e) => e.type)).toEqual(["answer", "finish_section"])
+    expect(journaled[0]?.payload).toEqual({
+      sectionId: "sec-l",
+      questionId: "q-l1",
+      clientInstanceId: queue.clientInstanceId(),
+      seq: queued.seq,
+      selectedChoiceIds: ["c-l1b"],
+    })
+
+    online.v = true
+    expect((await journalSync.syncNow("srv-1")).kind).toBe("synced")
+    await expect(post.mock.results[0]?.value).resolves.toMatchObject({
+      applied: 2,
+      answersAcked: 1,
+    })
+    expect(await queue.snapshotForAttempt("srv-1")).toEqual([])
   })
 })

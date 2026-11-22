@@ -111,7 +111,7 @@
   "result.summary": "{{correct}} correctes · {{incorrect}} incorrectes · {{unanswered}} sans réponse · {{answered}} répondues",
   "result.practiceNotice": "{{title}}, version {{version}}. Il s’agit d’un score d’entraînement, et non d’un score officiel étalonné du TOEFL Primary.",
   "result.backToLibrary": "Retour à la bibliothèque",
-  "result.reviewAnswers": "Voir les réponses →",
+  "result.reviewAnswers": "Voir les réponses",
   "result.forbidden": "Tu ne peux pas voir ce résultat.",
   "result.error": "Le résultat n’a pas pu être chargé. Réessaie.",
   "review.title": "Révision",
@@ -331,5 +331,6 @@
   "result.headlineGood": "Bel effort !",
   "result.headlineKeepGoing": "Continue de t’entraîner !",
   "history.resultLink": "Résultat",
-  "runner.saveState.pendingShort": "En attente d’envoi : {{count}}"
+  "runner.saveState.pendingShort": "En attente d’envoi : {{count}}",
+  "runner.previousQuestion": "Question précédente"
 }

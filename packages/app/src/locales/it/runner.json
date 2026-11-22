@@ -111,7 +111,7 @@
   "result.summary": "{{correct}} corrette · {{incorrect}} errate · {{unanswered}} senza risposta · {{answered}} risposte",
   "result.practiceNotice": "{{title}}, versione {{version}}. Questo è un punteggio di esercitazione, non un punteggio ufficiale in scala TOEFL Primary.",
   "result.backToLibrary": "Torna alla raccolta",
-  "result.reviewAnswers": "Rivedi le risposte →",
+  "result.reviewAnswers": "Rivedi le risposte",
   "result.forbidden": "Non puoi vedere questo risultato.",
   "result.error": "Impossibile caricare il risultato. Riprova.",
   "review.title": "Revisione",
@@ -331,5 +331,6 @@
   "result.headlineGood": "Bell’impegno!",
   "result.headlineKeepGoing": "Continua a esercitarti!",
   "history.resultLink": "Risultato",
-  "runner.saveState.pendingShort": "In attesa di invio: {{count}}"
+  "runner.saveState.pendingShort": "In attesa di invio: {{count}}",
+  "runner.previousQuestion": "Domanda precedente"
 }

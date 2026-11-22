@@ -603,6 +603,7 @@ describe("RunScreen", () => {
     cleanup()
     networkStore.setOnlineForTests(true)
     pendingCountStore.set(0)
+    toastStore.resetForTests()
     vi.clearAllMocks()
     vi.unstubAllGlobals()
     await getQueue().close()
@@ -1446,6 +1447,37 @@ describe("RunScreen", () => {
       expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument()
     })
     expect(screen.getByRole("status")).toHaveTextContent("Saved")
+    expect(toastStore.getSnapshot()?.message).toBe(
+      "Back online — 1 answer sent.",
+    )
+  })
+
+  it("shows no back-online toast on mount or for a session that was never pending", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            results: [{ questionId: "q-r2", status: "applied" }],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      ),
+    )
+    const user = userEvent.setup()
+
+    renderRunScreen(readingEnvelope)
+    expect(toastStore.getSnapshot()).toBeNull()
+
+    await user.click(screen.getByRole("radio", { name: "A city" }))
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalled()
+    })
+    await waitFor(() => {
+      expect(document.querySelector(".save-state")).toHaveTextContent("Saved")
+    })
+
+    expect(toastStore.getSnapshot()).toBeNull()
   })
 
   it("keeps answer controls enabled and records a new selection while the offline banner is showing", async () => {

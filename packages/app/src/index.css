@@ -9,7 +9,7 @@
  * pre-built dist JS (e.g. Sheet's `fixed`/`inset-y-0`/`w-72`/`z-50` and
  * Button's `bg-primary`/`h-9` variants) were never generated into this
  * app's CSS -- verified against the compiled output while checking
- * QuestionNavigator/AppMenu's SheetContent for task 7's device-emulation
+ * QuestionNavigator's SheetContent for task 7's device-emulation
  * pass: the Sheet rendered with `position: static` (the `.fixed` class
  * happened to exist only by accident, via the word "fixed" inside an
  * unrelated code comment) and sat wherever it fell in normal document
@@ -596,26 +596,7 @@
     text-align: left;
     font-variant-numeric: tabular-nums;
   }
-  .score-badge {
-    display: inline-flex;
-    margin-left: 4px;
-    border-radius: 999px;
-    padding: 2px 8px;
-    font-size: 12px;
-    font-weight: 800;
-  }
-  .score-badge[data-score-band="high"] {
-    background: var(--color-good-bg);
-    color: var(--color-good);
-  }
-  .score-badge[data-score-band="mid"] {
-    background: var(--color-teal-bg);
-    color: var(--color-teal);
-  }
-
-  /* Drawer and navigator overlays are genuine modal Radix dialogs. The
-   * overlay supplies the scrim/pointer boundary, while padding keeps sheet
-   * content and its close control clear of notches in every orientation. */
+  /* Question navigator contents (rendered inside BottomSheet). */
   .question-panel-groups {
     min-height: 0;
     flex: 1 1 auto;

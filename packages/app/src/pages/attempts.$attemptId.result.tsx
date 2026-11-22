@@ -61,6 +61,13 @@ export function ResultScreen({ result }: ResultScreenProps) {
   return (
     <div className="m-page">
       <header className="m-appbar">
+        <Link
+          to="/"
+          className="m-iconbtn"
+          aria-label={t("result.backToLibrary")}
+        >
+          <Icon name="back" />
+        </Link>
         <span className="m-brand">{t("result.scoreLabel")}</span>
       </header>
 

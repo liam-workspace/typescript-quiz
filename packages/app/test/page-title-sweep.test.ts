@@ -24,12 +24,16 @@ function sourceFiles(dir: string): string[] {
   return files
 }
 
+// An opening tag runs to the first `>` that is not the arrow of `=>` inside an
+// attribute expression.
+const H1_OPEN_TAG = /<h1\b(?:=>|[^>])*>/g
+
 function isUnmarked(tag: string): boolean {
-  return !tag.includes("data-page-title") || !tag.includes("tabIndex")
+  return !tag.includes("data-page-title") || !tag.includes("tabIndex={-1}")
 }
 
 function unmarkedH1s(file: string): string[] {
-  return [...readFileSync(file, "utf8").matchAll(/<h1\b[^>]*>/g)]
+  return [...readFileSync(file, "utf8").matchAll(H1_OPEN_TAG)]
     .map((match) => match[0])
     .filter(isUnmarked)
     .map((tag) => `${file}: ${tag}`)
@@ -39,6 +43,19 @@ function unmarkedH1s(file: string): string[] {
 // route change; a page h1 without the marker silently loses that announcement.
 describe("page titles", () => {
   it("marks every h1 as a focusable page title", () => {
-    expect(sourceFiles(SRC).flatMap(unmarkedH1s)).toEqual([])
+    const files = sourceFiles(SRC)
+
+    expect(files.length).toBeGreaterThan(0)
+    expect(files.flatMap(unmarkedH1s)).toEqual([])
+  })
+
+  it("actually finds the h1s it guards", () => {
+    const total = sourceFiles(SRC).reduce(
+      (count, file) =>
+        count + [...readFileSync(file, "utf8").matchAll(H1_OPEN_TAG)].length,
+      0,
+    )
+
+    expect(total).toBeGreaterThan(5)
   })
 })

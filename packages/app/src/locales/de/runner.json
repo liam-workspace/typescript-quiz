@@ -111,7 +111,7 @@
   "result.summary": "{{correct}} richtig · {{incorrect}} falsch · {{unanswered}} nicht beantwortet · {{answered}} beantwortet",
   "result.practiceNotice": "{{title}}, Version {{version}}. Dies ist ein Übungsergebnis und kein offizielles skaliertes TOEFL-Primary-Ergebnis.",
   "result.backToLibrary": "Zurück zur Übersicht",
-  "result.reviewAnswers": "Antworten ansehen →",
+  "result.reviewAnswers": "Antworten ansehen",
   "result.forbidden": "Du kannst dieses Ergebnis nicht ansehen.",
   "result.error": "Das Ergebnis konnte nicht geladen werden. Versuche es erneut.",
   "review.title": "Überprüfung",
@@ -331,5 +331,6 @@
   "result.headlineGood": "Gute Leistung!",
   "result.headlineKeepGoing": "Übe weiter!",
   "history.resultLink": "Ergebnis",
-  "runner.saveState.pendingShort": "Noch zu senden: {{count}}"
+  "runner.saveState.pendingShort": "Noch zu senden: {{count}}",
+  "runner.previousQuestion": "Vorherige Frage"
 }

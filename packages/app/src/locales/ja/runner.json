@@ -107,7 +107,7 @@
   "result.summary": "正解 {{correct}}問 · 不正解 {{incorrect}}問 · 未回答 {{unanswered}}問 · 回答済み {{answered}}問",
   "result.practiceNotice": "{{title}}、バージョン{{version}}。これは練習用のスコアであり、TOEFL Primaryの公式換算スコアではありません。",
   "result.backToLibrary": "ライブラリに戻る",
-  "result.reviewAnswers": "解答を確認 →",
+  "result.reviewAnswers": "解答を確認",
   "result.forbidden": "この結果は表示できません。",
   "result.error": "結果を読み込めませんでした。もう一度お試しください。",
   "review.title": "解答の確認",
@@ -319,5 +319,6 @@
   "result.headlineGood": "よくがんばりました！",
   "result.headlineKeepGoing": "もっと練習しましょう！",
   "history.resultLink": "結果",
-  "runner.saveState.pendingShort": "送信待ち：{{count}}件"
+  "runner.saveState.pendingShort": "送信待ち：{{count}}件",
+  "runner.previousQuestion": "前の問題"
 }

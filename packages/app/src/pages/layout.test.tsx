@@ -243,3 +243,43 @@ describe("AppLayout chrome", () => {
     )
   })
 })
+
+describe("AppLayout page-title focus", () => {
+  afterEach(cleanup)
+
+  it("focuses the new page's data-page-title once the resolved pathname changes", async () => {
+    const rootRoute = createRootRoute({ component: AppLayout })
+    const titled = (label: string) => () => (
+      <main>
+        <h1 tabIndex={-1} data-page-title>
+          {label}
+        </h1>
+      </main>
+    )
+    const router = createRouter({
+      routeTree: rootRoute.addChildren([
+        createRoute({
+          getParentRoute: () => rootRoute,
+          path: "/",
+          component: titled("Library title"),
+        }),
+        createRoute({
+          getParentRoute: () => rootRoute,
+          path: "/history",
+          component: titled("History title"),
+        }),
+      ]),
+      history: createMemoryHistory({ initialEntries: ["/"] }),
+    })
+
+    await router.load()
+    render(<RouterProvider router={router} />)
+    expect(document.activeElement).toHaveTextContent("Library title")
+
+    await act(async () => {
+      await router.navigate({ to: "/history" })
+    })
+
+    expect(document.activeElement).toHaveTextContent("History title")
+  })
+})

@@ -335,6 +335,8 @@ export function ReviewScreen({
     const url = new URL(window.location.href)
 
     url.searchParams.set("q", String(currentIndex + 1))
+    // Deliberately bypasses TanStack Router: a router navigation would re-run
+    // the loader and remount; the router's own `search.q` goes stale instead.
     window.history.replaceState(window.history.state, "", url)
 
     if (firstRender.current) {
@@ -434,7 +436,7 @@ export function ReviewScreen({
           type="button"
           className="m-btn"
           data-variant="secondary"
-          aria-label={t("runner.previous")}
+          aria-label={t("runner.previousQuestion")}
           style={{ flex: "0 0 56px" }}
           disabled={atFirst}
           onClick={() => {

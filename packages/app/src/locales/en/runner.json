@@ -111,7 +111,7 @@
   "result.summary": "{{correct}} correct · {{incorrect}} wrong · {{unanswered}} left blank · {{answered}} answered",
   "result.practiceNotice": "{{title}}, version {{version}}. This is a practice score, not an official TOEFL Primary scaled score.",
   "result.backToLibrary": "Back to library",
-  "result.reviewAnswers": "Review answers →",
+  "result.reviewAnswers": "Review answers",
   "result.forbidden": "You can't view this result.",
   "result.error": "The result could not be loaded. Please try again.",
   "review.title": "Review",
@@ -331,5 +331,6 @@
   "result.headlineGood": "Good effort!",
   "result.headlineKeepGoing": "Keep practising!",
   "history.resultLink": "Result",
-  "runner.saveState.pendingShort": "Waiting to send: {{count}}"
+  "runner.saveState.pendingShort": "Waiting to send: {{count}}",
+  "runner.previousQuestion": "Previous question"
 }

@@ -411,7 +411,9 @@ describe("attempt review page", () => {
     )
 
     expect(screen.getByText("Question 1 of 1")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled()
+    expect(
+      screen.getByRole("button", { name: "Previous question" }),
+    ).toBeDisabled()
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled()
     expect(new URL(window.location.href).searchParams.get("q")).toBe("1")
   })
@@ -420,7 +422,9 @@ describe("attempt review page", () => {
     const user = userEvent.setup()
 
     render(<ReviewScreen review={reviewPayload} />)
-    expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled()
+    expect(
+      screen.getByRole("button", { name: "Previous question" }),
+    ).toBeDisabled()
 
     await user.click(screen.getByRole("button", { name: "Jump to a question" }))
 
@@ -641,7 +645,7 @@ describe("attempt review page", () => {
     const review = await loadReview("attempt-1")
     render(<ReviewScreen review={review} />)
 
-    const previous = screen.getByRole("button", { name: "Previous" })
+    const previous = screen.getByRole("button", { name: "Previous question" })
     const next = screen.getByRole("button", { name: "Next" })
     expect(previous).toBeDisabled()
     expect(next).toBeEnabled()

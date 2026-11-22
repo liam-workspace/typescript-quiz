@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { isRedirect } from "@tanstack/react-router"
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -82,10 +82,12 @@ describe("attempt result page", () => {
     expect(screen.getByText("36 / 40")).toBeInTheDocument()
     expect(screen.getAllByText("18 / 20")).toHaveLength(2)
     expect(
-      screen.getByRole("link", { name: "Back to library" }),
+      within(screen.getByRole("contentinfo")).getByRole("link", {
+        name: "Back to library",
+      }),
     ).toHaveAttribute("href", "/")
     expect(
-      screen.getByRole("link", { name: "Review answers →" }),
+      screen.getByRole("link", { name: "Review answers" }),
     ).toHaveAttribute("href", "/attempts/attempt-1/review")
   })
 
@@ -144,11 +146,25 @@ describe("attempt result page", () => {
     renderResult(bestResult)
 
     expect(
-      screen.getByRole("link", { name: "Review answers →" }).closest("footer"),
+      screen.getByRole("link", { name: "Review answers" }).closest("footer"),
     ).toHaveClass("m-actionbar")
+    const backLinks = screen.getAllByRole("link", { name: "Back to library" })
+
+    expect(backLinks).toHaveLength(2)
+    expect(backLinks.map((link) => link.getAttribute("href"))).toEqual([
+      "/",
+      "/",
+    ])
     expect(
-      screen.getByRole("link", { name: "Back to library" }),
-    ).toHaveAttribute("href", "/")
+      within(screen.getByRole("banner")).getByRole("link", {
+        name: "Back to library",
+      }),
+    ).toHaveClass("m-iconbtn")
+    expect(
+      within(screen.getByRole("contentinfo")).getByRole("link", {
+        name: "Back to library",
+      }),
+    ).toHaveClass("m-btn")
     expect(
       screen.getByText(/not an official TOEFL Primary scaled score/i),
     ).toBeInTheDocument()
@@ -184,7 +200,11 @@ describe("attempt result page", () => {
       "/attempts/attempt-1/result",
     )
 
-    await user.click(screen.getByRole("link", { name: "Back to library" }))
+    await user.click(
+      within(screen.getByRole("contentinfo")).getByRole("link", {
+        name: "Back to library",
+      }),
+    )
 
     expect(router.state.location.pathname).toBe("/")
   })

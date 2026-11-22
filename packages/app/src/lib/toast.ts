@@ -39,6 +39,11 @@ export const toastStore = {
   getSnapshot(): ToastSnapshot | null {
     return current
   },
+  resetForTests(): void {
+    clearTimeout(timer)
+    current = null
+    emit()
+  },
   show(message: string, icon: ToastIcon = "check"): void {
     clearTimeout(timer)
     current = { id: nextId, message, icon }

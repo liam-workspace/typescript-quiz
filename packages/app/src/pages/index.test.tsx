@@ -19,12 +19,15 @@ import "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
 import type { Student, TestCard, TestCatalogPage } from "../lib/api-types.js"
 import { signOut } from "../lib/auth.js"
+import type { OfflineLibraryApi } from "../lib/offline/use-offline.js"
+import type { OfflineTestRecord } from "../lib/offline/offline-store.js"
 import { startInstall } from "../lib/pwa/install-flow.js"
 import { startTestAndRulesPath } from "../lib/start-test.js"
 import { toastStore } from "../lib/toast.js"
 import {
   LibraryRouteError,
   LibraryScreen,
+  LibraryWithOffline,
   loadLibrary,
   type LibraryScreenProps,
 } from "./index.js"
@@ -132,6 +135,7 @@ function response(body: unknown, status = 200): Response {
 async function renderLibraryWith(
   props: Omit<LibraryScreenProps, "student"> & {
     readonly student?: Student | null
+    readonly offline?: OfflineLibraryApi
   },
 ) {
   vi.stubGlobal("scrollTo", vi.fn())
@@ -139,9 +143,19 @@ async function renderLibraryWith(
   const libraryRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "/",
-    component: () => (
-      <LibraryScreen {...props} student={props.student ?? null} />
-    ),
+    component: () => {
+      const { offline, ...screenProps } = props
+
+      return offline ? (
+        <LibraryWithOffline
+          {...screenProps}
+          student={props.student ?? null}
+          offline={offline}
+        />
+      ) : (
+        <LibraryScreen {...screenProps} student={props.student ?? null} />
+      )
+    },
   })
   const historyRoute = createRoute({
     getParentRoute: () => rootRoute,
@@ -572,6 +586,148 @@ describe("test library page", () => {
     await user.click(link)
 
     expect(signOut).toHaveBeenCalledTimes(1)
+  })
+})
+
+const saveSpy = vi.fn()
+const fakeOffline: OfflineLibraryApi = {
+  saved: new Map(),
+  progressPercent: new Map(),
+  online: true,
+  save: saveSpy,
+  remove: vi.fn(),
+}
+
+function savedRecord(test: TestCard, testVersionId: string): OfflineTestRecord {
+  return {
+    slug: test.slug,
+    testVersionId,
+    version: 1,
+    title: test.title,
+    level: test.level,
+    totalBytes: 1,
+    savedAt: "2026-11-22T12:00:00.000Z",
+  }
+}
+
+describe("library offline saving", () => {
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+    saveSpy.mockReset()
+  })
+
+  const only = { ...initialPage, tests: [freshTest] }
+
+  it("shows a size-labelled Save button that saves this card's slug", async () => {
+    const user = userEvent.setup()
+
+    await renderLibraryWith({
+      initialPage: {
+        ...only,
+        tests: [{ ...freshTest, mediaBytes: 18 * 1_048_576 }],
+      },
+      student: tom,
+      offline: fakeOffline,
+    })
+    await user.click(
+      screen.getByRole("button", {
+        name: `Save ${freshTest.title} for offline use`,
+      }),
+    )
+
+    expect(screen.getByText("Save offline · 18 MB")).toBeInTheDocument()
+    expect(saveSpy).toHaveBeenCalledWith(freshTest.slug, freshTest.title)
+  })
+
+  it("offline: an unsaved test's Start is disabled with the reason, and Save is disabled", async () => {
+    await renderLibraryWith({
+      initialPage: only,
+      student: tom,
+      offline: { ...fakeOffline, online: false },
+    })
+
+    const start = screen.getByRole("button", { name: "Start test" })
+
+    expect(start).toBeDisabled()
+    expect(start).toHaveAccessibleDescription(/Needs a connection/u)
+    expect(
+      screen.getByRole("button", { name: /Save .* for offline use/u }),
+    ).toBeDisabled()
+  })
+
+  it("offline: a saved test can still start and shows Available offline", async () => {
+    await renderLibraryWith({
+      initialPage: only,
+      student: tom,
+      offline: {
+        ...fakeOffline,
+        online: false,
+        saved: new Map([[freshTest.slug, savedRecord(freshTest, "ver-1")]]),
+      },
+    })
+
+    expect(screen.getByRole("button", { name: "Start test" })).toBeEnabled()
+    expect(screen.getByText("Available offline")).toBeInTheDocument()
+    expect(screen.queryByText("Update saved copy")).toBeNull()
+  })
+
+  it("offers Update saved copy when the saved version is stale", async () => {
+    await renderLibraryWith({
+      initialPage: only,
+      student: tom,
+      offline: {
+        ...fakeOffline,
+        saved: new Map([[freshTest.slug, savedRecord(freshTest, "old")]]),
+      },
+    })
+
+    expect(
+      screen.getByRole("button", { name: "Update saved copy" }),
+    ).toBeEnabled()
+  })
+
+  it("saving shows the percentage and no Save button for that card", async () => {
+    await renderLibraryWith({
+      initialPage: only,
+      student: tom,
+      offline: {
+        ...fakeOffline,
+        progressPercent: new Map([[freshTest.slug, 40]]),
+      },
+    })
+
+    expect(screen.getByRole("status")).toHaveTextContent("Saving… 40%")
+    expect(
+      screen.queryByRole("button", { name: /for offline use/u }),
+    ).toBeNull()
+  })
+
+  it("finish-first wins over the connection reason, offline too", async () => {
+    await renderLibraryWith({
+      initialPage: { ...initialPage, tests: [freshTest, activeTest] },
+      student: tom,
+      offline: { ...fakeOffline, online: false },
+    })
+
+    const start = within(
+      screen.getByRole("article", { name: freshTest.title }),
+    ).getByRole("button", { name: "Start test" })
+
+    expect(start).toHaveAccessibleDescription(
+      `Finish ${activeTest.title} first.`,
+    )
+  })
+
+  it("the in-progress card has no save row and no offline reason", async () => {
+    await renderLibraryWith({
+      initialPage: { ...initialPage, tests: [activeTest] },
+      student: tom,
+      offline: { ...fakeOffline, online: false },
+    })
+
+    expect(screen.queryByText(/for offline use/u)).toBeNull()
+    expect(screen.queryByText(/Needs a connection/u)).toBeNull()
   })
 })
 

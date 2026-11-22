@@ -332,5 +332,14 @@
   "result.headlineKeepGoing": "Continue de t’entraîner !",
   "history.resultLink": "Résultat",
   "runner.saveState.pendingShort": "En attente d’envoi : {{count}}",
-  "runner.previousQuestion": "Question précédente"
+  "runner.previousQuestion": "Question précédente",
+  "offline.save": "Enregistrer hors ligne · {{size}}",
+  "offline.saveLabel": "Enregistrer {{title}} pour une utilisation hors ligne",
+  "offline.saving": "Enregistrement… {{percent}} %",
+  "offline.available": "Disponible hors ligne",
+  "offline.updateSaved": "Mettre à jour la copie enregistrée",
+  "offline.needsConnection": "Nécessite une connexion. Enregistre-le pour l'utiliser hors ligne tant que tu es en ligne.",
+  "offline.saveFailed": "Impossible d'enregistrer {{title}}. Réessaie.",
+  "offline.removeFailed": "Impossible de supprimer {{title}}. Réessaie.",
+  "offline.sizeMb": "{{count}} Mo"
 }

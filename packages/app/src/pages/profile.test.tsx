@@ -6,7 +6,8 @@ import type { Student } from "../lib/api-types.js"
 import type { PwaSnapshot } from "../lib/pwa/pwa-store.js"
 import { renderWithRouter } from "../test/renderWithRouter.js"
 import { OfflineStorageList } from "../components/OfflineStorageList.js"
-import { ProfileScreen } from "./profile.js"
+import type { OfflineTestRecord } from "../lib/offline/offline-store.js"
+import { ProfileScreen, SavedTestsList } from "./profile.js"
 
 const student: Student = {
   id: "s1",
@@ -118,7 +119,7 @@ describe("ProfileScreen", () => {
             {
               slug: "p3",
               title: "Practice Test 3",
-              level: "Step 1",
+              levelLabel: "Step 1",
               sizeMb: 18,
             },
           ]}
@@ -128,6 +129,37 @@ describe("ProfileScreen", () => {
     })
 
     expect(await screen.findByText("Step 1 · 18 MB")).toBeInTheDocument()
+  })
+
+  it("lists saved tests with level and size and removes one by slug and title", async () => {
+    const user = userEvent.setup()
+    const remove = vi.fn()
+    const record: OfflineTestRecord = {
+      slug: "practice-3",
+      testVersionId: "v1",
+      version: 1,
+      title: "Practice Test 3",
+      level: "primary-step-1",
+      totalBytes: 1000,
+      savedAt: "2026-11-22T12:00:00.000Z",
+    }
+
+    renderProfile({
+      offlineStorage: (
+        <SavedTestsList
+          offline={{ saved: new Map([[record.slug, record]]), remove }}
+        />
+      ),
+    })
+
+    expect(await screen.findByText("Practice Test 3")).toBeInTheDocument()
+    expect(screen.getByText("Step 1 · 1 MB")).toBeInTheDocument()
+    await user.click(
+      screen.getByRole("button", {
+        name: "Remove Practice Test 3 from this phone",
+      }),
+    )
+    expect(remove).toHaveBeenCalledWith("practice-3", "Practice Test 3")
   })
 
   it("switches the interface language", async () => {

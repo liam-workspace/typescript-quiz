@@ -332,5 +332,14 @@
   "result.headlineKeepGoing": "¡Sigue practicando!",
   "history.resultLink": "Resultado",
   "runner.saveState.pendingShort": "Pendiente de enviar: {{count}}",
-  "runner.previousQuestion": "Pregunta anterior"
+  "runner.previousQuestion": "Pregunta anterior",
+  "offline.save": "Guardar sin conexión · {{size}}",
+  "offline.saveLabel": "Guardar {{title}} para usarlo sin conexión",
+  "offline.saving": "Guardando… {{percent}} %",
+  "offline.available": "Disponible sin conexión",
+  "offline.updateSaved": "Actualizar la copia guardada",
+  "offline.needsConnection": "Necesita conexión. Guárdalo para usarlo sin conexión mientras estás en línea.",
+  "offline.saveFailed": "No se pudo guardar {{title}}. Inténtalo de nuevo.",
+  "offline.removeFailed": "No se pudo eliminar {{title}}. Inténtalo de nuevo.",
+  "offline.sizeMb": "{{count}} MB"
 }

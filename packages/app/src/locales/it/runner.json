@@ -332,5 +332,14 @@
   "result.headlineKeepGoing": "Continua a esercitarti!",
   "history.resultLink": "Risultato",
   "runner.saveState.pendingShort": "In attesa di invio: {{count}}",
-  "runner.previousQuestion": "Domanda precedente"
+  "runner.previousQuestion": "Domanda precedente",
+  "offline.save": "Salva offline · {{size}}",
+  "offline.saveLabel": "Salva {{title}} per l'uso offline",
+  "offline.saving": "Salvataggio… {{percent}}%",
+  "offline.available": "Disponibile offline",
+  "offline.updateSaved": "Aggiorna la copia salvata",
+  "offline.needsConnection": "Serve una connessione. Salvalo per l'uso offline mentre sei online.",
+  "offline.saveFailed": "Impossibile salvare {{title}}. Riprova.",
+  "offline.removeFailed": "Impossibile rimuovere {{title}}. Riprova.",
+  "offline.sizeMb": "{{count}} MB"
 }

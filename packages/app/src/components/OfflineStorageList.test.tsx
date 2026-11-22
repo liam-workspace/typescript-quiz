@@ -27,13 +27,13 @@ describe("OfflineStorageList", () => {
           {
             slug: "practice-3",
             title: "Practice Test 3",
-            level: "Step 1",
+            levelLabel: "Step 1",
             sizeMb: 18,
           },
           {
             slug: "practice-1-s2",
             title: "Practice Test 1",
-            level: "Step 2",
+            levelLabel: "Step 2",
             sizeMb: 21,
           },
         ]}
@@ -47,6 +47,6 @@ describe("OfflineStorageList", () => {
         name: "Remove Practice Test 3 from this phone",
       }),
     )
-    expect(onRemove).toHaveBeenCalledWith("practice-3")
+    expect(onRemove).toHaveBeenCalledWith("practice-3", "Practice Test 3")
   })
 })

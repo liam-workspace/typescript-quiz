@@ -7,6 +7,10 @@ import { InstallSheet } from "../components/InstallSheet.js"
 import { LibraryFilter } from "../components/LibraryFilter.js"
 import { LibrarySkeleton } from "../components/LibrarySkeleton.js"
 import { LibraryTestCard } from "../components/LibraryTestCard.js"
+import {
+  SaveOfflineControl,
+  type SaveOfflineState,
+} from "../components/SaveOfflineControl.js"
 import { ApiError } from "../lib/api-client.js"
 import type { Student, TestCard, TestCatalogPage } from "../lib/api-types.js"
 import { listTests } from "../lib/catalog-api.js"
@@ -16,6 +20,11 @@ import {
   waitingCount,
   type LibraryFilterValue,
 } from "../lib/library-state.js"
+import { startGate } from "../lib/offline/start-gate.js"
+import {
+  useOfflineLibrary,
+  type OfflineLibraryApi,
+} from "../lib/offline/use-offline.js"
 import { startInstall } from "../lib/pwa/install-flow.js"
 import { pwaStore } from "../lib/pwa/pwa-store.js"
 import { getCurrentStudent } from "../lib/session-api.js"
@@ -363,8 +372,88 @@ export const Route = createFileRoute("/")({
   component: RouteComponent,
 })
 
+const BYTES_PER_MB = 1_048_576
+
+/** Download state: none, saving (in progress here), or ready (stale if the test changed since). */
+export function offlineStateFor(
+  test: TestCard,
+  offline: OfflineLibraryApi,
+): SaveOfflineState {
+  const percent = offline.progressPercent.get(test.slug)
+
+  if (percent !== undefined) {
+    return { kind: "saving", percent }
+  }
+
+  const record = offline.saved.get(test.slug)
+
+  return record
+    ? { kind: "ready", stale: record.testVersionId !== test.testVersionId }
+    : { kind: "none" }
+}
+
+export type LibraryWithOfflineProps = Omit<
+  LibraryScreenProps,
+  "renderCardExtras" | "startDisabledReason"
+> & { readonly offline: OfflineLibraryApi }
+
+/**
+ * The library with the save-offline row and the offline Start gate plugged in
+ * through LibraryScreen's extension props. "Finish X first" is decided inside
+ * LibraryScreen and wins over the connection reason there, so the gate is
+ * asked only about the connection (`activeOtherTitle: null`).
+ */
+export function LibraryWithOffline({
+  offline,
+  ...screenProps
+}: LibraryWithOfflineProps) {
+  const { t } = useTranslation("runner")
+
+  return (
+    <LibraryScreen
+      {...screenProps}
+      startDisabledReason={(test) => {
+        if (test.inProgressAttemptId !== null) {
+          return null
+        }
+
+        const gate = startGate({
+          online: offline.online,
+          saved: offline.saved.has(test.slug),
+          // Task 21 supplies the real local-state lookup.
+          continuableLocally: false,
+          isContinue: false,
+          activeOtherTitle: null,
+        })
+
+        return gate.enabled ? null : t("offline.needsConnection")
+      }}
+      renderCardExtras={(test) =>
+        test.inProgressAttemptId === null ? (
+          <SaveOfflineControl
+            title={test.title}
+            sizeMb={Math.max(1, Math.round(test.mediaBytes / BYTES_PER_MB))}
+            online={offline.online}
+            state={offlineStateFor(test, offline)}
+            onSave={() => {
+              offline.save(test.slug, test.title)
+            }}
+          />
+        ) : null
+      }
+    />
+  )
+}
+
 function RouteComponent() {
   const data = Route.useLoaderData()
+  const offline = useOfflineLibrary()
 
-  return <LibraryScreen initialPage={data.initialPage} student={data.student} />
+  return (
+    <LibraryWithOffline
+      initialPage={data.initialPage}
+      student={data.student}
+      offline={offline}
+    />
+  )
 }

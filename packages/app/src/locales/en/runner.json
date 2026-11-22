@@ -332,5 +332,14 @@
   "result.headlineKeepGoing": "Keep practising!",
   "history.resultLink": "Result",
   "runner.saveState.pendingShort": "Waiting to send: {{count}}",
-  "runner.previousQuestion": "Previous question"
+  "runner.previousQuestion": "Previous question",
+  "offline.save": "Save offline · {{size}}",
+  "offline.saveLabel": "Save {{title}} for offline use",
+  "offline.saving": "Saving… {{percent}}%",
+  "offline.available": "Available offline",
+  "offline.updateSaved": "Update saved copy",
+  "offline.needsConnection": "Needs a connection. Save it for offline use while you're online.",
+  "offline.saveFailed": "Couldn't save {{title}}. Try again.",
+  "offline.removeFailed": "Couldn't remove {{title}}. Try again.",
+  "offline.sizeMb": "{{count}} MB"
 }

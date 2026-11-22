@@ -332,5 +332,14 @@
   "result.headlineKeepGoing": "Übe weiter!",
   "history.resultLink": "Ergebnis",
   "runner.saveState.pendingShort": "Noch zu senden: {{count}}",
-  "runner.previousQuestion": "Vorherige Frage"
+  "runner.previousQuestion": "Vorherige Frage",
+  "offline.save": "Offline speichern · {{size}}",
+  "offline.saveLabel": "{{title}} für die Offline-Nutzung speichern",
+  "offline.saving": "Wird gespeichert… {{percent}} %",
+  "offline.available": "Offline verfügbar",
+  "offline.updateSaved": "Gespeicherte Kopie aktualisieren",
+  "offline.needsConnection": "Benötigt eine Verbindung. Speichere den Test für die Offline-Nutzung, solange du online bist.",
+  "offline.saveFailed": "{{title}} konnte nicht gespeichert werden. Versuche es erneut.",
+  "offline.removeFailed": "{{title}} konnte nicht entfernt werden. Versuche es erneut.",
+  "offline.sizeMb": "{{count}} MB"
 }

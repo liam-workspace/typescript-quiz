@@ -17,6 +17,10 @@ import { RemindersRow } from "../components/RemindersRow.js"
 import type { Student } from "../lib/api-types.js"
 import { signOut } from "../lib/auth.js"
 import { SIGN_IN_PATH } from "../lib/authPaths.js"
+import {
+  useOfflineLibrary,
+  type OfflineLibraryApi,
+} from "../lib/offline/use-offline.js"
 import { startInstall } from "../lib/pwa/install-flow.js"
 import { pwaStore, type PwaSnapshot } from "../lib/pwa/pwa-store.js"
 import { reminders, type ReminderState } from "../lib/reminders.js"
@@ -39,7 +43,7 @@ export interface ProfileScreenProps {
     readonly busy: boolean
     readonly onToggle: (next: boolean) => void
   }
-  /** Task 16 injects the real saved-tests list; Task 6 passes an empty one. */
+  /** The saved-tests list (`OfflineStorageList`), injected by the route. */
   readonly offlineStorage: ReactNode
   readonly onInstall: () => void
   readonly onRefresh: () => void
@@ -218,6 +222,33 @@ export function ProfileScreen({
   )
 }
 
+const BYTES_PER_MB = 1_048_576
+
+/** Maps the saved records onto the stateless list. */
+export function SavedTestsList({
+  offline,
+}: {
+  readonly offline: Pick<OfflineLibraryApi, "saved" | "remove">
+}): JSX.Element {
+  const { t } = useTranslation("runner")
+
+  return (
+    <OfflineStorageList
+      items={[...offline.saved.values()].map((record) => ({
+        slug: record.slug,
+        title: record.title,
+        levelLabel: t(
+          record.level === "primary-step-1"
+            ? "library.step.1"
+            : "library.step.2",
+        ),
+        sizeMb: Math.max(1, Math.round(record.totalBytes / BYTES_PER_MB)),
+      }))}
+      onRemove={offline.remove}
+    />
+  )
+}
+
 export function ProfileRouteError(): JSX.Element {
   const { t } = useTranslation("runner")
 
@@ -267,6 +298,7 @@ function RouteComponent() {
     useState<ReminderState>("unsupported")
   const [busy, setBusy] = useState(false)
   const [installKind, setInstallKind] = useState<"ios" | "manual" | null>(null)
+  const offline = useOfflineLibrary()
 
   useEffect(() => {
     let active = true
@@ -318,9 +350,7 @@ function RouteComponent() {
             void handleToggle(next)
           },
         }}
-        offlineStorage={
-          <OfflineStorageList items={[]} onRemove={() => undefined} />
-        }
+        offlineStorage={<SavedTestsList offline={offline} />}
         onInstall={() => {
           void handleInstall()
         }}

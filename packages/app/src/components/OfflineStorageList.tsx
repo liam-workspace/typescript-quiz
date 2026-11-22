@@ -5,13 +5,13 @@ import { Icon } from "./Icon.js"
 export interface OfflineStorageItem {
   readonly slug: string
   readonly title: string
-  readonly level: string
+  readonly levelLabel: string
   readonly sizeMb: number
 }
 
 export interface OfflineStorageListProps {
   readonly items: readonly OfflineStorageItem[]
-  readonly onRemove: (slug: string) => void
+  readonly onRemove: (slug: string, title: string) => void
 }
 
 /** Prototype `vProfile()` "Saved for offline" list. */
@@ -44,7 +44,7 @@ export function OfflineStorageList({
             {item.title}
             <small>
               {t("profile.offline.item", {
-                level: item.level,
+                level: item.levelLabel,
                 size: item.sizeMb,
               })}
             </small>
@@ -54,7 +54,7 @@ export function OfflineStorageList({
             className="iconbtn"
             aria-label={t("profile.offline.remove", { title: item.title })}
             onClick={() => {
-              onRemove(item.slug)
+              onRemove(item.slug, item.title)
             }}
           >
             <Icon name="trash" />

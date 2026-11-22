@@ -320,5 +320,14 @@
   "result.headlineKeepGoing": "もっと練習しましょう！",
   "history.resultLink": "結果",
   "runner.saveState.pendingShort": "送信待ち：{{count}}件",
-  "runner.previousQuestion": "前の問題"
+  "runner.previousQuestion": "前の問題",
+  "offline.save": "オフライン用に保存 · {{size}}",
+  "offline.saveLabel": "{{title}} をオフライン用に保存",
+  "offline.saving": "保存中… {{percent}}%",
+  "offline.available": "オフラインで利用可能",
+  "offline.updateSaved": "保存したコピーを更新",
+  "offline.needsConnection": "接続が必要です。オンラインのうちにオフライン用に保存してください。",
+  "offline.saveFailed": "{{title}} を保存できませんでした。もう一度お試しください。",
+  "offline.removeFailed": "{{title}} を削除できませんでした。もう一度お試しください。",
+  "offline.sizeMb": "{{count}} MB"
 }

@@ -1,8 +1,10 @@
 import "fake-indexeddb/auto"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { OfflineBundle } from "../src/lib/api-types.js"
 import {
   createOfflineStore,
+  offlineStore,
+  type DownloadProgress,
   findStimulusMedia,
   OfflineDownloadError,
   type OfflineCache,
@@ -245,6 +247,144 @@ describe("offlineStore", () => {
     await expect(store.download("practice-3", opts)).resolves.toMatchObject({
       slug: "practice-3",
     })
+  })
+})
+
+function createFakeCacheStorage(): {
+  handles: FakeCache[]
+  open(name: string): Promise<FakeCache>
+  delete(name: string): Promise<boolean>
+} {
+  const handles: FakeCache[] = []
+  const byName = new Map<string, FakeCache>()
+
+  return {
+    handles,
+    open(name) {
+      let cache = byName.get(name)
+
+      if (!cache) {
+        cache = new FakeCache()
+        byName.set(name, cache)
+        handles.push(cache)
+      }
+
+      return Promise.resolve(cache)
+    },
+    delete: (name) => Promise.resolve(byName.delete(name)),
+  }
+}
+
+describe("purge during a download", () => {
+  it("aborts, writes no record and leaves no cache entries", async () => {
+    const storage = createFakeCacheStorage()
+
+    vi.stubGlobal("caches", storage)
+
+    const bundle = makeBundle({
+      media: [
+        ...makeBundle().media,
+        { ...makeBundle().media[0], key: "l2.mp3", stimulusId: "st-r" },
+      ],
+      totalBytes: 12,
+    })
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const { store } = build(bundle, {
+      dbName: "pp-offline",
+      cacheName: "pp-offline-media-v1",
+      cacheStorage: storage,
+      fetchMedia: async () => {
+        await gate
+
+        return twoChunkResponse()
+      },
+    })
+    const download = store.download("practice-3", opts)
+    const outcome = download.then(
+      () => "resolved",
+      (error: unknown) => error,
+    )
+
+    await store.whenReady()
+    await vi.waitFor(() => {
+      expect(storage.handles.length).toBe(1)
+    })
+    await purgeClientCaches()
+    release()
+
+    expect(await outcome).toMatchObject({ name: "AbortError" })
+    expect(store.snapshot()).toEqual([])
+    expect(await store.list()).toEqual([])
+    expect(await store.getBundle("practice-3")).toBeNull()
+    expect(storage.handles.flatMap((c) => [...c.entries.keys()])).toEqual([])
+    vi.unstubAllGlobals()
+  })
+})
+
+describe("robustness", () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("propagates the original error even when cleanup reads fail", async () => {
+    const { store } = build(makeBundle(), {
+      fetchMedia: () => Promise.resolve(new Response("x", { status: 500 })),
+    })
+
+    vi.spyOn(IDBObjectStore.prototype, "getAll").mockImplementation(() => {
+      throw new Error("idb broke")
+    })
+
+    await expect(store.download("practice-3", opts)).rejects.toMatchObject({
+      name: "OfflineDownloadError",
+      reason: "http",
+    })
+  })
+
+  it("reports a final progress tick when there is no media", async () => {
+    const { store } = build(makeBundle({ media: [], totalBytes: 0 }))
+    const ticks: DownloadProgress[] = []
+
+    await store.download("practice-3", {
+      signal: NEVER_ABORTED,
+      onProgress: (p) => ticks.push(p),
+    })
+
+    expect(ticks).toEqual([{ doneBytes: 0, totalBytes: 0 }])
+  })
+})
+
+describe("offlineStore facade", () => {
+  it("rejects download with an 'unsupported' error when Cache Storage is missing", async () => {
+    vi.stubGlobal("caches", undefined)
+
+    await expect(
+      offlineStore.download("practice-3", opts),
+    ).rejects.toMatchObject({
+      name: "OfflineDownloadError",
+      reason: "unsupported",
+    })
+    expect(await offlineStore.getMediaBlob("l1.mp3")).toBeNull()
+    expect(await offlineStore.list()).toEqual([])
+    expect(await offlineStore.getBundle("practice-3")).toBeNull()
+    await expect(offlineStore.removeAll()).resolves.toBeUndefined()
+    vi.unstubAllGlobals()
+  })
+
+  it("uses exactly the names purgeClientCaches() deletes", async () => {
+    const open = vi.fn(() => Promise.resolve(new FakeCache()))
+
+    vi.stubGlobal("caches", { open })
+    await offlineStore.getMediaBlob("l1.mp3")
+
+    expect(open).toHaveBeenCalledWith("pp-offline-media-v1")
+    expect((await indexedDB.databases()).map((d) => d.name)).toContain(
+      "pp-offline",
+    )
+    vi.unstubAllGlobals()
   })
 })
 

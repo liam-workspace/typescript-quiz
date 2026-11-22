@@ -53,11 +53,12 @@ export interface OfflineStore {
 /**
  * `http`: the server refused a file (expired signature, 403, 5xx).
  * `network`: the connection dropped mid-save ("Save paused" in the UI).
+ * `unsupported`: Cache Storage is unavailable (insecure context).
  */
 export class OfflineDownloadError extends Error {
-  readonly reason: "http" | "network"
+  readonly reason: "http" | "network" | "unsupported"
 
-  constructor(message: string, reason: "http" | "network") {
+  constructor(message: string, reason: "http" | "network" | "unsupported") {
     super(message)
     this.name = "OfflineDownloadError"
     this.reason = reason
@@ -184,9 +185,16 @@ export function createOfflineStore(deps: OfflineStoreDeps): OfflineStore {
   const ready = refresh().catch(() => undefined)
 
   async function removeKeys(keys: Iterable<string>): Promise<void> {
-    const cache = await deps.cacheStorage.open(deps.cacheName)
+    const cache = await deps.cacheStorage
+      .open(deps.cacheName)
+      .catch(() => undefined)
 
-    await Promise.all([...keys].map((key) => cache.delete(mediaKey(key))))
+    // No Cache Storage means nothing was ever cached.
+    await Promise.all(
+      [...keys].map((key) =>
+        cache ? cache.delete(mediaKey(key)) : Promise.resolve(false),
+      ),
+    )
   }
 
   /** Media keys referenced by every saved test except `excludeSlug`. */
@@ -196,12 +204,34 @@ export function createOfflineStore(deps: OfflineStoreDeps): OfflineStore {
     return new Set(others.flatMap((s) => s.bundle.media.map((m) => m.key)))
   }
 
+  /**
+   * Remove what a failed run wrote, keeping files other saved tests (or this
+   * slug's previous save) use. Never throws: the original error must win.
+   */
+  async function cleanupWritten(written: string[]): Promise<void> {
+    let used = new Set<string>()
+
+    try {
+      used = await keysUsedByOthers("")
+    } catch {
+      // Unreadable store: fall back to removing everything this run wrote.
+    }
+
+    await removeKeys(written.filter((key) => !used.has(key))).catch(
+      () => undefined,
+    )
+  }
+
   async function streamIntoCache(
     cache: OfflineCache,
     item: OfflineMedia,
-    io: { signal: AbortSignal; onBytes: (n: number) => void },
+    io: {
+      signal: AbortSignal
+      onBytes: (n: number) => void
+      assertLive: () => void
+    },
   ): Promise<void> {
-    const { signal, onBytes } = io
+    const { signal, onBytes, assertLive } = io
     const response = await deps
       .fetchMedia(item.url, signal)
       .catch((error: unknown) => {
@@ -215,6 +245,8 @@ export function createOfflineStore(deps: OfflineStoreDeps): OfflineStore {
         )
       })
 
+    assertLive()
+
     if (!response.ok || !response.body) {
       throw new OfflineDownloadError(
         `media ${item.key} returned ${response.status}`,
@@ -227,7 +259,7 @@ export function createOfflineStore(deps: OfflineStoreDeps): OfflineStore {
 
     try {
       for (;;) {
-        signal.throwIfAborted()
+        assertLive()
 
         // oxlint-disable-next-line no-await-in-loop
         const { done, value } = await reader.read()
@@ -252,6 +284,8 @@ export function createOfflineStore(deps: OfflineStoreDeps): OfflineStore {
       )
     }
 
+    assertLive()
+
     const bytes = new Uint8Array(chunks.reduce((n, c) => n + c.byteLength, 0))
     let offset = 0
 
@@ -271,10 +305,19 @@ export function createOfflineStore(deps: OfflineStoreDeps): OfflineStore {
     opts: { onProgress(p: DownloadProgress): void; signal: AbortSignal },
   ): Promise<OfflineTestRecord> {
     const startedIn = generation
+    // Opened first: with no Cache Storage there is no point fetching a bundle.
+    const cache = await deps.cacheStorage.open(deps.cacheName)
     const bundle = await deps.fetchBundle(slug)
     const media = uniqueMedia(bundle)
     const totalBytes = media.reduce((sum, item) => sum + item.bytes, 0)
-    const cache = await deps.cacheStorage.open(deps.cacheName)
+    // Stops a download the caller aborted or a purge invalidated.
+    const assertLive = (): void => {
+      opts.signal.throwIfAborted()
+
+      if (generation !== startedIn) {
+        throw new DOMException("Saved tests were cleared", "AbortError")
+      }
+    }
     const written: string[] = []
     const progress = { doneBytes: 0 }
 
@@ -283,26 +326,24 @@ export function createOfflineStore(deps: OfflineStoreDeps): OfflineStore {
         // oxlint-disable-next-line no-await-in-loop
         await streamIntoCache(cache, item, {
           signal: opts.signal,
+          assertLive,
           onBytes: (n) => {
             // The manifest's byte counts are advisory: never report over 100%.
             progress.doneBytes = Math.min(progress.doneBytes + n, totalBytes)
             opts.onProgress({ doneBytes: progress.doneBytes, totalBytes })
-            opts.signal.throwIfAborted()
+            assertLive()
           },
         })
         written.push(item.key)
       }
 
-      opts.signal.throwIfAborted()
+      assertLive()
 
-      if (generation !== startedIn) {
-        throw new DOMException("Saved tests were cleared", "AbortError")
+      if (media.length === 0) {
+        opts.onProgress({ doneBytes: 0, totalBytes: 0 })
       }
     } catch (error) {
-      // Keep anything another saved test (or this slug's previous save) uses.
-      const used = await keysUsedByOthers("")
-
-      await removeKeys(written.filter((key) => !used.has(key)))
+      await cleanupWritten(written)
       throw isAbortError(error) || !opts.signal.aborted
         ? error
         : new DOMException("The download was aborted", "AbortError")
@@ -317,8 +358,21 @@ export function createOfflineStore(deps: OfflineStoreDeps): OfflineStore {
       totalBytes,
       savedAt: deps.now().toISOString(),
     }
-    const previous = (await readAll()).find((s) => s.slug === slug)
-    const db = await getDb()
+    const { previous, db } = await (async () => {
+      try {
+        const existing = (await readAll()).find((s) => s.slug === slug)
+        const opened = await getDb()
+
+        // No await between this check and the write: a purge cannot interleave.
+        assertLive()
+
+        return { previous: existing, db: opened }
+      } catch (error) {
+        await cleanupWritten(written)
+        throw error
+      }
+    })()
+
     const tx = db.transaction(TESTS_STORE, "readwrite")
 
     tx.objectStore(TESTS_STORE).put({ slug: bundle.slug, record, bundle })
@@ -363,8 +417,10 @@ export function createOfflineStore(deps: OfflineStoreDeps): OfflineStore {
       return stored?.bundle ?? null
     },
     async getMediaBlob(key) {
-      const cache = await deps.cacheStorage.open(deps.cacheName)
-      const response = await cache.match(mediaKey(key))
+      const cache = await deps.cacheStorage
+        .open(deps.cacheName)
+        .catch(() => undefined)
+      const response = await cache?.match(mediaKey(key))
 
       return response ? response.blob() : null
     },
@@ -436,7 +492,17 @@ function getInstance(): OfflineStore {
     cacheName: CACHE_NAME,
     fetchBundle: getOfflineBundle,
     fetchMedia: (url, signal) => fetch(url, { signal }),
-    cacheStorage: caches,
+    cacheStorage: {
+      open: (name) =>
+        typeof caches === "undefined"
+          ? Promise.reject(
+              new OfflineDownloadError(
+                "Cache Storage is unavailable",
+                "unsupported",
+              ),
+            )
+          : caches.open(name),
+    },
     now: () => new Date(),
   })
 

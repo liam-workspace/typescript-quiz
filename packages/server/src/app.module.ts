@@ -7,6 +7,7 @@ import { CatalogModule } from "./catalog/catalog.module.js"
 import { DatabaseModule } from "./database/database.module.js"
 import { HealthModule } from "./health/health.module.js"
 import { MediaModule } from "./media/media.module.js"
+import { RemindersModule } from "./reminders/reminders.module.js"
 import { ResponsesModule } from "./responses/responses.module.js"
 import { SessionModule } from "./session/session.module.js"
 
@@ -20,6 +21,7 @@ import { SessionModule } from "./session/session.module.js"
     DatabaseModule,
     HealthModule,
     MediaModule,
+    RemindersModule,
     ResponsesModule,
     SessionModule,
   ],

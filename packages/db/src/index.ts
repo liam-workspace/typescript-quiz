@@ -2,12 +2,15 @@ import { type DbConfig, loadDbConfig } from "./config.js"
 import { createJobPool, createRequestPool } from "./pool.js"
 import {
   enterSection,
+  enterSectionInTransaction,
   finishSection,
+  finishSectionInTransaction,
   finalizeAttempt,
   finalizeExpiredAttempt,
   loadOwnedAttempt,
   loadRunningOwnedAttempt,
   setPosition,
+  setPositionInTransaction,
   startOrResumeAttempt,
   submitAttempt,
   TestNotFoundError,
@@ -40,6 +43,22 @@ import {
   type TestCardRow,
 } from "./repositories/catalog.repository.js"
 import {
+  loadOfflineBundle,
+  type OfflineBundleRow,
+  type OfflineBundleSectionRow,
+  type OfflineMediaRow,
+} from "./repositories/offline-bundle.repository.js"
+import {
+  advanceJournalCursor,
+  createOfflineAttempt,
+  createOfflineAttemptInTransaction,
+  getJournalCursor,
+  loadJournalContext,
+  type CreateOfflineAttemptInput,
+  type CreateOfflineAttemptOutcome,
+  type JournalContextRows,
+} from "./repositories/offline-journal.repository.js"
+import {
   insertFailedWrite,
   type FailedWriteRow,
 } from "./repositories/failed-write.repository.js"
@@ -69,12 +88,34 @@ import {
   upsertStudentBySubject,
   type StudentRow,
 } from "./repositories/student.repository.js"
+import {
+  claimReminderSend,
+  deleteReminderSubscription,
+  deleteReminderSubscriptionByEndpoint,
+  findReminderSubscription,
+  listReminderCandidates,
+  releaseReminderClaim,
+  upsertReminderSubscription,
+  type ReminderCandidateRow,
+  type ReminderClaim,
+  type ReminderLocale,
+  type ReminderSubscriptionInput,
+  type ReminderSubscriptionRow,
+} from "./repositories/reminder.repository.js"
 
 export { migrateToLatest } from "./migrate.js"
 
 export type { DbConfig }
 
 export type { StudentRow }
+
+export type {
+  ReminderCandidateRow,
+  ReminderClaim,
+  ReminderLocale,
+  ReminderSubscriptionInput,
+  ReminderSubscriptionRow,
+}
 
 export type {
   ListPublishedTestsResult,
@@ -106,6 +147,14 @@ export type { PlayClaimResult }
 
 export type { FailedWriteRow }
 
+export type { OfflineBundleRow, OfflineBundleSectionRow, OfflineMediaRow }
+
+export type {
+  CreateOfflineAttemptInput,
+  CreateOfflineAttemptOutcome,
+  JournalContextRows,
+}
+
 export type { ResponseWriteInput, WriteOutcome }
 
 export type { QuestionSectionInfo }
@@ -118,8 +167,21 @@ export {
   loadRunnerEnvelope,
   upsertStudentBySubject,
   findStudentBySubject,
+  upsertReminderSubscription,
+  findReminderSubscription,
+  deleteReminderSubscription,
+  listReminderCandidates,
+  claimReminderSend,
+  releaseReminderClaim,
+  deleteReminderSubscriptionByEndpoint,
   listPublishedTests,
   loadTestBrief,
+  loadOfflineBundle,
+  createOfflineAttempt,
+  createOfflineAttemptInTransaction,
+  getJournalCursor,
+  advanceJournalCursor,
+  loadJournalContext,
   loadSectionBrief,
   InvalidCursorError,
   loadOwnedAttempt,
@@ -131,10 +193,13 @@ export {
   AttemptNotInProgressError,
   SectionExpiredError,
   setPosition,
+  setPositionInTransaction,
   startOrResumeAttempt,
   submitAttempt,
   enterSection,
+  enterSectionInTransaction,
   finishSection,
+  finishSectionInTransaction,
   TestNotFoundError,
   claimPlay,
   isFilenameCapped,

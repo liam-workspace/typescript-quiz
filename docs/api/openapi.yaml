@@ -152,6 +152,65 @@ paths:
                 { schema: { $ref: "#/components/schemas/Problem" } },
             }
 
+  /me/reminders:
+    put:
+      tags: [Session]
+      operationId: putReminderSubscription
+      summary: Turn on the daily practice reminder for this device
+      description: |
+        Stores this student's Web Push subscription (`PushSubscription.toJSON()`) and the local time
+        to remind at. One subscription per student: a second PUT replaces the first, and an endpoint
+        already held by another student moves to the caller (a shared phone follows whoever
+        subscribed last). Returns `503 reminders_not_configured` when the server has no VAPID keys
+        -- checked AFTER the body is validated, so a malformed body is a `400` even then. The endpoint must be an
+        `https://` URL on an allow-listed push-service host (FCM `fcm.googleapis.com`,
+        `updates.push.services.mozilla.com`, `*.push.apple.com`, `*.notify.windows.com`, plus any
+        suffixes the operator adds with `PUSH_ENDPOINT_HOSTS`), matched on a label boundary, with
+        port 443 or none and no credentials; it is stored in canonical (lower-case) form. Any
+        other host is `400 invalid_body`. A rejected body is never retained in `failed_write`:
+        it carries the subscription secret.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReminderSubscriptionRequest" }
+      responses:
+        "204": { description: Subscription stored. }
+        "400": { $ref: "#/components/responses/InvalidBody" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: No profile for this `sub` — call `POST /session` first.
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
+        "409":
+          description: "`reminder_endpoint_conflict` — another sign-in was registering the same device at that instant. Not retryable in the `Problem` sense; the client may re-issue the PUT on its next user action."
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
+        "413": { $ref: "#/components/responses/PayloadCaptured" }
+        "503":
+          description: "`reminders_not_configured` — the server has no VAPID key pair."
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
+    delete:
+      tags: [Session]
+      operationId: deleteReminderSubscription
+      summary: Turn off the daily practice reminder
+      description: |
+        Idempotent: 204 whether or not a subscription existed, and available even when the server
+        has no VAPID keys, so sign-out cleanup never fails on server configuration.
+      responses:
+        "204": { description: No subscription remains for this student. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   # ─────────────────────────────────────────────────────────── Catalog ──
   /tests:
     get:
@@ -205,6 +264,33 @@ paths:
               application/json:
                 { schema: { $ref: "#/components/schemas/TestBrief" } },
             }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /tests/{slug}/offline-bundle:
+    get:
+      tags: [Catalog]
+      operationId: getOfflineBundle
+      summary: Everything needed to run a test with no network
+      description: |
+        Section rules plus the full runner content (groups, stimuli, questions, choices) and a
+        media manifest. Never carries an answer key. Every media URL is signed and short-lived
+        (`urlsExpireAt`): `/media` judges the cap per filename, which can disagree with a
+        stimulus's own cap, and ignores the signature on a file it does not consider capped.
+        The signature is NOT limited to downloading: until it expires the same URL also streams
+        a capped recording without a play claim (spec §14 accepts this; the window is short).
+        The client stores the bytes and enforces the play cap locally; the server audits play
+        counts when the journal is synced (`POST /attempts/offline-sync`).
+        Same access rules as `GET /tests/{slug}`: a student token is required, and an unknown
+        or unpublished slug is a 404 `test_not_found`.
+      parameters:
+        - { $ref: "#/components/parameters/Slug" }
+      responses:
+        "200":
+          description: The offline bundle.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OfflineBundle" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
@@ -442,6 +528,84 @@ paths:
                 { schema: { $ref: "#/components/schemas/Problem" } },
             }
         "410": { $ref: "#/components/responses/SectionOrAttemptExpired" }
+
+  /attempts/offline-sync:
+    post:
+      tags: [Attempt]
+      operationId: syncOfflineAttempt
+      summary: Replay a journal of lifecycle events recorded while offline
+      description: |
+        Journal-first lifecycle (spec D6, §13.1): the client records `start`, `enter_section`,
+        `play`, `position`, `answer` and `finish_section` events durably before sending them, then
+        posts them here. `attemptId` is the client-minted uuid and becomes `attempt.id` when the
+        server adopts the attempt, so no remapping is ever needed. The test version comes from the
+        `start` event for a new attempt and from the attempt itself afterwards.
+
+        Events are replayed IN ORDER through the same rules the live routes use, each at its
+        claimed time shifted by clock skew (`clientAt + (receivedAt − clientSentAt)`), so the
+        client stamps `clientSentAt` afresh on every send from the clock that stamps the events.
+        Idempotent: events at or below the stored cursor (`ackedThrough`) are skipped, so the
+        whole journal may be resent, or only the suffix after `ackedThrough`. One sync per attempt
+        runs at a time (a second one gets `503 offline_sync_busy` at once instead of waiting), and
+        each sync applies atomically: on any error nothing of it is applied.
+
+        Structurally impossible journals (gaps, time running backwards, unknown ids, sections out
+        of order or overlapping) are refused as a whole and captured as a `failed_write` (rule 4).
+        Events that arrived after a section or attempt deadline, or after the attempt ended, are
+        `late`; events refused by a navigation or answer rule, and a `play` beyond the recording's
+        cap (`play_cap_exceeded`: an honest client can produce one when a `POST /play` response is
+        lost), are `rejected`. Both are captured one by one and never applied (a refused play is
+        not counted), while the rest of the journal still lands. Hand-in is NOT part of the
+        journal: it requires a connection.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OfflineSyncRequest" }
+      responses:
+        "200":
+          description: The journal was applied (possibly partly late or rejected).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OfflineSyncResult" }
+        "400": { $ref: "#/components/responses/InvalidBody" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: |
+            `not_your_attempt`: the attempt belongs to another student, or the caller has no
+            student profile yet (call `POST /session` first). Nothing was applied; the journal is
+            captured under the SENDER (no attempt id), never under the other student's attempt.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/OfflineSyncProblem" }
+        "409":
+          description: |
+            `offline_attempt_conflict`: a live attempt already exists for this test. Nothing was
+            applied; the journal is captured. (A play beyond the cap is NOT a 409: it is one
+            `rejected` event of a 200.)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/OfflineSyncProblem" }
+        "413": { $ref: "#/components/responses/PayloadCaptured" }
+        "422":
+          description: |
+            `offline_journal_invalid`: the journal is structurally impossible, or its `start` names
+            a version that is not a published version of that slug. `reason` says which rule.
+            Nothing was applied; the journal is captured.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/OfflineSyncProblem" }
+        "500": { $ref: "#/components/responses/UnexpectedWriteError" }
+        "503":
+          description: |
+            `offline_sync_busy` (`retryable: true`): another sync of this attempt is running. The
+            request does not wait for it and nothing is captured; resend the same journal after a
+            backoff.
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
 
   /attempts/{id}/responses/{questionId}:
     put:
@@ -1558,6 +1722,49 @@ components:
         attempt: { $ref: "#/components/schemas/FinalizedAttempt" }
       additionalProperties: false
 
+    ReminderSubscriptionRequest:
+      type: object
+      required: [subscription, timezone, hour, minute]
+      additionalProperties: false
+      properties:
+        subscription:
+          type: object
+          required: [endpoint, keys]
+          additionalProperties: false
+          properties:
+            endpoint:
+              {
+                type: string,
+                format: uri,
+                maxLength: 2048,
+                pattern: "^https://",
+              }
+            expirationTime: { type: [number, "null"] }
+            keys:
+              type: object
+              required: [p256dh, auth]
+              additionalProperties: false
+              properties:
+                p256dh:
+                  {
+                    type: string,
+                    minLength: 1,
+                    maxLength: 256,
+                    pattern: "^[A-Za-z0-9_-]+={0,2}$",
+                  }
+                auth:
+                  {
+                    type: string,
+                    minLength: 1,
+                    maxLength: 256,
+                    pattern: "^[A-Za-z0-9_-]+={0,2}$",
+                  }
+        timezone:
+          { type: string, description: "IANA zone, e.g. `America/New_York`." }
+        locale: { type: string, enum: [de, en, es, fr, it, ja], default: en }
+        hour: { type: integer, minimum: 0, maximum: 23 }
+        minute: { type: integer, minimum: 0, maximum: 59 }
+
     Problem:
       type: object
       description: RFC 9457 problem details.
@@ -1653,9 +1860,11 @@ components:
         [
           id,
           slug,
+          testVersionId,
           title,
           level,
           durationSeconds,
+          mediaBytes,
           sections,
           inProgressAttemptId,
           attemptCount,
@@ -1664,9 +1873,17 @@ components:
       properties:
         id: { type: string }
         slug: { type: string }
+        testVersionId:
+          type: string
+          description: The published version; a saved offline copy is stale when this differs.
         title: { type: string }
         level: { $ref: "#/components/schemas/StudentLevel" }
         durationSeconds: { type: integer }
+        mediaBytes:
+          {
+            type: integer,
+            description: Total bytes of media a saved copy downloads.,
+          }
         sections:
           type: array
           items:
@@ -2143,35 +2360,92 @@ components:
         inProgressAttemptId: { type: [string, "null"] }
         sections:
           type: array
+          items: { $ref: "#/components/schemas/TestBriefSection" }
+
+    TestBriefSection:
+      type: object
+      required:
+        [
+          id,
+          type,
+          title,
+          ordinal,
+          questionCount,
+          durationSeconds,
+          navigation,
+          allowAnswerChange,
+          playback,
+          instructions,
+        ]
+      properties:
+        id: { type: string }
+        type: { $ref: "#/components/schemas/SectionType" }
+        title: { type: string, examples: ["Listening — Part 1"] }
+        ordinal: { type: integer }
+        questionCount: { type: integer }
+        durationSeconds: { type: integer }
+        navigation: { $ref: "#/components/schemas/NavigationMode" }
+        allowAnswerChange: { type: boolean }
+        playback: { $ref: "#/components/schemas/Playback" }
+        instructions:
+          type: array
+          items: { type: string }
+          description: Author-supplied free text rendered on the section-rules screen.
+
+    OfflineMedia:
+      type: object
+      required: [key, stimulusId, kind, mimeType, bytes, capped, url]
+      properties:
+        key:
+          { type: string, description: Stable cache key (the media filename). }
+        stimulusId: { type: string }
+        kind: { $ref: "#/components/schemas/MediaKind" }
+        mimeType: { type: string }
+        bytes: { type: integer }
+        capped:
+          { type: boolean, description: True when the stimulus has a play cap. }
+        url:
+          type: string
+          description: "Always signed, expiring at the bundle's `urlsExpireAt`."
+
+    OfflineBundle:
+      type: object
+      required:
+        [
+          slug,
+          testVersionId,
+          version,
+          title,
+          level,
+          durationSeconds,
+          sections,
+          media,
+          totalBytes,
+          urlsExpireAt,
+        ]
+      properties:
+        slug: { type: string }
+        testVersionId: { type: string }
+        version: { type: integer }
+        title: { type: string }
+        level: { $ref: "#/components/schemas/StudentLevel" }
+        durationSeconds: { type: integer }
+        sections:
+          type: array
           items:
-            type: object
-            required:
-              [
-                id,
-                type,
-                title,
-                ordinal,
-                questionCount,
-                durationSeconds,
-                navigation,
-                allowAnswerChange,
-                playback,
-                instructions,
-              ]
-            properties:
-              id: { type: string }
-              type: { $ref: "#/components/schemas/SectionType" }
-              title: { type: string, examples: ["Listening — Part 1"] }
-              ordinal: { type: integer }
-              questionCount: { type: integer }
-              durationSeconds: { type: integer }
-              navigation: { $ref: "#/components/schemas/NavigationMode" }
-              allowAnswerChange: { type: boolean }
-              playback: { $ref: "#/components/schemas/Playback" }
-              instructions:
-                type: array
-                items: { type: string }
-                description: Author-supplied free text rendered on the section-rules screen.
+            allOf:
+              - $ref: "#/components/schemas/TestBriefSection"
+              - type: object
+                required: [groups]
+                properties:
+                  groups:
+                    type: array
+                    items: { $ref: "#/components/schemas/QuestionGroup" }
+        media:
+          type: array
+          items: { $ref: "#/components/schemas/OfflineMedia" }
+        totalBytes: { type: integer }
+        urlsExpireAt: { type: string, format: date-time }
 
     AttemptStart:
       type: object
@@ -2441,6 +2715,7 @@ components:
           currentQuestionId,
           sections,
           responses,
+          offlineJournalCursor,
         ]
       properties:
         id: { type: string }
@@ -2448,6 +2723,14 @@ components:
         attemptNumber:
           type: integer
           description: The authoritative ordinal returned at attempt creation, repeated for section intros.
+        offlineJournalCursor:
+          type: integer
+          minimum: 0
+          description: >-
+            The highest offline-journal eventSeq the server has applied for this
+            attempt (0 when none). A device that mirrors this attempt continues
+            its journal at offlineJournalCursor + 1, because the server skips
+            every event at or below it.
         testTitle: { type: string }
         expiresAt: { type: [string, "null"], format: date-time }
         serverTime: { type: string, format: date-time }
@@ -2643,6 +2926,101 @@ components:
           description: |
             One ack per item in the request's `responses` array; empty when the queue was already
             drained. Always present, so the client can clear its queue from this response alone.
+
+    OfflineJournalEvent:
+      type: object
+      required: [eventSeq, type, clientAt, payload]
+      additionalProperties: false
+      properties:
+        eventSeq:
+          type: integer
+          minimum: 1
+          description: Contiguous per attempt, starting at 1.
+        type:
+          type: string
+          enum: [start, enter_section, play, position, answer, finish_section]
+        clientAt:
+          type: string
+          format: date-time
+          description: The device clock when the event happened; never later than `clientSentAt`.
+        payload:
+          type: object
+          description: |
+            By type — start: `{slug, testVersionId}`; enter_section / finish_section:
+            `{sectionId}`; play: `{stimulusId}`; position: `{sectionId, questionId}`; answer:
+            `{sectionId, questionId, clientInstanceId, seq, selectedChoiceIds, timeSpentMs?}`.
+
+    OfflineSyncRequest:
+      type: object
+      required: [attemptId, clientSentAt, events]
+      additionalProperties: false
+      properties:
+        attemptId: { type: string, format: uuid }
+        clientSentAt:
+          type: string
+          format: date-time
+          description: The device clock at send time, stamped afresh on every send.
+        events:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: { $ref: "#/components/schemas/OfflineJournalEvent" }
+
+    OfflineSyncResult:
+      type: object
+      required:
+        [
+          attemptId,
+          ackedThrough,
+          applied,
+          late,
+          rejected,
+          answersAcked,
+          finalized,
+        ]
+      additionalProperties: false
+      properties:
+        attemptId: { type: string, format: uuid }
+        ackedThrough:
+          type: integer
+          description: The highest `eventSeq` the server now holds; the client may drop every event up to it.
+        applied:
+          type: integer
+          description: Events applied by this call, answers included.
+        late:
+          type: integer
+          description: Events recorded but not applied because a deadline had passed or the attempt had ended.
+        rejected:
+          type: integer
+          description: Events recorded but not applied because a navigation or answer rule refused them, or a play exceeded its recording's cap.
+        answersAcked:
+          type: integer
+          description: Answer events applied (or already held) by this call — the "N answers sent" count.
+        finalized:
+          description: The attempt's terminal state when it is over (finalized by this call or earlier), else null.
+          oneOf:
+            - type: object
+              required: [status, resultUrl]
+              additionalProperties: false
+              properties:
+                status: { type: string, enum: [expired, submitted] }
+                resultUrl: { type: string }
+            - { type: "null" }
+
+    OfflineSyncProblem:
+      description: A refused journal. Nothing of it was applied; `capturedAs` names the `failed_write` holding it verbatim.
+      allOf:
+        - { $ref: "#/components/schemas/Problem" }
+        - type: object
+          required: [capturedAs]
+          properties:
+            reason:
+              type: string
+              description: The specific rule, e.g. `event_seq_not_contiguous`, `version_unavailable`.
+            eventSeq:
+              type: [integer, "null"]
+              description: The event that broke the rule, when there is one.
+            capturedAs: { type: string }
 
     SectionScore:
       type: object

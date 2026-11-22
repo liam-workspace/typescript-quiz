@@ -25,34 +25,31 @@ export function SignInScreen({
   const { t } = useTranslation("runner")
 
   return (
-    <div className="device-page">
-      <main className="center-main">
-        <div className="w-full max-w-xs">
-          <h1 className="screen-title text-[31px] tracking-[-0.02em]">
-            {t("library.brand")}
-          </h1>
-          <p className="screen-subtitle mt-2 mb-[18px] text-[15px] leading-relaxed">
-            {t("signIn.subtitle")}
-          </p>
-          <button
-            type="button"
-            className="device-button"
-            data-variant="secondary"
-            disabled={starting}
-            aria-busy={starting}
-            onClick={onSignIn}
-          >
-            {t(starting ? "signIn.starting" : "signIn.button")}
-          </button>
-          {failed ? (
-            <p role="alert" className="text-bad mt-3 text-[12.5px]">
-              {t("signIn.error")}
-            </p>
-          ) : null}
-          <p className="text-faint mt-4 max-w-[38ch] text-[12.5px] leading-relaxed">
-            {t("signIn.reassurance")}
-          </p>
+    <div className="m-page">
+      <main className="m-hero">
+        <div className="m-logo" aria-hidden="true">
+          {t("library.brand").charAt(0)}
         </div>
+        <h1 className="m-title" tabIndex={-1} data-page-title>
+          {t("library.brand")}
+        </h1>
+        <p className="m-sub">{t("signIn.subtitle")}</p>
+        {failed ? (
+          <p role="alert" className="m-alert">
+            {t("signIn.error")}
+          </p>
+        ) : null}
+        <button
+          type="button"
+          className="m-btn"
+          data-block="true"
+          disabled={starting}
+          aria-busy={starting}
+          onClick={onSignIn}
+        >
+          {t(starting ? "signIn.starting" : "signIn.button")}
+        </button>
+        <p className="m-reason">{t("signIn.reassurance")}</p>
       </main>
     </div>
   )

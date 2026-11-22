@@ -26,6 +26,16 @@ export interface ChoiceListProps {
   // stateless and props-only by policy; this prop is that policy's whole
   // interface for "is this question still open to change."
   locked: boolean
+  // Replaces the generic "Answer locked" line when the page knows WHY the
+  // choices are locked (e.g. the recording has not been played yet).
+  lockedMessage?: string
+}
+
+const LETTERS = "ABCDEFGH"
+
+// Past the eighth choice a letter would be `undefined`; fall back to a number.
+export function choiceLabel(index: number): string {
+  return LETTERS[index] ?? String(index + 1)
 }
 
 // Shared by both widgets below -- the prototype's `.choice` row (docs/
@@ -61,12 +71,13 @@ function MultiChoiceList({
   selectedIds,
   onSelect,
   locked,
+  lockedMessage,
 }: Omit<ChoiceListProps, "questionType">) {
   const { t } = useTranslation("runner")
 
   return (
     <div>
-      <p className="text-ink-2 mb-2 text-sm">
+      <p className="text-ink-2 m-hint mb-2 text-sm">
         {t("choices.selectAllThatApply")}
       </p>
       <div
@@ -74,7 +85,7 @@ function MultiChoiceList({
         aria-label={t("choices.selectAllThatApply")}
         className="choice-stack"
       >
-        {choices.map((choice) => (
+        {choices.map((choice, index) => (
           <label key={choice.id} className={CHOICE_ROW_CLASS}>
             <Checkbox.Root
               checked={selectedIds.includes(choice.id)}
@@ -82,9 +93,9 @@ function MultiChoiceList({
                 onSelect(choice.id)
               }}
               disabled={locked}
-              className="choice-dot rounded-[4px]"
+              className="choice-dot rounded-full"
             >
-              <Checkbox.Indicator className="block size-2.5 rounded-[1px] bg-white" />
+              <span aria-hidden="true">{choiceLabel(index)}</span>
             </Checkbox.Root>
             {choice.imageSvg ? <ChoiceImage svg={choice.imageSvg} /> : null}
             {choice.labelBlocks?.length ? (
@@ -95,7 +106,9 @@ function MultiChoiceList({
           </label>
         ))}
       </div>
-      {locked ? <p>{t("listening.answerLocked")}</p> : null}
+      {locked ? (
+        <p className="m-hint">{lockedMessage ?? t("listening.answerLocked")}</p>
+      ) : null}
     </div>
   )
 }
@@ -105,6 +118,7 @@ function SingleChoiceList({
   selectedIds,
   onSelect,
   locked,
+  lockedMessage,
 }: Omit<ChoiceListProps, "questionType">) {
   const { t } = useTranslation("runner")
 
@@ -116,13 +130,13 @@ function SingleChoiceList({
         disabled={locked}
         className="choice-stack"
       >
-        {choices.map((choice) => (
+        {choices.map((choice, index) => (
           <label key={choice.id} className={CHOICE_ROW_CLASS}>
             <RadioGroup.Item
               value={choice.id}
               className="choice-dot rounded-full"
             >
-              <RadioGroup.Indicator className="block size-1.5 rounded-full bg-white" />
+              <span aria-hidden="true">{choiceLabel(index)}</span>
             </RadioGroup.Item>
             {choice.imageSvg ? <ChoiceImage svg={choice.imageSvg} /> : null}
             {choice.labelBlocks?.length ? (
@@ -133,7 +147,9 @@ function SingleChoiceList({
           </label>
         ))}
       </RadioGroup.Root>
-      {locked ? <p>{t("listening.answerLocked")}</p> : null}
+      {locked ? (
+        <p className="m-hint">{lockedMessage ?? t("listening.answerLocked")}</p>
+      ) : null}
     </div>
   )
 }
@@ -148,6 +164,7 @@ export function ChoiceList({
   selectedIds,
   onSelect,
   locked,
+  lockedMessage,
 }: ChoiceListProps) {
   if (questionType === "multi_choice") {
     return (
@@ -156,6 +173,7 @@ export function ChoiceList({
         selectedIds={selectedIds}
         onSelect={onSelect}
         locked={locked}
+        lockedMessage={lockedMessage}
       />
     )
   }
@@ -166,6 +184,7 @@ export function ChoiceList({
       selectedIds={selectedIds}
       onSelect={onSelect}
       locked={locked}
+      lockedMessage={lockedMessage}
     />
   )
 }

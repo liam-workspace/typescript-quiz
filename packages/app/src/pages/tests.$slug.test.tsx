@@ -1,3 +1,4 @@
+import "fake-indexeddb/auto"
 import { cleanup, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import {
@@ -8,6 +9,13 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
 import { startAttempt } from "../lib/attempts-api.js"
+import { setAttemptGateway } from "../lib/attempt/gateway-selector.js"
+import { HybridAttemptGateway } from "../lib/attempt/hybrid-gateway.js"
+import { JournalStore } from "../lib/attempt/journal-store.js"
+import type { JournalSync } from "../lib/attempt/journal-sync.js"
+import { LocalAttemptGateway } from "../lib/attempt/local-gateway.js"
+import { RemoteAttemptGateway } from "../lib/attempt/remote-gateway.js"
+import { makeBundle } from "../../test/helpers/bundle-fixture.js"
 import type { AttemptStart, TestBrief } from "../lib/api-types.js"
 import {
   TestBriefRouteError,
@@ -287,5 +295,59 @@ describe("test brief page", () => {
       "The test could not be started. Please try again.",
     )
     expect(screen.getByRole("button", { name: "Start test" })).toBeEnabled()
+  })
+
+  it("offline, an in-progress (untimed) online attempt this phone never loaded blocks an offline start, with the connection reason", async () => {
+    const journal = await JournalStore.open("pp-brief-untimed")
+    const local = new LocalAttemptGateway({
+      journal,
+      clock: { nowMs: () => Date.now() },
+      bundles: {
+        list: () => Promise.resolve([]),
+        // The test IS saved: without the hint an offline start would succeed.
+        getBundle: () => Promise.resolve(makeBundle({ slug: brief.slug })),
+        getMediaBlob: () => Promise.resolve(null),
+      },
+      newId: () => "local-1",
+      objectUrl: () => "blob:x",
+      requestSync: () => undefined,
+      ownerSub: () => "sub-1",
+    })
+    const sync: JournalSync = {
+      syncNow: () => Promise.resolve({ kind: "offline" }),
+      syncAll: () => Promise.resolve(),
+      request: () => undefined,
+    }
+
+    setAttemptGateway(
+      new HybridAttemptGateway({
+        remote: new RemoteAttemptGateway(),
+        local,
+        journal,
+        sync,
+        isOnline: () => false,
+      }),
+    )
+
+    try {
+      const user = userEvent.setup()
+      const navigate = vi.fn()
+
+      render(
+        <TestBriefScreen
+          brief={{ ...brief, inProgressAttemptId: "srv-untimed" }}
+          navigate={navigate}
+        />,
+      )
+      await user.click(screen.getByRole("button", { name: "Start test" }))
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        /Needs a connection/u,
+      )
+      expect(navigate).not.toHaveBeenCalled()
+      expect(await journal.listAttempts()).toEqual([])
+    } finally {
+      setAttemptGateway(new RemoteAttemptGateway())
+    }
   })
 })

@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next"
+import { Icon, type IconName } from "./Icon.js"
 
 export type SaveStateProps =
   | { readonly state: "saving" }
@@ -6,44 +7,31 @@ export type SaveStateProps =
   | { readonly state: "failed" }
   | { readonly state: "pending"; readonly pendingCount: number }
 
-interface StateColors {
-  readonly text: string
-  readonly dot: string
-}
-
-function colorsFor(state: SaveStateProps["state"]): StateColors {
-  switch (state) {
-    case "saved":
-      return { text: "text-good", dot: "bg-good" }
-
-    case "failed":
-      return { text: "text-bad", dot: "bg-bad" }
-
-    default:
-      return { text: "text-amber", dot: "bg-amber" }
-  }
+const ICON: Record<SaveStateProps["state"], IconName> = {
+  saved: "check",
+  saving: "refresh",
+  pending: "wifioff",
+  failed: "alert",
 }
 
 export function SaveState(props: SaveStateProps) {
   const { t } = useTranslation("runner")
   const label =
     props.state === "pending"
-      ? t("runner.saveState.pending", { count: props.pendingCount })
+      ? t("runner.saveState.pendingShort", { count: props.pendingCount })
       : t(`runner.saveState.${props.state}`)
-  const colors = colorsFor(props.state)
 
   return (
     <span
       role="status"
       aria-live="polite"
       data-state={props.state}
-      className={`save-state inline-flex items-center gap-1.5 text-xs font-bold ${colors.text}`}
+      className="save-state m-save"
     >
-      <span
-        aria-hidden="true"
-        className={`size-1.5 rounded-full ${colors.dot}`}
-      />
-      {label}
+      <Icon name={ICON[props.state]} small />
+      {/* Its own element so the top bar can ellipsize (or, below 360 px,
+          visually hide) it while it stays in the live region. */}
+      <span className="m-save-text">{label}</span>
     </span>
   )
 }

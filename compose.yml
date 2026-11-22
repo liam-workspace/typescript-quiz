@@ -19,6 +19,9 @@ services:
         VITE_AUTH_ISSUER: ${VITE_AUTH_ISSUER:?set it, e.g. https://auth-dev.icovn.me}
         VITE_AUTH_CLIENT_ID: ${VITE_AUTH_CLIENT_ID:?set it, e.g. local-dev}
         VITE_AUTH_REDIRECT_URI: ${VITE_AUTH_REDIRECT_URI:?must match a redirect URI registered with the issuer, exactly}
+        # Optional. Unset keeps the placeholder, which docker-entrypoint.sh
+        # fills at start from VAPID_PUBLIC_KEY below.
+        VITE_VAPID_PUBLIC_KEY: ${VITE_VAPID_PUBLIC_KEY:-__VITE_VAPID_PUBLIC_KEY__}
     # Bound to all interfaces ON PURPOSE, unlike postgres below: the child's
     # iPad reaches this over the home wifi, so loopback would make the app
     # unusable for the one device it exists to serve. What protects it is not
@@ -52,10 +55,33 @@ services:
       MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET:?set MEDIA_SIGNING_SECRET}
       MEDIA_ROOT: /media
       MEDIA_MAX_BYTES: ${MEDIA_MAX_BYTES:-20971520}
+      # Web Push for the practice reminders. All three or none: an empty value
+      # counts as unset (config.ts), a partial set refuses to boot, none means
+      # PUT /api/me/reminders answers 503 reminders_not_configured and no
+      # reminders are sent. Generate a pair with:
+      #   pnpm --filter @pp/server exec web-push generate-vapid-keys
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      # Push endpoints are accepted only from known push services (FCM,
+      # Mozilla, Apple, Windows) on port 443. Comma-separated extra host
+      # suffixes for any other vendor; leave empty otherwise.
+      PUSH_ENDPOINT_HOSTS: ${PUSH_ENDPOINT_HOSTS:-}
+      # The in-process reminder sender (every 60 s, one replica at a time via
+      # a Postgres advisory lock). Empty = on whenever VAPID is set; `false`
+      # stops sending without touching subscriptions.
+      REMINDER_SCHEDULER_ENABLED: ${REMINDER_SCHEDULER_ENABLED:-}
     volumes:
       - pp-media:/media
     depends_on:
       - postgres
+    # Node as PID 1 ignores the SIGTERM it re-raises after Nest's shutdown
+    # hooks have run (PID 1 has no default signal handlers), so `docker stop`
+    # would wait out the grace period and SIGKILL it with the pg pools still
+    # open. An init (tini) as PID 1 forwards the signal and reaps; the grace
+    # period gives in-flight requests and the hooks time to finish.
+    init: true
+    stop_grace_period: 30s
 
   # Local development only. Bound to loopback (127.0.0.1) so this database is
   # never reachable from the LAN or shared wifi — it holds a child's test

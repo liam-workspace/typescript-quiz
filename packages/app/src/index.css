@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@import "@fontsource-variable/nunito/index.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
 
 /*
  * Tailwind v4's automatic content scan does not look inside node_modules,
@@ -6,7 +9,7 @@
  * pre-built dist JS (e.g. Sheet's `fixed`/`inset-y-0`/`w-72`/`z-50` and
  * Button's `bg-primary`/`h-9` variants) were never generated into this
  * app's CSS -- verified against the compiled output while checking
- * QuestionNavigator/AppMenu's SheetContent for task 7's device-emulation
+ * QuestionNavigator's SheetContent for task 7's device-emulation
  * pass: the Sheet rendered with `position: static` (the `.fixed` class
  * happened to exist only by accident, via the word "fixed" inside an
  * unrelated code comment) and sat wherever it fell in normal document
@@ -47,7 +50,7 @@
 @theme {
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --color-ink: #1c2530;
-  --color-ink-2: #55636f;
+  --color-ink-2: #4b5966;
   --color-faint: #8d9aa6;
   --color-paper: #ffffff;
   --color-surface: #f4f7f9;
@@ -56,11 +59,15 @@
   --color-teal-bg: #e4f1f2;
   --color-clay: #a8622f;
   --color-clay-bg: #f8ede4;
-  --color-good: #2e9e5b;
+  --color-good: #1f7a43;
   --color-good-bg: #e6f4eb;
-  --color-bad: #c4453f;
+  --color-bad: #b53a34;
   --color-bad-bg: #faeae9;
   --color-amber: #e8a33d;
+  --color-teal-d: #0b5a63;
+  --color-amber-bg: #fdf3df;
+  /* Text on amber (pending / waiting): the amber itself is too light to read. */
+  --color-amber-ink: #7a4d00;
 
   --radius-device: 10px;
 }
@@ -77,6 +84,7 @@
     background: var(--color-surface);
     color: var(--color-ink);
     font-family:
+      "Nunito Variable",
       Nunito,
       ui-sans-serif,
       system-ui,
@@ -132,6 +140,27 @@
  * state is a defect, and both have already been exactly that.
  */
 @layer components {
+  .lang-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .lang-btn {
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 12px;
+    border: 1.5px solid var(--color-line);
+    background: var(--color-paper);
+    font-weight: 800;
+    color: var(--color-ink-2);
+    cursor: pointer;
+  }
+  .lang-btn[aria-pressed="true"] {
+    background: var(--color-teal);
+    border-color: var(--color-teal);
+    color: #fff;
+  }
   .app-shell {
     min-height: calc(
       100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)
@@ -141,20 +170,22 @@
   /* An answer option. Its selected state is the single most important
    * visual signal in the app: a child taps and must see it took. */
   .choice {
+    position: relative;
     display: flex;
+    width: 100%;
+    min-height: 60px;
     align-items: center;
     gap: 12px;
-    width: 100%;
-    min-height: 44px; /* HIG minimum; the kit's own controls stop at 40px */
+    border: 2px solid var(--color-line);
+    border-radius: 16px;
     background: var(--color-paper);
-    border: 1.5px solid var(--color-line);
-    border-radius: var(--radius-device);
-    padding: 12px 15px;
-    font: inherit;
-    font-size: 15px;
-    text-align: left;
-    cursor: pointer;
+    padding: 10px 14px;
     color: var(--color-ink);
+    cursor: pointer;
+    font: inherit;
+    font-size: 17px;
+    font-weight: 700;
+    text-align: left;
     touch-action: manipulation;
   }
   .choice:hover {
@@ -163,14 +194,31 @@
   .choice:has([data-state="checked"]) {
     border-color: var(--color-teal);
     background: var(--color-teal-bg);
-    font-weight: 700;
   }
+  .choice:has(:focus-visible) {
+    outline: 3px solid var(--color-teal);
+    outline-offset: 2px;
+  }
+  .choice:has(:disabled) {
+    background: #f1f4f6;
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+  /* Review rows are always read-only but must stay fully legible. */
   .choice[data-locked="true"] {
     cursor: not-allowed;
     opacity: 0.92;
   }
-  .choice[data-locked="true"]:hover {
+  .choice[data-locked="true"]:hover,
+  .choice:has(:disabled):hover {
     border-color: var(--color-line);
+  }
+  /* A disabled choice the student SELECTED (a locked answer) keeps the
+   * selected fill and border: the rules above would grey it out (D14). */
+  .choice:has(:disabled):has([data-state="checked"]),
+  .choice:has(:disabled):has([data-state="checked"]):hover {
+    border-color: var(--color-teal);
+    background: var(--color-teal-bg);
   }
   /* Review only: the attempt is finished, so correctness may be shown. */
   .choice[data-verdict="correct"] {
@@ -184,17 +232,22 @@
 
   /* The radio/checkbox mark inside a `.choice`. */
   .choice-dot {
-    width: 19px;
-    height: 19px;
-    flex: none;
-    border: 2px solid var(--color-line);
     display: grid;
+    width: 32px;
+    height: 32px;
+    flex: none;
     place-items: center;
-    background: var(--color-paper);
+    border: 1.5px solid var(--color-line);
+    border-radius: 50%;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-size: 14px;
+    font-weight: 800;
   }
   .choice-dot[data-state="checked"] {
     border-color: var(--color-teal);
     background: var(--color-teal);
+    color: #fff;
   }
 
   /* A picture choice's pictogram. `stroke="currentColor"` inside the SVG
@@ -226,90 +279,78 @@
 
   /* A navigator cell. Five states, five looks -- see the note above. */
   .np-cell {
+    position: relative;
     display: grid;
+    min-height: 52px;
     place-items: center;
-    font: inherit;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    border-radius: 7px;
-    border: 1.5px solid var(--color-line);
+    border: 2px solid var(--color-line);
+    border-radius: 12px;
     background: var(--color-paper);
-    color: var(--color-ink-2);
+    color: var(--color-ink);
     cursor: pointer;
+    font: inherit;
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
     touch-action: manipulation;
   }
-  .np-cell:hover:not(:disabled) {
-    border-color: var(--color-teal);
-  }
   .np-cell:disabled {
-    cursor: not-allowed;
-    opacity: 0.55;
+    cursor: default;
+    opacity: 0.8;
   }
   .np-cell[data-status="answered"] {
-    background: var(--color-teal-bg);
     border-color: var(--color-teal);
-    color: var(--color-teal);
+    background: var(--color-teal);
+    color: #fff;
   }
   .np-cell[data-status="current"] {
-    background: var(--color-amber);
-    border-color: var(--color-amber);
-    color: #4a3208;
+    border-color: var(--color-clay);
+    box-shadow: 0 0 0 3px var(--color-clay-bg);
+    color: var(--color-clay);
   }
   .np-cell[data-status="correct"] {
-    background: var(--color-good-bg);
     border-color: var(--color-good);
+    background: var(--color-good-bg);
     color: var(--color-good);
   }
   .np-cell[data-status="incorrect"] {
-    background: var(--color-bad-bg);
     border-color: var(--color-bad);
+    background: var(--color-bad-bg);
     color: var(--color-bad);
   }
   .np-cell[data-status="blank"] {
-    background: var(--color-surface);
     border-style: dashed;
   }
-
-  /* The navigator's legend swatch: the same five states at glyph size. */
+  .np-mark {
+    position: absolute;
+    top: 1px;
+    right: 4px;
+    font-size: 10px;
+  }
   .np-key {
-    width: 11px;
-    height: 11px;
-    border-radius: 3px;
-    border: 1.5px solid var(--color-line);
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--color-line);
+    border-radius: 5px;
   }
   .np-key[data-status="answered"] {
-    background: var(--color-teal-bg);
     border-color: var(--color-teal);
-  }
-  .np-key[data-status="current"] {
-    background: var(--color-amber);
-    border-color: var(--color-amber);
-  }
-  .np-key[data-status="blank"] {
-    background: var(--color-surface);
-    border-style: dashed;
-  }
-  .np-key[data-status="correct"] {
-    background: var(--color-good-bg);
-    border-color: var(--color-good);
-  }
-  .np-key[data-status="incorrect"] {
-    background: var(--color-bad-bg);
-    border-color: var(--color-bad);
-  }
-
-  /* Progress pips along the runner chrome. */
-  .pip {
-    width: 19px;
-    height: 5px;
-    border-radius: 3px;
-    background: var(--color-line);
-  }
-  .pip[data-state="done"] {
     background: var(--color-teal);
   }
-  .pip[data-state="now"] {
-    background: var(--color-amber);
+  .np-key[data-status="current"] {
+    border-color: var(--color-clay);
+  }
+  .np-key[data-status="correct"] {
+    border-color: var(--color-good);
+    background: var(--color-good-bg);
+  }
+  .np-key[data-status="incorrect"] {
+    border-color: var(--color-bad);
+    background: var(--color-bad-bg);
+  }
+  .np-key[data-status="blank"] {
+    border-style: dashed;
   }
 
   /* The shared screen vocabulary is deliberately responsive: pages fill a
@@ -446,18 +487,14 @@
     color: var(--color-ink-2);
     font-size: 14px;
   }
-  .question-count {
-    color: var(--color-faint);
-    font-size: 12.5px;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-  }
   .question-prompt {
-    margin: 15px 0 0;
-    font-size: 16.5px;
-    font-weight: 700;
-    text-wrap: balance;
+    margin: 2px 0 4px;
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1.3;
+  }
+  .question-prompt:focus {
+    outline: none;
   }
   .choice-stack {
     display: flex;
@@ -468,31 +505,34 @@
   .audio-box {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
     gap: 10px;
-    border: 1px solid color-mix(in srgb, var(--color-teal) 22%, transparent);
-    border-radius: 12px;
-    padding: 20px;
-    background: var(--color-teal-bg);
+    border: 1.5px solid var(--color-line);
+    border-radius: 16px;
+    background: var(--color-paper);
+    padding: 16px;
+    text-align: center;
   }
   .play-button {
     display: inline-flex;
-    min-height: 44px;
+    min-height: 48px;
     align-items: center;
+    justify-content: center;
     gap: 10px;
-    border: 0;
-    border-radius: 999px;
-    padding: 10px 24px;
+    border: 2px solid var(--color-teal);
+    border-radius: 14px;
     background: var(--color-teal);
-    color: white;
+    color: #fff;
     cursor: pointer;
-    font-size: 15px;
-    font-weight: 700;
+    font-size: 16px;
+    font-weight: 800;
     touch-action: manipulation;
   }
   .play-button:disabled {
+    border-color: #e8edf1;
+    background: #e8edf1;
+    color: #5d6a76;
     cursor: not-allowed;
-    background: var(--color-faint);
   }
   .passage {
     max-height: min(35dvh, 21rem);
@@ -506,7 +546,7 @@
   }
   .score-ring {
     display: grid;
-    width: 118px;
+    width: 170px;
     aspect-ratio: 1;
     place-items: center;
     border-radius: 50%;
@@ -522,18 +562,6 @@
     place-items: center;
     border-radius: 50%;
     background: var(--color-paper);
-  }
-  .score-bar {
-    height: 7px;
-    overflow: hidden;
-    border-radius: 4px;
-    background: var(--color-line);
-  }
-  .score-bar > * {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--color-teal);
   }
   .history-table {
     width: 100%;
@@ -556,177 +584,7 @@
     text-align: left;
     font-variant-numeric: tabular-nums;
   }
-  .score-badge {
-    display: inline-flex;
-    margin-left: 4px;
-    border-radius: 999px;
-    padding: 2px 8px;
-    font-size: 12px;
-    font-weight: 800;
-  }
-  .score-badge[data-score-band="high"] {
-    background: var(--color-good-bg);
-    color: var(--color-good);
-  }
-  .score-badge[data-score-band="mid"] {
-    background: var(--color-teal-bg);
-    color: var(--color-teal);
-  }
-
-  /* Drawer and navigator overlays are genuine modal Radix dialogs. The
-   * overlay supplies the scrim/pointer boundary, while padding keeps sheet
-   * content and its close control clear of notches in every orientation. */
-  .device-sheet-content {
-    width: min(
-      22rem,
-      calc(
-        100vw - 4rem - env(safe-area-inset-left) - env(safe-area-inset-right)
-      )
-    );
-    max-width: calc(
-      100vw - 4rem - env(safe-area-inset-left) - env(safe-area-inset-right)
-    );
-    gap: 12px;
-    padding-top: calc(18px + env(safe-area-inset-top));
-    padding-bottom: calc(18px + env(safe-area-inset-bottom));
-    background: var(--color-paper);
-  }
-  .device-sheet-content[data-side="left"] {
-    padding-right: 18px;
-    padding-left: calc(18px + env(safe-area-inset-left));
-  }
-  .device-sheet-content[data-side="right"] {
-    padding-right: calc(18px + env(safe-area-inset-right));
-    padding-left: 18px;
-  }
-  .device-sheet-close {
-    top: calc(12px + env(safe-area-inset-top));
-  }
-  .device-sheet-content[data-side="left"] .device-sheet-close {
-    right: 12px;
-  }
-  .device-sheet-content[data-side="right"] .device-sheet-close {
-    right: calc(12px + env(safe-area-inset-right));
-  }
-  .device-drawer-panel,
-  .question-panel {
-    box-shadow: 0 12px 32px rgb(26 41 48 / 0.18);
-    color: var(--color-ink);
-  }
-  .device-drawer-panel [data-slot="dialog-title"],
-  .question-panel [data-slot="dialog-title"] {
-    padding-right: 32px;
-    color: var(--color-ink);
-    font-size: 18px;
-    font-weight: 800;
-  }
-  .device-drawer {
-    display: flex;
-    min-height: 0;
-    flex: 1 1 auto;
-    flex-direction: column;
-    gap: 14px;
-  }
-  .device-drawer-student {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    border-bottom: 1px solid var(--color-line);
-    padding-bottom: 14px;
-  }
-  .device-drawer-avatar {
-    display: grid;
-    width: 36px;
-    height: 36px;
-    flex: none;
-    place-items: center;
-    border-radius: 50%;
-    background: var(--color-teal);
-    color: white;
-    font-weight: 700;
-  }
-  .device-drawer-actions {
-    display: grid;
-    gap: 4px;
-  }
-  .device-drawer-actions button,
-  .device-drawer-sign-out {
-    min-height: 44px;
-    border: 0;
-    border-radius: 8px;
-    padding: 0 12px;
-    background: transparent;
-    color: var(--color-ink);
-    cursor: pointer;
-    font-size: 15px;
-    font-weight: 700;
-    text-align: left;
-    touch-action: manipulation;
-  }
-  .device-drawer-actions button:hover {
-    background: var(--color-surface);
-  }
-  .device-drawer-actions hr {
-    width: 100%;
-    margin: 8px 0;
-    border: 0;
-    border-top: 1px solid var(--color-line);
-  }
-  .device-drawer-actions p {
-    margin: 0;
-    padding: 0 12px;
-    color: var(--color-ink-2);
-    font-size: 12px;
-    line-height: 1.5;
-  }
-  .device-drawer-footer {
-    margin-top: auto;
-    border-top: 1px solid var(--color-line);
-    padding-top: 14px;
-  }
-  .device-drawer-footer > :first-child {
-    margin-bottom: 8px;
-    color: var(--color-faint);
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .device-drawer-languages {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .device-drawer-languages button {
-    width: 44px;
-    height: 44px;
-    border: 1px solid var(--color-line);
-    border-radius: 8px;
-    background: var(--color-paper);
-    color: var(--color-ink-2);
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-  }
-  .device-drawer-languages button[aria-pressed="true"] {
-    border-color: var(--color-teal);
-    background: var(--color-teal-bg);
-    color: var(--color-teal);
-  }
-  .device-drawer-sign-out {
-    width: 100%;
-    margin-top: 8px;
-    background: var(--color-paper);
-    color: var(--color-bad);
-  }
-  .device-drawer-sign-out:hover {
-    background: var(--color-bad-bg);
-  }
-  .question-panel [data-slot="dialog-description"] {
-    color: var(--color-ink-2);
-    font-size: 14px;
-  }
+  /* Question navigator contents (rendered inside BottomSheet). */
   .question-panel-groups {
     min-height: 0;
     flex: 1 1 auto;
@@ -771,5 +629,1145 @@
     color: var(--color-ink-2);
     font-size: 12px;
     line-height: 1.5;
+  }
+
+  /* ───── Prototype shell vocabulary (docs/prototype/pwa-mobile.html) ───── */
+  .grow {
+    flex: 1;
+  }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--color-ink-2);
+  }
+  .reason {
+    font-size: 13px;
+    color: var(--color-ink-2);
+    margin-top: 6px;
+  }
+  svg.i {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex: none;
+  }
+  svg.i.sm {
+    width: 16px;
+    height: 16px;
+  }
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--color-teal);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 14px;
+  }
+  .iconbtn {
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    display: grid;
+    place-items: center;
+    color: var(--color-ink);
+    cursor: pointer;
+  }
+  .iconbtn:active {
+    background: var(--color-surface);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 10px 18px;
+    border-radius: 14px;
+    border: 2px solid var(--color-teal);
+    background: var(--color-teal);
+    color: #fff;
+    font-weight: 800;
+    font-size: 16px;
+    text-decoration: none;
+    text-align: center;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .btn:hover {
+    background: var(--color-teal-d);
+  }
+  .btn.secondary {
+    background: var(--color-paper);
+    color: var(--color-teal);
+  }
+  .btn.secondary:hover {
+    background: var(--color-teal-bg);
+  }
+  .btn.ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--color-teal);
+  }
+  .btn.danger {
+    background: var(--color-bad);
+    border-color: var(--color-bad);
+  }
+  .btn.sm {
+    min-height: 44px;
+    padding: 6px 14px;
+    font-size: 14px;
+  }
+  .btn.block {
+    width: 100%;
+  }
+  .btn[disabled],
+  .btn[aria-disabled="true"] {
+    background: #e8edf1;
+    border-color: #e8edf1;
+    color: #5d6a76;
+    cursor: not-allowed;
+  }
+  .btn[aria-busy="true"]::after {
+    content: "";
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 3px solid currentColor;
+    border-right-color: transparent;
+    animation: pw-spin 0.8s linear infinite;
+  }
+  @keyframes pw-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .card {
+    background: var(--color-paper);
+    border: 1.5px solid var(--color-line);
+    border-radius: 16px;
+    padding: 14px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 99px;
+    font-size: 12.5px;
+    font-weight: 800;
+    background: var(--color-surface);
+    color: var(--color-ink-2);
+    border: 1px solid var(--color-line);
+  }
+  .chip.teal {
+    background: var(--color-teal-bg);
+    color: var(--color-teal-d);
+    border-color: transparent;
+  }
+  .chip.good {
+    background: var(--color-good-bg);
+    color: var(--color-good);
+    border-color: transparent;
+  }
+  .chip.bad {
+    background: var(--color-bad-bg);
+    color: var(--color-bad);
+    border-color: transparent;
+  }
+  .chip.warn {
+    background: var(--color-amber-bg);
+    color: var(--color-amber-ink);
+    border-color: transparent;
+  }
+  .chip.clay {
+    background: var(--color-clay-bg);
+    color: var(--color-clay);
+    border-color: transparent;
+  }
+
+  .list {
+    background: var(--color-paper);
+    border: 1.5px solid var(--color-line);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .list > * + * {
+    border-top: 1px solid var(--color-line);
+  }
+  .li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 60px;
+    padding: 8px 14px;
+    width: 100%;
+    background: none;
+    border: 0;
+    text-align: left;
+  }
+  .li .t {
+    flex: 1;
+    /* A flex item never shrinks below its longest word unless told to: without
+     * this a long German title pushes the switch past the 320 px edge. */
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-weight: 800;
+  }
+  .li .t small {
+    display: block;
+    font-weight: 600;
+    color: var(--color-ink-2);
+    font-size: 13px;
+  }
+  .li .ticon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: var(--color-teal-bg);
+    color: var(--color-teal);
+    flex: none;
+  }
+  .switch {
+    position: relative;
+    width: 52px;
+    height: 32px;
+    flex: none;
+  }
+  .switch input {
+    position: absolute;
+    /* The track is 52×32; the input reaches 4 px past each side and 6 px
+     * above and below, so the TARGET is 60×44 with the same look (D10). */
+    inset: -6px -4px;
+    opacity: 0;
+    margin: 0;
+    cursor: pointer;
+  }
+  .switch i {
+    position: absolute;
+    inset: 0;
+    /* The visual track is painted over the input's centre; it must never
+     * catch the tap, or only the 4–6 px ring outside it would toggle. */
+    pointer-events: none;
+    border-radius: 99px;
+    background: #b7c2cb;
+    transition: background 0.15s;
+  }
+  .switch i::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.15s;
+  }
+  .switch input:checked + i {
+    background: var(--color-teal);
+  }
+  .switch input:checked + i::after {
+    transform: translateX(20px);
+  }
+  .switch input:focus-visible + i {
+    outline: 3px solid var(--color-teal);
+    outline-offset: 2px;
+  }
+  .switch input:disabled {
+    cursor: not-allowed;
+  }
+  .switch input:disabled + i {
+    opacity: 0.5;
+  }
+
+  .banner {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .banner.off {
+    background: #2b3540;
+    color: #fff;
+  }
+  .banner.upd {
+    background: var(--color-teal-bg);
+    color: var(--color-teal-d);
+  }
+  .banner .btn {
+    min-height: 44px;
+    padding: 2px 12px;
+    font-size: 13px;
+    border-radius: 10px;
+  }
+  .install {
+    background: var(--color-teal-bg);
+    border-color: transparent;
+  }
+  .install p {
+    font-size: 14px;
+    color: var(--color-ink-2);
+    margin: 2px 0 0;
+  }
+  .install .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  /* App column and tab bar: phone width is the design; wider screens centre a 520px column. */
+  .app-shell--column {
+    max-width: 520px;
+    margin-inline: auto;
+  }
+  .app-shell--tabs {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom));
+  }
+  .tabbar {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(100%, 520px);
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    background: var(--color-paper);
+    border-top: 1px solid var(--color-line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tabbar a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 4px;
+    min-height: 60px;
+    text-decoration: none;
+    color: var(--color-ink-2);
+    font-size: 12px;
+    font-weight: 700;
+    position: relative;
+  }
+  .tabbar a[aria-current="page"] {
+    color: var(--color-teal);
+  }
+  .tabbar a[aria-current="page"]::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 30%;
+    right: 30%;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: var(--color-teal);
+  }
+  .tabbar a:focus-visible {
+    outline: 3px solid var(--color-teal);
+    outline-offset: -3px;
+  }
+
+  .toast {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    max-width: 496px;
+    margin-inline: auto;
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    z-index: 80;
+    background: #1c2530;
+    color: #fff;
+    padding: 12px 14px;
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 14px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    animation: pw-toast-in 0.2s ease-out;
+  }
+  @keyframes pw-toast-in {
+    from {
+      transform: translateY(10px);
+      opacity: 0;
+    }
+  }
+
+  .splash {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: var(--color-teal);
+    color: #fff;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 14px;
+    transition:
+      opacity 0.35s,
+      visibility 0s;
+  }
+  .splash[data-visible="false"] {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      opacity 0.35s,
+      visibility 0s 0.35s;
+  }
+  .splash .logo {
+    width: 84px;
+    height: 84px;
+    border-radius: 24px;
+    background: #fff;
+    color: var(--color-teal);
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    font-size: 40px;
+  }
+  .splash b {
+    font-size: 22px;
+  }
+
+  .bsheet-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(16, 22, 28, 0.45);
+  }
+  .bsheet {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 70;
+    width: min(100vw, 520px);
+    max-height: 86dvh;
+    overflow: auto;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.2);
+    padding: 6px 18px calc(18px + env(safe-area-inset-bottom));
+    animation: pw-sheet-up 0.22s ease-out;
+  }
+  @keyframes pw-sheet-up {
+    from {
+      transform: translate(-50%, 28px);
+      opacity: 0;
+    }
+  }
+  .bsheet-grab {
+    width: 44px;
+    height: 5px;
+    border-radius: 9px;
+    background: var(--color-line);
+    margin: 8px auto 4px;
+  }
+  .bsheet-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .bsheet-title {
+    flex: 1;
+    font-size: 20px;
+    font-weight: 800;
+    margin: 0;
+  }
+  .steps {
+    padding-left: 0;
+    list-style: none;
+    display: grid;
+    gap: 10px;
+    margin: 12px 0;
+  }
+  .steps li {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    background: var(--color-surface);
+    border-radius: 14px;
+    padding: 10px 12px;
+    font-weight: 700;
+  }
+  .steps .n {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--color-teal);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    flex: none;
+  }
+  .btnrow {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bsheet,
+    .toast,
+    .btn[aria-busy="true"]::after {
+      animation: none;
+    }
+    .switch i,
+    .switch i::after,
+    .splash {
+      transition: none;
+    }
+  }
+
+  /* ───── Mobile screen vocabulary — docs/prototype/pwa-mobile.html ───── */
+  .m-page {
+    display: flex;
+    min-height: calc(
+      100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+    );
+    flex-direction: column;
+    background: var(--color-surface);
+    color: var(--color-ink);
+  }
+  .m-appbar {
+    display: flex;
+    min-height: 56px;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-paper);
+    padding: 8px 14px;
+  }
+  .m-brand {
+    color: var(--color-teal);
+    font-size: 17px;
+    font-weight: 800;
+  }
+  .m-avatar {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--color-teal);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 800;
+  }
+  .m-appbar .m-iconbtn {
+    /* Never shrink below 44 px beside a long brand and section chip. */
+    flex: none;
+  }
+  /* The brand and the chip give way instead, ellipsized on one line, so the
+   * bar never pushes the page wider than 320 px in a long locale. */
+  .m-appbar .m-brand,
+  .m-appbar .section-chip {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .m-iconbtn {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--color-ink);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .m-body {
+    flex: 1 1 auto;
+    padding: 18px 16px 24px;
+  }
+  .m-title {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1.2;
+  }
+  .m-title:focus {
+    outline: none;
+  }
+  .m-sub {
+    margin: 4px 0 0;
+    color: var(--color-ink-2);
+    font-size: 15px;
+  }
+  .m-eyebrow {
+    color: var(--color-ink-2);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+  .m-btn {
+    display: inline-flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 2px solid var(--color-teal);
+    border-radius: 14px;
+    background: var(--color-teal);
+    padding: 10px 18px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 800;
+    text-align: center;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  .m-btn:hover {
+    filter: brightness(0.94);
+  }
+  .m-btn[data-variant="secondary"] {
+    background: var(--color-paper);
+    color: var(--color-teal);
+  }
+  .m-btn[data-variant="ghost"] {
+    border-color: transparent;
+    background: transparent;
+    color: var(--color-teal);
+  }
+  .m-btn[data-variant="danger"] {
+    border-color: var(--color-bad);
+    background: var(--color-bad);
+  }
+  .m-btn[data-size="sm"] {
+    min-height: 44px;
+    padding: 6px 14px;
+    font-size: 14px;
+  }
+  .m-btn[data-block="true"] {
+    width: 100%;
+  }
+  .m-btn:disabled,
+  .m-btn[aria-disabled="true"] {
+    border-color: #e8edf1;
+    background: #e8edf1;
+    color: #5d6a76;
+    cursor: not-allowed;
+    filter: none;
+  }
+  .m-btn[aria-busy="true"]::after {
+    content: "";
+    width: 16px;
+    height: 16px;
+    border: 3px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: m-spin 0.8s linear infinite;
+  }
+  @keyframes m-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .m-reason {
+    margin-top: 6px;
+    color: var(--color-ink-2);
+    font-size: 13px;
+  }
+  .m-card {
+    border: 1.5px solid var(--color-line);
+    border-radius: 16px;
+    background: var(--color-paper);
+    padding: 14px;
+  }
+  .m-card[data-highlight="true"] {
+    border-color: var(--color-teal);
+  }
+  .m-stack > * + * {
+    margin-top: 12px;
+  }
+  .m-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .m-row[data-align="start"] {
+    align-items: flex-start;
+  }
+  .m-meta {
+    margin-top: 2px;
+    color: var(--color-ink-2);
+    font-size: 13.5px;
+  }
+  .m-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .m-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid var(--color-line);
+    border-radius: 999px;
+    background: var(--color-surface);
+    padding: 3px 10px;
+    color: var(--color-ink-2);
+    font-size: 12.5px;
+    font-weight: 800;
+  }
+  .m-chip[data-tone="teal"] {
+    border-color: transparent;
+    background: var(--color-teal-bg);
+    color: #0b5a63;
+  }
+  .m-chip[data-tone="good"] {
+    border-color: transparent;
+    background: var(--color-good-bg);
+    color: #1f7a43;
+  }
+  .m-chip[data-tone="bad"] {
+    border-color: transparent;
+    background: var(--color-bad-bg);
+    color: var(--color-bad);
+  }
+  .m-chip[data-tone="warn"] {
+    border-color: transparent;
+    background: #fdf3df;
+    color: var(--color-amber-ink);
+  }
+  .m-chip[data-tone="clay"] {
+    border-color: transparent;
+    background: var(--color-clay-bg);
+    color: var(--color-clay);
+  }
+  .m-ticon {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    flex: none;
+    place-items: center;
+    border-radius: 12px;
+    background: var(--color-teal-bg);
+    color: var(--color-teal);
+  }
+  .m-ticon[data-kind="math"] {
+    background: var(--color-clay-bg);
+    color: var(--color-clay);
+  }
+  .m-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .m-seg {
+    display: flex;
+    gap: 6px;
+    margin: 16px 0 12px;
+  }
+  .m-seg > button {
+    min-height: 44px;
+    flex: 1;
+    border: 1.5px solid var(--color-line);
+    border-radius: 12px;
+    background: var(--color-paper);
+    color: var(--color-ink-2);
+    cursor: pointer;
+    font-weight: 800;
+  }
+  .m-seg > button[aria-pressed="true"] {
+    border-color: var(--color-teal);
+    background: var(--color-teal);
+    color: #fff;
+  }
+  .m-notice {
+    margin-top: 12px;
+    border-radius: 12px;
+    background: #fdf3df;
+    padding: 10px 12px;
+    color: #5c3a00;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .m-skeleton {
+    height: 96px;
+    border-radius: 16px;
+    background: linear-gradient(90deg, #e6ecf1 25%, #f0f4f7 50%, #e6ecf1 75%);
+    background-size: 200% 100%;
+    animation: m-shimmer 1.2s linear infinite;
+  }
+  @keyframes m-shimmer {
+    to {
+      background-position: -200% 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .m-skeleton {
+      animation: none;
+    }
+    .m-btn[aria-busy="true"]::after {
+      animation-duration: 2s;
+    }
+  }
+  .m-stats {
+    display: flex;
+    gap: 28px;
+    margin: 18px 0 0;
+  }
+  .m-stats dt {
+    color: var(--color-ink-2);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+  .m-stats dd {
+    margin: 0;
+    font-size: 20px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+  }
+  .m-actionbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-top: 1px solid var(--color-line);
+    background: var(--color-paper);
+    padding: 10px 14px;
+  }
+  .m-actionbar > .m-btn {
+    /* min-width 0: a long label ("Terminer Compréhension orale") wraps
+     * inside its button instead of pushing the bar past the screen. */
+    min-width: 0;
+    flex: 1;
+  }
+
+  .m-hero {
+    display: flex;
+    min-height: calc(
+      100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+    );
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 14px;
+    background: var(--color-paper);
+    padding: 32px 24px;
+    text-align: center;
+  }
+  .m-hero > * {
+    margin-inline: auto;
+    width: 100%;
+    max-width: 360px;
+  }
+  .m-logo {
+    display: grid;
+    width: 84px;
+    height: 84px;
+    place-items: center;
+    border-radius: 24px;
+    background: var(--color-teal);
+    box-shadow: 0 8px 20px rgb(15 110 120 / 0.3);
+    color: #fff;
+    font-size: 40px;
+    font-weight: 800;
+  }
+  .m-logo[data-tone="clay"] {
+    background: var(--color-clay);
+    box-shadow: none;
+  }
+  .m-hero .m-title {
+    font-size: 28px;
+  }
+  .m-hero .m-title[data-size="long"] {
+    font-size: 22px;
+  }
+  .m-alert {
+    border-radius: 12px;
+    background: var(--color-bad-bg);
+    padding: 10px 12px;
+    color: var(--color-bad);
+    font-size: 14px;
+    font-weight: 700;
+    text-align: left;
+  }
+  .m-rules {
+    display: grid;
+    gap: 10px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .m-rules li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    border: 1.5px solid var(--color-line);
+    border-radius: 14px;
+    background: var(--color-paper);
+    padding: 12px 14px;
+    font-weight: 700;
+  }
+  .m-rules svg {
+    margin-top: 1px;
+    color: var(--color-clay);
+  }
+
+  /* ───── Run chrome — prototype vRun top bar / action bar ───── */
+  /*
+   * Safe-area geometry (one rule app-wide): `body` already pads every inset,
+   * so bars in the page flow never add inset padding of their own -- that
+   * would leave an empty inset-tall strip inside the bar. Sticky offsets are
+   * measured from the viewport edge, not from body's padding box, so the
+   * sticky run bars instead stop `env(safe-area-inset-*)` short of that edge:
+   * at rest they sit exactly on body's padding line, and while scrolling they
+   * stay clear of the notch / home indicator. Only `position: fixed` chrome
+   * (the tab bar) pads its own inset, because it is outside body's flow.
+   */
+  .m-runtop {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 40;
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-paper);
+    padding: 6px 10px 0;
+  }
+  .m-runtop .m-row {
+    min-height: 48px;
+    gap: 8px;
+  }
+  /* At 320 px the row must fit without wrapping or scrolling (C1): the menu
+   * button and the clock never shrink (the ⋯ target stays 44×44); the
+   * section chip and the save chip give way, ellipsized, on one line. */
+  .m-runtop .m-iconbtn,
+  .m-timer {
+    flex: none;
+  }
+  .m-runtop .section-chip {
+    display: block;
+    min-width: 0;
+    flex: 0 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .m-timer {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 10px;
+    background: var(--color-surface);
+    padding: 4px 10px;
+    font-family: var(--font-mono);
+    font-size: 17px;
+    font-weight: 600;
+  }
+  .m-timer[data-low="true"] {
+    background: var(--color-bad-bg);
+    color: var(--color-bad);
+  }
+  .m-progress {
+    height: 5px;
+    margin: 4px -10px 0;
+    background: var(--color-line);
+  }
+  .m-progress > i {
+    display: block;
+    height: 100%;
+    background: var(--color-teal);
+    transition: width 0.25s;
+  }
+  .m-actionbar[data-sticky="true"] {
+    position: sticky;
+    bottom: env(safe-area-inset-bottom, 0px);
+    z-index: 40;
+  }
+  .m-run-body {
+    padding-top: 12px;
+  }
+  .m-sheet-actions {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  .m-qmeta {
+    margin: 0 0 8px;
+    color: var(--color-ink-2);
+    font-size: 13px;
+    font-weight: 800;
+  }
+  .m-hint {
+    margin: 0 0 10px;
+    color: var(--color-ink-2);
+    font-size: 14px;
+  }
+  .m-bar {
+    height: 10px;
+    margin: 12px 0 6px;
+    overflow: hidden;
+    border-radius: 9px;
+    background: var(--color-line);
+  }
+  .m-bar > i {
+    display: block;
+    height: 100%;
+    background: var(--color-clay);
+  }
+  .m-eq {
+    display: inline-flex;
+    height: 16px;
+    align-items: flex-end;
+    gap: 3px;
+  }
+  .m-eq > b {
+    width: 4px;
+    height: 8px;
+    border-radius: 2px;
+    background: currentColor;
+    animation: m-eq 0.8s ease-in-out infinite;
+  }
+  .m-eq > b:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+  .m-eq > b:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+  @keyframes m-eq {
+    50% {
+      height: 16px;
+    }
+  }
+  .m-passage {
+    margin-bottom: 14px;
+    border: 1.5px solid var(--color-line);
+    border-radius: 16px;
+    background: var(--color-paper);
+  }
+  .m-passage > summary {
+    display: flex;
+    min-height: 48px;
+    cursor: pointer;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    font-weight: 800;
+    list-style: none;
+  }
+  .m-passage > summary::-webkit-details-marker {
+    display: none;
+  }
+  .m-passage .passage {
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0 14px 14px;
+    font-size: 17px;
+    line-height: 1.6;
+  }
+  .m-tiles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .m-tile {
+    display: flex;
+    flex-direction: column-reverse;
+    border: 1.5px solid var(--color-line);
+    border-radius: 16px;
+    background: var(--color-paper);
+    padding: 14px;
+    text-align: center;
+  }
+  .m-tile > b {
+    font-size: 30px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+  }
+  .m-tile > span {
+    color: var(--color-ink-2);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .m-tile[data-tone="warn"] > b {
+    color: var(--color-clay);
+  }
+  .m-save {
+    display: inline-flex;
+    min-width: 0;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 4px;
+    color: var(--color-ink-2);
+    font-size: 12.5px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+  .m-save > svg {
+    flex: none;
+  }
+  .m-save-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .m-save[data-state="pending"] {
+    color: var(--color-amber-ink);
+  }
+  .m-save[data-state="failed"] {
+    color: var(--color-bad);
+  }
+  /* The icon alone says "jump" on the narrowest phones; the button keeps its
+   * aria-label, so nothing is lost for assistive tech. */
+  @media (max-width: 359px) {
+    .m-jump-label {
+      display: none;
+    }
+    /* The save state's icon says it on the narrowest phones; the text stays
+     * in the live region (visually hidden, not display:none), so it is still
+     * announced. */
+    .m-runtop .m-save {
+      flex: none;
+    }
+    .m-runtop .m-save-text {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .m-actionbar > .m-btn {
+      padding-inline: 12px;
+      font-size: 15px;
+      line-height: 1.2;
+    }
   }
 }

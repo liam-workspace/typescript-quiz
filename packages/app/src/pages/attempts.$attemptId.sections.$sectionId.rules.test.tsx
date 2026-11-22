@@ -1,8 +1,12 @@
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
+import {
+  OfflineError,
+  type AttemptGateway,
+} from "../lib/attempt/attempt-gateway.js"
 import { enterSection, getRunnerEnvelope } from "../lib/attempts-api.js"
 import type { RunnerEnvelope } from "../lib/api-types.js"
 import {
@@ -37,6 +41,8 @@ const baseProps = {
   durationSeconds: 1500,
   instructions: ["Each recording plays once.", "You cannot pause or rewind."],
   finalizedPriorAttempt: null,
+  sectionNumber: 1,
+  sectionTotal: 2,
 }
 
 describe("SectionRulesScreen", () => {
@@ -48,7 +54,6 @@ describe("SectionRulesScreen", () => {
   it("renders the section's instructions from the SectionEntry it already has via loader data", () => {
     render(<SectionRulesScreen {...baseProps} navigate={vi.fn()} />)
 
-    expect(screen.getByText("Listening — Part 1")).toBeInTheDocument()
     expect(screen.getByText("Each recording plays once.")).toBeInTheDocument()
     expect(screen.getByText("You cannot pause or rewind.")).toBeInTheDocument()
   })
@@ -56,17 +61,24 @@ describe("SectionRulesScreen", () => {
   it("renders the section title, question count, duration, untimed notice, and authoritative attempt number", () => {
     render(<SectionRulesScreen {...baseProps} navigate={vi.fn()} />)
 
-    expect(screen.getByText("Listening — Part 1")).toBeInTheDocument()
-    expect(screen.getByText("20 questions · 25 minutes")).toBeInTheDocument()
-    expect(screen.getByText("25 min when you begin")).toBeInTheDocument()
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Before you begin: Listening",
+      }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText("20 questions · 25 minutes · Section 1 of 2"),
+    ).toBeInTheDocument()
     expect(screen.getByText("Practice Test 04 · Attempt 3")).toBeInTheDocument()
   })
 
-  it("uses the centered device rules layout and a semantic section chip", () => {
+  it("uses the mobile rules layout and a semantic section chip", () => {
     render(<SectionRulesScreen {...baseProps} navigate={vi.fn()} />)
 
-    expect(screen.getByRole("banner")).toHaveClass("app-bar")
-    expect(screen.getByRole("main")).toHaveClass("center-main")
+    expect(screen.getByRole("banner")).toHaveClass("m-appbar")
+    expect(screen.getByRole("main")).toHaveClass("m-body")
+    expect(screen.getByRole("list")).toHaveClass("m-rules")
     expect(
       screen.getByText("Listening", { selector: "[data-section-type]" }),
     ).toHaveAttribute("data-section-type", "listening")
@@ -83,6 +95,7 @@ describe("SectionRulesScreen", () => {
       questionCount: 20,
       answeredCount: 0,
       unansweredOrdinals: [1],
+      offlineJournalCursor: 0,
       currentSectionId: null,
       currentQuestionId: null,
       sections: [
@@ -116,8 +129,89 @@ describe("SectionRulesScreen", () => {
       questionCount: 20,
       durationSeconds: 1500,
       instructions: ["Put your headphones on now."],
+      sectionNumber: 1,
+      sectionTotal: 1,
     })
     expect(mockEnterSection).not.toHaveBeenCalled()
+  })
+
+  it("heads the screen 'Before you begin: <section>' with a focusable title and the section position", () => {
+    render(
+      <SectionRulesScreen
+        {...baseProps}
+        sectionType="reading"
+        sectionNumber={2}
+        sectionTotal={2}
+        navigate={vi.fn()}
+      />,
+    )
+
+    const heading = screen.getByRole("heading", { level: 1 })
+
+    expect(heading).toHaveTextContent("Before you begin: Reading")
+    expect(heading).toHaveAttribute("tabindex", "-1")
+    expect(heading).toHaveAttribute("data-page-title")
+    expect(screen.getByText(/Section 2 of 2/)).toBeInTheDocument()
+  })
+
+  it("omits the section position when the test has a single section", () => {
+    render(
+      <SectionRulesScreen {...baseProps} sectionTotal={1} navigate={vi.fn()} />,
+    )
+
+    expect(screen.queryByText(/Section 1 of 1/)).not.toBeInTheDocument()
+  })
+
+  it("explains the clock: first section says it keeps running, later sections do not", () => {
+    const { rerender } = render(
+      <SectionRulesScreen {...baseProps} navigate={vi.fn()} />,
+    )
+
+    expect(
+      screen.getByText(
+        "The clock starts when you tap I'm ready and keeps running if you leave.",
+      ),
+    ).toBeInTheDocument()
+
+    rerender(
+      <SectionRulesScreen
+        {...baseProps}
+        sectionNumber={2}
+        navigate={vi.fn()}
+      />,
+    )
+
+    expect(
+      screen.getByText("The clock starts when you tap I'm ready."),
+    ).toBeInTheDocument()
+  })
+
+  it("renders every instruction as a row in a list", () => {
+    render(<SectionRulesScreen {...baseProps} navigate={vi.fn()} />)
+
+    expect(
+      within(screen.getByRole("list")).getAllByRole("listitem"),
+    ).toHaveLength(baseProps.instructions.length)
+  })
+
+  it("offers two ways back to the library, each with its own name (D11)", () => {
+    render(<SectionRulesScreen {...baseProps} navigate={vi.fn()} />)
+
+    expect(
+      screen.getByRole("link", { name: "Back to library" }),
+    ).toHaveAttribute("href", "/")
+    expect(screen.getByRole("link", { name: "Leave" })).toHaveAttribute(
+      "href",
+      "/",
+    )
+  })
+
+  it("pins the action bar so I'm ready is visible without scrolling (C4)", () => {
+    render(<SectionRulesScreen {...baseProps} navigate={vi.fn()} />)
+
+    expect(
+      screen.getByTestId("ready-button").closest(".m-actionbar"),
+    ).toHaveAttribute("data-sticky", "true")
   })
 
   it("calls enterSection when the ready button is clicked, not on mount", async () => {
@@ -233,6 +327,8 @@ describe("SectionRulesScreen", () => {
     await user.click(button)
 
     expect(button).toBeDisabled()
+    expect(button).toHaveTextContent("Starting…")
+    expect(button).toHaveAttribute("aria-busy", "true")
     expect(mockEnterSection).toHaveBeenCalledTimes(1)
 
     resolveEnter()
@@ -259,6 +355,40 @@ describe("SectionRulesScreen", () => {
     expect(navigate).not.toHaveBeenCalled()
     expect(screen.getByTestId("ready-button")).toBeEnabled()
   })
+
+  it.each([
+    [
+      "a storage failure",
+      new DOMException("The quota has been exceeded.", "QuotaExceededError"),
+    ],
+    ["an offline refusal", new OfflineError("not_hydrated")],
+  ])(
+    "surfaces %s as the generic error and re-enables I'm ready (A9)",
+    async (_label, failure) => {
+      const gateway = {
+        enterSection: vi.fn().mockRejectedValue(failure),
+      } as unknown as AttemptGateway
+      const navigate = vi.fn()
+      const user = userEvent.setup()
+
+      render(
+        <SectionRulesScreen
+          {...baseProps}
+          navigate={navigate}
+          gateway={gateway}
+        />,
+      )
+
+      await user.click(screen.getByTestId("ready-button"))
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Something went wrong. Please try again.",
+      )
+      expect(navigate).not.toHaveBeenCalled()
+      expect(screen.getByTestId("ready-button")).toBeEnabled()
+      expect(screen.getByTestId("ready-button")).toHaveTextContent("I'm ready")
+    },
+  )
 
   it("shows the section-expired state on a 410 section_expired without navigating", async () => {
     mockEnterSection.mockRejectedValue(

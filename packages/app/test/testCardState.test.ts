@@ -15,6 +15,8 @@ const freshCard: TestCard = {
   inProgressAttemptId: null,
   attemptCount: 0,
   bestAttempt: null,
+  testVersionId: "ver-1",
+  mediaBytes: 0,
 }
 
 describe("testCardActions", () => {

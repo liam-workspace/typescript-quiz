@@ -1,32 +1,35 @@
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@liam-workspace/browser-react-ui"
 import { createFileRoute } from "@tanstack/react-router"
-import { useEffect, useRef, useState, type JSX } from "react"
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type JSX,
+} from "react"
 import { useTranslation } from "react-i18next"
-import { AppMenu, type MenuStudent } from "../components/AppMenu.js"
+import { RouteErrorView } from "../components/RouteErrorView.js"
+import { FinishSectionSheet } from "../components/FinishSectionSheet.js"
 import { ListeningRunner } from "../components/ListeningRunner.js"
-import { OfflineBanner } from "../components/OfflineBanner.js"
+import { OfflineBanner } from "../components/Banners.js"
 import { QuestionNavigator } from "../components/QuestionNavigator.js"
+import { PLAY_HINT_ID } from "../components/QuestionMedia.js"
 import { ReadingRunner } from "../components/ReadingRunner.js"
-import { SaveState, type SaveStateProps } from "../components/SaveState.js"
+import {
+  RunActionBar,
+  type RunPrimaryAction,
+} from "../components/RunActionBar.js"
+import { RunMenuSheet } from "../components/RunMenuSheet.js"
+import { isLowTime, RunTopBar } from "../components/RunTopBar.js"
+import type { SaveStateProps } from "../components/SaveState.js"
+import { TimeUpView } from "../components/TimeUpView.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
 import { ApiError } from "../lib/api-client.js"
 import {
-  createServerCountdown,
-  formatCountdown,
-  type TimeSource,
-} from "../lib/countdown.js"
-import {
-  claimPlay,
-  finishSection,
-  getRunnerEnvelope,
-  setPosition,
-} from "../lib/attempts-api.js"
+  OfflineError,
+  type AttemptGateway,
+} from "../lib/attempt/attempt-gateway.js"
+import { attemptGateway } from "../lib/attempt/gateway-selector.js"
+import { createServerCountdown, type TimeSource } from "../lib/countdown.js"
 import { redirectExpiredAttemptToResult } from "../lib/expired-attempt-redirect.js"
 import {
   FlushController,
@@ -39,8 +42,11 @@ import {
   registerPagehideFlush,
   reconcileFinalFlush,
 } from "../lib/lifecycleFlush.js"
+import { networkStore } from "../lib/network.js"
+import { pendingCountStore } from "../lib/pending-count.js"
 import { getCurrentStudent } from "../lib/session-api.js"
 import { storeTimeUpAttempt } from "../lib/time-up-navigation.js"
+import { toastStore } from "../lib/toast.js"
 import type { NavigatorSource } from "../lib/navigator-state.js"
 import type {
   FinalizedAttempt,
@@ -109,6 +115,16 @@ type PlayState =
   // exactly like any other replay.
   | { readonly status: "failed" }
 
+/**
+ * Who is signed in, as the loader fetches it (`GET /me`). The run screen does
+ * not show it -- its menu is a "Leave test" sheet -- but the loader still
+ * returns it.
+ */
+export interface RunStudent {
+  readonly displayName: string
+  readonly email: string
+}
+
 interface ExpiredState {
   readonly kind: "section" | "attempt"
   readonly resultUrl: string | null
@@ -118,26 +134,34 @@ export interface RunScreenProps {
   readonly attemptId: string
   readonly envelope: RunnerEnvelope
   readonly queue: AnswerQueue
-  readonly student?: MenuStudent
+  readonly student?: RunStudent
   readonly navigate: (path: string, state?: TimeUpNavigationState) => void
   readonly now?: TimeSource
   readonly flushScheduler?: Scheduler
+  /** Defaults to the app-wide `attemptGateway`; tests inject a fake. */
+  readonly gateway?: AttemptGateway
+  /**
+   * True when the server does not know this attempt yet (an offline start):
+   * the `pagehide` keepalive `PATCH /responses` must not fire for it.
+   */
+  readonly localOnly?: boolean
 }
 
 export interface TimeUpNavigationState {
   readonly attempt: FinalizedAttempt
 }
 
-type RunnerPanel = "menu" | "navigator" | null
+type RunnerPanel = "menu" | "navigator" | "finish" | null
 
 export function RunScreen({
   attemptId,
   envelope,
   queue,
-  student,
   navigate,
   now = Date.now,
   flushScheduler = defaultScheduler,
+  gateway = attemptGateway,
+  localOnly = false,
 }: RunScreenProps) {
   const { t } = useTranslation("runner")
   const section = envelope.currentSectionId
@@ -169,14 +193,15 @@ export function RunScreen({
       ),
   )
   const [playState, setPlayState] = useState<PlayState>({ status: "idle" })
+  const [audioProgress, setAudioProgress] = useState(0)
   const [playsUsedByStimulusId, setPlaysUsedByStimulusId] = useState<
     Record<string, number>
   >({})
   const [expired, setExpired] = useState<ExpiredState | null>(null)
   const [panel, setPanel] = useState<RunnerPanel>(null)
-  const previousPanelRef = useRef<RunnerPanel>(null)
   const menuTriggerRef = useRef<HTMLButtonElement>(null)
   const navigatorTriggerRef = useRef<HTMLButtonElement>(null)
+  const primaryTriggerRef = useRef<HTMLButtonElement>(null)
   const [finishingSection, setFinishingSection] = useState(false)
   const [sectionTransitionFailed, setSectionTransitionFailed] = useState(false)
   const [readRemainingMs, setReadRemainingMs] = useState<(() => number) | null>(
@@ -202,19 +227,57 @@ export function RunScreen({
     state: "saved",
   })
   const [retryableFlushFailure, setRetryableFlushFailure] = useState(false)
+  const { online } = useSyncExternalStore(
+    (listener) => networkStore.subscribe(listener),
+    () => networkStore.getSnapshot(),
+  )
+  const lastPendingRef = useRef(0)
+  const lowTimeAnnouncementRef = useRef<HTMLParagraphElement>(null)
 
+  // "One minute left." is spoken once, through RunTopBar's live region. An
+  // open sheet aria-hides the whole runner (Radix hides every sibling of its
+  // portal, all the way up to <body>), so text written into that region
+  // while a sheet is open would never be read. This effect runs after the
+  // commit in which the sheet unmounted and Radix lifted its aria-hidden, so
+  // the text lands while the region is exposed. The region's own text is the
+  // "already said" flag: written once, never cleared, so announced once. It
+  // is an imperative write to the assistive-technology channel, not React
+  // state, which is also why React never renders children into it.
   useEffect(() => {
-    const previousPanel = previousPanelRef.current
-    previousPanelRef.current = panel
+    const region = lowTimeAnnouncementRef.current
 
-    if (panel !== null || previousPanel === null) {
+    if (
+      region?.textContent !== "" ||
+      panel !== null ||
+      remainingMs === null ||
+      remainingMs <= 0 ||
+      !isLowTime(remainingMs)
+    ) {
       return
     }
 
-    const trigger =
-      previousPanel === "menu" ? menuTriggerRef : navigatorTriggerRef
-    trigger.current?.focus()
-  }, [panel])
+    // `region` is non-null here: a null one fails the `!== ""` guard.
+    region.textContent = t("runner.oneMinuteLeft")
+  }, [panel, remainingMs, t])
+
+  // A new question moves focus to its title (prototype `data-qtitle`), so a
+  // screen reader starts reading the new question rather than staying on
+  // Next. The guard compares against the PREVIOUS question id rather than a
+  // first-render flag: StrictMode re-runs effects on mount and would defeat
+  // a boolean (dev would focus the title on arrival, prod would not).
+  const previousQuestionIdRef = useRef(currentQuestionId)
+
+  useEffect(() => {
+    if (previousQuestionIdRef.current === currentQuestionId) {
+      return
+    }
+
+    previousQuestionIdRef.current = currentQuestionId
+
+    document
+      .querySelector<HTMLElement>("[data-qtitle]")
+      ?.focus({ preventScroll: true })
+  }, [currentQuestionId])
 
   // Constructed once per mount, tied to this attempt's `queue` prop (opened
   // once by the route loader, not re-opened on every render) -- the lazy
@@ -233,6 +296,10 @@ export function RunScreen({
     sectionId: string
   } | null>(null)
   const pendingAnswerWritesRef = useRef<Set<Promise<unknown>>>(new Set())
+  // Whether this phone's journal is ahead of the server for this attempt.
+  // Read synchronously at `pagehide`, so it is kept current after every
+  // gateway call that can journal something.
+  const journalBehindRef = useRef(false)
   const zeroTouchStartedRef = useRef(false)
 
   useEffect(() => {
@@ -256,7 +323,8 @@ export function RunScreen({
 
     zeroTouchStartedRef.current = true
 
-    void getRunnerEnvelope(attemptId)
+    void gateway
+      .loadEnvelope(attemptId)
       .then((freshEnvelope) => {
         // Zero was only a prompt. A successful response means the server
         // still considers the attempt active, so recalibrate from this new
@@ -286,16 +354,15 @@ export function RunScreen({
           })
         }
       })
-  }, [attemptId, navigate, now, remainingMs])
+  }, [attemptId, gateway, navigate, now, remainingMs])
 
   // Refs are read outside render (event handlers, effects); writing one
   // must live there too, never inline in the render body, so this update
   // runs as its own no-dependency-array effect -- after every render,
   // exactly the "keep it current" semantics the comment above promises.
   useEffect(() => {
-    openSectionRef.current = section
-      ? { attemptId, sectionId: section.id }
-      : null
+    openSectionRef.current =
+      section && !localOnly ? { attemptId, sectionId: section.id } : null
   })
 
   // Shared by every call site that can learn about a newly (or
@@ -309,6 +376,17 @@ export function RunScreen({
     }
 
     setSaveFailedQuestionIds((prev) => new Set([...prev, ...questionIds]))
+  }
+
+  const refreshJournalBehind = (): void => {
+    void gateway
+      .hasPendingJournal(attemptId)
+      .then((behind) => {
+        journalBehindRef.current = behind
+      })
+      .catch(() => {
+        // Keep the last known answer; the next call refreshes it.
+      })
   }
 
   const applyFlushResult = (result: FlushResult): void => {
@@ -326,6 +404,24 @@ export function RunScreen({
 
     setSaveState({ state: result.saveState.status })
   }
+
+  // The shell's browsing banner reads this on every other screen, so it
+  // deliberately survives leaving the run screen until the next flush result.
+  useEffect(() => {
+    pendingCountStore.set(
+      saveState.state === "pending" ? saveState.pendingCount : 0,
+    )
+
+    if (saveState.state === "pending") {
+      lastPendingRef.current = saveState.pendingCount
+    } else if (saveState.state === "saved" && lastPendingRef.current > 0) {
+      toastStore.show(
+        t("toast.backOnline", { count: lastPendingRef.current }),
+        "cloud",
+      )
+      lastPendingRef.current = 0
+    }
+  }, [saveState, t])
 
   // Defect B3 fix: a reload opens the SAME queue the loader's AnswerQueue
   // was already holding answers in (IndexedDB survives the reload; the
@@ -414,8 +510,8 @@ export function RunScreen({
 
     let cancelled = false
 
-    void controller
-      .flushSection(attemptId, section.id, `/attempts/${attemptId}/responses`)
+    void gateway
+      .flushAnswers({ controller, queue, attemptId, sectionId: section.id })
       .then((result) => {
         if (!cancelled) {
           applyFlushResult(result)
@@ -432,7 +528,7 @@ export function RunScreen({
     // envelope/currentSectionId (envelope.sections.find on an unchanged
     // array), so this only re-runs on an actual section change, not on
     // every keystroke-driven re-render.
-  }, [queue, attemptId, controller, section])
+  }, [queue, attemptId, controller, gateway, section])
 
   useEffect(() => {
     if (!section) {
@@ -440,8 +536,8 @@ export function RunScreen({
     }
 
     const flushOnConnectionHint = (): void => {
-      void controller
-        .flushSection(attemptId, section.id, `/attempts/${attemptId}/responses`)
+      void gateway
+        .flushAnswers({ controller, queue, attemptId, sectionId: section.id })
         .then(applyFlushResult)
         .catch(() => {
           // The browser's `online` event is only a hint that the radio came
@@ -455,16 +551,29 @@ export function RunScreen({
     return () => {
       window.removeEventListener("online", flushOnConnectionHint)
     }
-  }, [attemptId, controller, section])
+  }, [attemptId, controller, gateway, queue, section])
 
   // Spec §5 rule 6, "Flush at end of life": a backgrounded/closed tab must
   // not lose whatever the queue is still holding for the open section. The
   // queue itself is closed here too -- on unmount, not per render -- since
   // this component owns the one open() call the loader made for it.
   useEffect(() => {
+    void gateway
+      .hasPendingJournal(attemptId)
+      .then((behind) => {
+        journalBehindRef.current = behind
+      })
+      .catch(() => {
+        // Assume nothing pending: exactly the pre-journal behaviour.
+      })
+  }, [attemptId, gateway])
+
+  useEffect(() => {
     const unregisterPagehideFlush = registerPagehideFlush(
       queue,
-      () => openSectionRef.current,
+      // The journal is durable and will sync: a keepalive sent around it
+      // would land ahead of journaled moves (per-event navigation_locked).
+      () => (journalBehindRef.current ? null : openSectionRef.current),
       (id) => `/attempts/${id}/responses`,
     )
 
@@ -500,6 +609,11 @@ export function RunScreen({
   }
 
   const { question, stimulus } = currentEntry
+  // Progress is per section (prototype `vRun`: answered / section total).
+  const answeredInSection = entries.filter(
+    (entry) => (responses.get(entry.question.id)?.length ?? 0) > 0,
+  ).length
+  const sectionLabel = t(`runner.sectionChip.${section.type}`)
   const existingResponse = responses.get(question.id)
   const selectedChoiceIds = existingResponse ?? []
   // `allowAnswerChange: false` means "your answer is final once given". For
@@ -580,41 +694,94 @@ export function RunScreen({
       new Date(),
     )
 
-    pendingAnswerWritesRef.current.add(durableWrite)
+    // What finishing the section must wait for is the WHOLE write: the
+    // queue record AND the gateway's note of it (the local gateway journals
+    // the answer there). Waiting on the queue write alone let a quick Finish
+    // journal `finish_section` before the answer it follows.
+    const recorded = durableWrite.then((queued) =>
+      gateway.noteAnswer(attemptId, queued),
+    )
+    // An answer the rules REFUSED (an ApiError from the local gateway) is
+    // settled -- there is nothing left to journal, so it must not block
+    // finishing the section. Any other failure still does.
+    const settled = recorded.catch((error: unknown) => {
+      if (!(error instanceof ApiError)) {
+        throw error
+      }
+    })
 
-    void durableWrite
-      .then(() =>
-        controller.flushSection(
-          attemptId,
-          section.id,
-          `/attempts/${attemptId}/responses`,
-        ),
+    settled.catch(() => undefined)
+    pendingAnswerWritesRef.current.add(settled)
+
+    void recorded
+      .then(
+        () =>
+          gateway
+            .flushAnswers({
+              controller,
+              queue,
+              attemptId,
+              sectionId: section.id,
+            })
+            .then((result) => {
+              // Defect B5 fix: a terminal per-item rejection (spec §5 rule 5's
+              // "stop dead") is surfaced here; retry/backoff successes and
+              // in-flight failures still resolve silently, because only a
+              // settled, terminal rejection is actionable enough to
+              // interrupt the child with.
+              applyFlushResult(result)
+              refreshJournalBehind()
+            })
+            .catch((error: unknown) => {
+              // FlushController owns retry/backoff and the answer is already
+              // durable, so a failed flush is not the child's problem -- the
+              // next tap, pagehide or hand-in carries it. Caught so a queue
+              // closed out from under an in-flight flush (unmount) is never an
+              // unhandled rejection.
+              if (error instanceof ApiError) {
+                refuseAnswer(error, question.id)
+              }
+            }),
+        (error: unknown) => {
+          // The answer never became durable (or the gateway refused it). A
+          // rule refusal gets its verdict; a storage failure (a full disk:
+          // QuotaExceededError) must not be silent while the choice still
+          // shows selected -- the "didn't save" notice asks for another tap.
+          if (error instanceof ApiError) {
+            refuseAnswer(error, question.id)
+          } else {
+            addSaveFailedQuestionIds([question.id])
+          }
+        },
       )
-      .then((result) => {
-        // Defect B5 fix: a terminal per-item rejection (spec §5 rule 5's
-        // "stop dead") used to reach here and be thrown away -- the queue
-        // stopped resending it, correctly, but nothing ever told the
-        // child. This is the one place that DOES surface it: retry/backoff
-        // successes and in-flight failures still resolve silently (see the
-        // `.catch()` below), because only a settled, terminal rejection is
-        // ever actionable enough to interrupt the child with.
-        applyFlushResult(result)
-      })
-      .catch(() => {
-        // Deliberately not re-thrown, and deliberately not surfaced as UI
-        // state (unlike moveToQuestion/handleNavigatorNavigate's own
-        // `.catch`, which react to `attempt_expired`/`section_expired`):
-        // FlushController already owns retry/backoff internally (see the
-        // "fire-and-forget on purpose" comment above), and the answer is
-        // already durable in IndexedDB regardless of whether THIS flush
-        // attempt succeeds -- the next one (the next tap, pagehide, or
-        // hand-in) carries it. Only exists so a rejection here (including a
-        // queue closed out from under an in-flight flush, e.g. on unmount)
-        // is never left as an unhandled promise rejection.
-      })
       .finally(() => {
-        pendingAnswerWritesRef.current.delete(durableWrite)
+        pendingAnswerWritesRef.current.delete(settled)
       })
+  }
+
+  // The local gateway refuses an answer the server could never apply
+  // (deadline passed, forward-only lock, a change that is not allowed). It
+  // is the same verdict a terminal server rejection gives: keep the record
+  // out of every future send and say it did not save.
+  const refuseAnswer = (error: ApiError, questionId: string): void => {
+    if (error.problem.type === "attempt_expired" && error.problem.attempt) {
+      navigate(`/attempts/${attemptId}/time-up`, {
+        attempt: error.problem.attempt,
+      })
+
+      return
+    }
+
+    if (error.problem.type === "section_expired") {
+      setExpired({ kind: "section", resultUrl: null })
+
+      return
+    }
+
+    void queue.markTerminalRejection(attemptId, questionId).catch(() => {
+      // The notice below is what matters; the queue may be closing.
+    })
+    addSaveFailedQuestionIds([questionId])
   }
 
   const handleClaimPlay = async (): Promise<void> => {
@@ -623,14 +790,25 @@ export function RunScreen({
     }
 
     try {
-      const grant = await claimPlay(attemptId, stimulus.id)
+      const grant = await gateway.claimPlay(attemptId, stimulus.id)
 
       setPlaysUsedByStimulusId((prev) => ({
         ...prev,
         [stimulus.id]: grant.playsUsed,
       }))
       setPlayState({ status: "granted", mediaUrl: grant.mediaUrl })
+      refreshJournalBehind()
+      setAudioProgress(0)
     } catch (error) {
+      if (error instanceof OfflineError) {
+        // Nothing was claimed (the local gateway only spends a play when the
+        // audio is on this phone), so this is the same honest "the recording
+        // did not come through" state the audio element's own error produces.
+        setPlayState({ status: "failed" })
+
+        return
+      }
+
       if (!(error instanceof ApiError)) {
         throw error
       }
@@ -652,40 +830,86 @@ export function RunScreen({
       // 409 (no plays remaining) or anything else unexpected: the play
       // simply did not happen. Reset so the button reflects that rather
       // than staying stuck mid-claim.
+      if (error.problem.status === 409 && stimulus.maxPlays !== null) {
+        // The server says nothing is left (plays spent on another device or
+        // tab) while this client's count is stale. Record the stimulus as
+        // used up so the card shows "No plays left" and the answers unlock
+        // -- a recording that cannot play must never trap the student.
+        const { maxPlays } = stimulus
+
+        setPlaysUsedByStimulusId((prev) => ({
+          ...prev,
+          [stimulus.id]: Math.max(prev[stimulus.id] ?? 0, maxPlays),
+        }))
+        setPlayState({ status: "failed" })
+
+        return
+      }
+
       setPlayState({ status: "idle" })
     }
   }
 
   const handleAudioEnded = (): void => {
     setPlayState({ status: "idle" })
+    setAudioProgress(0)
   }
 
   const handleAudioError = (): void => {
     setPlayState({ status: "failed" })
+    setAudioProgress(0)
   }
 
   const nextEntry = entries.at(currentIndex + 1)
-  const previousEntry =
+  // Free sections always show Previous (disabled on their first question,
+  // acceptance row 15), so the action bar never shifts under the thumb.
+  const hasPrevious =
     (section.type === "reading" || section.type === "math") &&
-    section.navigation === "free" &&
-    currentIndex > 0
-      ? entries.at(currentIndex - 1)
-      : undefined
+    section.navigation === "free"
+  const previousEntry =
+    hasPrevious && currentIndex > 0 ? entries.at(currentIndex - 1) : undefined
   const sectionIndex = envelope.sections.findIndex(
     (candidate) => candidate.id === section.id,
   )
   const nextSection = envelope.sections.at(sectionIndex + 1)
 
+  // Every answer tapped so far has reached the gateway (journaled, when the
+  // attempt is local). A move must wait for it: offline, an answer takes more
+  // IndexedDB hops to reach the journal than a position does, so "tap, then
+  // Next at once" journaled the move FIRST -- and in a forward-only section
+  // the rules then refused the answer (`navigation_locked`) for good. A full
+  // page navigation (Leave, Hand in) can likewise abandon an unfinished
+  // note-to-journal chain. A failed write is surfaced by its own tap; it
+  // must not also block the move, so the wait never rejects.
+  const afterPendingAnswerWrites = (): Promise<void> =>
+    Promise.all([...pendingAnswerWritesRef.current]).then(
+      () => undefined,
+      () => undefined,
+    )
+
+  // A move that could not be written (the journal's disk is full, or the
+  // network died under an online move with no local copy) leaves the student
+  // where they are. Silence would read as a dead Next button: say that this
+  // question's work did not save, so the child taps again.
+  const moveFailed = (): void => {
+    addSaveFailedQuestionIds([question.id])
+  }
+
   // Next and Previous share the same position update and expiration handling.
   const moveToQuestion = (entry: FlatEntry): void => {
-    setPosition(attemptId, section.id, entry.question.id)
+    void afterPendingAnswerWrites()
+      .then(() => gateway.setPosition(attemptId, section.id, entry.question.id))
       .then(() => {
         setCurrentQuestionId(entry.question.id)
+        refreshJournalBehind()
         setPlayState({ status: "idle" })
+        setAudioProgress(0)
       })
       .catch((error: unknown) => {
         if (!(error instanceof ApiError)) {
-          throw error
+          moveFailed()
+
+          return
         }
 
         if (error.problem.type === "section_expired") {
@@ -733,16 +957,18 @@ export function RunScreen({
     void Promise.all([...pendingAnswerWritesRef.current])
       .then(() => buildSectionFinishRemainder(queue, attemptId, section.id))
       .then((body) =>
-        finishSection(attemptId, section.id, body).then(async (result) => {
-          await reconcileFinalFlush(
-            queue,
-            attemptId,
-            body.responses,
-            result.finalFlush,
-          )
+        gateway
+          .finishSection(attemptId, section.id, body)
+          .then(async (result) => {
+            await reconcileFinalFlush(
+              queue,
+              attemptId,
+              body.responses,
+              result.finalFlush,
+            )
 
-          return result
-        }),
+            return result
+          }),
       )
       .then((result) => {
         const { nextSectionId } = result
@@ -772,10 +998,14 @@ export function RunScreen({
 
         if (error.problem.type === "section_expired") {
           setExpired({ kind: "section", resultUrl: null })
+          // The confirm sheet's question is moot once the section is over.
+          setPanel(null)
 
           return
         }
 
+        // Any other failure leaves the confirm sheet open: its alert is the
+        // feedback, and its button is the retry.
         setSectionTransitionFailed(true)
       })
   }
@@ -788,11 +1018,8 @@ export function RunScreen({
         }
       : stimulus
 
-  const pips = entries.map((entry) => ({
-    questionId: entry.question.id,
-    ordinal: entry.question.ordinal,
-    current: entry.question.id === question.id,
-  }))
+  const positionInSection = currentIndex + 1
+  const sectionQuestionCount = entries.length
 
   const navigatorSource: NavigatorSource = {
     mode: "runner",
@@ -834,14 +1061,25 @@ export function RunScreen({
       return
     }
 
-    setPosition(attemptId, targetSection.id, targetEntry.question.id)
+    void afterPendingAnswerWrites()
+      .then(() =>
+        gateway.setPosition(
+          attemptId,
+          targetSection.id,
+          targetEntry.question.id,
+        ),
+      )
       .then(() => {
         setCurrentQuestionId(targetEntry.question.id)
+        refreshJournalBehind()
         setPlayState({ status: "idle" })
+        setAudioProgress(0)
       })
       .catch((error: unknown) => {
         if (!(error instanceof ApiError)) {
-          throw error
+          moveFailed()
+
+          return
         }
 
         if (error.problem.type === "section_expired") {
@@ -875,8 +1113,10 @@ export function RunScreen({
         onAudioError={handleAudioError}
         audioFailed={playState.status === "failed"}
         saveFailed={saveFailedQuestionIds.has(question.id)}
-        questionCount={envelope.questionCount}
-        pips={pips}
+        positionInSection={positionInSection}
+        sectionQuestionCount={sectionQuestionCount}
+        audioProgress={audioProgress}
+        onAudioProgress={setAudioProgress}
         expired={expired}
       />
     )
@@ -898,8 +1138,9 @@ export function RunScreen({
         locked={locked}
         onSelectChoice={handleSelectChoice}
         saveFailed={saveFailedQuestionIds.has(question.id)}
-        questionCount={envelope.questionCount}
-        pips={pips}
+        sectionType={section.type}
+        positionInSection={positionInSection}
+        sectionQuestionCount={sectionQuestionCount}
         expired={expired}
       />
     )
@@ -909,147 +1150,143 @@ export function RunScreen({
     return null
   }
 
-  return (
-    <div className="device-page runner-shell" data-panel={panel ?? undefined}>
-      <header className="app-bar relative z-[40]">
-        <button
-          ref={menuTriggerRef}
-          type="button"
-          aria-label={t("menu.openLabel")}
-          aria-expanded={panel === "menu"}
-          className="runner-panel-trigger runner-menu-trigger hover:bg-teal-bg size-11 touch-manipulation rounded-md text-xl font-bold select-none"
-          onClick={() => {
-            setPanel((current) => (current === "menu" ? null : "menu"))
-          }}
-        >
-          <span aria-hidden="true">☰</span>
-        </button>
-        <span
-          className={`section-chip section-chip--${section.type}`}
-          data-section={section.type}
-        >
-          {t(`runner.sectionChip.${section.type}`)}
-        </span>
-        <span className="grow" />
-        <SaveState {...saveState} />
-        {remainingMs !== null ? (
-          <span
-            aria-label={t("runner.timeRemaining")}
-            className={`timer text-sm font-bold ${
-              // Five minutes gives a child a calm, useful warning without
-              // making the majority of a short practice section feel urgent.
-              remainingMs < 5 * 60 * 1_000 ? "text-amber" : "text-ink-2"
-            }`}
-          >
-            {formatCountdown(remainingMs)}
-          </span>
-        ) : null}
-      </header>
+  // A section that ran out (`section_expired`) ends the run view: the server
+  // never raises it from `finishSection`, so this screen is the way on --
+  // including from the section's LAST question, where the action bar has no
+  // other primary action once expired. Entering the next section needs no
+  // `finishSection` first: `enterSection` closes an expired-but-unfinished
+  // section lazily (packages/db attempt.repository.ts). The last section has
+  // no next one, so the way on is the hand-in screen (submit, or a 410 that
+  // lands on the attempt time-up view).
+  if (expired?.kind === "section") {
+    return (
+      <TimeUpView
+        title={envelope.testTitle}
+        heading={t("sectionRules.expired.title")}
+        message={t("sectionRules.expired.sectionMessage")}
+        messageRole="alert"
+        summary={null}
+        action={{
+          kind: "button",
+          label: nextSection
+            ? t("runner.continueToSection", {
+                section: t(`runner.sectionChip.${nextSection.type}`),
+              })
+            : t("runner.handIn"),
+          onClick: () => {
+            navigate(
+              nextSection
+                ? `/attempts/${attemptId}/sections/${nextSection.id}/rules`
+                : `/attempts/${attemptId}/hand-in`,
+            )
+          },
+        }}
+      />
+    )
+  }
 
-      <main className="device-main runner-main mx-auto w-full max-w-4xl">
-        {retryableFlushFailure && saveState.state === "pending" ? (
-          <OfflineBanner pendingCount={saveState.pendingCount} />
+  let primary: RunPrimaryAction | null = null
+  // Moving on while the recording plays would spend the play for nothing --
+  // and in a forward-only section the student could never come back to it
+  // (prototype `vRun`: the primary is disabled while playing).
+  const recordingPlays = playState.status === "granted"
+  const playingLock = recordingPlays
+    ? { disabled: true, describedBy: PLAY_HINT_ID }
+    : { disabled: false }
+
+  if (!expired) {
+    if (nextEntry) {
+      primary = { kind: "next", label: t("runner.next"), ...playingLock }
+    } else if (nextSection) {
+      primary = {
+        kind: "finish",
+        label: t("runner.finishSectionButton", { section: sectionLabel }),
+        ...playingLock,
+        disabled: finishingSection || recordingPlays,
+      }
+    } else {
+      primary = { kind: "handIn", label: t("runner.handIn"), ...playingLock }
+    }
+  }
+
+  const handlePrimary = (): void => {
+    if (nextEntry) {
+      handleNext()
+    } else if (nextSection) {
+      setPanel("finish")
+    } else {
+      void afterPendingAnswerWrites().then(() => {
+        navigate(`/attempts/${attemptId}/hand-in`)
+      })
+    }
+  }
+
+  // Radix requests closing for Escape, overlay and close-button interactions;
+  // opening is exclusively driven by our triggers. Only close if `which` is
+  // still the active panel: a delayed dismiss from one sheet must not clobber
+  // a newer one.
+  const closePanel =
+    (which: Exclude<RunnerPanel, null>) =>
+    (next: boolean): void => {
+      if (!next) {
+        setPanel((current) => (current === which ? null : current))
+      }
+    }
+
+  return (
+    <div className="m-page runner-shell" data-panel={panel ?? undefined}>
+      <RunTopBar
+        sectionType={section.type}
+        saveState={saveState}
+        remainingMs={remainingMs}
+        answered={answeredInSection}
+        total={entries.length}
+        menuExpanded={panel === "menu"}
+        menuTriggerRef={menuTriggerRef}
+        announcementRef={lowTimeAnnouncementRef}
+        onOpenMenu={() => {
+          setPanel((current) => (current === "menu" ? null : "menu"))
+        }}
+      />
+
+      <main className="m-body m-run-body">
+        {!online || (retryableFlushFailure && saveState.state === "pending") ? (
+          <OfflineBanner
+            variant="in-test"
+            pendingCount={
+              saveState.state === "pending" ? saveState.pendingCount : 0
+            }
+          />
         ) : null}
 
         {runner}
 
-        {!nextEntry ? (
-          <div className="device-card text-ink-2 mt-4 flex flex-wrap items-center justify-between gap-3">
-            <span className="text-sm font-semibold">
-              {nextSection
-                ? t("runner.sectionComplete")
-                : t("runner.testComplete")}
-            </span>
-            <button
-              type="button"
-              className="device-button"
-              disabled={finishingSection}
-              onClick={() => {
-                if (nextSection) {
-                  handleFinishSection()
-                } else {
-                  navigate(`/attempts/${attemptId}/hand-in`)
-                }
-              }}
-            >
-              {nextSection
-                ? t("runner.continueToSection", {
-                    section: t(`runner.sectionChip.${nextSection.type}`),
-                  })
-                : t("runner.finishTest")}
-            </button>
-          </div>
-        ) : null}
-        {sectionTransitionFailed ? (
-          <p role="alert" className="text-bad mt-3 text-sm">
+        {sectionTransitionFailed && panel !== "finish" ? (
+          <p role="alert" className="m-alert mt-3">
             {t("runner.sectionTransitionError")}
           </p>
         ) : null}
       </main>
 
-      <footer className="device-footer sticky bottom-0 z-[40] flex-wrap">
-        {!expired && previousEntry ? (
-          <button
-            type="button"
-            className="device-button"
-            data-variant="ghost"
-            onClick={handlePrevious}
-          >
-            {t("runner.previous")}
-          </button>
-        ) : null}
-        <button
-          ref={navigatorTriggerRef}
-          type="button"
-          aria-label={t("navigator.openLabel")}
-          aria-expanded={panel === "navigator"}
-          className="nav-toggle runner-panel-trigger runner-navigator-trigger hover:border-teal border-line bg-paper inline-flex size-11 touch-manipulation items-center justify-center gap-2 rounded-lg border text-sm font-bold select-none sm:w-auto sm:px-3"
-          onClick={() => {
-            setPanel((current) =>
-              current === "navigator" ? null : "navigator",
-            )
-          }}
-        >
-          <span aria-hidden="true">▦</span>
-          <span className="hidden sm:inline">
-            {t("navigator.progressSubtitle", {
-              answered: responses.size,
-              total: envelope.questionCount,
-            })}
-          </span>
-        </button>
-        <span className="grow" />
-        {!expired ? (
-          <button
-            type="button"
-            className="device-button"
-            data-variant="ghost"
-            onClick={() => {
-              navigate(`/attempts/${attemptId}/hand-in`)
-            }}
-          >
-            {t("runner.handIn")}
-          </button>
-        ) : null}
-        {!expired && nextEntry ? (
-          <button type="button" className="device-button" onClick={handleNext}>
-            {t("runner.next")}
-          </button>
-        ) : null}
-      </footer>
-
-      <AppMenu
-        open={panel === "menu"}
-        onOpenChange={(next) => {
-          // Radix requests closing for Escape, overlay and close-button
-          // interactions. Opening is exclusively driven by our triggers.
-          // Only close if this is still the active panel: a delayed dismiss
-          // from the menu must not clobber a direct switch to the navigator.
-          if (!next) {
-            setPanel((current) => (current === "menu" ? null : current))
-          }
+      <RunActionBar
+        showPrevious={!expired && hasPrevious}
+        previousDisabled={previousEntry === undefined}
+        onPrevious={handlePrevious}
+        answered={answeredInSection}
+        total={entries.length}
+        navigatorExpanded={panel === "navigator"}
+        navigatorTriggerRef={navigatorTriggerRef}
+        onOpenNavigator={() => {
+          setPanel((current) => (current === "navigator" ? null : "navigator"))
         }}
-        inTest
+        primary={primary}
+        onPrimary={handlePrimary}
+        primaryRef={primaryTriggerRef}
+      />
+
+      <RunMenuSheet
+        open={panel === "menu"}
+        onOpenChange={closePanel("menu")}
         // The attempt's clock does not start with the attempt: openapi.yaml
         // is explicit that `startedAt` and `expiresAt` "stay null until the
         // first section entry". Hardcoding this told a child "the clock
@@ -1057,35 +1294,33 @@ export function RunScreen({
         // anything -- false, and exactly the sort of thing that would stop
         // a child leaving a test they had not begun.
         clockStarted={envelope.expiresAt !== null}
-        student={student}
-        onGoLibrary={() => {
-          navigate("/")
+        onLeave={() => {
+          void afterPendingAnswerWrites().then(() => {
+            navigate("/")
+          })
         }}
-        onGoHistory={() => {
-          navigate("/history")
-        }}
-        onLeaveTest={() => {
-          navigate("/")
-        }}
-        onOpenNavigator={() => setPanel("navigator")}
         returnFocusRef={menuTriggerRef}
-        onSignOut={() => {
-          navigate("/")
-        }}
+      />
+      {/* Focus returns to Finish explicitly: Safari does not focus a tapped
+          button, so Radix's default would land on <body>. While finishing,
+          Finish is disabled and the navigator button takes it instead. */}
+      <FinishSectionSheet
+        returnFocusRef={primaryTriggerRef}
+        fallbackFocusRef={navigatorTriggerRef}
+        open={panel === "finish"}
+        onOpenChange={closePanel("finish")}
+        sectionLabel={sectionLabel}
+        blankCount={entries.length - answeredInSection}
+        busy={finishingSection}
+        failed={sectionTransitionFailed}
+        onConfirm={handleFinishSection}
       />
       <QuestionNavigator
         open={panel === "navigator"}
-        onOpenChange={(next) => {
-          // See AppMenu's matching guards: Sheet never owns the open action,
-          // and a stale close must not dismiss the newly selected panel.
-          if (!next) {
-            setPanel((current) => (current === "navigator" ? null : current))
-          }
-        }}
+        onOpenChange={closePanel("navigator")}
         source={navigatorSource}
-        answeredCount={responses.size}
-        totalCount={envelope.questionCount}
-        onOpenMenu={() => setPanel("menu")}
+        answeredCount={answeredInSection}
+        totalCount={entries.length}
         returnFocusRef={navigatorTriggerRef}
         onNavigate={handleNavigatorNavigate}
       />
@@ -1105,10 +1340,10 @@ export function RunScreen({
  */
 export async function loadRunScreenData(attemptId: string): Promise<{
   envelope: RunnerEnvelope
-  student: MenuStudent | undefined
+  student: RunStudent | undefined
 }> {
   const [envelope, student] = await Promise.all([
-    getRunnerEnvelope(attemptId),
+    attemptGateway.loadEnvelope(attemptId),
     getCurrentStudent().catch(() => undefined),
   ])
 
@@ -1125,16 +1360,18 @@ export async function loadRunScreenData(attemptId: string): Promise<{
  */
 export async function loadRunRouteData(attemptId: string): Promise<{
   envelope: RunnerEnvelope
-  student: MenuStudent | undefined
+  student: RunStudent | undefined
   queue: AnswerQueue
+  localOnly: boolean
 }> {
   try {
-    const [{ envelope, student }, queue] = await Promise.all([
+    const [{ envelope, student }, queue, localOnly] = await Promise.all([
       loadRunScreenData(attemptId),
       AnswerQueue.open(),
+      attemptGateway.isLocalOnly(attemptId),
     ])
 
-    return { envelope, student, queue }
+    return { envelope, student, queue, localOnly }
   } catch (error) {
     // A 410 attempt_expired here means THIS load finalized the attempt --
     // the honest destination is the result screen it names, not an error
@@ -1167,24 +1404,16 @@ export function RunRouteError(_props: RunRouteErrorProps) {
   const { t } = useTranslation("runner")
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-12">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("runError.title")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p role="alert">{t("runError.message")}</p>
-          <Button
-            className="h-11 min-w-11 touch-manipulation select-none"
-            onClick={() => {
-              window.location.reload()
-            }}
-          >
-            {t("runError.retry")}
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+    <RouteErrorView
+      title={t("runError.title")}
+      message={t("runError.message")}
+      retry={{
+        label: t("runError.retry"),
+        onRetry: () => {
+          window.location.reload()
+        },
+      }}
+    />
   )
 }
 
@@ -1196,7 +1425,7 @@ export const Route = createFileRoute("/attempts/$attemptId/run")({
 
 function RouteComponent() {
   const { attemptId } = Route.useParams()
-  const { envelope, student, queue } = Route.useLoaderData()
+  const { envelope, student, queue, localOnly } = Route.useLoaderData()
 
   // Same stand-in as sections.$sectionId.rules.tsx: no typed route exists
   // yet for the section-rules destination from here without inventing its
@@ -1216,6 +1445,7 @@ function RouteComponent() {
       queue={queue}
       student={student}
       navigate={navigate}
+      localOnly={localOnly}
     />
   )
 }

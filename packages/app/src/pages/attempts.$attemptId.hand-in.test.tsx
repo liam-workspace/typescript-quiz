@@ -1,5 +1,5 @@
 import "fake-indexeddb/auto"
-import { cleanup, render, screen } from "@testing-library/react"
+import { act, cleanup, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { isRedirect } from "@tanstack/react-router"
 import {
@@ -14,6 +14,7 @@ import {
 import "../i18n.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
 import type { RunnerEnvelope } from "../lib/api-types.js"
+import { networkStore } from "../lib/network.js"
 import {
   HandInRouteError,
   HandInScreen,
@@ -74,6 +75,7 @@ const baseEnvelope: RunnerEnvelope = {
   questionCount: 40,
   answeredCount: 38,
   unansweredOrdinals: [12, 31],
+  offlineJournalCursor: 0,
   currentSectionId: "section-1",
   currentQuestionId: "q-1",
   sections: [],
@@ -91,7 +93,7 @@ describe("HandInScreen", () => {
     vi.unstubAllGlobals()
   })
 
-  it("uses the confirmation-screen hierarchy for live answer counts", async () => {
+  it("shows answered and not-answered tiles, the blank list and the minutes left", async () => {
     const queue = await AnswerQueue.open(DB_NAME)
 
     try {
@@ -104,21 +106,106 @@ describe("HandInScreen", () => {
         />,
       )
 
-      expect(screen.getByText(baseEnvelope.testTitle).closest("header")).toHaveClass(
-        "app-bar",
+      // D7: the app bar says what the screen is (prototype vHandin).
+      expect(screen.getByRole("banner")).toHaveTextContent("Hand in")
+      expect(screen.getByRole("banner")).not.toHaveTextContent(
+        "Practice Test 04",
       )
       expect(
         screen.getByRole("heading", { level: 1, name: "Hand in your test?" }),
-      ).toHaveClass("screen-title")
-      expect(screen.getByText(/still blank/i)).toHaveClass("notice")
-      expect(screen.getByText("Answered").parentElement).toHaveClass(
-        "summary-row",
+      ).toHaveAttribute("tabindex", "-1")
+      expect(screen.getByText("Answered").nextSibling).toHaveTextContent("38")
+      expect(screen.getByText("Not answered").nextSibling).toHaveTextContent(
+        "2",
       )
-      expect(screen.getByText("Answered").closest("section")).toHaveClass(
-        "device-card",
+      expect(screen.getByText(/Questions 12, 31 are still blank/)).toHaveClass(
+        "m-notice",
       )
-      expect(screen.getByTestId("hand-in-button").closest("footer")).toHaveClass(
-        "device-footer",
+      expect(
+        screen.getByText("You have 30 minutes left if you want to go back."),
+      ).toBeInTheDocument()
+      expect(
+        screen.getByTestId("hand-in-button").closest("footer"),
+      ).toHaveClass("m-actionbar")
+      // C4: pinned, so Hand in is visible without scrolling at 320×568.
+      expect(
+        screen.getByTestId("hand-in-button").closest("footer"),
+      ).toHaveAttribute("data-sticky", "true")
+    } finally {
+      await queue.close()
+    }
+  })
+
+  it("disables Hand in with the offline reason, and re-enables it when back online", async () => {
+    const queue = await AnswerQueue.open(DB_NAME)
+
+    try {
+      render(
+        <HandInScreen
+          attemptId="attempt-1"
+          envelope={baseEnvelope}
+          queue={queue}
+          navigate={vi.fn()}
+        />,
+      )
+
+      act(() => {
+        networkStore.setOnlineForTests(false)
+      })
+
+      const reason = screen.getByRole("alert")
+
+      expect(screen.getByTestId("hand-in-button")).toBeDisabled()
+      expect(reason).toHaveTextContent(
+        "Handing in needs a connection. Your answers are safe on this phone — reconnect and try again.",
+      )
+      expect(screen.getByTestId("hand-in-button")).toHaveAttribute(
+        "aria-describedby",
+        reason.id,
+      )
+
+      act(() => {
+        networkStore.setOnlineForTests(true)
+      })
+
+      expect(screen.getByTestId("hand-in-button")).toBeEnabled()
+      expect(screen.getByTestId("hand-in-button")).not.toHaveAttribute(
+        "aria-describedby",
+      )
+    } finally {
+      networkStore.setOnlineForTests(true)
+      await queue.close()
+    }
+  })
+
+  it("shows 'Handing in…' with aria-busy while the submit is in flight", async () => {
+    const queue = await AnswerQueue.open(DB_NAME)
+
+    // Never settles: keeps the submit in flight.
+    const inFlight = Promise.withResolvers<Response>()
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockReturnValue(inFlight.promise),
+    )
+
+    try {
+      render(
+        <HandInScreen
+          attemptId="attempt-1"
+          envelope={baseEnvelope}
+          queue={queue}
+          navigate={vi.fn()}
+        />,
+      )
+      await userEvent.setup().click(screen.getByTestId("hand-in-button"))
+
+      expect(screen.getByTestId("hand-in-button")).toHaveTextContent(
+        "Handing in…",
+      )
+      expect(screen.getByTestId("hand-in-button")).toHaveAttribute(
+        "aria-busy",
+        "true",
       )
     } finally {
       await queue.close()
@@ -168,8 +255,12 @@ describe("HandInScreen", () => {
       // The child is still told a sync is in flight -- this is informational
       // now, not a block.
       expect(
-        await screen.findByRole("status", {}, { timeout: 2000 }),
-      ).toHaveTextContent("Waiting for your last answers to save")
+        await screen.findByText(
+          "Waiting for your last answers to save…",
+          {},
+          { timeout: 2000 },
+        ),
+      ).toHaveAttribute("role", "status")
     } finally {
       await queue.close()
     }
@@ -420,7 +511,8 @@ describe("HandInScreen", () => {
           new Response(
             JSON.stringify({
               type: "attempt_expired",
-              title: "The attempt was past its deadline and has been finalized.",
+              title:
+                "The attempt was past its deadline and has been finalized.",
               status: 410,
               attempt: {
                 id: "attempt-1",
@@ -477,12 +569,12 @@ describe("HandInScreen", () => {
       await user.click(await screen.findByTestId("hand-in-button"))
 
       const answered = await screen.findByText("Answered")
-      expect(answered.parentElement).toHaveTextContent("39")
-      expect(screen.getByText("Left blank").parentElement).toHaveTextContent(
-        "1",
-      )
+      expect(answered.nextSibling).toHaveTextContent("39")
+      expect(screen.getByText("Left blank").nextSibling).toHaveTextContent("1")
       expect(fetchMock).toHaveBeenCalledTimes(2)
-      expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/attempts/attempt-1/result")
+      expect(fetchMock.mock.calls[1]?.[0]).toBe(
+        "/api/attempts/attempt-1/result",
+      )
     } finally {
       await queue.close()
     }
@@ -517,6 +609,7 @@ describe("HandInScreen", () => {
             ...baseEnvelope,
             answeredCount: 0,
             unansweredOrdinals: [],
+            offlineJournalCursor: 0,
           }}
           queue={queue}
           navigate={navigate}

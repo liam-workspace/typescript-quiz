@@ -4,9 +4,13 @@ import type { SectionType } from "@pp/common"
 export interface TestCardRow {
   id: string
   slug: string
+  /** The published version a saved offline copy is compared against. */
+  testVersionId: string
   title: string
   level: "primary-step-1" | "primary-step-2" | null
   durationSeconds: number
+  /** Bytes of media a saved copy downloads (each asset counted once). */
+  mediaBytes: number
   sections: Array<{ type: SectionType; questionCount: number }>
   inProgressAttemptId: string | null
   attemptCount: number
@@ -81,6 +85,8 @@ interface SectionSummaryDbRow {
 interface CatalogPageDbRow {
   id: string
   slug: string
+  version_id: string
+  media_bytes: string
   title: string
   level: "primary-step-1" | "primary-step-2" | null
   duration_seconds: number
@@ -124,9 +130,11 @@ function toTestCard(row: CatalogPageDbRow): TestCardRow {
   return {
     id: row.id,
     slug: row.slug,
+    testVersionId: row.version_id,
     title: row.title,
     level: row.level,
     durationSeconds: row.duration_seconds,
+    mediaBytes: Number(row.media_bytes),
     sections: row.sections.map((section) => ({
       type: section.type as SectionType,
       questionCount: section.questionCount,
@@ -155,7 +163,7 @@ const PAGE_QUERY = `
      ORDER BY tv.title, t.id
      LIMIT $1
   )
-  SELECT page.id, page.slug, page.title, page.level, page.duration_seconds,
+  SELECT page.id, page.slug, page.version_id, page.title, page.level, page.duration_seconds,
          COALESCE(sec.sections, '[]'::jsonb) AS sections,
          ip.attempt_id AS in_progress_attempt_id,
          COALESCE(ac.attempt_count, 0) AS attempt_count,
@@ -163,7 +171,8 @@ const PAGE_QUERY = `
          best.submitted_at AS best_submitted_at,
          best.points_earned AS best_points_earned,
          best.points_possible AS best_points_possible,
-         best.percentage AS best_percentage
+         best.percentage AS best_percentage,
+         mb.media_bytes
     FROM page
     LEFT JOIN LATERAL (
       SELECT jsonb_agg(
@@ -200,6 +209,16 @@ const PAGE_QUERY = `
        ORDER BY a.percentage DESC, a.submitted_at DESC
        LIMIT 1
     ) best ON true
+    LEFT JOIN LATERAL (
+      SELECT COALESCE(sum(ma.byte_size), 0) AS media_bytes
+        FROM (
+          SELECT DISTINCT st.media_asset_id
+            FROM stimulus st
+           WHERE st.test_version_id = page.version_id
+             AND st.media_asset_id IS NOT NULL
+        ) s
+        JOIN media_asset ma ON ma.id = s.media_asset_id
+    ) mb ON true
    ORDER BY page.title, page.id
 `
 

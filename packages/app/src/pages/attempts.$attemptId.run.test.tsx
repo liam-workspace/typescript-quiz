@@ -1,4 +1,5 @@
 import "fake-indexeddb/auto"
+import { StrictMode } from "react"
 import {
   act,
   cleanup,
@@ -22,6 +23,8 @@ import {
 import "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
+import type { AttemptGateway } from "../lib/attempt/attempt-gateway.js"
+import { RemoteAttemptGateway } from "../lib/attempt/remote-gateway.js"
 import type { Scheduler } from "../lib/flushController.js"
 import {
   claimPlay,
@@ -36,7 +39,10 @@ import type {
   ResponseSnapshotItem,
   RunnerEnvelope,
 } from "../lib/api-types.js"
+import { networkStore } from "../lib/network.js"
+import { pendingCountStore } from "../lib/pending-count.js"
 import { getCurrentStudent } from "../lib/session-api.js"
+import { toastStore } from "../lib/toast.js"
 import {
   loadRunRouteData,
   loadRunScreenData,
@@ -124,6 +130,18 @@ const finishWasCalled = (): void => {
   expect(mockFinishSection).toHaveBeenCalledOnce()
 }
 
+/**
+ * Hoisted rather than inlined into `waitFor` (callback-nesting depth, as
+ * above): the finish-section confirm lands on the next section's rules.
+ */
+function navigatedToReadingRules(navigate: ReturnType<typeof vi.fn>) {
+  return (): void => {
+    expect(navigate).toHaveBeenCalledWith(
+      "/attempts/attempt-1/sections/section-reading/rules",
+    )
+  }
+}
+
 class TestClock {
   public reads = 0
   private currentMs: number
@@ -196,6 +214,12 @@ function offlineBannerHasThreePending(): void {
   )
 }
 
+function offlineBannerHasOnePending(): void {
+  expect(screen.getByTestId("offline-banner")).toHaveTextContent(
+    "Waiting to be sent: 1",
+  )
+}
+
 function offlineBannerIsGone(): void {
   expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument()
 }
@@ -240,6 +264,11 @@ const cappedAudio: CappedStimulusWire = {
   allowSeek: false,
 }
 
+// A recording that has already been played once: the listening answers are
+// locked until then (and while a clip is playing), so every test about
+// answering, saving or navigating starts from this one.
+const playedAudio: CappedStimulusWire = { ...cappedAudio, playsUsed: 1 }
+
 const listeningEnvelope: RunnerEnvelope = {
   id: "attempt-1",
   status: "in_progress",
@@ -250,6 +279,7 @@ const listeningEnvelope: RunnerEnvelope = {
   questionCount: 20,
   answeredCount: 0,
   unansweredOrdinals: [3, 4],
+  offlineJournalCursor: 0,
   currentSectionId: "section-listening",
   currentQuestionId: "q-1",
   sections: [
@@ -268,7 +298,7 @@ const listeningEnvelope: RunnerEnvelope = {
       groups: [
         {
           id: "group-1",
-          stimulus: cappedAudio,
+          stimulus: playedAudio,
           questions: [
             {
               id: "q-1",
@@ -320,6 +350,7 @@ const multiChoiceEnvelope: RunnerEnvelope = {
   questionCount: 20,
   answeredCount: 0,
   unansweredOrdinals: [3, 4],
+  offlineJournalCursor: 0,
   currentSectionId: "section-listening",
   currentQuestionId: "q-1",
   sections: [
@@ -344,7 +375,7 @@ const multiChoiceEnvelope: RunnerEnvelope = {
       groups: [
         {
           id: "group-1",
-          stimulus: cappedAudio,
+          stimulus: playedAudio,
           questions: [
             {
               id: "q-1",
@@ -401,6 +432,7 @@ const readingEnvelope: RunnerEnvelope = {
   questionCount: 20,
   answeredCount: 0,
   unansweredOrdinals: [5, 6, 7, 8],
+  offlineJournalCursor: 0,
   currentSectionId: "section-reading",
   currentQuestionId: "q-r2",
   sections: [
@@ -475,6 +507,22 @@ const readingEnvelope: RunnerEnvelope = {
   responses: [],
 }
 
+// The same section before anything has been played (playback tests).
+const unplayedListeningEnvelope: RunnerEnvelope = {
+  ...listeningEnvelope,
+  sections: [
+    {
+      ...listeningEnvelope.sections[0],
+      groups: [
+        {
+          ...listeningEnvelope.sections[0].groups[0],
+          stimulus: cappedAudio,
+        },
+      ],
+    },
+  ],
+}
+
 const sectionBoundaryEnvelope: RunnerEnvelope = {
   ...listeningEnvelope,
   currentQuestionId: "q-2",
@@ -503,6 +551,99 @@ function getQueue(): AnswerQueue {
   }
 
   return queue
+}
+
+/** A remote gateway whose answer path is observable (journal hook + flush). */
+function observedGateway(): {
+  gateway: AttemptGateway
+  noteAnswer: MockInstance<AttemptGateway["noteAnswer"]>
+  flushAnswers: MockInstance<AttemptGateway["flushAnswers"]>
+} {
+  const gateway = new RemoteAttemptGateway()
+  const noteAnswer = vi.spyOn(gateway, "noteAnswer")
+  const flushAnswers = vi.spyOn(gateway, "flushAnswers")
+
+  return { gateway, noteAnswer, flushAnswers }
+}
+
+/** Every `fetch` call made with `keepalive: true` (the pagehide flush). */
+function keepaliveFetchCalls(): unknown[][] {
+  return vi
+    .mocked(fetch)
+    .mock.calls.filter(([, init]) => init?.keepalive === true)
+}
+
+/**
+ * Hoisted rather than inlined into `waitFor` (callback-nesting depth, as
+ * above).
+ */
+function calledAtLeastOnce(mock: MockInstance) {
+  return (): void => {
+    expect(mock).toHaveBeenCalled()
+  }
+}
+
+function calledExactlyOnce(mock: MockInstance) {
+  return (): void => {
+    expect(mock).toHaveBeenCalledOnce()
+  }
+}
+
+function oneKeepaliveFetch(): void {
+  expect(keepaliveFetchCalls()).toHaveLength(1)
+}
+
+function waitMs(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+/**
+ * Lets the pagehide handler's snapshot read settle (and, were it going to,
+ * issue its fetch) with the same margin the server-known case gets.
+ */
+async function settlePagehideFlush(): Promise<void> {
+  await act(async () => {
+    await getQueue().snapshotForSection("attempt-1", "section-reading")
+    await waitMs(50)
+  })
+}
+
+/** The remote gateway, with the local journal's "behind" answer stubbed. */
+function gatewayWithJournal(
+  hasPendingJournal: AttemptGateway["hasPendingJournal"],
+): AttemptGateway {
+  const remote = new RemoteAttemptGateway()
+
+  return {
+    start: (slug, hint) => remote.start(slug, hint),
+    loadEnvelope: (id) => remote.loadEnvelope(id),
+    enterSection: (id, s) => remote.enterSection(id, s),
+    setPosition: (id, s, q) => remote.setPosition(id, s, q),
+    claimPlay: (id, s) => remote.claimPlay(id, s),
+    finishSection: (id, s, body) => remote.finishSection(id, s, body),
+    submit: (id, body) => remote.submit(id, body),
+    noteAnswer: (id, answer) => remote.noteAnswer(id, answer),
+    flushAnswers: (ctx) => remote.flushAnswers(ctx),
+    isLocalOnly: (id) => remote.isLocalOnly(id),
+    hasPendingJournal,
+  }
+}
+
+async function recordReadingAnswerAndHidePage(): Promise<void> {
+  await getQueue().recordAnswer(
+    {
+      attemptId: "attempt-1",
+      sectionId: "section-reading",
+      questionId: "q-r1",
+      selectedChoiceIds: ["cr-1"],
+      timeSpentMs: null,
+    },
+    new Date(),
+  )
+  vi.mocked(fetch).mockClear()
+  window.dispatchEvent(new Event("pagehide"))
 }
 
 function renderRunScreen(
@@ -535,6 +676,25 @@ function renderRunScreen(
   return { ...utils, navigate }
 }
 
+const finishHasFocus = (): void => {
+  expect(screen.getByRole("button", { name: "Finish Listening" })).toHaveFocus()
+}
+
+/** A `fetch` stub that answers every call with its OWN Response (a body reads once). */
+const freshJsonResponse =
+  (body: string): (() => Promise<Response>) =>
+  () =>
+    Promise.resolve(
+      new Response(body, {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    )
+
+const toastSays = (message: string) => (): void => {
+  expect(toastStore.getSnapshot()?.message).toBe(message)
+}
+
 describe("RunScreen", () => {
   // A default fetch stub for every test in this describe, not just the ones
   // that assert on it: selecting a choice now durably records the answer
@@ -558,6 +718,9 @@ describe("RunScreen", () => {
 
   afterEach(async () => {
     cleanup()
+    networkStore.setOnlineForTests(true)
+    pendingCountStore.set(0)
+    toastStore.resetForTests()
     vi.clearAllMocks()
     vi.unstubAllGlobals()
     await getQueue().close()
@@ -603,6 +766,113 @@ describe("RunScreen", () => {
   // loader is wrapped as `loadRunRouteData` (exported, above) so both halves
   // of the fix -- the 410 redirect and the fallback to RunRouteError -- are
   // testable directly, matching result.tsx's own `loadResult` convention.
+  describe("attempt gateway seam", () => {
+    it("journals a tapped answer through the gateway, then flushes the open section through it", async () => {
+      const user = userEvent.setup()
+      const { gateway, noteAnswer, flushAnswers } = observedGateway()
+
+      render(
+        <RunScreen
+          attemptId="attempt-1"
+          envelope={readingEnvelope}
+          queue={getQueue()}
+          navigate={vi.fn()}
+          gateway={gateway}
+        />,
+      )
+      await waitFor(calledAtLeastOnce(flushAnswers))
+      flushAnswers.mockClear()
+
+      await user.click(screen.getByRole("radio", { name: "A forest" }))
+
+      await waitFor(calledExactlyOnce(flushAnswers))
+      expect(noteAnswer).toHaveBeenCalledOnce()
+      expect(noteAnswer).toHaveBeenCalledWith(
+        "attempt-1",
+        expect.objectContaining({
+          attemptId: "attempt-1",
+          sectionId: "section-reading",
+          questionId: "q-r2",
+          selectedChoiceIds: ["cr-3"],
+        }),
+      )
+      expect(noteAnswer.mock.invocationCallOrder[0]).toBeLessThan(
+        flushAnswers.mock.invocationCallOrder[0] ?? 0,
+      )
+      expect(flushAnswers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          queue: getQueue(),
+          attemptId: "attempt-1",
+          sectionId: "section-reading",
+        }),
+      )
+    })
+
+    it("sends the pagehide keepalive flush for a server-known attempt", async () => {
+      renderRunScreen(readingEnvelope)
+
+      await recordReadingAnswerAndHidePage()
+
+      await waitFor(oneKeepaliveFetch)
+    })
+
+    it("never sends the pagehide keepalive for a server-known attempt whose journal is behind (it would overtake journaled moves)", async () => {
+      const hasPendingJournal = vi.fn().mockResolvedValue(true)
+
+      render(
+        <RunScreen
+          attemptId="attempt-1"
+          envelope={readingEnvelope}
+          queue={getQueue()}
+          navigate={vi.fn()}
+          gateway={gatewayWithJournal(hasPendingJournal)}
+        />,
+      )
+      await waitFor(calledAtLeastOnce(hasPendingJournal))
+
+      await recordReadingAnswerAndHidePage()
+      await settlePagehideFlush()
+
+      expect(keepaliveFetchCalls()).toHaveLength(0)
+    })
+
+    it("still sends the pagehide keepalive for a server-known attempt with nothing pending in the journal", async () => {
+      const hasPendingJournal = vi.fn().mockResolvedValue(false)
+
+      render(
+        <RunScreen
+          attemptId="attempt-1"
+          envelope={readingEnvelope}
+          queue={getQueue()}
+          navigate={vi.fn()}
+          gateway={gatewayWithJournal(hasPendingJournal)}
+        />,
+      )
+      await waitFor(calledAtLeastOnce(hasPendingJournal))
+
+      await recordReadingAnswerAndHidePage()
+
+      await waitFor(oneKeepaliveFetch)
+    })
+
+    it("never sends the pagehide keepalive flush for a local-only attempt", async () => {
+      render(
+        <RunScreen
+          attemptId="attempt-1"
+          envelope={readingEnvelope}
+          queue={getQueue()}
+          navigate={vi.fn()}
+          localOnly
+        />,
+      )
+
+      await recordReadingAnswerAndHidePage()
+      await settlePagehideFlush()
+
+      expect(keepaliveFetchCalls()).toHaveLength(0)
+    })
+  })
+
   describe("loadRunRouteData / RunRouteError", () => {
     const openedQueues: AnswerQueue[] = []
     let openSpy: MockInstance | undefined = undefined
@@ -696,17 +966,21 @@ describe("RunScreen", () => {
   it("renders the prototype runner shell with route-owned bottom actions", () => {
     renderRunScreen()
 
-    expect(screen.getByRole("banner")).toHaveClass("app-bar", "z-[40]")
-    expect(screen.getByRole("main")).toHaveClass("device-main", "runner-main")
-    expect(screen.getByRole("contentinfo")).toHaveClass(
-      "device-footer",
-      "z-[40]",
+    expect(screen.getByRole("banner")).toHaveClass("m-runtop")
+    expect(screen.getByRole("main")).toHaveClass("m-body", "m-run-body")
+    expect(screen.getByRole("contentinfo")).toHaveClass("m-actionbar")
+    expect(screen.getByRole("contentinfo")).toHaveAttribute(
+      "data-sticky",
+      "true",
     )
     expect(
       screen.queryByRole("button", { name: "Previous" }),
     ).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Next" })).toBeEnabled()
-    expect(screen.getByRole("button", { name: "Hand in" })).toBeEnabled()
+    // Hand in lives on the last question of the last section only now.
+    expect(
+      screen.queryByRole("button", { name: "Hand in" }),
+    ).not.toBeInTheDocument()
   })
 
   it("renders math prompts and choices as formulas without a passage label", () => {
@@ -728,7 +1002,7 @@ describe("RunScreen", () => {
   })
 
   it.each([1, 2])(
-    "hides Previous at the first question in a free math section (question count: %i)",
+    "shows Previous DISABLED at the first question in a free math section, so the bar does not jump (D2; question count: %i)",
     (questionCount) => {
       const envelope = structuredClone(readingEnvelope)
       const [section] = envelope.sections
@@ -746,9 +1020,7 @@ describe("RunScreen", () => {
 
       renderRunScreen(envelope)
 
-      expect(
-        screen.queryByRole("button", { name: "Previous" }),
-      ).not.toBeInTheDocument()
+      expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled()
     },
   )
 
@@ -763,6 +1035,16 @@ describe("RunScreen", () => {
     expect(
       screen.queryByRole("button", { name: "Previous" }),
     ).not.toBeInTheDocument()
+  })
+
+  it("names the navigator button with the count it shows (D3, WCAG 2.5.3)", () => {
+    renderRunScreen()
+
+    expect(
+      screen.getByRole("button", {
+        name: "Question navigator, 0 of 2 answered",
+      }),
+    ).toHaveTextContent("0/2")
   })
 
   it("keeps Previous in the route-owned footer for reading", () => {
@@ -802,25 +1084,68 @@ describe("RunScreen", () => {
       expect(screen.getByLabelText("Time remaining")).toHaveTextContent("24:59")
     })
 
-    it("switches from the normal treatment to a calm at-risk treatment below five minutes", () => {
+    it("switches to the low treatment, with an icon and one announcement, at one minute", () => {
       const clock = new TestClock(Date.parse("2026-08-28T11:00:00.000Z"))
       renderRunScreen(
         {
           ...listeningEnvelope,
-          expiresAt: "2026-08-28T10:05:01.000Z",
+          expiresAt: "2026-08-28T10:01:01.000Z",
           serverTime: "2026-08-28T10:00:00.000Z",
         },
         undefined,
         clock.read.bind(clock),
       )
 
-      const timer = screen.getByLabelText("Time remaining")
-      expect(timer.className).toContain("text-ink-2")
-      expect(timer.className).not.toContain("text-amber")
+      const timer = screen.getByRole("timer", { name: "Time remaining" })
+      expect(timer).not.toHaveAttribute("data-low")
+      expect(timer.querySelector("svg")).toBeNull()
+      expect(screen.queryByText("One minute left.")).not.toBeInTheDocument()
 
       advanceClock(clock, 2_000)
 
-      expect(timer.className).toContain("text-amber")
+      expect(timer).toHaveAttribute("data-low", "true")
+      expect(timer.querySelector("svg")).not.toBeNull()
+      expect(screen.getByText("One minute left.")).toBeInTheDocument()
+    })
+
+    // An open sheet aria-hides the whole runner (Radix hides every sibling of
+    // its portal), so a live region inside it would be swallowed. The page
+    // holds the message back until no sheet is open, then keeps it: the
+    // region's text changes exactly once, so it is spoken exactly once.
+    it("holds the one-minute announcement while a sheet is open and says it once after", () => {
+      const clock = new TestClock(Date.parse("2026-08-28T11:00:00.000Z"))
+      renderRunScreen(
+        {
+          ...listeningEnvelope,
+          expiresAt: "2026-08-28T10:01:01.000Z",
+          serverTime: "2026-08-28T10:00:00.000Z",
+        },
+        undefined,
+        clock.read.bind(clock),
+      )
+      const navigatorTrigger = screen.getByRole("button", {
+        name: /^Question navigator/u,
+      })
+      const announcement = (): HTMLElement | null =>
+        document.querySelector<HTMLElement>("p[aria-live='polite']")
+
+      fireEvent.click(navigatorTrigger)
+      expect(screen.getByRole("dialog", { name: "Questions" })).toBeVisible()
+
+      advanceClock(clock, 2_000)
+
+      expect(announcement()?.textContent).toBe("")
+
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" })
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+      expect(announcement()).toHaveTextContent("One minute left.")
+      expect(announcement()?.closest("[aria-hidden='true']")).toBeNull()
+
+      fireEvent.click(navigatorTrigger)
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" })
+
+      expect(announcement()).toHaveTextContent("One minute left.")
     })
 
     it("stops reading the clock after the runner unmounts", () => {
@@ -943,7 +1268,7 @@ describe("RunScreen", () => {
       expect(screen.getByRole("dialog", { name: "Menu" })).toBeInTheDocument()
     })
 
-    it("switches directly between modal panels using controls inside the active sheet", async () => {
+    it("keeps exactly one modal panel open at a time", async () => {
       renderRunScreen()
 
       const menuTrigger = screen.getByRole("button", { name: "Open menu" })
@@ -956,30 +1281,18 @@ describe("RunScreen", () => {
         "runner-panel-trigger",
         "runner-menu-trigger",
       )
+      expect(screen.getAllByRole("dialog")).toHaveLength(1)
 
+      await userEvent.keyboard("{Escape}")
       await userEvent.click(
-        within(screen.getByRole("dialog", { name: "Menu" })).getByRole(
-          "button",
-          { name: "Open the question navigator" },
-        ),
+        screen.getByRole("button", { name: /^Question navigator/u }),
       )
 
+      expect(runner).toHaveAttribute("data-panel", "navigator")
       expect(screen.getAllByRole("dialog")).toHaveLength(1)
       expect(
         screen.getByRole("dialog", { name: "Questions" }),
       ).toBeInTheDocument()
-      expect(runner).toHaveAttribute("data-panel", "navigator")
-
-      await userEvent.click(
-        within(screen.getByRole("dialog", { name: "Questions" })).getByRole(
-          "button",
-          { name: "Open menu" },
-        ),
-      )
-
-      expect(screen.getAllByRole("dialog")).toHaveLength(1)
-      expect(screen.getByRole("dialog", { name: "Menu" })).toBeInTheDocument()
-      expect(runner).toHaveAttribute("data-panel", "menu")
     })
 
     it("makes the runner landmarks inaccessible while a modal panel is open", async () => {
@@ -1000,7 +1313,7 @@ describe("RunScreen", () => {
         screen.queryByRole("button", { name: "Play recording" }),
       ).not.toBeInTheDocument()
       expect(
-        screen.queryByRole("button", { name: "Hand in" }),
+        screen.queryByRole("button", { name: "Next" }),
       ).not.toBeInTheDocument()
     })
 
@@ -1015,7 +1328,7 @@ describe("RunScreen", () => {
       expect(menuTrigger).toHaveFocus()
 
       const navigatorTrigger = screen.getByRole("button", {
-        name: "Open the question navigator",
+        name: /^Question navigator/u,
       })
       await userEvent.click(navigatorTrigger)
       await userEvent.keyboard("{Escape}")
@@ -1027,14 +1340,102 @@ describe("RunScreen", () => {
     it("uses 44px touch targets for both runner-chrome triggers", () => {
       renderRunScreen()
 
-      expect(
-        screen.getByRole("button", { name: "Open menu" }).className,
-      ).toContain("size-11")
+      // `.m-iconbtn` is 44×44 and `.m-btn` has a 48px min-height
+      // (src/index.css); jsdom applies no CSS, so the classes are the proxy.
+      expect(screen.getByRole("button", { name: "Open menu" })).toHaveClass(
+        "m-iconbtn",
+      )
       expect(
         screen.getByRole("button", {
-          name: "Open the question navigator",
-        }).className,
-      ).toContain("size-11")
+          name: /^Question navigator/u,
+        }),
+      ).toHaveClass("m-btn")
+    })
+
+    it("offers Finish <Section> on the last question of a non-final section and confirms in a sheet", async () => {
+      const user = userEvent.setup()
+
+      mockSetPosition.mockResolvedValue(undefined)
+      mockFinishSection.mockImplementation(finishWithAppliedRemainder)
+      const { navigate } = renderRunScreen(sectionBoundaryEnvelope)
+
+      await user.click(screen.getByRole("button", { name: "Finish Listening" }))
+
+      const dialog = screen.getByRole("dialog", { name: "Finish Listening?" })
+
+      expect(
+        within(dialog).getByText(/You cannot come back to this section\./),
+      ).toBeInTheDocument()
+      expect(mockFinishSection).not.toHaveBeenCalled()
+
+      await user.click(
+        within(dialog).getByRole("button", { name: "Finish Listening" }),
+      )
+
+      await waitFor(finishWasCalled)
+      await waitFor(navigatedToReadingRules(navigate))
+    })
+
+    it("returns focus to Finish when the confirm sheet is dismissed, even where a click does not focus buttons (D13)", async () => {
+      const user = userEvent.setup()
+
+      renderRunScreen(sectionBoundaryEnvelope)
+
+      const finish = screen.getByRole("button", { name: "Finish Listening" })
+
+      // Safari: tapping a button does not focus it, so Radix's default
+      // (whatever was focused when the sheet opened) would be <body>.
+      fireEvent.click(finish)
+      expect(finish).not.toHaveFocus()
+      await screen.findByRole("dialog", { name: "Finish Listening?" })
+      await user.keyboard("{Escape}")
+
+      await waitFor(finishHasFocus)
+    })
+
+    it("offers Hand in on the last question of the last section and goes to the hand-in route", async () => {
+      const user = userEvent.setup()
+      const { navigate } = renderRunScreen({
+        ...readingEnvelope,
+        currentQuestionId: "q-r4",
+      })
+
+      await user.click(screen.getByRole("button", { name: "Hand in" }))
+
+      expect(navigate).toHaveBeenCalledWith("/attempts/attempt-1/hand-in")
+    })
+
+    it("has no Hand in button before the last question", () => {
+      renderRunScreen()
+
+      expect(screen.queryByRole("button", { name: "Hand in" })).toBeNull()
+      expect(screen.getByRole("button", { name: "Next" })).toBeInTheDocument()
+    })
+
+    it("leaves the test from the Menu sheet", async () => {
+      const user = userEvent.setup()
+      const { navigate } = renderRunScreen()
+
+      await user.click(screen.getByRole("button", { name: "Open menu" }))
+      await user.click(
+        within(screen.getByRole("dialog", { name: "Menu" })).getByRole(
+          "button",
+          { name: "Leave test" },
+        ),
+      )
+
+      expect(navigate).toHaveBeenCalledWith("/")
+    })
+
+    it("shows per-section progress in the action bar and top bar", () => {
+      renderRunScreen()
+
+      expect(
+        screen.getByRole("button", { name: /^Question navigator/u }),
+      ).toHaveTextContent("0/2")
+      expect(
+        screen.getByRole("progressbar", { name: "Section progress" }),
+      ).toHaveAttribute("aria-valuemax", "2")
     })
 
     it("never writes position when a disabled forward-only cell is clicked", async () => {
@@ -1042,10 +1443,12 @@ describe("RunScreen", () => {
 
       await userEvent.click(
         screen.getByRole("button", {
-          name: "Open the question navigator",
+          name: /^Question navigator/u,
         }),
       )
-      await userEvent.click(screen.getByRole("button", { name: "Question 4" }))
+      await userEvent.click(
+        screen.getByRole("button", { name: /^Question 4,/ }),
+      )
 
       expect(mockSetPosition).not.toHaveBeenCalled()
     })
@@ -1056,10 +1459,12 @@ describe("RunScreen", () => {
 
       await userEvent.click(
         screen.getByRole("button", {
-          name: "Open the question navigator",
+          name: /^Question navigator/u,
         }),
       )
-      await userEvent.click(screen.getByRole("button", { name: "Question 7" }))
+      await userEvent.click(
+        screen.getByRole("button", { name: /^Question 7,/ }),
+      )
 
       await waitFor(positionWasWritten)
 
@@ -1103,7 +1508,7 @@ describe("RunScreen", () => {
     })
     const user = userEvent.setup()
 
-    renderRunScreen()
+    renderRunScreen(unplayedListeningEnvelope)
 
     const button = screen.getByRole("button", { name: "Play recording" })
     expect(button).toBeEnabled()
@@ -1125,7 +1530,7 @@ describe("RunScreen", () => {
     })
     const user = userEvent.setup()
 
-    renderRunScreen()
+    renderRunScreen(unplayedListeningEnvelope)
 
     expect(screen.queryByTestId("audio-player")).not.toBeInTheDocument()
 
@@ -1149,8 +1554,9 @@ describe("RunScreen", () => {
   // hardcoded `true`, so the menu told a child "the clock keeps running
   // while you are away" before they had started anything -- false, and
   // exactly what would stop a child leaving a test they had not begun. I
-  // fixed the wiring and did not test it. AppMenu covers both branches of
-  // the COMPONENT; nothing asserted the run shell passes the right value.
+  // fixed the wiring and did not test it. RunMenuSheet's own test covers both
+  // branches of the COMPONENT; nothing asserted the run shell passes the
+  // right value.
   //
   // openapi.yaml is explicit that an attempt's expiresAt "stays null until
   // the first section entry", so that null IS the not-started signal.
@@ -1235,6 +1641,25 @@ describe("RunScreen", () => {
     })
   })
 
+  it("shows the in-test offline banner whenever the network store says offline, even with nothing queued", () => {
+    renderRunScreen()
+
+    act(() => {
+      networkStore.setOnlineForTests(false)
+    })
+
+    expect(screen.getByTestId("offline-banner")).toHaveAttribute(
+      "data-variant",
+      "in-test",
+    )
+
+    act(() => {
+      networkStore.setOnlineForTests(true)
+    })
+
+    expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument()
+  })
+
   it("shows retryable queued work with reassurance and clears it after the next successful flush", async () => {
     vi.stubGlobal(
       "fetch",
@@ -1249,19 +1674,14 @@ describe("RunScreen", () => {
     await user.click(screen.getByRole("radio", { name: "A city" }))
 
     const banner = await screen.findByTestId("offline-banner")
-    expect(banner).toHaveAttribute("role", "alert")
-    expect(banner).toHaveClass("offline-notice")
+    expect(banner).toHaveAttribute("data-variant", "in-test")
     expect(screen.getByRole("main")).toContainElement(banner)
-    expect(banner).toHaveTextContent("We can't reach the server right now.")
     expect(banner).toHaveTextContent(
-      "Keep answering — your answers are saved on this iPad and will be sent as soon as the connection is back.",
+      "You're offline. Keep answering — your answers are saved on this phone and will be sent when you reconnect.",
     )
-    expect(
-      screen.getByText(
-        "Keep answering — your answers are saved on this iPad and will be sent as soon as the connection is back.",
-      ),
-    ).not.toHaveClass("text-ink-2")
-    expect(banner).toHaveTextContent("Waiting to be sent: 1")
+    // The banner now also follows the network store, so it can appear a beat
+    // before the queued count reaches it.
+    await waitFor(offlineBannerHasOnePending)
 
     vi.mocked(fetch).mockResolvedValue(
       new Response(
@@ -1277,6 +1697,37 @@ describe("RunScreen", () => {
       expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument()
     })
     expect(screen.getByRole("status")).toHaveTextContent("Saved")
+    expect(toastStore.getSnapshot()?.message).toBe(
+      "Back online — 1 answer sent.",
+    )
+  })
+
+  it("shows no back-online toast on mount or for a session that was never pending", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            results: [{ questionId: "q-r2", status: "applied" }],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      ),
+    )
+    const user = userEvent.setup()
+
+    renderRunScreen(readingEnvelope)
+    expect(toastStore.getSnapshot()).toBeNull()
+
+    await user.click(screen.getByRole("radio", { name: "A city" }))
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalled()
+    })
+    await waitFor(() => {
+      expect(document.querySelector(".save-state")).toHaveTextContent("Saved")
+    })
+
+    expect(toastStore.getSnapshot()).toBeNull()
   })
 
   it("keeps answer controls enabled and records a new selection while the offline banner is showing", async () => {
@@ -1603,9 +2054,8 @@ describe("RunScreen", () => {
       })
 
       await user.click(screen.getByRole("radio", { name: "A city" }))
-      expect(await screen.findByTestId("offline-banner")).toHaveTextContent(
-        "Waiting to be sent: 1",
-      )
+      await screen.findByTestId("offline-banner")
+      await waitFor(offlineBannerHasOnePending)
 
       await user.click(screen.getByRole("button", { name: "Next" }))
       await user.click(screen.getByRole("radio", { name: "Nine" }))
@@ -1619,31 +2069,37 @@ describe("RunScreen", () => {
       )
       expect(questionIdsOf(pending)).toEqual(["q-r2", "q-r3", "q-r4"])
       await waitFor(offlineBannerHasThreePending)
+      expect(pendingCountStore.getSnapshot()).toBe(3)
       expect(allVisibleRadiosAreEnabled()).toBe(true)
 
       vi.mocked(fetch).mockClear()
-      vi.mocked(fetch).mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            results: pending.map(toAppliedFlushItem),
-          }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        ),
-      )
+      // A FRESH Response per call: the retry loop still in flight from the
+      // outage and the `online` flush can overlap, and one shared Response
+      // has a body only the first caller can read ("body used" counted as a
+      // network error made this test flaky).
+      const appliedBody = JSON.stringify({
+        results: pending.map(toAppliedFlushItem),
+      })
+
+      vi.mocked(fetch).mockImplementation(freshJsonResponse(appliedBody))
 
       window.dispatchEvent(new Event("online"))
 
+      await waitFor(readingQueueIsEmpty)
       await waitFor(offlineBannerIsGone)
+      await waitFor(toastSays("Back online — 3 answers sent."))
+      expect(pendingCountStore.getSnapshot()).toBe(0)
 
-      expect(fetch).toHaveBeenCalledOnce()
-      const [firstFetchCall] = vi.mocked(fetch).mock.calls
-      const [url, init] = firstFetchCall
+      // Overlapping flushes may each send: what matters is that the
+      // snapshot sent carried all three answers.
+      expect(fetch).toHaveBeenCalled()
+      const lastFetchCall = vi.mocked(fetch).mock.calls.at(-1)
+      const [url, init] = lastFetchCall ?? []
       const body = JSON.parse((init?.body as string | undefined) ?? "null") as {
         responses: Array<{ questionId: string }>
       }
       expect(url).toBe("/api/attempts/attempt-1/responses")
       expect(questionIdsOf(body.responses)).toEqual(["q-r2", "q-r3", "q-r4"])
-      await waitFor(readingQueueIsEmpty)
     })
 
     it("restores three visible answers and a pending count of three after a reload mid-outage", async () => {
@@ -1678,9 +2134,8 @@ describe("RunScreen", () => {
         flushScheduler: resolveScheduledRetry,
       })
 
-      expect(await screen.findByTestId("offline-banner")).toHaveTextContent(
-        "Waiting to be sent: 3",
-      )
+      await screen.findByTestId("offline-banner")
+      await waitFor(offlineBannerHasThreePending)
       await waitFor(cityRadioIsChecked)
 
       await user.click(screen.getByRole("button", { name: "Next" }))
@@ -1751,14 +2206,14 @@ describe("RunScreen", () => {
       })
 
       expect(
-        screen.queryByRole("button", { name: "Continue to Reading" }),
+        screen.queryByRole("button", { name: "Finish Listening" }),
       ).not.toBeInTheDocument()
 
       cleanup()
       renderRunScreen(sectionBoundaryEnvelope)
 
       expect(
-        screen.getByRole("button", { name: "Continue to Reading" }),
+        screen.getByRole("button", { name: "Finish Listening" }),
       ).toBeInTheDocument()
     })
 
@@ -1768,8 +2223,11 @@ describe("RunScreen", () => {
       const user = userEvent.setup()
 
       await user.click(screen.getByRole("radio", { name: "School" }))
+      await user.click(screen.getByRole("button", { name: "Finish Listening" }))
       await user.click(
-        screen.getByRole("button", { name: "Continue to Reading" }),
+        within(
+          screen.getByRole("dialog", { name: "Finish Listening?" }),
+        ).getByRole("button", { name: "Finish Listening" }),
       )
 
       await waitFor(finishWasCalled)
@@ -1793,6 +2251,74 @@ describe("RunScreen", () => {
       ).resolves.toEqual([])
     })
 
+    it("keeps the confirm sheet open with an alert when finishing fails, and retries from it", async () => {
+      mockFinishSection
+        .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+        .mockImplementationOnce(finishWithAppliedRemainder)
+      const { navigate } = renderRunScreen(sectionBoundaryEnvelope)
+      const user = userEvent.setup()
+
+      await user.click(screen.getByRole("button", { name: "Finish Listening" }))
+      const dialog = screen.getByRole("dialog", { name: "Finish Listening?" })
+      await user.click(
+        within(dialog).getByRole("button", { name: "Finish Listening" }),
+      )
+
+      expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+        "The next section could not be opened.",
+      )
+      expect(navigate).not.toHaveBeenCalled()
+
+      const confirm = within(dialog).getByRole("button", {
+        name: "Finish Listening",
+      })
+      expect(confirm).toBeEnabled()
+      await user.click(confirm)
+
+      await waitFor(navigatedToReadingRules(navigate))
+    })
+
+    it("closes the confirm sheet and shows the time-up view with a Continue action when the section ran out", async () => {
+      mockFinishSection.mockRejectedValue(
+        new ApiError({
+          type: "section_expired",
+          title: "The section's clock ran out.",
+          status: 410,
+        }),
+      )
+      const { navigate } = renderRunScreen(sectionBoundaryEnvelope)
+      const user = userEvent.setup()
+
+      await user.click(screen.getByRole("button", { name: "Finish Listening" }))
+      await user.click(
+        within(
+          screen.getByRole("dialog", { name: "Finish Listening?" }),
+        ).getByRole("button", { name: "Finish Listening" }),
+      )
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "This section's time ran out.",
+      )
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Time's up" }),
+      ).toHaveAttribute("tabindex", "-1")
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole("button", { name: "Finish Listening" }),
+      ).not.toBeInTheDocument()
+
+      // Last question of the section: the server's finishSection never
+      // raises section_expired on success, so this view is the way out.
+      await user.click(
+        screen.getByRole("button", { name: "Continue to Reading" }),
+      )
+
+      expect(navigate).toHaveBeenCalledExactlyOnceWith(
+        "/attempts/attempt-1/sections/section-reading/rules",
+      )
+      expect(mockFinishSection).toHaveBeenCalledOnce()
+    })
+
     it("offers hand-in instead of a nonexistent next section on the final question", async () => {
       const finalEnvelope: RunnerEnvelope = {
         ...readingEnvelope,
@@ -1801,10 +2327,10 @@ describe("RunScreen", () => {
       const { navigate } = renderRunScreen(finalEnvelope)
 
       expect(
-        screen.queryByRole("button", { name: "Continue to Reading" }),
+        screen.queryByRole("button", { name: /^Finish / }),
       ).not.toBeInTheDocument()
 
-      await userEvent.click(screen.getByRole("button", { name: "Finish test" }))
+      await userEvent.click(screen.getByRole("button", { name: "Hand in" }))
 
       expect(mockFinishSection).not.toHaveBeenCalled()
       expect(navigate).toHaveBeenCalledExactlyOnceWith(
@@ -1813,16 +2339,123 @@ describe("RunScreen", () => {
     })
   })
 
-  it("renders the pip/progress strip from questionCount and the section's own question ordinals, read-only", () => {
+  it("moves focus to the question heading after Next", async () => {
+    const user = userEvent.setup()
+
+    mockSetPosition.mockResolvedValue(undefined)
+    renderRunScreen(readingEnvelope)
+
+    await user.click(screen.getByRole("button", { name: "Next" }))
+
+    await waitFor(() => {
+      expect(document.activeElement).toHaveAttribute("data-qtitle")
+    })
+  })
+
+  it("does not steal focus on arrival, even under StrictMode's double effect run", () => {
+    render(
+      <StrictMode>
+        <RunScreen
+          attemptId="attempt-1"
+          envelope={readingEnvelope}
+          queue={getQueue()}
+          navigate={vi.fn()}
+        />
+      </StrictMode>,
+    )
+
+    expect(document.activeElement).toBe(document.body)
+  })
+
+  it("unlocks the answers and says no plays are left when the server refuses a claim with 409", async () => {
+    const user = userEvent.setup()
+
+    mockClaimPlay.mockRejectedValueOnce(
+      new ApiError({
+        type: "no_plays_remaining",
+        title: "No plays",
+        status: 409,
+      }),
+    )
+    renderRunScreen(unplayedListeningEnvelope)
+
+    expect(screen.getByRole("radio", { name: "A dog" })).toBeDisabled()
+
+    await user.click(screen.getByRole("button", { name: "Play recording" }))
+
+    expect(
+      await screen.findByRole("button", { name: "No plays left" }),
+    ).toBeDisabled()
+    expect(screen.getByRole("radio", { name: "A dog" })).toBeEnabled()
+    expect(screen.queryByTestId("audio-player")).not.toBeInTheDocument()
+  })
+
+  it("renders exactly one h1 on the run screen", () => {
     renderRunScreen()
 
-    expect(screen.getByText("Question 3 of 20")).toBeInTheDocument()
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1)
+  })
 
-    const pips = screen.getAllByTestId("question-pip")
-    expect(pips.map((pip) => pip.textContent)).toEqual(["3", "4"])
-    for (const pip of pips) {
-      expect(pip.tagName).not.toBe("BUTTON")
-    }
+  it("shows the section-relative position and no pip strip", () => {
+    renderRunScreen()
+
+    expect(screen.getByText("Listening · Question 1 of 2")).toBeInTheDocument()
+    expect(screen.queryByTestId("question-pip")).toBeNull()
+  })
+
+  it("keeps answers locked until the recording has played, then unlocks them", async () => {
+    const user = userEvent.setup()
+
+    mockClaimPlay.mockResolvedValue({
+      stimulusId: "stim-1",
+      playsUsed: 1,
+      playsRemaining: 1,
+      mediaUrl: "/api/media/a.mp3",
+      urlExpiresAt: "2026-08-27T09:05:00.000Z",
+    })
+    renderRunScreen(unplayedListeningEnvelope)
+
+    expect(screen.getByRole("radio", { name: "A dog" })).toBeDisabled()
+
+    await user.click(screen.getByRole("button", { name: "Play recording" }))
+    expect(
+      await screen.findByRole("button", { name: "Playing…" }),
+    ).toBeDisabled()
+    expect(screen.getByRole("radio", { name: "A dog" })).toBeDisabled()
+
+    fireEvent.ended(screen.getByTestId("audio-player"))
+
+    expect(await screen.findByRole("radio", { name: "A dog" })).toBeEnabled()
+  })
+
+  it("disables Next while the recording plays, described by the play hint, and enables it when it ends (C2)", async () => {
+    const user = userEvent.setup()
+
+    mockClaimPlay.mockResolvedValue({
+      stimulusId: "stim-1",
+      playsUsed: 1,
+      playsRemaining: 1,
+      mediaUrl: "/api/media/a.mp3",
+      urlExpiresAt: "2026-08-27T09:05:00.000Z",
+    })
+    renderRunScreen(unplayedListeningEnvelope)
+
+    await user.click(screen.getByRole("button", { name: "Play recording" }))
+    await screen.findByRole("button", { name: "Playing…" })
+
+    const next = screen.getByRole("button", { name: "Next" })
+
+    expect(next).toBeDisabled()
+    expect(next).toHaveAccessibleDescription("You cannot pause or rewind.")
+
+    fireEvent.ended(screen.getByTestId("audio-player"))
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Next" })).toBeEnabled()
+    })
+    expect(screen.getByRole("button", { name: "Next" })).not.toHaveAttribute(
+      "aria-describedby",
+    )
   })
 
   // Defect B: ListeningRunner's `<audio>` had no `onError`, so a stalled or
@@ -1842,7 +2475,7 @@ describe("RunScreen", () => {
       })
       const user = userEvent.setup()
 
-      renderRunScreen()
+      renderRunScreen(unplayedListeningEnvelope)
 
       await user.click(screen.getByRole("button", { name: "Play recording" }))
       const audio = await screen.findByTestId("audio-player")
@@ -1865,6 +2498,9 @@ describe("RunScreen", () => {
       // spend a play they never asked for.
       expect(mockClaimPlay).toHaveBeenCalledTimes(1)
       expect(screen.queryByTestId("audio-player")).not.toBeInTheDocument()
+      // A failed load with plays still left must not trap the student behind
+      // locked answers either.
+      expect(screen.getByRole("radio", { name: "A dog" })).toBeEnabled()
 
       // A deliberate retap is a perfectly ordinary new claim, and clears
       // the failure message once it succeeds.
@@ -1896,7 +2532,7 @@ describe("RunScreen", () => {
       })
       const user = userEvent.setup()
 
-      renderRunScreen()
+      renderRunScreen(unplayedListeningEnvelope)
 
       await user.click(screen.getByRole("button", { name: "Play recording" }))
       const audio = await screen.findByTestId("audio-player")
@@ -1909,8 +2545,10 @@ describe("RunScreen", () => {
       // Honest about the OTHER direction too: the button reflects the real
       // play cap (exhausted), not the stuck-disabled bug this fix removes.
       expect(
-        screen.getByRole("button", { name: "Play recording" }),
+        screen.getByRole("button", { name: "No plays left" }),
       ).toBeDisabled()
+      // A failed load never leaves the student stuck behind locked answers.
+      expect(screen.getByRole("radio", { name: "A dog" })).toBeEnabled()
     })
   })
 
@@ -1921,7 +2559,42 @@ describe("RunScreen", () => {
   // finalizes it and carries the finalized attempt). Before this task,
   // QuestionMedia swallowed the rejection and the student saw nothing.
   describe("a claimPlay 410 surfaces an actionable expired state, not silence", () => {
-    it("shows the section-expired message on a 410 section_expired", async () => {
+    it("shows the time-up view with a Continue button when a section expires and another follows", async () => {
+      mockClaimPlay.mockRejectedValue(
+        new ApiError({
+          type: "section_expired",
+          title: "The section's clock ran out.",
+          status: 410,
+        }),
+      )
+      const user = userEvent.setup()
+      const { navigate } = renderRunScreen({
+        ...unplayedListeningEnvelope,
+        sections: [
+          ...unplayedListeningEnvelope.sections,
+          sectionBoundaryEnvelope.sections[1],
+        ],
+      })
+
+      await user.click(screen.getByRole("button", { name: "Play recording" }))
+
+      expect(
+        await screen.findByRole("heading", { name: "Time's up" }),
+      ).toBeInTheDocument()
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "This section's time ran out.",
+      )
+
+      await user.click(
+        screen.getByRole("button", { name: "Continue to Reading" }),
+      )
+
+      expect(navigate).toHaveBeenCalledWith(
+        "/attempts/attempt-1/sections/section-reading/rules",
+      )
+    })
+
+    it("offers Hand in from the time-up view when the last section expires", async () => {
       mockClaimPlay.mockRejectedValue(
         new ApiError({
           type: "section_expired",
@@ -1931,7 +2604,7 @@ describe("RunScreen", () => {
       )
       const user = userEvent.setup()
 
-      renderRunScreen()
+      const { navigate } = renderRunScreen(unplayedListeningEnvelope)
 
       await user.click(screen.getByRole("button", { name: "Play recording" }))
 
@@ -1939,8 +2612,12 @@ describe("RunScreen", () => {
         "This section's time ran out.",
       )
       expect(
-        screen.queryAllByRole("button", { name: /previous|next|hand in/i }),
+        screen.queryAllByRole("button", { name: /previous|next/i }),
       ).toHaveLength(0)
+
+      await user.click(screen.getByRole("button", { name: "Hand in" }))
+
+      expect(navigate).toHaveBeenCalledWith("/attempts/attempt-1/hand-in")
     })
 
     it("moves to time-up with the finalized attempt on a 410 attempt_expired", async () => {
@@ -1954,7 +2631,7 @@ describe("RunScreen", () => {
       )
       const user = userEvent.setup()
 
-      const { navigate } = renderRunScreen()
+      const { navigate } = renderRunScreen(unplayedListeningEnvelope)
 
       await user.click(screen.getByRole("button", { name: "Play recording" }))
 
@@ -2074,9 +2751,16 @@ describe("RunScreen", () => {
     })
 
     it("navigates to the hand-in dialog when Hand in is tapped", async () => {
+      mockSetPosition.mockResolvedValue(undefined)
+      const user = userEvent.setup()
       const { navigate } = renderRunScreen(readingEnvelope)
 
-      await userEvent.click(screen.getByRole("button", { name: "Hand in" }))
+      // Hand in is the last question's primary action: q-r2 → q-r3 → q-r4.
+      await user.click(screen.getByRole("button", { name: "Next" }))
+      await screen.findByText("What time does the library open?")
+      await user.click(screen.getByRole("button", { name: "Next" }))
+      await screen.findByText("What kind of building is it?")
+      await user.click(screen.getByRole("button", { name: "Hand in" }))
 
       expect(navigate).toHaveBeenCalledWith(expect.stringContaining("/hand-in"))
     })
@@ -2104,7 +2788,7 @@ describe("RunScreen", () => {
         "This section's time ran out.",
       )
       expect(
-        screen.queryAllByRole("button", { name: /previous|next|hand in/i }),
+        screen.queryAllByRole("button", { name: /previous|next/i }),
       ).toHaveLength(0)
     })
   })

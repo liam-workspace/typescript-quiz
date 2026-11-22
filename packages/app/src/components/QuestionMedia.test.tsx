@@ -112,9 +112,7 @@ describe("QuestionMedia", () => {
       />,
     )
 
-    expect(
-      screen.getByRole("button", { name: "Play recording" }),
-    ).toBeDisabled()
+    expect(screen.getByRole("button", { name: "Playing…" })).toBeDisabled()
   })
 
   it("disables the play button once plays are exhausted", () => {
@@ -126,9 +124,7 @@ describe("QuestionMedia", () => {
       />,
     )
 
-    expect(
-      screen.getByRole("button", { name: "Play recording" }),
-    ).toBeDisabled()
+    expect(screen.getByRole("button", { name: "Played" })).toBeDisabled()
   })
 
   it("does not crash when onClaimPlay rejects with a 410 (an expired play or attempt)", async () => {
@@ -243,5 +239,97 @@ describe("QuestionMedia", () => {
     // same play-cap-bypass concern api-types.test.ts pins at the type level.
     expect(container.querySelector("img")).not.toBeInTheDocument()
     expect(screen.getByText("Look at the picture.")).toBeInTheDocument()
+  })
+})
+
+describe("QuestionMedia audio card", () => {
+  afterEach(cleanup)
+
+  it("offers Play recording with the plays-left hint and an empty bar", () => {
+    render(
+      <QuestionMedia
+        stimulus={cappedAudio}
+        onClaimPlay={vi.fn()}
+        playing={false}
+        progress={0}
+      />,
+    )
+
+    expect(screen.getByRole("button", { name: "Play recording" })).toBeEnabled()
+    expect(
+      screen.getByText("2 plays left. They cannot be paused."),
+    ).toBeInTheDocument()
+    expect(screen.getByTestId("audio-progress")).toHaveStyle({ width: "0%" })
+  })
+
+  it("shows a disabled Playing… state with the no-pause rule while the clip plays", () => {
+    render(
+      <QuestionMedia
+        stimulus={{ ...cappedAudio, playsUsed: 1 }}
+        onClaimPlay={vi.fn()}
+        playing
+        progress={0.4}
+      />,
+    )
+
+    expect(screen.getByRole("button", { name: "Playing…" })).toBeDisabled()
+    expect(screen.getByText("You cannot pause or rewind.")).toBeInTheDocument()
+    expect(screen.getByTestId("audio-progress")).toHaveStyle({ width: "40%" })
+  })
+
+  it("shows Played with the answer-now hint once the last play is spent", () => {
+    render(
+      <QuestionMedia
+        stimulus={{ ...cappedAudio, maxPlays: 1, playsUsed: 1 }}
+        onClaimPlay={vi.fn()}
+        playing={false}
+        progress={1}
+      />,
+    )
+
+    expect(screen.getByRole("button", { name: "Played" })).toBeDisabled()
+    expect(
+      screen.getByText("Answer now. You cannot come back to this question."),
+    ).toBeInTheDocument()
+  })
+
+  it("says No plays left when loading failed and nothing remains, and offers a retry when plays remain", () => {
+    const { rerender } = render(
+      <QuestionMedia
+        stimulus={{ ...cappedAudio, maxPlays: 1, playsUsed: 1 }}
+        onClaimPlay={vi.fn()}
+        playing={false}
+        audioFailed
+      />,
+    )
+
+    expect(screen.getByRole("button", { name: "No plays left" })).toBeDisabled()
+
+    rerender(
+      <QuestionMedia
+        stimulus={{ ...cappedAudio, playsUsed: 1 }}
+        onClaimPlay={vi.fn()}
+        playing={false}
+        audioFailed
+      />,
+    )
+    expect(screen.getByRole("button", { name: "Play recording" })).toBeEnabled()
+  })
+
+  it("keeps the legacy audio-box and play-button hooks", () => {
+    render(
+      <QuestionMedia
+        stimulus={cappedAudio}
+        onClaimPlay={vi.fn()}
+        playing={false}
+      />,
+    )
+
+    expect(screen.getByRole("button", { name: "Play recording" })).toHaveClass(
+      "play-button",
+    )
+    expect(screen.getByRole("region", { name: "Recording" })).toHaveClass(
+      "audio-box",
+    )
   })
 })

@@ -3,30 +3,6 @@ import type { RunnerQuestion, StimulusWire } from "../lib/api-types.js"
 import { ChoiceList } from "./ChoiceList.js"
 import { QuestionMedia } from "./QuestionMedia.js"
 
-export interface QuestionPip {
-  readonly questionId: string
-  readonly ordinal: number
-  readonly current: boolean
-}
-
-type QuestionPipState = "done" | "now" | "future"
-
-function questionPipState(
-  pip: QuestionPip,
-  index: number,
-  currentIndex: number,
-): QuestionPipState {
-  if (index < currentIndex) {
-    return "done"
-  }
-
-  if (pip.current) {
-    return "now"
-  }
-
-  return "future"
-}
-
 // A claimPlay 410 that outlived a section (or the whole attempt). Both are
 // the SAME `SectionOrAttemptExpired` condition openapi.yaml already defines
 // for every other runner call -- there is no distinct "media expired"
@@ -73,14 +49,14 @@ export interface ListeningRunnerProps {
   // did not actually save, honestly, rather than trusting an optimistic UI
   // the server has already disagreed with.
   readonly saveFailed: boolean
-  readonly questionCount: number
-  // One entry per question in the CURRENT section, in section order --
-  // "the section's own question ordinals," not 1..questionCount. Read-only:
-  // rendered as plain <span>s, no click handler, because a forward_only
-  // section (openapi.yaml `PUT /attempts/{id}/position`, `409
-  // navigation_locked` on a backward move) does not let a tap on an earlier
-  // pip jump back to it.
-  readonly pips: readonly QuestionPip[]
+  // 1-based position of this question within its section, and the
+  // section's question count -- section-relative numbering (overall
+  // progress lives in RunTopBar).
+  readonly positionInSection: number
+  readonly sectionQuestionCount: number
+  // 0-1 playback fraction of the current clip, owned by the page.
+  readonly audioProgress: number
+  readonly onAudioProgress: (fraction: number) => void
   readonly expired: ListeningExpiredState | null
 }
 
@@ -99,12 +75,24 @@ export function ListeningRunner({
   onAudioError,
   audioFailed,
   saveFailed,
-  questionCount,
-  pips,
+  positionInSection,
+  sectionQuestionCount,
+  audioProgress,
+  onAudioProgress,
   expired,
 }: ListeningRunnerProps) {
   const { t } = useTranslation("runner")
-  const currentPipIndex = pips.findIndex((pip) => pip.current)
+  const playsUsed =
+    stimulus !== undefined && "playsUsed" in stimulus ? stimulus.playsUsed : 0
+  const hasAudio =
+    stimulus !== undefined &&
+    "playsUsed" in stimulus &&
+    (stimulus.type === "audio" ||
+      (stimulus.type === "mixed" && stimulus.mediaKind === "audio"))
+  const playing = audioSrc !== null
+  // Answers unlock once the recording has been played -- or has failed to
+  // load, so a student is never stuck behind a clip that will not play.
+  const heard = !hasAudio || audioFailed || (playsUsed > 0 && !playing)
 
   if (expired) {
     return (
@@ -123,34 +111,22 @@ export function ListeningRunner({
 
   return (
     <div data-testid="listening-runner" className="runner-question">
-      <div className="mb-3 flex items-center gap-3">
-        <p className="question-count shrink-0">
-          {t("runner.questionCount", {
-            current: question.ordinal,
-            total: questionCount,
-          })}
-        </p>
-        <div className="flex flex-1 flex-wrap gap-1">
-          {pips.map((pip, index) => (
-            <span
-              key={pip.questionId}
-              data-testid="question-pip"
-              data-state={questionPipState(pip, index, currentPipIndex)}
-              aria-current={pip.current ? "step" : undefined}
-              className="pip block overflow-hidden text-[0px]"
-            >
-              {pip.ordinal}
-            </span>
-          ))}
-        </div>
-      </div>
+      <p className="m-qmeta">
+        {t("runner.sectionQuestionCount", {
+          section: t("runner.sectionChip.listening"),
+          current: positionInSection,
+          total: sectionQuestionCount,
+        })}
+      </p>
 
       {stimulus ? (
         <>
           <QuestionMedia
             stimulus={stimulus}
             onClaimPlay={onClaimPlay}
-            playing={audioSrc !== null}
+            playing={playing}
+            audioFailed={audioFailed}
+            progress={audioProgress}
           />
           {/* Defect A3: `mixed` means text AND media together, and its own
               `type` never says which -- only `mediaKind` does (mirrors
@@ -171,6 +147,13 @@ export function ListeningRunner({
               autoPlay
               onEnded={onAudioEnded}
               onError={onAudioError}
+              onTimeUpdate={(event) => {
+                const { currentTime, duration } = event.currentTarget
+
+                if (duration > 0) {
+                  onAudioProgress(currentTime / duration)
+                }
+              }}
             />
           ) : null}
           {(stimulus.type === "audio" ||
@@ -186,13 +169,18 @@ export function ListeningRunner({
         </>
       ) : null}
 
-      <p className="question-prompt">{question.prompt}</p>
+      <h1 className="question-prompt" tabIndex={-1} data-qtitle data-page-title>
+        {question.prompt}
+      </h1>
       <ChoiceList
         choices={question.choices}
         questionType={question.type}
         selectedIds={selectedChoiceIds}
         onSelect={onSelectChoice}
-        locked={locked}
+        locked={locked || !heard}
+        lockedMessage={
+          !locked && !heard ? t("listening.unlockHint") : undefined
+        }
       />
       {saveFailed ? (
         <p

@@ -7,6 +7,10 @@ import "@pp/app/index.css"
 // findings, because every component test builds its OWN i18next instance
 // inline. The suite was supplying the production code the app had forgotten.
 import "@pp/app/i18n"
+import { installOfflineAttempts } from "@pp/app/lib/attempt/install"
+import { registerPurgeStep } from "@pp/app/lib/pwa/purge"
+import { registerPwa } from "@pp/app/lib/pwa/register"
+import { unsubscribeOnSignOut } from "@pp/app/lib/reminders"
 import { routeTree } from "@pp/app/route.gen"
 import { RouterProvider, createRouter } from "@tanstack/react-router"
 import { StrictMode } from "react"
@@ -25,6 +29,13 @@ const root = document.getElementById("root")
 if (!root) {
   throw new Error("Root element not found")
 }
+
+registerPwa()
+// Journal-first attempts (offline start, offline run, sync on reconnect).
+installOfflineAttempts()
+// Sign-out drops this browser's practice-reminder subscription (and the
+// server's copy of it, when this browser made it).
+registerPurgeStep(unsubscribeOnSignOut)
 
 createRoot(root).render(
   <StrictMode>

@@ -35,11 +35,6 @@ const cappedAudio: CappedStimulusWire = {
   allowSeek: false,
 }
 
-const pips = [
-  { questionId: "q-1", ordinal: 3, current: true },
-  { questionId: "q-2", ordinal: 4, current: false },
-]
-
 const baseProps = {
   question,
   stimulus: cappedAudio,
@@ -52,8 +47,10 @@ const baseProps = {
   onAudioError: vi.fn(),
   audioFailed: false,
   saveFailed: false,
-  questionCount: 20,
-  pips,
+  positionInSection: 1,
+  sectionQuestionCount: 4,
+  audioProgress: 0,
+  onAudioProgress: vi.fn(),
   expired: null,
 }
 
@@ -75,7 +72,13 @@ describe("ListeningRunner", () => {
     const onSelectChoice = vi.fn()
     const user = userEvent.setup()
 
-    render(<ListeningRunner {...baseProps} onSelectChoice={onSelectChoice} />)
+    render(
+      <ListeningRunner
+        {...baseProps}
+        stimulus={{ ...cappedAudio, playsUsed: 1 }}
+        onSelectChoice={onSelectChoice}
+      />,
+    )
 
     await user.click(screen.getByRole("radio", { name: "A cat" }))
 
@@ -280,43 +283,6 @@ describe("ListeningRunner", () => {
     ).not.toBeInTheDocument()
   })
 
-  it("renders the pip/progress strip from questionCount and the passed-in ordinals, read-only", () => {
-    render(<ListeningRunner {...baseProps} />)
-
-    expect(screen.getByText("Question 3 of 20")).toBeInTheDocument()
-
-    const strip = screen.getAllByTestId("question-pip")
-    expect(strip.map((pip) => pip.textContent)).toEqual(["3", "4"])
-    for (const pip of strip) {
-      expect(pip.tagName).not.toBe("BUTTON")
-    }
-  })
-
-  it("uses the prototype body classes and marks prior, current, and future pips", () => {
-    render(
-      <ListeningRunner
-        {...baseProps}
-        pips={[
-          { questionId: "q-0", ordinal: 2, current: false },
-          { questionId: "q-1", ordinal: 3, current: true },
-          { questionId: "q-2", ordinal: 4, current: false },
-        ]}
-      />,
-    )
-
-    expect(screen.getByText("Question 3 of 20")).toHaveClass("question-count")
-    expect(screen.getByText("What did the boy see?")).toHaveClass(
-      "question-prompt",
-    )
-    expect(screen.getByRole("radiogroup")).toHaveClass("choice-stack")
-    expect(
-      screen.getAllByTestId("question-pip").map((pip) => pip.dataset.state),
-    ).toEqual(["done", "now", "future"])
-    expect(
-      screen.queryByRole("button", { name: /previous|next|hand in/i }),
-    ).not.toBeInTheDocument()
-  })
-
   it("renders an actionable message instead of the question when expired is set to section", () => {
     render(
       <ListeningRunner
@@ -349,5 +315,112 @@ describe("ListeningRunner", () => {
       "href",
       "/attempts/attempt-1/result",
     )
+  })
+
+  it("shows the section-relative question position", () => {
+    render(
+      <ListeningRunner
+        {...baseProps}
+        positionInSection={2}
+        sectionQuestionCount={4}
+      />,
+    )
+
+    expect(screen.getByText("Listening · Question 2 of 4")).toBeInTheDocument()
+  })
+
+  it("locks the answers with an explanation until the recording has been played", () => {
+    render(<ListeningRunner {...baseProps} />)
+
+    expect(screen.getByRole("radio", { name: "A dog" })).toBeDisabled()
+    expect(
+      screen.getByText("Play the recording to unlock the answers."),
+    ).toBeInTheDocument()
+  })
+
+  it("keeps answers locked while the clip is playing and unlocks them after it ends", () => {
+    const { rerender } = render(
+      <ListeningRunner
+        {...baseProps}
+        stimulus={{ ...cappedAudio, playsUsed: 1 }}
+        audioSrc="/api/media/a.mp3"
+      />,
+    )
+
+    expect(screen.getByRole("radio", { name: "A dog" })).toBeDisabled()
+
+    rerender(
+      <ListeningRunner
+        {...baseProps}
+        stimulus={{ ...cappedAudio, playsUsed: 1 }}
+        audioSrc={null}
+      />,
+    )
+    expect(screen.getByRole("radio", { name: "A dog" })).toBeEnabled()
+  })
+
+  it("unlocks the answers when the recording failed to load, so the student is never stuck", () => {
+    render(
+      <ListeningRunner
+        {...baseProps}
+        stimulus={{ ...cappedAudio, playsUsed: 0 }}
+        audioFailed
+      />,
+    )
+
+    expect(screen.getByRole("radio", { name: "A dog" })).toBeEnabled()
+  })
+
+  it("does not gate answers when the question has no audio stimulus", () => {
+    render(<ListeningRunner {...baseProps} stimulus={undefined} />)
+
+    expect(screen.getByRole("radio", { name: "A dog" })).toBeEnabled()
+  })
+
+  it("reports playback progress from the audio element", () => {
+    const onAudioProgress = vi.fn()
+
+    render(
+      <ListeningRunner
+        {...baseProps}
+        stimulus={{ ...cappedAudio, playsUsed: 1 }}
+        audioSrc="/api/media/a.mp3"
+        onAudioProgress={onAudioProgress}
+      />,
+    )
+
+    const audio = screen.getByTestId("audio-player")
+
+    Object.defineProperty(audio, "duration", {
+      value: 10,
+      configurable: true,
+    })
+    Object.defineProperty(audio, "currentTime", {
+      value: 4,
+      configurable: true,
+    })
+    fireEvent.timeUpdate(audio)
+
+    expect(onAudioProgress).toHaveBeenCalledWith(0.4)
+  })
+
+  it("keeps the prompt and choice-stack hooks and renders no navigation buttons", () => {
+    render(<ListeningRunner {...baseProps} />)
+
+    expect(screen.getByText("What did the boy see?")).toHaveClass(
+      "question-prompt",
+    )
+    expect(screen.getByRole("radiogroup")).toHaveClass("choice-stack")
+    expect(
+      screen.queryByRole("button", { name: /previous|next|hand in/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it("makes the prompt a focus target heading", () => {
+    render(<ListeningRunner {...baseProps} />)
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "What did the boy see?" }),
+    ).toHaveAttribute("tabindex", "-1")
   })
 })

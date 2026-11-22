@@ -26,7 +26,7 @@ export function AdminLayout() {
       </header>
 
       <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
-        <h1 className="screen-title">
+        <h1 className="screen-title" tabIndex={-1} data-page-title>
           {t("admin.title", { defaultValue: "Administration" })}
         </h1>
         <nav

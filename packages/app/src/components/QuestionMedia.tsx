@@ -1,10 +1,111 @@
+import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
-import type { StimulusWire } from "../lib/api-types.js"
+import type {
+  CappedStimulusWire,
+  OpenStimulusWire,
+  StimulusWire,
+} from "../lib/api-types.js"
+import { Icon } from "./Icon.js"
+
+/**
+ * The play card's hint ("You cannot pause or rewind." while playing). The
+ * runner's Next button points at it while it is disabled mid-recording
+ * (prototype `aria-describedby="plr"`).
+ */
+export const PLAY_HINT_ID = "play-hint"
 
 export interface QuestionMediaProps {
   stimulus: StimulusWire
   onClaimPlay: () => Promise<void>
   playing: boolean
+  // The most recent claimed play failed to load (see ListeningRunner).
+  audioFailed?: boolean
+  // 0-1 playback fraction for the progress bar.
+  progress?: number
+}
+
+function AudioCard({
+  stimulus,
+  onClaimPlay,
+  playing,
+  audioFailed,
+  progress,
+  className,
+}: {
+  readonly stimulus: CappedStimulusWire | OpenStimulusWire
+  readonly onClaimPlay: () => Promise<void>
+  readonly playing: boolean
+  readonly audioFailed: boolean
+  readonly progress: number
+  readonly className: string
+}) {
+  const { t } = useTranslation("runner")
+  const { maxPlays } = stimulus
+  const playsUsed = "playsUsed" in stimulus ? stimulus.playsUsed : 0
+  const exhausted = maxPlays !== null && playsUsed >= maxPlays
+  const left = maxPlays !== null ? Math.max(0, maxPlays - playsUsed) : null
+  const spentAndClean = exhausted && !audioFailed && !playing
+  let label = t("listening.playButton")
+  let hint: string | null = null
+
+  if (playing) {
+    label = t("listening.playing")
+    hint = t("listening.rule.noPauseRewind")
+  } else if (audioFailed && exhausted) {
+    label = t("listening.noPlaysLeft")
+  } else if (spentAndClean) {
+    label = t("listening.played")
+    hint = t("listening.answerNow")
+  } else if (!audioFailed && left !== null) {
+    hint = t("listening.playsLeftHint", { count: left })
+  }
+
+  const handlePlay = (): void => {
+    onClaimPlay().catch(() => {
+      // Handled by the caller -- see QuestionMedia's doc comment.
+    })
+  }
+  let leadingIcon: ReactNode = <Icon name="play" />
+
+  if (playing) {
+    leadingIcon = (
+      <span className="m-eq" aria-hidden="true">
+        <b />
+        <b />
+        <b />
+      </span>
+    )
+  } else if (exhausted) {
+    leadingIcon = null
+  }
+
+  const fraction = Math.min(1, Math.max(0, spentAndClean ? 1 : progress))
+
+  return (
+    <section aria-label={t("listening.recordingLabel")} className={className}>
+      <button
+        type="button"
+        className="play-button"
+        onClick={handlePlay}
+        disabled={playing || exhausted}
+        aria-describedby={hint ? PLAY_HINT_ID : undefined}
+      >
+        {leadingIcon}
+        {label}
+      </button>
+      <div className="m-bar" aria-hidden="true">
+        <i
+          data-testid="audio-progress"
+          style={{ width: `${Math.round(fraction * 100)}%` }}
+        />
+      </div>
+      {hint ? (
+        <p id={PLAY_HINT_ID} className="m-reason" style={{ margin: 0 }}>
+          {hint}
+        </p>
+      ) : null}
+    </section>
+  )
 }
 
 // Adapted from packages/web/src/components/QuestionMedia.tsx. The audio
@@ -28,9 +129,9 @@ export function QuestionMedia({
   stimulus,
   onClaimPlay,
   playing,
+  audioFailed = false,
+  progress = 0,
 }: QuestionMediaProps) {
-  const { t } = useTranslation("runner")
-
   if (stimulus.type === "passage") {
     return <div className="passage">{stimulus.bodyText}</div>
   }
@@ -64,27 +165,15 @@ export function QuestionMedia({
   }
 
   if (stimulus.type === "audio") {
-    const handlePlay = (): void => {
-      onClaimPlay().catch(() => {
-        // Handled by the caller -- see the component doc comment above.
-      })
-    }
-
     return (
-      <div className="audio-box">
-        <button
-          type="button"
-          className="play-button"
-          onClick={handlePlay}
-          disabled={
-            playing ||
-            (stimulus.maxPlays !== null &&
-              stimulus.playsUsed >= stimulus.maxPlays)
-          }
-        >
-          {t("listening.playButton")}
-        </button>
-      </div>
+      <AudioCard
+        stimulus={stimulus}
+        onClaimPlay={onClaimPlay}
+        playing={playing}
+        audioFailed={audioFailed}
+        progress={progress}
+        className="audio-box"
+      />
     )
   }
 
@@ -96,12 +185,6 @@ export function QuestionMedia({
   // branches on instead. This used to fall through to `return null`,
   // showing a child a blank panel for a real, publishable stimulus type.
   if (stimulus.type === "mixed") {
-    const handlePlay = (): void => {
-      onClaimPlay().catch(() => {
-        // Handled by the caller -- see the component doc comment above.
-      })
-    }
-
     // A capped stimulus carries no mediaUrl regardless of media kind (see
     // StimulusWire's doc comment) -- only an open one does.
     const mediaUrl = stimulus.maxPlays === null ? stimulus.mediaUrl : undefined
@@ -117,20 +200,14 @@ export function QuestionMedia({
           />
         ) : null}
         {stimulus.mediaKind === "audio" ? (
-          <div className="audio-box mt-3">
-            <button
-              type="button"
-              className="play-button"
-              onClick={handlePlay}
-              disabled={
-                playing ||
-                (stimulus.maxPlays !== null &&
-                  stimulus.playsUsed >= stimulus.maxPlays)
-              }
-            >
-              {t("listening.playButton")}
-            </button>
-          </div>
+          <AudioCard
+            stimulus={stimulus}
+            onClaimPlay={onClaimPlay}
+            playing={playing}
+            audioFailed={audioFailed}
+            progress={progress}
+            className="audio-box mt-3"
+          />
         ) : null}
       </div>
     )

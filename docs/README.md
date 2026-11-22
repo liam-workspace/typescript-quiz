@@ -6,7 +6,7 @@
 - [`db/`](db/) — the schema (`schema.sql`, source of truth), the invariants test suite that
   proves each constraint actually rejects what it claims to, and the generated ER diagram
   under [`diagrams/`](diagrams/).
-- [`prototype/`](prototype/) — a standalone HTML prototype of the test-runner UI.
+- [`prototype/`](prototype/) — a standalone HTML prototype of the test-runner UI (`index.html`) and the installable mobile PWA prototype (`pwa-mobile.html`).
 - [`superpowers/specs/`](superpowers/specs/) and [`superpowers/plans/`](superpowers/plans/) —
   the fork's design spec and the ordered implementation plans that built it.
 

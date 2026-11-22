@@ -156,125 +156,80 @@ describe("attempt history page", () => {
     expect(data).toEqual({ initialPage: firstPage, student: tom })
   })
 
-  it("uses the prototype history shell and a labelled horizontal table region", () => {
-    const { container } = renderHistory(firstPage)
+  it("uses the mobile history layout with a focusable page title", () => {
+    renderHistory(firstPage)
 
-    expect(screen.getByRole("banner")).toHaveClass("app-bar")
-    expect(screen.getByRole("button", { name: "Open menu" })).toHaveAttribute(
-      "aria-expanded",
-      "false",
+    expect(screen.getByRole("banner")).toHaveClass("m-appbar")
+    expect(screen.getByText("Your attempts")).toHaveClass("m-brand")
+    expect(screen.getByRole("main")).toHaveClass("m-body")
+    expect(screen.getByRole("heading", { level: 1 })).toHaveAttribute(
+      "tabindex",
+      "-1",
     )
-    expect(screen.getByText("Your attempts")).toHaveClass("app-brand")
-    expect(container.querySelector(".student-avatar")).toHaveTextContent("T")
-    expect(screen.getByRole("main")).toHaveClass("device-main")
-    expect(screen.getByRole("heading", { level: 1 })).toHaveClass(
-      "screen-title",
+    expect(screen.getByRole("heading", { level: 1 })).toHaveAttribute(
+      "data-page-title",
     )
     expect(
       screen.getByText("Every test you have finished, newest first."),
-    ).toHaveClass("screen-subtitle")
-
-    const tableRegion = screen.getByRole("region", {
-      name: "Attempt history",
-    })
-    expect(tableRegion).toHaveClass("overflow-x-auto")
-    expect(within(tableRegion).getByRole("table")).toHaveClass(
-      "history-table",
-      "min-w-[720px]",
-    )
-
-    expect(screen.getByRole("contentinfo")).toHaveClass("device-footer")
-    expect(screen.getByRole("link", { name: "Back to library" })).toHaveClass(
-      "device-button",
-    )
+    ).toHaveClass("m-sub")
   })
 
-  it("opens an accessible student menu from the history app bar", async () => {
-    const user = userEvent.setup()
+  it("renders each attempt as a card: title, date, status chip with an icon, score and actions", () => {
     renderHistory(firstPage)
 
-    const trigger = screen.getByRole("button", { name: "Open menu" })
-    await user.click(trigger)
+    const cards = screen.getAllByRole("listitem")
 
-    expect(trigger).toHaveAttribute("aria-expanded", "true")
-    const menu = screen.getByRole("dialog", { name: "Menu" })
-    expect(within(menu).getByText("Tom")).toBeInTheDocument()
+    expect(cards).toHaveLength(2)
+    expect(within(cards[0]).getByText("Practice Test 04")).toBeInTheDocument()
     expect(
-      within(menu).getByRole("button", { name: "Test library" }),
-    ).toBeInTheDocument()
+      within(cards[0]).getByText("Handed in").closest(".m-chip"),
+    ).toHaveAttribute("data-tone", "good")
     expect(
-      within(menu).getByRole("button", { name: "Attempt history" }),
-    ).toBeInTheDocument()
-    expect(screen.queryByRole("main")).not.toBeInTheDocument()
-
-    await user.keyboard("{Escape}")
-
+      within(cards[1]).getByText("Time ran out").closest(".m-chip"),
+    ).toHaveAttribute("data-tone", "warn")
     expect(
-      screen.queryByRole("dialog", { name: "Menu" }),
-    ).not.toBeInTheDocument()
-    expect(trigger).toHaveFocus()
-  })
-
-  it("renders one row per finished attempt with its per-section and total scores", () => {
-    renderHistory(firstPage)
-
-    const submittedRow = screen.getByRole("row", {
-      name: /Practice Test 04/u,
-    })
-    const expiredRow = screen.getByRole("row", { name: /Practice Test 03/u })
-
-    expect(screen.getAllByRole("row")).toHaveLength(3)
-    expect(within(submittedRow).getAllByText("18 / 20")).toHaveLength(2)
-    expect(within(submittedRow).getByText("36 / 40")).toBeInTheDocument()
-    expect(within(submittedRow).getByText("90%")).toHaveClass("score-badge")
-    expect(within(submittedRow).getByText("90%")).toHaveAttribute(
-      "data-score-band",
-      "high",
-    )
-    expect(within(expiredRow).getByText("16 / 20")).toBeInTheDocument()
-    expect(within(expiredRow).getByText("17 / 20")).toBeInTheDocument()
-    expect(within(expiredRow).getByText("33 / 40")).toBeInTheDocument()
-    expect(within(expiredRow).getByText("82.5%")).toHaveClass("score-badge")
-    expect(within(expiredRow).getByText("82.5%")).toHaveAttribute(
-      "data-score-band",
-      "mid",
-    )
-    expect(within(submittedRow).getByRole("time")).toHaveAttribute(
+      within(cards[0])
+        .getByText("Handed in")
+        .closest(".m-chip")
+        ?.querySelector("svg"),
+    ).not.toBeNull()
+    expect(within(cards[0]).getByText("90%")).toBeInTheDocument()
+    expect(within(cards[1]).getByText("82.5%")).toBeInTheDocument()
+    expect(within(cards[0]).getByRole("time")).toHaveAttribute(
       "datetime",
       "2026-08-25T08:48:34.000Z",
     )
+    expect(within(cards[0]).getByRole("time")).toHaveTextContent("Aug 25")
+    expect(within(cards[0]).getByRole("time")).not.toHaveTextContent("2026")
     expect(
-      within(submittedRow).getByRole("link", { name: "Review" }),
+      within(cards[0]).getByRole("link", { name: "Review" }),
     ).toHaveAttribute("href", "/attempts/attempt-submitted/review")
-    expect(within(submittedRow).getByRole("time")).toHaveTextContent("Aug 25")
-    expect(within(submittedRow).getByRole("time")).not.toHaveTextContent("2026")
+    expect(
+      within(cards[0]).getByRole("link", { name: "Result" }),
+    ).toHaveAttribute("href", "/attempts/attempt-submitted/result")
     expect(
       screen.queryByText("No finished attempts yet."),
     ).not.toBeInTheDocument()
   })
 
-  it("renders 'Time ran out' styling, not the ordinary 'Handed in' text, for a status: expired row", () => {
+  it("marks how each attempt ended without relying on colour alone", () => {
     renderHistory(firstPage)
 
-    const row = screen.getByRole("row", { name: /Practice Test 03/u })
-    expect(within(row).getByText("Time ran out")).toHaveClass("text-amber")
-    expect(within(row).getByText("Time ran out")).toHaveAttribute(
-      "data-ended",
-      "expired",
-    )
-    expect(within(row).queryByText("Handed in")).not.toBeInTheDocument()
+    const [submitted, expired] = screen.getAllByRole("listitem")
+
+    expect(within(submitted).getByText("Handed in")).toBeInTheDocument()
+    expect(within(submitted).queryByText("Time ran out")).toBeNull()
+    expect(
+      within(expired).getByText("Time ran out").closest(".m-chip"),
+    ).toHaveAttribute("data-ended", "expired")
+    expect(within(expired).queryByText("Handed in")).toBeNull()
   })
 
-  it("renders ordinary 'Handed in' styling, not 'Time ran out', for a status: submitted row", () => {
+  it("has no table and no drawer trigger any more", () => {
     renderHistory(firstPage)
 
-    const row = screen.getByRole("row", { name: /Practice Test 04/u })
-    expect(within(row).getByText("Handed in")).toHaveClass("text-ink-2")
-    expect(within(row).getByText("Handed in")).toHaveAttribute(
-      "data-ended",
-      "submitted",
-    )
-    expect(within(row).queryByText("Time ran out")).not.toBeInTheDocument()
+    expect(screen.queryByRole("table")).toBeNull()
+    expect(screen.queryByRole("button", { name: "Open menu" })).toBeNull()
   })
 
   it("fetches the next page on Load more and appends rather than replaces the rows", async () => {
@@ -289,32 +244,24 @@ describe("attempt history page", () => {
     expect(loadMore).toBeEnabled()
     await user.click(loadMore)
 
-    expect(
-      await screen.findByRole("row", { name: /Practice Test 02/u }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole("row", { name: /Practice Test 04/u }),
-    ).toBeInTheDocument()
+    expect(await screen.findByText("Practice Test 02")).toBeInTheDocument()
+    expect(screen.getByText("Practice Test 04")).toBeInTheDocument()
+    expect(screen.getAllByRole("listitem")).toHaveLength(3)
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       "/api/attempts?status=finished&limit=20&cursor=cursor-page-2",
     )
+    // D7: no permanently disabled "No older attempts" button.
     expect(
-      screen.getByRole("button", { name: "No older attempts" }),
-    ).toBeDisabled()
+      screen.queryByRole("button", { name: /older|load more/iu }),
+    ).toBeNull()
   })
 
-  it("disables Load more when nextCursor is null", () => {
+  it("shows no pagination button at all when there is no next page (D7)", () => {
     renderHistory(lastPage)
 
-    const terminalPagination = screen.getByRole("button", {
-      name: "No older attempts",
-    })
-    expect(terminalPagination).toBeDisabled()
-    expect(terminalPagination).toHaveClass("device-button", "w-full")
-    expect(terminalPagination).toHaveAttribute("data-variant", "secondary")
     expect(
-      screen.queryByRole("button", { name: "Load more" }),
-    ).not.toBeInTheDocument()
+      screen.queryByRole("button", { name: /older|load more/iu }),
+    ).toBeNull()
   })
 
   it("disables Load more while a page is in flight and re-enables it when another cursor arrives", async () => {
@@ -366,9 +313,7 @@ describe("attempt history page", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Older attempts could not be loaded. Try again.",
     )
-    expect(
-      screen.getByRole("row", { name: /Practice Test 04/u }),
-    ).toBeInTheDocument()
+    expect(screen.getByText("Practice Test 04")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Load more" })).toBeEnabled()
   })
 
@@ -376,38 +321,7 @@ describe("attempt history page", () => {
     renderHistory({ attempts: [], nextCursor: null })
 
     expect(screen.getByText("No finished attempts yet.")).toBeInTheDocument()
-    expect(
-      screen.queryByRole("row", { name: /Practice Test/u }),
-    ).not.toBeInTheDocument()
-  })
-
-  it("navigates back to the registered library route without reloading the document", async () => {
-    const user = userEvent.setup()
-    const { router } = renderWithRouter(
-      <HistoryScreen initialPage={lastPage} />,
-      "/history",
-    )
-
-    await user.click(screen.getByRole("link", { name: "Back to library" }))
-
-    expect(router.state.location.pathname).toBe("/")
-  })
-
-  it("marks a section as not included when another test establishes that column", () => {
-    renderHistory({
-      attempts: [
-        firstPage.attempts[0],
-        {
-          ...lastPage.attempts[0],
-          sections: [lastPage.attempts[0].sections[0]],
-        },
-      ],
-      nextCursor: null,
-    })
-
-    const row = screen.getByRole("row", { name: /Practice Test 02/u })
-    expect(within(row).getByText("14 / 20")).toBeInTheDocument()
-    expect(within(row).getByText("Not included")).toBeInTheDocument()
+    expect(screen.queryByRole("listitem")).not.toBeInTheDocument()
   })
 
   it("renders the signed-out route error for a 401", () => {

@@ -1,40 +1,28 @@
-import { createFileRoute, defaultStringifySearch } from "@tanstack/react-router"
+import { createFileRoute } from "@tanstack/react-router"
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiError } from "../lib/api-client.js"
-import { startAttempt } from "../lib/attempts-api.js"
-import type { AttemptStart, TestBrief } from "../lib/api-types.js"
+import { OfflineError } from "../lib/attempt/attempt-gateway.js"
+import { attemptGateway } from "../lib/attempt/gateway-selector.js"
+import type { TestBrief } from "../lib/api-types.js"
 import { getTest } from "../lib/catalog-api.js"
+import { firstSectionOf, sectionRulesPath } from "../lib/start-test.js"
 
 export interface TestBriefScreenProps {
   readonly brief: TestBrief
   readonly navigate: (path: string) => void
 }
 
-function sectionRulesPath(attempt: AttemptStart, sectionId: string): string {
-  const search = attempt.finalizedPriorAttempt
-    ? defaultStringifySearch({
-        finalizedPriorAttempt: attempt.finalizedPriorAttempt,
-      })
-    : ""
-
-  return `/attempts/${attempt.id}/sections/${sectionId}/rules${search}`
-}
-
 export function TestBriefScreen({ brief, navigate }: TestBriefScreenProps) {
   const { t } = useTranslation("runner")
   const startingRef = useRef(false)
   const [starting, setStarting] = useState(false)
-  const [startFailed, setStartFailed] = useState(false)
+  const [startFailed, setStartFailed] = useState<
+    false | "failed" | "needsConnection"
+  >(false)
   const durationMinutes = Math.round(brief.durationSeconds / 60)
   const attemptNumber = brief.attemptCount + 1
-  const firstSection = brief.sections.reduce<
-    TestBrief["sections"][number] | undefined
-  >(
-    (first, section) =>
-      !first || section.ordinal < first.ordinal ? section : first,
-    undefined,
-  )
+  const firstSection = firstSectionOf(brief)
   const step = t(
     brief.level === "primary-step-1" ? "library.step.1" : "library.step.2",
   )
@@ -49,12 +37,19 @@ export function TestBriefScreen({ brief, navigate }: TestBriefScreenProps) {
     setStartFailed(false)
 
     try {
-      const attempt = await startAttempt(brief.slug)
+      // The hint matters offline: an attempt already in progress on the
+      // server (even an untimed one) may only be continued, never started
+      // again locally -- the server would refuse that journal as a conflict.
+      const attempt = await attemptGateway.start(brief.slug, {
+        inProgressAttemptId: brief.inProgressAttemptId,
+      })
       navigate(sectionRulesPath(attempt, firstSection.id))
-    } catch {
+    } catch (error) {
       startingRef.current = false
       setStarting(false)
-      setStartFailed(true)
+      setStartFailed(
+        error instanceof OfflineError ? "needsConnection" : "failed",
+      )
     }
   }
 
@@ -65,7 +60,9 @@ export function TestBriefScreen({ brief, navigate }: TestBriefScreenProps) {
       </header>
 
       <main className="device-main">
-        <h1 className="screen-title">{brief.title}</h1>
+        <h1 className="screen-title" tabIndex={-1} data-page-title>
+          {brief.title}
+        </h1>
         <p className="screen-subtitle mb-4">
           {t("brief.summary", {
             step,
@@ -128,7 +125,11 @@ export function TestBriefScreen({ brief, navigate }: TestBriefScreenProps) {
         </p>
         {startFailed ? (
           <p role="alert" className="text-bad mt-3 text-sm font-semibold">
-            {t("brief.startError")}
+            {t(
+              startFailed === "needsConnection"
+                ? "offline.needsConnection"
+                : "brief.startError",
+            )}
           </p>
         ) : null}
       </main>

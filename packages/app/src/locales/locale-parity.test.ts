@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest"
+import i18n from "../i18n.js"
 
 const REQUIRED_LOCALES = ["de", "en", "es", "fr", "it", "ja"]
 
 const REQUIRED_DEVICE_LABEL_KEYS = [
-  "runner:menu.primaryNavigation",
   "runner:navigator.questionGridLabel",
   "runner:navigator.legendLabel",
 ]
@@ -42,6 +42,15 @@ function flatten(value: unknown, prefix = ""): string[] {
 
   return Object.entries(value as Record<string, unknown>).flatMap(
     ([key, child]) => flatten(child, prefix ? `${prefix}.${key}` : key),
+  )
+}
+
+/** Every key of one locale file, as `namespace:key`, plural suffixes kept. */
+function namespacedKeys(path: string, mod: unknown): string[] {
+  const namespace = parseLocaleFile(path)?.namespace ?? ""
+
+  return flatten((mod as { default: unknown }).default).map(
+    (key) => `${namespace}:${key}`,
   )
 }
 
@@ -105,9 +114,37 @@ describe("locale parity", () => {
     for (const locale of REQUIRED_LOCALES) {
       const keys = byLocale.get(locale) ?? new Set<string>()
 
-      expect([...REQUIRED_DEVICE_LABEL_KEYS].filter((key) => !keys.has(key))).toEqual(
-        [],
-      )
+      expect(
+        [...REQUIRED_DEVICE_LABEL_KEYS].filter((key) => !keys.has(key)),
+      ).toEqual([])
     }
+  })
+
+  it("uses ONE plural convention: every key pluralised in English is `_other` in Japanese (D8)", () => {
+    const flat = (locale: string): string[] =>
+      Object.entries(modules)
+        .filter(([path]) => parseLocaleFile(path)?.locale === locale)
+        .flatMap(([path, mod]) => namespacedKeys(path, mod))
+    const en = flat("en")
+    const ja = new Set(flat("ja"))
+    const pluralBases = en
+      .filter((key) => key.endsWith("_one"))
+      .map((key) => key.slice(0, -"_one".length))
+
+    expect(pluralBases.length).toBeGreaterThan(0)
+    expect(pluralBases.filter((base) => !ja.has(`${base}_other`))).toEqual([])
+    expect(pluralBases.filter((base) => ja.has(base))).toEqual([])
+  })
+
+  it("still resolves the renamed Japanese plurals through count (D8)", async () => {
+    await i18n.loadLanguages("ja")
+    const t = i18n.getFixedT("ja", "runner")
+
+    expect(t("listening.playsLeftHint", { count: 2 })).toBe(
+      "残り2回再生できます。一時停止はできません。",
+    )
+    expect(t("runner.finishSectionBlank", { count: 1 })).toBe(
+      "1問がまだ空欄です。このセクションには戻れません。",
+    )
   })
 })

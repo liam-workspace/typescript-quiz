@@ -1,13 +1,40 @@
-import { Link, createFileRoute } from "@tanstack/react-router"
-import { useState } from "react"
+import { createFileRoute } from "@tanstack/react-router"
+import { useRef, useState, useSyncExternalStore, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
+import { InstallCard } from "../components/Banners.js"
+import { Icon } from "../components/Icon.js"
+import { InstallSheet } from "../components/InstallSheet.js"
+import { LibraryFilter } from "../components/LibraryFilter.js"
+import { LibrarySkeleton } from "../components/LibrarySkeleton.js"
+import { PendingSyncNote } from "../components/PendingSyncNote.js"
+import { LibraryTestCard } from "../components/LibraryTestCard.js"
+import {
+  SaveOfflineControl,
+  type SaveOfflineState,
+} from "../components/SaveOfflineControl.js"
 import { ApiError } from "../lib/api-client.js"
+import { useLocalAttemptIds } from "../lib/attempt/use-local-attempts.js"
+import { useSyncStatus } from "../lib/attempt/use-sync-status.js"
 import type { Student, TestCard, TestCatalogPage } from "../lib/api-types.js"
 import { listTests } from "../lib/catalog-api.js"
+import {
+  blockingTest,
+  matchesFilter,
+  waitingCount,
+  type LibraryFilterValue,
+} from "../lib/library-state.js"
+import { startGate } from "../lib/offline/start-gate.js"
+import {
+  useOfflineLibrary,
+  type OfflineLibraryApi,
+} from "../lib/offline/use-offline.js"
+import { startInstall } from "../lib/pwa/install-flow.js"
+import { pwaStore } from "../lib/pwa/pwa-store.js"
 import { getCurrentStudent } from "../lib/session-api.js"
 import { signOut } from "../lib/auth.js"
 import { SIGN_IN_PATH } from "../lib/authPaths.js"
-import { testCardActions, type TestCardAction } from "../lib/testCardState.js"
+import { startTestAndRulesPath } from "../lib/start-test.js"
+import { toastStore } from "../lib/toast.js"
 
 export interface LibraryData {
   initialPage: TestCatalogPage
@@ -23,126 +50,53 @@ export async function loadLibrary(): Promise<LibraryData> {
   return { initialPage, student }
 }
 
-const primaryActionClass = "device-button whitespace-nowrap"
-const secondaryActionClass = "device-button whitespace-nowrap"
-
-function CardActionLink({
-  action,
-  test,
-}: {
-  readonly action: TestCardAction
-  readonly test: TestCard
-}) {
-  const { t } = useTranslation("runner")
-
-  switch (action.kind) {
-    case "continue":
-      return (
-        <Link
-          to="/attempts/$attemptId/run"
-          params={{ attemptId: action.attemptId }}
-          className={primaryActionClass}
-        >
-          {t("library.action.continue")}
-        </Link>
-      )
-
-    case "start":
-      return (
-        <a href={`/tests/${test.slug}`} className={primaryActionClass}>
-          {t("library.action.start")}
-        </a>
-      )
-
-    case "tryAgain":
-      return (
-        <a href={`/tests/${test.slug}`} className={primaryActionClass}>
-          {t("library.action.tryAgain")}
-        </a>
-      )
-
-    case "seeResult":
-      return (
-        <Link
-          to="/attempts/$attemptId/result"
-          params={{ attemptId: action.attemptId }}
-          className={secondaryActionClass}
-          data-variant="secondary"
-        >
-          {t("library.action.seeResult")}
-        </Link>
-      )
-  }
-}
-
-function TestLibraryCard({ test }: { readonly test: TestCard }) {
-  const { t } = useTranslation("runner")
-  const actions = testCardActions(test)
-  const highlighted =
-    test.inProgressAttemptId !== null || test.attemptCount === 0
-  const titleId = `test-card-${test.id}`
-
-  return (
-    <article
-      aria-labelledby={titleId}
-      className={`device-card ${highlighted ? "border-teal" : "border-line"}`}
-    >
-      <div className="flex flex-wrap items-start gap-3.5">
-        <div className="min-w-0 flex-[1_1_15rem]">
-          <h2 id={titleId} className="text-ink text-[15.5px] font-extrabold">
-            {test.title}
-          </h2>
-          <div className="text-ink-2 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px]">
-            <span>
-              {t(
-                test.level === "primary-step-1"
-                  ? "library.step.1"
-                  : "library.step.2",
-              )}
-            </span>
-            {test.sections.map((section) => (
-              <span
-                key={section.type}
-                className="before:mr-1.5 before:content-['·']"
-              >
-                {t("library.sectionCount", {
-                  section: t(`library.section.${section.type}`),
-                  count: section.questionCount,
-                })}
-              </span>
-            ))}
-            <span className="before:mr-1.5 before:content-['·']">
-              {t("library.durationMinutes", {
-                count: Math.round(test.durationSeconds / 60),
-              })}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {actions.map((action) => (
-            <CardActionLink key={action.kind} action={action} test={test} />
-          ))}
-        </div>
-      </div>
-    </article>
-  )
-}
-
 export interface LibraryScreenProps {
   readonly initialPage: TestCatalogPage
   readonly student: Student | null
+  readonly navigate?: (path: string) => void
+  readonly renderCardExtras?: (test: TestCard) => ReactNode
+  readonly startDisabledReason?: (test: TestCard) => string | null
+  /** Offline work of this student waiting to reach the server. */
+  readonly sync?: {
+    readonly pendingAttempts: number
+    readonly failed: boolean
+  }
 }
 
-export function LibraryScreen({ initialPage, student }: LibraryScreenProps) {
+const NO_SYNC = { pendingAttempts: 0, failed: false }
+
+const assign = (path: string): void => {
+  window.location.assign(path)
+}
+
+export function LibraryScreen({
+  initialPage,
+  student,
+  navigate = assign,
+  renderCardExtras,
+  startDisabledReason,
+  sync = NO_SYNC,
+}: LibraryScreenProps) {
   const { i18n, t } = useTranslation("runner")
   const [tests, setTests] = useState(initialPage.tests)
   const [nextCursor, setNextCursor] = useState(initialPage.nextCursor)
   const [loading, setLoading] = useState(false)
   const [loadMoreFailed, setLoadMoreFailed] = useState(false)
+  const [filter, setFilter] = useState<LibraryFilterValue>("all")
+  const [startingId, setStartingId] = useState<string | null>(null)
+  const [startFailed, setStartFailed] = useState(false)
+  const [installKind, setInstallKind] = useState<"ios" | "manual" | null>(null)
+  const installRef = useRef<HTMLButtonElement>(null)
+  const pwa = useSyncExternalStore(
+    (listener) => pwaStore.subscribe(listener),
+    () => pwaStore.getSnapshot(),
+  )
   const numberFormatter = new Intl.NumberFormat(i18n.language, {
     maximumFractionDigits: 2,
   })
+  const blocker = blockingTest(tests)
+  const waiting = waitingCount(tests)
+  const visible = tests.filter((test) => matchesFilter(test, filter))
 
   async function loadMore() {
     if (nextCursor === null || loading) {
@@ -163,47 +117,107 @@ export function LibraryScreen({ initialPage, student }: LibraryScreenProps) {
     }
   }
 
+  function handleStart(test: TestCard): void {
+    if (startingId !== null) {
+      return
+    }
+
+    setStartingId(test.id)
+    setStartFailed(false)
+
+    startTestAndRulesPath(test.slug, {
+      inProgressAttemptId: test.inProgressAttemptId,
+    })
+      .then(navigate)
+      .catch(() => {
+        setStartingId(null)
+        setStartFailed(true)
+      })
+  }
+
+  async function handleInstall(): Promise<void> {
+    const step = await startInstall()
+
+    if (step === "accepted") {
+      toastStore.show(t("toast.installed"), "check")
+    } else if (step === "show-ios" || step === "show-manual") {
+      setInstallKind(step === "show-ios" ? "ios" : "manual")
+    }
+  }
+
+  function reasonFor(test: TestCard): string | null {
+    if (test.inProgressAttemptId === null && blocker) {
+      return t("library.blockedByActive", { title: blocker.title })
+    }
+
+    return startDisabledReason?.(test) ?? null
+  }
+
+  const showInstall = !pwa.standalone && !pwa.installDismissed
+
   return (
-    <div className="device-page">
-      <header className="app-bar">
-        <span className="app-brand">{t("library.brand")}</span>
+    <div className="m-page">
+      <header className="m-appbar">
+        <span className="m-brand">{t("library.brand")}</span>
         <span className="grow" />
         {student ? (
-          <>
-            <span className="truncate text-[13.5px] font-bold">
-              {student.displayName}
-            </span>
-            <span
-              aria-hidden="true"
-              className="bg-teal text-paper grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold"
-            >
-              {student.displayName[0]}
-            </span>
-          </>
+          <span aria-hidden="true" className="m-avatar">
+            {student.displayName[0]}
+          </span>
         ) : null}
       </header>
 
-      <main className="device-main">
-        <h1 className="screen-title">
+      <main className="m-body">
+        <h1 className="m-title" tabIndex={-1} data-page-title>
           {student
             ? t("library.greeting.named", { name: student.displayName })
             : t("library.greeting.anonymous")}
         </h1>
-        <p className="screen-subtitle">
-          {t("library.waiting", { count: tests.length })}
+        <p className="m-sub">
+          {waiting === 0
+            ? t("library.caughtUp")
+            : t("library.waiting", { count: waiting })}
         </p>
+        <PendingSyncNote
+          pendingAttempts={sync.pendingAttempts}
+          failed={sync.failed}
+        />
 
-        {tests.length === 0 ? (
+        {showInstall ? (
+          <InstallCard
+            installRef={installRef}
+            onInstall={() => {
+              void handleInstall()
+            }}
+            onDismiss={() => {
+              pwaStore.dismissInstall()
+            }}
+          />
+        ) : null}
+
+        <LibraryFilter value={filter} onChange={setFilter} />
+
+        {visible.length === 0 ? (
           <p
             role="status"
-            className="device-card text-ink-2 mt-5 border-dashed py-8 text-center font-semibold"
+            className="m-card text-ink-2 border-dashed py-8 text-center font-bold"
           >
-            {t("library.empty")}
+            {tests.length === 0 ? t("library.empty") : t("library.filterEmpty")}
           </p>
         ) : (
-          <div className="mt-5 space-y-[11px]">
-            {tests.map((test) => (
-              <TestLibraryCard key={test.id} test={test} />
+          <div className="m-stack">
+            {visible.map((test) => (
+              <LibraryTestCard
+                key={test.id}
+                test={test}
+                highlighted={
+                  test.inProgressAttemptId !== null || test.attemptCount === 0
+                }
+                starting={startingId === test.id}
+                disabledReason={reasonFor(test)}
+                onStart={handleStart}
+                extras={renderCardExtras?.(test)}
+              />
             ))}
           </div>
         )}
@@ -211,8 +225,9 @@ export function LibraryScreen({ initialPage, student }: LibraryScreenProps) {
         {nextCursor !== null ? (
           <button
             type="button"
-            className="device-button mt-[11px] w-full"
+            className="m-btn mt-3"
             data-variant="secondary"
+            data-block="true"
             disabled={loading}
             aria-busy={loading}
             onClick={loadMore}
@@ -225,50 +240,68 @@ export function LibraryScreen({ initialPage, student }: LibraryScreenProps) {
             {t("library.loadMoreError")}
           </p>
         ) : null}
+        {startFailed ? (
+          <p role="alert" className="text-bad mt-3 text-sm font-semibold">
+            {t("brief.startError")}
+          </p>
+        ) : null}
 
-        <div className="mt-[17px] flex flex-wrap items-center gap-3">
-          <dl className="flex flex-1 flex-wrap gap-6">
-            <div>
-              <dt className="text-faint text-[11px] font-bold tracking-[0.07em] uppercase">
-                {t("library.summary.attempts")}
-              </dt>
-              <dd className="text-ink font-bold tabular-nums">
-                {initialPage.summary.attemptCount}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-faint text-[11px] font-bold tracking-[0.07em] uppercase">
-                {t("library.summary.average")}
-              </dt>
-              <dd className="text-ink font-bold tabular-nums">
-                {t("library.percentage", {
-                  percentage: numberFormatter.format(
-                    initialPage.summary.averagePct,
-                  ),
-                })}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-faint text-[11px] font-bold tracking-[0.07em] uppercase">
-                {t("library.summary.best")}
-              </dt>
-              <dd className="text-ink font-bold tabular-nums">
-                {t("library.percentage", {
-                  percentage: numberFormatter.format(
-                    initialPage.summary.bestPct,
-                  ),
-                })}
-              </dd>
-            </div>
-          </dl>
-          <Link
-            to="/history"
-            className={secondaryActionClass}
-            data-variant="secondary"
-          >
-            {t("library.allAttempts")}
-          </Link>
-        </div>
+        <dl className="m-stats">
+          <div>
+            <dt>{t("library.summary.attempts")}</dt>
+            <dd>{initialPage.summary.attemptCount}</dd>
+          </div>
+          <div>
+            <dt>{t("library.summary.average")}</dt>
+            <dd>
+              {t("library.percentage", {
+                percentage: numberFormatter.format(
+                  initialPage.summary.averagePct,
+                ),
+              })}
+            </dd>
+          </div>
+          <div>
+            <dt>{t("library.summary.best")}</dt>
+            <dd>
+              {t("library.percentage", {
+                percentage: numberFormatter.format(initialPage.summary.bestPct),
+              })}
+            </dd>
+          </div>
+        </dl>
+      </main>
+
+      <InstallSheet
+        open={installKind !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setInstallKind(null)
+          }
+        }}
+        kind={installKind ?? "manual"}
+        returnFocusRef={installRef}
+        onConfirm={() => {
+          pwaStore.markInstalled()
+          setInstallKind(null)
+          toastStore.show(t("toast.installed"), "check")
+        }}
+      />
+    </div>
+  )
+}
+
+/** Route pending view: the page chrome with the prototype's skeleton cards. */
+export function LibraryPending() {
+  const { t } = useTranslation("runner")
+
+  return (
+    <div className="m-page">
+      <header className="m-appbar">
+        <span className="m-brand">{t("library.brand")}</span>
+      </header>
+      <main className="m-body">
+        <LibrarySkeleton />
       </main>
     </div>
   )
@@ -305,37 +338,44 @@ export function LibraryRouteError({ error }: LibraryRouteErrorProps) {
   }
 
   return (
-    <div className="device-page">
-      <main className="center-main">
-        <div className="device-card max-w-xl">
-          <p role="alert">{t(message)}</p>
-          {noAccess ? (
-            <p className="text-ink-2 mt-2 text-sm">
-              {t("library.noAccess.detail")}
-            </p>
-          ) : null}
-          {/* Every error state gets a way out. Plain links, not router calls:
-              this component also renders where there is no router (tests, the
-              route's own error boundary), and a full navigation is what a
-              retry or a fresh sign-in wants anyway. */}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {unauthorized || noAccess ? null : (
-              <a href="/" className={primaryActionClass}>
-                {t("library.errorRetry")}
-              </a>
-            )}
-            <a
-              href={SIGN_IN_PATH}
-              className={secondaryActionClass}
-              data-variant="secondary"
-              onClick={() => {
-                signOut()
-              }}
-            >
-              {t("menu.signOut")}
-            </a>
-          </div>
+    <div className="m-page">
+      <main className="m-hero">
+        <div className="m-logo" data-tone="clay" aria-hidden="true">
+          <Icon name="lock" />
         </div>
+        <div role="alert">
+          <h1
+            className="m-title"
+            tabIndex={-1}
+            data-page-title
+            data-size={noAccess ? "long" : undefined}
+          >
+            {t(message)}
+          </h1>
+        </div>
+        {noAccess ? (
+          <p className="m-sub">{t("library.noAccess.detail")}</p>
+        ) : null}
+        {/* Every error state gets a way out. Plain links, not router calls:
+            this component also renders where there is no router (tests, the
+            route's own error boundary), and a full navigation is what a
+            retry or a fresh sign-in wants anyway. */}
+        {unauthorized || noAccess ? null : (
+          <a href="/" className="m-btn" data-block="true">
+            {t("library.errorRetry")}
+          </a>
+        )}
+        <a
+          href={SIGN_IN_PATH}
+          className="m-btn"
+          data-variant={unauthorized || noAccess ? undefined : "secondary"}
+          data-block="true"
+          onClick={() => {
+            signOut()
+          }}
+        >
+          <Icon name="logout" /> {t("menu.signOut")}
+        </a>
       </main>
     </div>
   )
@@ -343,12 +383,126 @@ export function LibraryRouteError({ error }: LibraryRouteErrorProps) {
 
 export const Route = createFileRoute("/")({
   loader: loadLibrary,
+  pendingComponent: LibraryPending,
+  pendingMs: 150,
   errorComponent: LibraryRouteError,
   component: RouteComponent,
 })
 
+const BYTES_PER_MB = 1_048_576
+
+/** Whole MB for the label, at least 1; a missing or non-finite size reads as 1. */
+function sizeInMb(bytes: number): number {
+  return Number.isFinite(bytes)
+    ? Math.max(1, Math.round(bytes / BYTES_PER_MB))
+    : 1
+}
+
+/** Download state: none, saving (in progress here), or ready (stale if the test changed since). */
+export function offlineStateFor(
+  test: TestCard,
+  offline: OfflineLibraryApi,
+): SaveOfflineState {
+  const percent = offline.progressPercent.get(test.slug)
+
+  if (percent !== undefined) {
+    return { kind: "saving", percent }
+  }
+
+  const record = offline.saved.get(test.slug)
+
+  return record
+    ? { kind: "ready", stale: record.testVersionId !== test.testVersionId }
+    : { kind: "none" }
+}
+
+export type LibraryWithOfflineProps = Omit<
+  LibraryScreenProps,
+  "renderCardExtras" | "startDisabledReason"
+> & {
+  readonly offline: OfflineLibraryApi
+  /** The signed-in student's attempts this phone holds state for (Continue offline). */
+  readonly localAttemptIds?: ReadonlySet<string>
+}
+
+const NO_LOCAL_ATTEMPTS: ReadonlySet<string> = new Set()
+
+/**
+ * The library with the save-offline row and the offline Start gate plugged in
+ * through LibraryScreen's extension props. "Finish X first" is decided inside
+ * LibraryScreen and wins over the connection reason there, so the gate is
+ * asked only about the connection (`activeOtherTitle: null`).
+ */
+export function LibraryWithOffline({
+  offline,
+  localAttemptIds = NO_LOCAL_ATTEMPTS,
+  ...screenProps
+}: LibraryWithOfflineProps) {
+  const { t } = useTranslation("runner")
+
+  return (
+    <LibraryScreen
+      {...screenProps}
+      startDisabledReason={(test) => {
+        const gate = startGate({
+          online: offline.online,
+          saved: offline.saved.has(test.slug),
+          // A timed attempt continues offline only on a phone that loaded it
+          // (spec §13.1 #5); an untimed one this phone never held would be
+          // a second start the server refuses as a conflict.
+          continuableLocally:
+            test.inProgressAttemptId !== null &&
+            localAttemptIds.has(test.inProgressAttemptId),
+          isContinue: test.inProgressAttemptId !== null,
+          activeOtherTitle: null,
+        })
+
+        return gate.enabled ? null : t("offline.needsConnection")
+      }}
+      renderCardExtras={(test) =>
+        test.inProgressAttemptId === null ? (
+          <SaveOfflineControl
+            title={test.title}
+            sizeMb={sizeInMb(test.mediaBytes)}
+            online={offline.online}
+            state={offlineStateFor(test, offline)}
+            onSave={() => {
+              offline.save(test.slug, test.title)
+            }}
+          />
+        ) : null
+      }
+    />
+  )
+}
+
 function RouteComponent() {
   const data = Route.useLoaderData()
+  const offline = useOfflineLibrary()
+  // Only a list loaded while online is the server's word on what is in
+  // progress (offline, the service worker may answer from its cache).
+  const [freshList] = useState(() =>
+    offline.online
+      ? {
+          tests: data.initialPage.tests,
+          complete: data.initialPage.nextCursor === null,
+        }
+      : null,
+  )
+  const localAttemptIds = useLocalAttemptIds(freshList)
+  const status = useSyncStatus()
+  const sync = {
+    pendingAttempts: status.pendingAttempts,
+    failed: status.failedAttemptIds.length > 0,
+  }
 
-  return <LibraryScreen initialPage={data.initialPage} student={data.student} />
+  return (
+    <LibraryWithOffline
+      sync={sync}
+      initialPage={data.initialPage}
+      student={data.student}
+      offline={offline}
+      localAttemptIds={localAttemptIds}
+    />
+  )
 }

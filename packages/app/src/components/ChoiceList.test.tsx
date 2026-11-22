@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
-import { ChoiceList } from "./ChoiceList.js"
+import { ChoiceList, choiceLabel } from "./ChoiceList.js"
 
 const choices = [
   { id: "c-1", label: "A dog" },
@@ -354,5 +354,75 @@ describe("ChoiceList -- multi_choice", () => {
     expect(
       screen.getByText("Answer locked — this section does not allow changes."),
     ).toBeInTheDocument()
+  })
+})
+
+describe("ChoiceList -- letters and lockedMessage", () => {
+  afterEach(() => {
+    cleanup()
+  })
+
+  it("renders an aria-hidden letter badge inside each radio and keeps the accessible name", () => {
+    render(
+      <ChoiceList
+        choices={choices}
+        questionType="single_choice"
+        selectedIds={[]}
+        onSelect={vi.fn()}
+        locked={false}
+      />,
+    )
+
+    const radio = screen.getByRole("radio", { name: "A cat" })
+
+    expect(radio.querySelector('[aria-hidden="true"]')).toHaveTextContent("B")
+  })
+
+  it("renders letters inside checkboxes for multi_choice", () => {
+    render(
+      <ChoiceList
+        choices={choices}
+        questionType="multi_choice"
+        selectedIds={[]}
+        onSelect={vi.fn()}
+        locked={false}
+      />,
+    )
+
+    expect(
+      screen
+        .getByRole("checkbox", { name: "A dog" })
+        .querySelector('[aria-hidden="true"]'),
+    ).toHaveTextContent("A")
+  })
+
+  it("shows the caller's lockedMessage instead of the section-lock line", () => {
+    render(
+      <ChoiceList
+        choices={choices}
+        questionType="single_choice"
+        selectedIds={[]}
+        onSelect={vi.fn()}
+        locked
+        lockedMessage="Play the recording to unlock the answers."
+      />,
+    )
+
+    expect(
+      screen.getByText("Play the recording to unlock the answers."),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText(
+        "Answer locked — this section does not allow changes.",
+      ),
+    ).toBeNull()
+  })
+})
+
+describe("choiceLabel", () => {
+  it("uses letters for the first eight choices and numbers after", () => {
+    expect(choiceLabel(0)).toBe("A")
+    expect(choiceLabel(7)).toBe("H")
+    expect(choiceLabel(8)).toBe("9")
   })
 })

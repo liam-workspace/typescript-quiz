@@ -22,10 +22,10 @@ are written down in `docs/architecture/plan-2-preconditions.md`.
 
 ## Adopted — foundation (plan 1)
 
-| Package                      | Used for                                                                                                                                                                                                                                                                         |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Package                         | Used for                                                                                                                                                                                                                                                                         |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@liam-workspace/node-postgres` | `^0.3.1`, direct dependency. `createPool`, `withTransaction`, `runMigrations`, `waitForDatabase`; named explicitly because the two-pool policy, `runMigrations`' scoped `migrationsTable`, and `createPool`'s `applicationName` knob are load-bearing decisions, not incidental. |
-| `@liam-workspace/platform`   | `Clock` / `createFixedClock`, `Result`/`ok`/`err`, `NotFoundError`/`ValidationError`/`ConflictError`.                                                                                                                                                                            |
+| `@liam-workspace/platform`      | `Clock` / `createFixedClock`, `Result`/`ok`/`err`, `NotFoundError`/`ValidationError`/`ConflictError`.                                                                                                                                                                            |
 | `@liam-workspace/node-config`   | `parseIntegerEnv`, `parseBooleanEnv`, `parseCsvEnv` for `PORT`, `MEDIA_MAX_BYTES`, `ALLOWED_EMAILS`.                                                                                                                                                                             |
 | `@liam-workspace/node-logger`   | Structured logging.                                                                                                                                                                                                                                                              |
 | `@liam-workspace/event-bus`     | `DomainEventEnvelope` for `attempt.submitted`, `write.captured`.                                                                                                                                                                                                                 |
@@ -49,9 +49,9 @@ umbrella; the table above reflects that as the standing decision.
 
 ## Adopted — server (plan 2)
 
-| Package                                | Used for                                                                             |
-| -------------------------------------- | ------------------------------------------------------------------------------------ |
-| `@liam-workspace/node-auth-server`     | `createJwksVerifier`, `decodeServiceJwt`, `isEmailAllowed`, and `createPasskeyAuth`. |
+| Package                                   | Used for                                                                             |
+| ----------------------------------------- | ------------------------------------------------------------------------------------ |
+| `@liam-workspace/node-auth-server`        | `createJwksVerifier`, `decodeServiceJwt`, `isEmailAllowed`, and `createPasskeyAuth`. |
 | `@liam-workspace/node-webauthn`           | Server half of the passkey ceremony, behind `createPasskeyAuth`.                     |
 | `@liam-workspace/node-nest-common`        | `AllExceptionsFilter`, `LoggingInterceptor`.                                         |
 | `@liam-workspace/node-nest-observability` | `ObservabilityModule`, `HttpMetricsInterceptor`, `initOtel`, `PrometheusModule`.     |
@@ -65,9 +65,9 @@ when the parsed body is empty, exactly as their rescue filter does.
 
 ## Adopted — client (plans 4–5)
 
-| Package                                     | Used for                                                                                                                             |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `@liam-workspace/auth-client`               | OIDC authorization-code + PKCE against `auth.icovn.me`.                                                                              |
+| Package                                        | Used for                                                                                                                             |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `@liam-workspace/auth-client`                  | OIDC authorization-code + PKCE against `auth.icovn.me`.                                                                              |
 | `@liam-workspace/browser-react-auth`           | `AuthProvider`, `useAuth`, `createAuthenticatedFetch`.                                                                               |
 | `@liam-workspace/browser-webauthn`             | Passkey registration and login ceremonies.                                                                                           |
 | `@liam-workspace/auth-fetch`                   | Bearer injection with **transparent refresh on 401**. This is the spec's stated mid-attempt-expiry risk, already solved.             |
@@ -95,6 +95,8 @@ offline app-shell is what makes that true of the _page_, not just of the
 answer queue — without it, a reload during an outage shows a browser error and
 the queue never gets a chance to flush.
 
+**Status (2026-11-22): adopted and configured** (`docs/superpowers/specs/2026-11-22-quiz-pwa-mobile-design.md`, D1). The preset supplies the manifest and base Workbox options through `vite-plugin-pwa`'s `generateSW`; its default `runtimeCaching` (every `/api` GET `NetworkFirst`) is deliberately **replaced** by an allow-list (cache `pp-api-v1`), because this API serves play-capped media and per-student data that a shared device must not leak. Registration is `prompt`, not `autoUpdate`, so a student is never reloaded mid-test. The worker also imports `push-sw.js` for the reminder `push` and `notificationclick` handlers. Configuration lives in `packages/app/pwa.config.ts`; `packages/app/test/pwa-build.test.ts` builds for real and pins what ships.
+
 **`browser-telemetry` closes the loop the durability rules open.** awesome-survey
 had to add end-to-end tracing specifically to debug the answer-save path
 (`fix(capability): trace the answer-save path`). A `traceparent` that survives
@@ -103,8 +105,8 @@ than an investigation.
 
 ## Adopted — tooling (plan 1, CI gates)
 
-| Package                            | Used for                                                                                     |
-| ---------------------------------- | -------------------------------------------------------------------------------------------- |
+| Package                               | Used for                                                                                     |
+| ------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `@liam-workspace/node-frontend-lint`  | Audits the layered React frontend: stateless components, one-way imports.                    |
 | `@liam-workspace/node-i18n-lint`      | Detects hardcoded untranslated strings in TSX. With six locales, the failure mode is silent. |
 | `@liam-workspace/node-dev-tools`      | Git / Docker / release workflow utilities for `scripts/`.                                    |
@@ -112,22 +114,22 @@ than an investigation.
 
 ## Adopted later — the admin spec
 
-| Package                             | Why it waits                                                                                                                                                                                   |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@liam-workspace/browser-react-cms` | App-shell, auth guards, dark mode, toasts, Zod forms, data-table. This is the authoring editor, which is a separate spec.                                                                      |
-| `@liam-workspace/browser-react-data`   | `DataProvider` + TanStack Query CRUD hooks — shaped for CMS resources. The student runner is not CRUD (an attempt is a lifecycle, not a resource), so it fits the admin side and not this one. |
-| `@liam-workspace/cms-contracts`        | The Zod list/CRUD contract `browser-react-data` speaks. Same reasoning.                                                                                                                        |
+| Package                              | Why it waits                                                                                                                                                                                   |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@liam-workspace/browser-react-cms`  | App-shell, auth guards, dark mode, toasts, Zod forms, data-table. This is the authoring editor, which is a separate spec.                                                                      |
+| `@liam-workspace/browser-react-data` | `DataProvider` + TanStack Query CRUD hooks — shaped for CMS resources. The student runner is not CRUD (an attempt is a lifecycle, not a resource), so it fits the admin side and not this one. |
+| `@liam-workspace/cms-contracts`      | The Zod list/CRUD contract `browser-react-data` speaks. Same reasoning.                                                                                                                        |
 
 ## Declined — adopting these would make the design worse
 
-| Package                                 | Why not                                                                                                                                                                                                                                                      |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `@liam-workspace/node-drizzle-postgres`    | Competes with `node-postgres`. The schema depends on triggers, partial unique indexes and composite foreign keys — the parts of PostgreSQL an ORM migration generator handles worst. Raw SQL + `node-pg-migrate` keeps `schema.sql` as the single authority. |
-| `@liam-workspace/platform`'s `EntityId` | Adopted the module, **not this class.** Ids come from `gen_random_uuid()` and cross the wire as strings; wrapping them in a class means mapping on every read and write for safety branded string types already give. The rest of `platform` is adopted.     |
-| `@liam-workspace/node-nest-cache`          | Redis, which the spec rules out of v1 scope (§1). A single-family deployment has nothing to cache that Postgres does not already serve in under a millisecond.                                                                                               |
-| `@liam-workspace/json-logic-whitelist`     | Configurable rule evaluation. Section rules are four columns with fixed semantics; a rule engine would make them dynamic, which is the opposite of what publication-time validation needs.                                                                   |
-| `@liam-workspace/node-browser-automation`  | Puppeteer with stealth and a proxy pool. E2E here is Playwright against a local server; stealth and proxies are for scraping.                                                                                                                                |
-| `@liam-workspace/browser-vietnamese-ime`   | Telex/VNI input. Every text field a student touches is English by construction — this is an English exam. Reconsider if the admin editor ever takes Vietnamese content notes.                                                                                |
+| Package                                   | Why not                                                                                                                                                                                                                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@liam-workspace/node-drizzle-postgres`   | Competes with `node-postgres`. The schema depends on triggers, partial unique indexes and composite foreign keys — the parts of PostgreSQL an ORM migration generator handles worst. Raw SQL + `node-pg-migrate` keeps `schema.sql` as the single authority. |
+| `@liam-workspace/platform`'s `EntityId`   | Adopted the module, **not this class.** Ids come from `gen_random_uuid()` and cross the wire as strings; wrapping them in a class means mapping on every read and write for safety branded string types already give. The rest of `platform` is adopted.     |
+| `@liam-workspace/node-nest-cache`         | Redis, which the spec rules out of v1 scope (§1). A single-family deployment has nothing to cache that Postgres does not already serve in under a millisecond.                                                                                               |
+| `@liam-workspace/json-logic-whitelist`    | Configurable rule evaluation. Section rules are four columns with fixed semantics; a rule engine would make them dynamic, which is the opposite of what publication-time validation needs.                                                                   |
+| `@liam-workspace/node-browser-automation` | Puppeteer with stealth and a proxy pool. E2E here is Playwright against a local server; stealth and proxies are for scraping.                                                                                                                                |
+| `@liam-workspace/browser-vietnamese-ime`  | Telex/VNI input. Every text field a student touches is English by construction — this is an English exam. Reconsider if the admin editor ever takes Vietnamese content notes.                                                                                |
 
 ## No subject matter in common
 

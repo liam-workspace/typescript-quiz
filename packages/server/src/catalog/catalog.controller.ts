@@ -13,7 +13,7 @@ import { CurrentStudent } from "../auth/current-student.decorator.js"
 import { JwksGuard } from "../auth/jwks.guard.js"
 import { ProblemException } from "../attempts/problem.exception.js"
 import { ProblemExceptionFilter } from "../attempts/problem.filter.js"
-import { CatalogService } from "./catalog.service.js"
+import { CatalogService, type OfflineBundleView } from "./catalog.service.js"
 
 @Controller("tests")
 @UseGuards(JwksGuard)
@@ -28,6 +28,14 @@ export class CatalogController {
     @Query("cursor") cursor?: string,
   ): Promise<ListPublishedTestsResult> {
     return this.catalog.list(subjectOf(claims), limit, cursor ?? null)
+  }
+
+  @Get(":slug/offline-bundle")
+  getOfflineBundle(
+    @CurrentStudent() claims: JwtClaims,
+    @Param("slug") slug: string,
+  ): Promise<OfflineBundleView> {
+    return this.catalog.getOfflineBundle(subjectOf(claims), slug)
   }
 
   @Get(":slug")

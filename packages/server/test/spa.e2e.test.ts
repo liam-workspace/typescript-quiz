@@ -124,4 +124,67 @@ describeIfSpaBuilt("SPA serving", () => {
       .get("/health")
       .expect(200)
   })
+
+  it("serves the worker and manifest as real files with revalidation headers", async () => {
+    if (!app) {
+      throw new Error("Application failed to initialize")
+    }
+
+    const sw = await request(app.http.getHttpServer() as App)
+      .get("/sw.js")
+      .expect(200)
+      .expect("Content-Type", /javascript/)
+      .expect("Cache-Control", "no-cache")
+    expect(sw.text).not.toContain('<div id="root">')
+
+    await request(app.http.getHttpServer() as App)
+      .get("/manifest.webmanifest")
+      .expect(200)
+      .expect("Content-Type", /manifest\+json|application\/json/)
+      .expect("Cache-Control", "no-cache")
+  })
+
+  it("serves push-sw.js (imported by the worker) as a real script with no-cache", async () => {
+    if (!app) {
+      throw new Error("Application failed to initialize")
+    }
+
+    const res = await request(app.http.getHttpServer() as App)
+      .get("/push-sw.js")
+      .expect(200)
+      .expect("Content-Type", /javascript/)
+      .expect("Cache-Control", "no-cache")
+
+    expect(res.text).toContain("notificationclick")
+  })
+
+  it("marks the shell no-cache and hashed assets immutable", async () => {
+    if (!app) {
+      throw new Error("Application failed to initialize")
+    }
+
+    await request(app.http.getHttpServer() as App)
+      .get("/history")
+      .expect(200)
+      .expect("Cache-Control", "no-cache")
+
+    const assets = await readdir(join(hiddenSpaRoot, "assets"))
+    const script = assets.find((asset) => asset.endsWith(".js"))
+
+    await request(app.http.getHttpServer() as App)
+      .get(`/assets/${script}`)
+      .expect("Cache-Control", /immutable/)
+  })
+
+  it("answers a missing worker file with a JSON 404, never the shell", async () => {
+    if (!app) {
+      throw new Error("Application failed to initialize")
+    }
+
+    const res = await request(app.http.getHttpServer() as App)
+      .get("/workbox-doesnotexist.js")
+      .expect(404)
+      .expect("Content-Type", /application\/json/)
+    expect(res.body).toMatchObject({ statusCode: 404 })
+  })
 })

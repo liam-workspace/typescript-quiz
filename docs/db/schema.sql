@@ -299,6 +299,9 @@ CREATE TABLE attempt (
     -- or a recorded score would lose the content it was computed from.
     test_version_id  uuid           NOT NULL REFERENCES test_version (id) ON DELETE RESTRICT,
     status           attempt_status NOT NULL DEFAULT 'in_progress',
+    -- Where the attempt came from. 'offline' = started with no network and
+    -- adopted at sync time; attempt.id is then the client-minted uuid.
+    origin           text           NOT NULL DEFAULT 'server',
 
     -- created_at is when POST /attempts made the row. started_at is when
     -- the FIRST section was entered — reading the brief and the section
@@ -325,6 +328,7 @@ CREATE TABLE attempt (
     question_count   integer,
 
     CONSTRAINT attempt_id_version UNIQUE (id, test_version_id),
+    CONSTRAINT attempt_origin_known CHECK (origin IN ('server', 'offline')),
 
     CONSTRAINT attempt_position_section_fk FOREIGN KEY (current_section_id, test_version_id)
         REFERENCES test_section (id, test_version_id) ON DELETE RESTRICT,
@@ -455,6 +459,17 @@ CREATE TABLE attempt_section (
 CREATE UNIQUE INDEX attempt_section_one_open
     ON attempt_section (attempt_id)
     WHERE completed_at IS NULL;
+
+
+-- The highest offline-journal eventSeq already applied to an attempt.
+-- Events at or below it are never replayed, so a retried or overlapping
+-- POST /attempts/offline-sync cannot double-count a play or an answer.
+CREATE TABLE offline_journal_cursor (
+    attempt_id      uuid PRIMARY KEY REFERENCES attempt (id) ON DELETE CASCADE,
+    last_event_seq  integer     NOT NULL,
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT journal_cursor_non_negative CHECK (last_event_seq >= 0)
+);
 
 
 CREATE TABLE response (
@@ -828,6 +843,40 @@ CREATE OR REPLACE VIEW publication_violation AS
 -- `missing_media_asset` is absent by construction: stimulus.media_asset_id
 -- is a real foreign key, so an unresolvable asset cannot be stored in the
 -- first place and never reaches publication.
+
+-- =====================================================================
+--  REMINDER SUBSCRIPTION
+--  One Web Push subscription per student for the daily practice reminder
+--  (PUT/DELETE /me/reminders). Written only by the repository; the
+--  scheduler reads it.
+-- =====================================================================
+
+CREATE TABLE reminder_subscription (
+    student_id    uuid        PRIMARY KEY REFERENCES student (id) ON DELETE CASCADE,
+    endpoint      text        NOT NULL,
+    p256dh        text        NOT NULL,
+    auth          text        NOT NULL,
+    timezone      text        NOT NULL,
+    locale        text        NOT NULL DEFAULT 'en',
+    hour          smallint    NOT NULL,
+    minute        smallint    NOT NULL,
+    -- The student's LOCAL calendar date of the last reminder sent (or claimed).
+    -- A date, not a timestamp: "once per local day" is the rule.
+    last_sent_on  date,
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    updated_at    timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT reminder_endpoint_https     CHECK (endpoint LIKE 'https://%'),
+    CONSTRAINT reminder_keys_not_blank     CHECK (length(btrim(p256dh)) > 0 AND length(btrim(auth)) > 0),
+    CONSTRAINT reminder_timezone_not_blank CHECK (length(btrim(timezone)) > 0),
+    CONSTRAINT reminder_locale_known       CHECK (locale IN ('de', 'en', 'es', 'fr', 'it', 'ja')),
+    CONSTRAINT reminder_hour_range         CHECK (hour BETWEEN 0 AND 23),
+    CONSTRAINT reminder_minute_range       CHECK (minute BETWEEN 0 AND 59)
+);
+
+-- One browser belongs to one student at a time; the repository evicts the
+-- previous holder when a second student subscribes from the same phone.
+CREATE UNIQUE INDEX reminder_subscription_endpoint_key ON reminder_subscription (endpoint);
 
 COMMIT;
 

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './pages/__root'
 import { Route as SignInRouteImport } from './pages/sign-in'
+import { Route as ProfileRouteImport } from './pages/profile'
 import { Route as HistoryRouteImport } from './pages/history'
 import { Route as CallbackRouteImport } from './pages/callback'
 import { Route as AdminRouteImport } from './pages/admin'
@@ -32,6 +33,11 @@ import { Route as AttemptsAttemptIdSectionsSectionIdRulesRouteImport } from './p
 const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
   path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HistoryRoute = HistoryRouteImport.update({
@@ -132,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/callback': typeof CallbackRoute
   '/history': typeof HistoryRoute
+  '/profile': typeof ProfileRoute
   '/sign-in': typeof SignInRoute
   '/admin/learners': typeof AdminLearnersRoute
   '/admin/quizzes': typeof AdminQuizzesRouteWithChildren
@@ -152,6 +159,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/callback': typeof CallbackRoute
   '/history': typeof HistoryRoute
+  '/profile': typeof ProfileRoute
   '/sign-in': typeof SignInRoute
   '/admin/learners': typeof AdminLearnersRoute
   '/admin/quizzes': typeof AdminQuizzesRouteWithChildren
@@ -174,6 +182,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/callback': typeof CallbackRoute
   '/history': typeof HistoryRoute
+  '/profile': typeof ProfileRoute
   '/sign-in': typeof SignInRoute
   '/admin/learners': typeof AdminLearnersRoute
   '/admin/quizzes': typeof AdminQuizzesRouteWithChildren
@@ -197,6 +206,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/callback'
     | '/history'
+    | '/profile'
     | '/sign-in'
     | '/admin/learners'
     | '/admin/quizzes'
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
     | '/'
     | '/callback'
     | '/history'
+    | '/profile'
     | '/sign-in'
     | '/admin/learners'
     | '/admin/quizzes'
@@ -238,6 +249,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/callback'
     | '/history'
+    | '/profile'
     | '/sign-in'
     | '/admin/learners'
     | '/admin/quizzes'
@@ -260,6 +272,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   CallbackRoute: typeof CallbackRoute
   HistoryRoute: typeof HistoryRoute
+  ProfileRoute: typeof ProfileRoute
   SignInRoute: typeof SignInRoute
   TestsSlugRoute: typeof TestsSlugRoute
   AttemptsAttemptIdHandInRoute: typeof AttemptsAttemptIdHandInRoute
@@ -277,6 +290,13 @@ declare module '@tanstack/react-router' {
       path: '/sign-in'
       fullPath: '/sign-in'
       preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/history': {
@@ -445,6 +465,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   CallbackRoute: CallbackRoute,
   HistoryRoute: HistoryRoute,
+  ProfileRoute: ProfileRoute,
   SignInRoute: SignInRoute,
   TestsSlugRoute: TestsSlugRoute,
   AttemptsAttemptIdHandInRoute: AttemptsAttemptIdHandInRoute,

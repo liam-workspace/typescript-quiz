@@ -1,3 +1,4 @@
+import { useId } from "react"
 import { useTranslation } from "react-i18next"
 import { Icon } from "./Icon.js"
 
@@ -9,6 +10,19 @@ export type TimeUpAction =
       readonly onClick: () => void
     }
 
+/**
+ * The result is not ready because this phone still holds unsent work: a
+ * disabled primary button that says why, and either a way to check again or
+ * (when the server refused the journal) the ask-an-adult alert.
+ */
+export interface TimeUpWaiting {
+  readonly seeResultLabel: string
+  readonly reason: string
+  readonly checkAgainLabel: string
+  readonly onCheckAgain: () => void
+  readonly failedMessage: string | null
+}
+
 export interface TimeUpViewProps {
   readonly heading: string
   readonly message: string
@@ -19,6 +33,8 @@ export interface TimeUpViewProps {
     readonly blank: number
   } | null
   readonly action: TimeUpAction | null
+  /** Takes the place of `action` while the result waits for a sync. */
+  readonly waiting?: TimeUpWaiting
 }
 
 export function TimeUpView({
@@ -28,6 +44,7 @@ export function TimeUpView({
   title,
   summary,
   action,
+  waiting,
 }: TimeUpViewProps) {
   const { t } = useTranslation("runner")
 
@@ -73,19 +90,61 @@ export function TimeUpView({
           </div>
         ) : null}
       </main>
-      {action ? (
-        <footer className="m-actionbar">
-          {action.kind === "link" ? (
-            <a href={action.href} className="m-btn">
-              {action.label}
-            </a>
-          ) : (
-            <button type="button" className="m-btn" onClick={action.onClick}>
-              {action.label}
-            </button>
-          )}
-        </footer>
-      ) : null}
+      {waiting ? <WaitingFooter waiting={waiting} /> : null}
+      {!waiting && action ? <ActionFooter action={action} /> : null}
     </div>
+  )
+}
+
+function ActionFooter({ action }: { readonly action: TimeUpAction }) {
+  return (
+    <footer className="m-actionbar">
+      {action.kind === "link" ? (
+        <a href={action.href} className="m-btn">
+          {action.label}
+        </a>
+      ) : (
+        <button type="button" className="m-btn" onClick={action.onClick}>
+          {action.label}
+        </button>
+      )}
+    </footer>
+  )
+}
+
+function WaitingFooter({ waiting }: { readonly waiting: TimeUpWaiting }) {
+  const reasonId = useId()
+
+  return (
+    <footer
+      className="m-actionbar"
+      style={{ flexDirection: "column", alignItems: "stretch" }}
+    >
+      <button
+        type="button"
+        className="m-btn"
+        disabled
+        aria-describedby={reasonId}
+      >
+        {waiting.seeResultLabel}
+      </button>
+      <p id={reasonId} className="m-reason text-center">
+        {waiting.reason}
+      </p>
+      {waiting.failedMessage ? (
+        <p role="alert" className="m-alert">
+          {waiting.failedMessage}
+        </p>
+      ) : (
+        <button
+          type="button"
+          className="m-btn"
+          data-variant="secondary"
+          onClick={waiting.onCheckAgain}
+        >
+          {waiting.checkAgainLabel}
+        </button>
+      )}
+    </footer>
   )
 }

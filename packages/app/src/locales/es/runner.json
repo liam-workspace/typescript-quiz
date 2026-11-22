@@ -341,5 +341,11 @@
   "offline.needsConnection": "Necesita conexión. Guárdalo para usarlo sin conexión mientras estás en línea.",
   "offline.saveFailed": "No se pudo guardar {{title}}. Inténtalo de nuevo.",
   "offline.removeFailed": "No se pudo eliminar {{title}}. Inténtalo de nuevo.",
-  "offline.sizeMb": "{{count}} MB"
+  "offline.sizeMb": "{{count}} MB",
+  "offline.timeUp.waiting": "Lo calificaremos en cuanto vuelvas a estar en línea.",
+  "offline.timeUp.waitingReason": "Tu resultado aún no está listo.",
+  "offline.timeUp.checkAgain": "Comprobar de nuevo",
+  "offline.timeUp.failed": "No pudimos enviar esta prueba. Díselo a un adulto.",
+  "offline.pendingSync": "Guardado en este teléfono: se enviará cuando vuelvas a estar en línea.",
+  "offline.syncFailed": "No se pudieron enviar algunas respuestas. Díselo a un adulto."
 }

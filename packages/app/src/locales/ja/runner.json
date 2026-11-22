@@ -329,5 +329,11 @@
   "offline.needsConnection": "接続が必要です。オンラインのうちにオフライン用に保存してください。",
   "offline.saveFailed": "{{title}} を保存できませんでした。もう一度お試しください。",
   "offline.removeFailed": "{{title}} を削除できませんでした。もう一度お試しください。",
-  "offline.sizeMb": "{{count}} MB"
+  "offline.sizeMb": "{{count}} MB",
+  "offline.timeUp.waiting": "オンラインに戻りしだい採点します。",
+  "offline.timeUp.waitingReason": "結果はまだ準備できていません。",
+  "offline.timeUp.checkAgain": "もう一度確認",
+  "offline.timeUp.failed": "このテストを送信できませんでした。大人に伝えてください。",
+  "offline.pendingSync": "この端末に保存しました。オンラインに戻ると送信されます。",
+  "offline.syncFailed": "送信できなかった回答があります。大人に伝えてください。"
 }

@@ -341,5 +341,11 @@
   "offline.needsConnection": "Serve una connessione. Salvalo per l'uso offline mentre sei online.",
   "offline.saveFailed": "Impossibile salvare {{title}}. Riprova.",
   "offline.removeFailed": "Impossibile rimuovere {{title}}. Riprova.",
-  "offline.sizeMb": "{{count}} MB"
+  "offline.sizeMb": "{{count}} MB",
+  "offline.timeUp.waiting": "Lo valuteremo non appena sarai di nuovo online.",
+  "offline.timeUp.waitingReason": "Il tuo risultato non è ancora pronto.",
+  "offline.timeUp.checkAgain": "Controlla di nuovo",
+  "offline.timeUp.failed": "Non siamo riusciti a inviare questo test. Avvisa un adulto.",
+  "offline.pendingSync": "Salvato su questo telefono: verrà inviato quando sarai di nuovo online.",
+  "offline.syncFailed": "Alcune risposte non sono state inviate. Avvisa un adulto."
 }

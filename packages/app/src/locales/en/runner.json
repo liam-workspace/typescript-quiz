@@ -341,5 +341,11 @@
   "offline.needsConnection": "Needs a connection. Save it for offline use while you're online.",
   "offline.saveFailed": "Couldn't save {{title}}. Try again.",
   "offline.removeFailed": "Couldn't remove {{title}}. Try again.",
-  "offline.sizeMb": "{{count}} MB"
+  "offline.sizeMb": "{{count}} MB",
+  "offline.timeUp.waiting": "We'll score it as soon as you're back online.",
+  "offline.timeUp.waitingReason": "Your result isn't ready yet.",
+  "offline.timeUp.checkAgain": "Check again",
+  "offline.timeUp.failed": "We couldn't send this test. Please tell an adult.",
+  "offline.pendingSync": "Saved on this phone — it will be sent when you're back online.",
+  "offline.syncFailed": "Some answers couldn't be sent. Please tell an adult."
 }

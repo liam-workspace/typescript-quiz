@@ -12,7 +12,10 @@ import { Icon } from "../components/Icon.js"
 import { TimeUpView } from "../components/TimeUpView.js"
 import { ApiError } from "../lib/api-client.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
-import type { AttemptGateway } from "../lib/attempt/attempt-gateway.js"
+import {
+  OfflineError,
+  type AttemptGateway,
+} from "../lib/attempt/attempt-gateway.js"
 import { attemptGateway } from "../lib/attempt/gateway-selector.js"
 import { getAttemptResult } from "../lib/attempts-api.js"
 import { redirectExpiredAttemptToResult } from "../lib/expired-attempt-redirect.js"
@@ -54,6 +57,10 @@ type Outcome =
       } | null
     }
   | { readonly status: "error" }
+  /** The connection went away after the tap: same reason as offline. */
+  | { readonly status: "offline" }
+  /** The server refused this phone's journal; the answers are still kept. */
+  | { readonly status: "syncFailed" }
 
 export interface HandInScreenProps {
   readonly attemptId: string
@@ -159,6 +166,14 @@ export function HandInScreen({
         )
       })
       .catch((error: unknown) => {
+        if (error instanceof OfflineError) {
+          setOutcome({
+            status: error.reason === "sync_failed" ? "syncFailed" : "offline",
+          })
+
+          return
+        }
+
         if (!(error instanceof ApiError)) {
           throw error
         }
@@ -292,11 +307,16 @@ export function HandInScreen({
             {t("handIn.pendingSync")}
           </p>
         ) : null}
-        {online ? null : (
+        {online && outcome.status !== "offline" ? null : (
           <p role="alert" className="m-notice" id={offlineReasonId}>
             <Icon name="wifioff" small /> {t("handIn.offlineBlocked")}
           </p>
         )}
+        {outcome.status === "syncFailed" ? (
+          <p role="alert" className="m-alert mt-3.5">
+            {t("offline.syncFailed")}
+          </p>
+        ) : null}
         {outcome.status === "nothingAnswered" ? (
           <div className="mt-3.5">
             <p role="alert" className="text-bad text-sm font-semibold">
@@ -323,7 +343,9 @@ export function HandInScreen({
           onClick={handleSubmit}
           disabled={disabled}
           aria-busy={submitting}
-          aria-describedby={online ? undefined : offlineReasonId}
+          aria-describedby={
+            online && outcome.status !== "offline" ? undefined : offlineReasonId
+          }
         >
           {t(submitting ? "handIn.handingIn" : "runner.handIn")}
         </button>

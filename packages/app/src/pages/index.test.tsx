@@ -870,4 +870,36 @@ describe("library install card", () => {
 
     expect(dismissInstall).toHaveBeenCalled()
   })
+
+  it("shows the saved-on-this-phone note while an offline attempt is waiting to be sent", async () => {
+    await renderLibraryWith({
+      initialPage,
+      student: tom,
+      sync: { pendingAttempts: 1, failed: false },
+    })
+
+    expect(screen.getByRole("status", { name: "" })).toHaveTextContent(
+      "Saved on this phone — it will be sent when you're back online.",
+    )
+  })
+
+  it("shows the adult-help alert when a journal was refused", async () => {
+    await renderLibraryWith({
+      initialPage,
+      student: tom,
+      sync: { pendingAttempts: 0, failed: true },
+    })
+
+    expect(screen.getByText(/Please tell an adult/)).toHaveAttribute(
+      "role",
+      "alert",
+    )
+  })
+
+  it("shows no sync note when nothing is waiting", async () => {
+    await renderLibrary()
+
+    expect(screen.queryByText(/saved on this phone/i)).toBeNull()
+    expect(screen.queryByText(/Please tell an adult/)).toBeNull()
+  })
 })

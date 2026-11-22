@@ -341,5 +341,11 @@
   "offline.needsConnection": "Benötigt eine Verbindung. Speichere den Test für die Offline-Nutzung, solange du online bist.",
   "offline.saveFailed": "{{title}} konnte nicht gespeichert werden. Versuche es erneut.",
   "offline.removeFailed": "{{title}} konnte nicht entfernt werden. Versuche es erneut.",
-  "offline.sizeMb": "{{count}} MB"
+  "offline.sizeMb": "{{count}} MB",
+  "offline.timeUp.waiting": "Wir werten ihn aus, sobald du wieder online bist.",
+  "offline.timeUp.waitingReason": "Dein Ergebnis ist noch nicht fertig.",
+  "offline.timeUp.checkAgain": "Erneut prüfen",
+  "offline.timeUp.failed": "Wir konnten diesen Test nicht senden. Bitte sag einem Erwachsenen Bescheid.",
+  "offline.pendingSync": "Auf diesem Telefon gespeichert – wird gesendet, sobald du wieder online bist.",
+  "offline.syncFailed": "Einige Antworten konnten nicht gesendet werden. Bitte sag einem Erwachsenen Bescheid."
 }

@@ -6,6 +6,7 @@ import { Icon } from "../components/Icon.js"
 import { InstallSheet } from "../components/InstallSheet.js"
 import { LibraryFilter } from "../components/LibraryFilter.js"
 import { LibrarySkeleton } from "../components/LibrarySkeleton.js"
+import { PendingSyncNote } from "../components/PendingSyncNote.js"
 import { LibraryTestCard } from "../components/LibraryTestCard.js"
 import {
   SaveOfflineControl,
@@ -13,6 +14,7 @@ import {
 } from "../components/SaveOfflineControl.js"
 import { ApiError } from "../lib/api-client.js"
 import { useLocalAttemptIds } from "../lib/attempt/use-local-attempts.js"
+import { useSyncStatus } from "../lib/attempt/use-sync-status.js"
 import type { Student, TestCard, TestCatalogPage } from "../lib/api-types.js"
 import { listTests } from "../lib/catalog-api.js"
 import {
@@ -54,7 +56,14 @@ export interface LibraryScreenProps {
   readonly navigate?: (path: string) => void
   readonly renderCardExtras?: (test: TestCard) => ReactNode
   readonly startDisabledReason?: (test: TestCard) => string | null
+  /** Offline work of this student waiting to reach the server. */
+  readonly sync?: {
+    readonly pendingAttempts: number
+    readonly failed: boolean
+  }
 }
+
+const NO_SYNC = { pendingAttempts: 0, failed: false }
 
 const assign = (path: string): void => {
   window.location.assign(path)
@@ -66,6 +75,7 @@ export function LibraryScreen({
   navigate = assign,
   renderCardExtras,
   startDisabledReason,
+  sync = NO_SYNC,
 }: LibraryScreenProps) {
   const { i18n, t } = useTranslation("runner")
   const [tests, setTests] = useState(initialPage.tests)
@@ -168,6 +178,10 @@ export function LibraryScreen({
             ? t("library.caughtUp")
             : t("library.waiting", { count: waiting })}
         </p>
+        <PendingSyncNote
+          pendingAttempts={sync.pendingAttempts}
+          failed={sync.failed}
+        />
 
         {showInstall ? (
           <InstallCard
@@ -466,9 +480,15 @@ function RouteComponent() {
   const data = Route.useLoaderData()
   const offline = useOfflineLibrary()
   const localAttemptIds = useLocalAttemptIds()
+  const status = useSyncStatus()
+  const sync = {
+    pendingAttempts: status.pendingAttempts,
+    failed: status.failedAttemptIds.length > 0,
+  }
 
   return (
     <LibraryWithOffline
+      sync={sync}
       initialPage={data.initialPage}
       student={data.student}
       offline={offline}

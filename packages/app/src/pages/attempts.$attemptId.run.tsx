@@ -18,7 +18,7 @@ import {
   type RunPrimaryAction,
 } from "../components/RunActionBar.js"
 import { RunMenuSheet } from "../components/RunMenuSheet.js"
-import { RunTopBar } from "../components/RunTopBar.js"
+import { isLowTime, RunTopBar } from "../components/RunTopBar.js"
 import type { SaveStateProps } from "../components/SaveState.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
 import { ApiError } from "../lib/api-client.js"
@@ -212,6 +212,33 @@ export function RunScreen({
     state: "saved",
   })
   const [retryableFlushFailure, setRetryableFlushFailure] = useState(false)
+  const lowTimeAnnouncementRef = useRef<HTMLParagraphElement>(null)
+
+  // "One minute left." is spoken once, through RunTopBar's live region. An
+  // open sheet aria-hides the whole runner (Radix hides every sibling of its
+  // portal, all the way up to <body>), so text written into that region
+  // while a sheet is open would never be read. This effect runs after the
+  // commit in which the sheet unmounted and Radix lifted its aria-hidden, so
+  // the text lands while the region is exposed. The region's own text is the
+  // "already said" flag: written once, never cleared, so announced once. It
+  // is an imperative write to the assistive-technology channel, not React
+  // state, which is also why React never renders children into it.
+  useEffect(() => {
+    const region = lowTimeAnnouncementRef.current
+
+    if (
+      region?.textContent !== "" ||
+      panel !== null ||
+      remainingMs === null ||
+      remainingMs <= 0 ||
+      !isLowTime(remainingMs)
+    ) {
+      return
+    }
+
+    // `region` is non-null here: a null one fails the `!== ""` guard.
+    region.textContent = t("runner.oneMinuteLeft")
+  }, [panel, remainingMs, t])
 
   // A new question moves focus to its title (prototype `data-qtitle`), so a
   // screen reader starts reading the new question rather than staying on
@@ -980,6 +1007,7 @@ export function RunScreen({
         total={entries.length}
         menuExpanded={panel === "menu"}
         menuTriggerRef={menuTriggerRef}
+        announcementRef={lowTimeAnnouncementRef}
         onOpenMenu={() => {
           setPanel((current) => (current === "menu" ? null : "menu"))
         }}

@@ -1,5 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { createRef } from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
 import { RunTopBar } from "./RunTopBar.js"
@@ -30,30 +31,41 @@ describe("RunTopBar", () => {
     ).toHaveTextContent("02:05")
   })
 
-  it("marks the timer low at one minute and announces it once", () => {
+  it("marks the timer low at one minute with an icon, not colour alone", () => {
     render(<RunTopBar {...props} remainingMs={59_000} />)
 
-    expect(
-      screen.getByRole("timer", { name: "Time remaining" }),
-    ).toHaveAttribute("data-low", "true")
-    // Spoken once through a polite live region; the ticking timer itself is
-    // never announced (role="timer" is aria-live off by default).
-    expect(screen.getByText("One minute left.")).toHaveAttribute(
-      "aria-live",
-      "polite",
-    )
-    expect(
-      screen.getByRole("timer", { name: "Time remaining" }),
-    ).not.toHaveAttribute("aria-live")
+    const timer = screen.getByRole("timer", { name: "Time remaining" })
+
+    expect(timer).toHaveAttribute("data-low", "true")
+    expect(timer.querySelector("svg")).not.toBeNull()
+    // The ticking timer itself is never announced (role="timer" is
+    // aria-live off by default).
+    expect(timer).not.toHaveAttribute("aria-live")
   })
 
   it("is not low with exactly 61 seconds left", () => {
     render(<RunTopBar {...props} remainingMs={61_000} />)
 
-    expect(
-      screen.getByRole("timer", { name: "Time remaining" }),
-    ).not.toHaveAttribute("data-low")
-    expect(screen.queryByText("One minute left.")).toBeNull()
+    const timer = screen.getByRole("timer", { name: "Time remaining" })
+
+    expect(timer).not.toHaveAttribute("data-low")
+    expect(timer.querySelector("svg")).toBeNull()
+  })
+
+  it("hands the page an empty polite live region for the one-minute warning", () => {
+    const announcementRef = createRef<HTMLParagraphElement>()
+
+    render(
+      <RunTopBar
+        {...props}
+        remainingMs={59_000}
+        announcementRef={announcementRef}
+      />,
+    )
+
+    // RunTopBar never writes it: the page does, once no sheet hides it.
+    expect(announcementRef.current).toHaveAttribute("aria-live", "polite")
+    expect(announcementRef.current?.textContent).toBe("")
   })
 
   it("omits the timer before the clock has started", () => {

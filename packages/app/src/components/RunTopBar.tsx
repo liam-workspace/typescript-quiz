@@ -7,6 +7,11 @@ import { SaveState, type SaveStateProps } from "./SaveState.js"
 
 const LOW_MS = 60_000
 
+/** The prototype's low-time threshold: one minute or less, clock running. */
+export function isLowTime(remainingMs: number | null): boolean {
+  return remainingMs !== null && remainingMs <= LOW_MS
+}
+
 export interface RunTopBarProps {
   readonly sectionType: SectionType
   readonly saveState: SaveStateProps
@@ -15,6 +20,12 @@ export interface RunTopBarProps {
   readonly total: number
   readonly menuExpanded: boolean
   readonly menuTriggerRef?: RefObject<HTMLButtonElement | null>
+  /**
+   * The polite live region for "One minute left.". Rendered empty and
+   * written by the page: an open sheet aria-hides this whole subtree, so only
+   * the page knows when the message can actually be heard (see run.tsx).
+   */
+  readonly announcementRef?: RefObject<HTMLParagraphElement | null>
   readonly onOpenMenu: () => void
 }
 
@@ -26,11 +37,11 @@ export function RunTopBar({
   total,
   menuExpanded,
   menuTriggerRef,
+  announcementRef,
   onOpenMenu,
 }: RunTopBarProps) {
   const { t } = useTranslation("runner")
-  const low = remainingMs !== null && remainingMs <= LOW_MS
-  const announceLow = remainingMs !== null && remainingMs > 0 && low
+  const low = isLowTime(remainingMs)
 
   return (
     <header className="m-runtop">
@@ -77,12 +88,16 @@ export function RunTopBar({
         <i style={{ width: `${total > 0 ? (100 * answered) / total : 0}%` }} />
       </div>
       {/* The timer itself is role="timer" (aria-live off), so its every-second
-          text is never read out; this region speaks once, when the minute
-          mark is crossed. A bare live region rather than role="status", so
-          the save chip stays the screen's one status. */}
-      <p aria-live="polite" aria-atomic="true" className="sr-only">
-        {announceLow ? t("runner.oneMinuteLeft") : ""}
-      </p>
+          text is never read out. This always-present, initially empty region
+          is where the page writes the one-minute warning. A bare live region
+          rather than role="status", so the save chip stays the screen's one
+          status. */}
+      <p
+        ref={announcementRef}
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      />
     </header>
   )
 }

@@ -1689,15 +1689,23 @@
   }
 
   /* ───── Run chrome — prototype vRun top bar / action bar ───── */
+  /*
+   * Safe-area geometry (one rule app-wide): `body` already pads every inset,
+   * so bars in the page flow never add inset padding of their own -- that
+   * would leave an empty inset-tall strip inside the bar. Sticky offsets are
+   * measured from the viewport edge, not from body's padding box, so the
+   * sticky run bars instead stop `env(safe-area-inset-*)` short of that edge:
+   * at rest they sit exactly on body's padding line, and while scrolling they
+   * stay clear of the notch / home indicator. Only `position: fixed` chrome
+   * (the tab bar) pads its own inset, because it is outside body's flow.
+   */
   .m-runtop {
     position: sticky;
-    top: 0;
+    top: env(safe-area-inset-top, 0px);
     z-index: 40;
     border-bottom: 1px solid var(--color-line);
     background: var(--color-paper);
     padding: 6px 10px 0;
-    /* Sticky at the viewport edge, under a translucent iOS status bar. */
-    padding-top: max(6px, env(safe-area-inset-top));
   }
   .m-runtop .m-row {
     min-height: 48px;
@@ -1731,9 +1739,8 @@
   }
   .m-actionbar[data-sticky="true"] {
     position: sticky;
-    bottom: 0;
+    bottom: env(safe-area-inset-bottom, 0px);
     z-index: 40;
-    padding-bottom: max(10px, env(safe-area-inset-bottom));
   }
   .m-run-body {
     padding-top: 12px;

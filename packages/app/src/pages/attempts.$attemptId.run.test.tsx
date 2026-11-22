@@ -842,6 +842,46 @@ describe("RunScreen", () => {
       expect(screen.getByText("One minute left.")).toBeInTheDocument()
     })
 
+    // An open sheet aria-hides the whole runner (Radix hides every sibling of
+    // its portal), so a live region inside it would be swallowed. The page
+    // holds the message back until no sheet is open, then keeps it: the
+    // region's text changes exactly once, so it is spoken exactly once.
+    it("holds the one-minute announcement while a sheet is open and says it once after", () => {
+      const clock = new TestClock(Date.parse("2026-08-28T11:00:00.000Z"))
+      renderRunScreen(
+        {
+          ...listeningEnvelope,
+          expiresAt: "2026-08-28T10:01:01.000Z",
+          serverTime: "2026-08-28T10:00:00.000Z",
+        },
+        undefined,
+        clock.read.bind(clock),
+      )
+      const navigatorTrigger = screen.getByRole("button", {
+        name: "Open the question navigator",
+      })
+      const announcement = (): HTMLElement | null =>
+        document.querySelector<HTMLElement>("p[aria-live='polite']")
+
+      fireEvent.click(navigatorTrigger)
+      expect(screen.getByRole("dialog", { name: "Questions" })).toBeVisible()
+
+      advanceClock(clock, 2_000)
+
+      expect(announcement()?.textContent).toBe("")
+
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" })
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+      expect(announcement()).toHaveTextContent("One minute left.")
+      expect(announcement()?.closest("[aria-hidden='true']")).toBeNull()
+
+      fireEvent.click(navigatorTrigger)
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" })
+
+      expect(announcement()).toHaveTextContent("One minute left.")
+    })
+
     it("stops reading the clock after the runner unmounts", () => {
       const clock = new TestClock(Date.parse("2026-08-28T11:00:00.000Z"))
       const { unmount } = renderRunScreen(

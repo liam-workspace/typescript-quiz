@@ -29,7 +29,10 @@ import type { SaveStateProps } from "../components/SaveState.js"
 import { TimeUpView } from "../components/TimeUpView.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
 import { ApiError } from "../lib/api-client.js"
-import type { AttemptGateway } from "../lib/attempt/attempt-gateway.js"
+import {
+  OfflineError,
+  type AttemptGateway,
+} from "../lib/attempt/attempt-gateway.js"
 import { attemptGateway } from "../lib/attempt/gateway-selector.js"
 import { createServerCountdown, type TimeSource } from "../lib/countdown.js"
 import { redirectExpiredAttemptToResult } from "../lib/expired-attempt-redirect.js"
@@ -667,19 +670,25 @@ export function RunScreen({
       new Date(),
     )
 
-    pendingAnswerWritesRef.current.add(durableWrite)
+    // What finishing the section must wait for is the WHOLE write: the
+    // queue record AND the gateway's note of it (the local gateway journals
+    // the answer there). Waiting on the queue write alone let a quick Finish
+    // journal `finish_section` before the answer it follows.
+    const recorded = durableWrite.then((queued) =>
+      gateway.noteAnswer(attemptId, queued),
+    )
 
-    void durableWrite
-      .then(async (queued) => {
-        await gateway.noteAnswer(attemptId, queued)
+    pendingAnswerWritesRef.current.add(recorded)
 
-        return gateway.flushAnswers({
+    void recorded
+      .then(() =>
+        gateway.flushAnswers({
           controller,
           queue,
           attemptId,
           sectionId: section.id,
-        })
-      })
+        }),
+      )
       .then((result) => {
         // Defect B5 fix: a terminal per-item rejection (spec §5 rule 5's
         // "stop dead") used to reach here and be thrown away -- the queue
@@ -703,7 +712,7 @@ export function RunScreen({
         // is never left as an unhandled promise rejection.
       })
       .finally(() => {
-        pendingAnswerWritesRef.current.delete(durableWrite)
+        pendingAnswerWritesRef.current.delete(recorded)
       })
   }
 
@@ -722,6 +731,15 @@ export function RunScreen({
       setPlayState({ status: "granted", mediaUrl: grant.mediaUrl })
       setAudioProgress(0)
     } catch (error) {
+      if (error instanceof OfflineError) {
+        // Nothing was claimed (the local gateway only spends a play when the
+        // audio is on this phone), so this is the same honest "the recording
+        // did not come through" state the audio element's own error produces.
+        setPlayState({ status: "failed" })
+
+        return
+      }
+
       if (!(error instanceof ApiError)) {
         throw error
       }

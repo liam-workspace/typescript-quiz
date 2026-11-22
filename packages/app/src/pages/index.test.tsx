@@ -136,6 +136,7 @@ async function renderLibraryWith(
   props: Omit<LibraryScreenProps, "student"> & {
     readonly student?: Student | null
     readonly offline?: OfflineLibraryApi
+    readonly localAttemptIds?: ReadonlySet<string>
   },
 ) {
   vi.stubGlobal("scrollTo", vi.fn())
@@ -144,13 +145,14 @@ async function renderLibraryWith(
     getParentRoute: () => rootRoute,
     path: "/",
     component: () => {
-      const { offline, ...screenProps } = props
+      const { offline, localAttemptIds, ...screenProps } = props
 
       return offline ? (
         <LibraryWithOffline
           {...screenProps}
           student={props.student ?? null}
           offline={offline}
+          localAttemptIds={localAttemptIds}
         />
       ) : (
         <LibraryScreen {...screenProps} student={props.student ?? null} />
@@ -735,6 +737,30 @@ describe("library offline saving", () => {
     expect(
       screen.queryByRole("button", { name: /Save .* for offline use/u }),
     ).toBeNull()
+  })
+
+  it("offline: Continue is enabled only when this phone holds the attempt's state", async () => {
+    const held = activeTest.inProgressAttemptId ?? ""
+
+    await renderLibraryWith({
+      initialPage: { ...initialPage, tests: [activeTest] },
+      student: tom,
+      offline: { ...fakeOffline, online: false },
+      localAttemptIds: new Set(["some-other-attempt"]),
+    })
+
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled()
+
+    cleanup()
+    await renderLibraryWith({
+      initialPage: { ...initialPage, tests: [activeTest] },
+      student: tom,
+      offline: { ...fakeOffline, online: false },
+      localAttemptIds: new Set([held]),
+    })
+
+    expect(screen.getByRole("link", { name: "Continue" })).toBeInTheDocument()
+    expect(screen.queryByText(/Needs a connection/u)).toBeNull()
   })
 
   it("online: Continue stays an enabled link with no reason", async () => {

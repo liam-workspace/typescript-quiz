@@ -88,4 +88,38 @@ describe("startTestAndRulesPath", () => {
     )
     expect(startAttempt).not.toHaveBeenCalled()
   })
+
+  it("offline, the first section comes from the attempt itself (the brief endpoint is not cached)", async () => {
+    vi.mocked(getTest).mockRejectedValue(new TypeError("Failed to fetch"))
+    const start = vi
+      .spyOn(attemptGateway, "start")
+      .mockResolvedValue({ ...attempt, id: "local-1" })
+    const load = vi.spyOn(attemptGateway, "loadEnvelope").mockResolvedValue({
+      sections: [{ id: "s1" }, { id: "s2" }],
+    } as unknown as Awaited<ReturnType<typeof attemptGateway.loadEnvelope>>)
+
+    try {
+      await expect(startTestAndRulesPath("practice-3")).resolves.toBe(
+        "/attempts/local-1/sections/s1/rules",
+      )
+      expect(load).toHaveBeenCalledWith("local-1")
+    } finally {
+      start.mockRestore()
+      load.mockRestore()
+    }
+  })
+
+  it("a server refusal of the brief is not mistaken for being offline", async () => {
+    vi.mocked(getTest).mockRejectedValue(new Error("test_not_found"))
+    const start = vi.spyOn(attemptGateway, "start")
+
+    try {
+      await expect(startTestAndRulesPath("practice-3")).rejects.toThrow(
+        "test_not_found",
+      )
+      expect(start).not.toHaveBeenCalled()
+    } finally {
+      start.mockRestore()
+    }
+  })
 })

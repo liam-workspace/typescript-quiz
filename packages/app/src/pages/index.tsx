@@ -12,6 +12,7 @@ import {
   type SaveOfflineState,
 } from "../components/SaveOfflineControl.js"
 import { ApiError } from "../lib/api-client.js"
+import { useLocalAttemptIds } from "../lib/attempt/use-local-attempts.js"
 import type { Student, TestCard, TestCatalogPage } from "../lib/api-types.js"
 import { listTests } from "../lib/catalog-api.js"
 import {
@@ -404,7 +405,13 @@ export function offlineStateFor(
 export type LibraryWithOfflineProps = Omit<
   LibraryScreenProps,
   "renderCardExtras" | "startDisabledReason"
-> & { readonly offline: OfflineLibraryApi }
+> & {
+  readonly offline: OfflineLibraryApi
+  /** The signed-in student's attempts this phone holds state for (Continue offline). */
+  readonly localAttemptIds?: ReadonlySet<string>
+}
+
+const NO_LOCAL_ATTEMPTS: ReadonlySet<string> = new Set()
 
 /**
  * The library with the save-offline row and the offline Start gate plugged in
@@ -414,6 +421,7 @@ export type LibraryWithOfflineProps = Omit<
  */
 export function LibraryWithOffline({
   offline,
+  localAttemptIds = NO_LOCAL_ATTEMPTS,
   ...screenProps
 }: LibraryWithOfflineProps) {
   const { t } = useTranslation("runner")
@@ -425,8 +433,12 @@ export function LibraryWithOffline({
         const gate = startGate({
           online: offline.online,
           saved: offline.saved.has(test.slug),
-          // Task 21 supplies the real local-state lookup.
-          continuableLocally: false,
+          // A timed attempt continues offline only on a phone that loaded it
+          // (spec §13.1 #5); an untimed one this phone never held would be
+          // a second start the server refuses as a conflict.
+          continuableLocally:
+            test.inProgressAttemptId !== null &&
+            localAttemptIds.has(test.inProgressAttemptId),
           isContinue: test.inProgressAttemptId !== null,
           activeOtherTitle: null,
         })
@@ -453,12 +465,14 @@ export function LibraryWithOffline({
 function RouteComponent() {
   const data = Route.useLoaderData()
   const offline = useOfflineLibrary()
+  const localAttemptIds = useLocalAttemptIds()
 
   return (
     <LibraryWithOffline
       initialPage={data.initialPage}
       student={data.student}
       offline={offline}
+      localAttemptIds={localAttemptIds}
     />
   )
 }

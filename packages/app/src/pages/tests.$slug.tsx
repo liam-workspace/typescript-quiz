@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiError } from "../lib/api-client.js"
+import { OfflineError } from "../lib/attempt/attempt-gateway.js"
 import { attemptGateway } from "../lib/attempt/gateway-selector.js"
 import type { TestBrief } from "../lib/api-types.js"
 import { getTest } from "../lib/catalog-api.js"
@@ -16,7 +17,9 @@ export function TestBriefScreen({ brief, navigate }: TestBriefScreenProps) {
   const { t } = useTranslation("runner")
   const startingRef = useRef(false)
   const [starting, setStarting] = useState(false)
-  const [startFailed, setStartFailed] = useState(false)
+  const [startFailed, setStartFailed] = useState<
+    false | "failed" | "needsConnection"
+  >(false)
   const durationMinutes = Math.round(brief.durationSeconds / 60)
   const attemptNumber = brief.attemptCount + 1
   const firstSection = firstSectionOf(brief)
@@ -34,14 +37,19 @@ export function TestBriefScreen({ brief, navigate }: TestBriefScreenProps) {
     setStartFailed(false)
 
     try {
+      // The hint matters offline: an attempt already in progress on the
+      // server (even an untimed one) may only be continued, never started
+      // again locally -- the server would refuse that journal as a conflict.
       const attempt = await attemptGateway.start(brief.slug, {
-        inProgressAttemptId: null,
+        inProgressAttemptId: brief.inProgressAttemptId,
       })
       navigate(sectionRulesPath(attempt, firstSection.id))
-    } catch {
+    } catch (error) {
       startingRef.current = false
       setStarting(false)
-      setStartFailed(true)
+      setStartFailed(
+        error instanceof OfflineError ? "needsConnection" : "failed",
+      )
     }
   }
 
@@ -117,7 +125,11 @@ export function TestBriefScreen({ brief, navigate }: TestBriefScreenProps) {
         </p>
         {startFailed ? (
           <p role="alert" className="text-bad mt-3 text-sm font-semibold">
-            {t("brief.startError")}
+            {t(
+              startFailed === "needsConnection"
+                ? "offline.needsConnection"
+                : "brief.startError",
+            )}
           </p>
         ) : null}
       </main>

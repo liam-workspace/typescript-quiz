@@ -12,6 +12,8 @@ const base: TestCard = {
   inProgressAttemptId: null,
   attemptCount: 0,
   bestAttempt: null,
+  testVersionId: "ver-1",
+  mediaBytes: 0,
 }
 const fresh = { ...base, id: "fresh" }
 const finished = { ...base, id: "finished", attemptCount: 2 }

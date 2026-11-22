@@ -19,6 +19,8 @@ const fresh: TestCard = {
   inProgressAttemptId: null,
   attemptCount: 0,
   bestAttempt: null,
+  testVersionId: "ver-1",
+  mediaBytes: 0,
 }
 const finished: TestCard = {
   ...fresh,

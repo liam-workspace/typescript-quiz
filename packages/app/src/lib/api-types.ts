@@ -79,6 +79,8 @@ export interface TestCard {
   inProgressAttemptId: string | null
   attemptCount: number
   bestAttempt: AttemptRef | null
+  testVersionId: string
+  mediaBytes: number
 }
 
 export interface StudentSummary {
@@ -281,6 +283,40 @@ export interface RunnerEnvelope {
   currentQuestionId: string | null
   sections: RunnerSection[]
   responses: RecordedResponse[]
+}
+
+export interface OfflineMedia {
+  key: string
+  stimulusId: string
+  kind: "audio" | "image"
+  mimeType: string
+  bytes: number
+  capped: boolean
+  url: string
+}
+
+// A brief section plus its runner content. Everything that is per-attempt
+// state on `RunnerSection` (status, completedAt, expiresAt) is absent: a bundle
+// is content, an attempt is state.
+export interface OfflineBundleSection
+  extends Omit<RunnerSection, "status" | "completedAt" | "expiresAt"> {
+  ordinal: number
+  playback: PlaybackRules | null
+}
+
+// `GET /tests/:slug/offline-bundle`. Capped stimuli in `sections[].groups`
+// carry no `mediaUrl`: match media to a stimulus through `media[].stimulusId`.
+export interface OfflineBundle {
+  slug: string
+  testVersionId: string
+  version: number
+  title: string
+  level: StudentLevel
+  durationSeconds: number
+  sections: OfflineBundleSection[]
+  media: OfflineMedia[]
+  totalBytes: number
+  urlsExpireAt: string
 }
 
 // Mirrors openapi.yaml `ResponseSnapshotItem` -- the shape `AnswerQueue`'s

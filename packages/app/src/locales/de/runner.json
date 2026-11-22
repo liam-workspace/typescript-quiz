@@ -347,5 +347,10 @@
   "offline.timeUp.checkAgain": "Erneut prüfen",
   "offline.timeUp.failed": "Wir konnten diesen Test nicht senden. Bitte sag einem Erwachsenen Bescheid.",
   "offline.pendingSync": "Auf diesem Telefon gespeichert – wird gesendet, sobald du wieder online bist.",
-  "offline.syncFailed": "Einige Antworten konnten nicht gesendet werden. Bitte sag einem Erwachsenen Bescheid."
+  "offline.syncFailed": "Einige Antworten konnten nicht gesendet werden. Bitte sag einem Erwachsenen Bescheid.",
+  "profile.reminders.error.failed": "Erinnerungen konnten nicht eingeschaltet werden. Bitte versuche es noch einmal.",
+  "profile.reminders.error.offline": "Du bist offline. Verbinde dich mit dem Internet, um Erinnerungen einzuschalten.",
+  "profile.reminders.error.notConfigured": "Erinnerungen sind gerade nicht verfügbar.",
+  "profile.reminders.error.conflict": "Eine andere Anmeldung hat gerade Erinnerungen auf diesem Gerät eingerichtet. Bitte versuche es noch einmal.",
+  "profile.reminders.error.disable": "Erinnerungen konnten nicht ausgeschaltet werden. Bitte versuche es noch einmal."
 }

@@ -347,5 +347,10 @@
   "offline.timeUp.checkAgain": "Comprobar de nuevo",
   "offline.timeUp.failed": "No pudimos enviar esta prueba. Díselo a un adulto.",
   "offline.pendingSync": "Guardado en este teléfono: se enviará cuando vuelvas a estar en línea.",
-  "offline.syncFailed": "No se pudieron enviar algunas respuestas. Díselo a un adulto."
+  "offline.syncFailed": "No se pudieron enviar algunas respuestas. Díselo a un adulto.",
+  "profile.reminders.error.failed": "No se pudieron activar los recordatorios. Inténtalo de nuevo.",
+  "profile.reminders.error.offline": "No tienes conexión. Conéctate a internet para activar los recordatorios.",
+  "profile.reminders.error.notConfigured": "Los recordatorios no están disponibles ahora mismo.",
+  "profile.reminders.error.conflict": "Otro inicio de sesión estaba configurando recordatorios en este dispositivo. Inténtalo de nuevo.",
+  "profile.reminders.error.disable": "No se pudieron desactivar los recordatorios. Inténtalo de nuevo."
 }

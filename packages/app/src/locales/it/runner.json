@@ -347,5 +347,10 @@
   "offline.timeUp.checkAgain": "Controlla di nuovo",
   "offline.timeUp.failed": "Non siamo riusciti a inviare questo test. Avvisa un adulto.",
   "offline.pendingSync": "Salvato su questo telefono: verrà inviato quando sarai di nuovo online.",
-  "offline.syncFailed": "Alcune risposte non sono state inviate. Avvisa un adulto."
+  "offline.syncFailed": "Alcune risposte non sono state inviate. Avvisa un adulto.",
+  "profile.reminders.error.failed": "Non è stato possibile attivare i promemoria. Riprova.",
+  "profile.reminders.error.offline": "Sei offline. Connettiti a internet per attivare i promemoria.",
+  "profile.reminders.error.notConfigured": "I promemoria non sono disponibili al momento.",
+  "profile.reminders.error.conflict": "Un altro accesso stava configurando i promemoria su questo dispositivo. Riprova.",
+  "profile.reminders.error.disable": "Non è stato possibile disattivare i promemoria. Riprova."
 }

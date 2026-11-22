@@ -1,13 +1,27 @@
-import { cleanup, screen, waitFor, within } from "@testing-library/react"
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import i18n from "../i18n.js"
+import { ApiError } from "../lib/api-client.js"
+import {
+  createReminders,
+  type PushEnvironment,
+  type RemindersApi,
+  type RemindersDeps,
+} from "../lib/reminders.js"
+import { toastStore } from "../lib/toast.js"
+import { fakePushBrowser } from "../test/fake-push.js"
 import type { Student } from "../lib/api-types.js"
 import type { PwaSnapshot } from "../lib/pwa/pwa-store.js"
 import { renderWithRouter } from "../test/renderWithRouter.js"
 import { OfflineStorageList } from "../components/OfflineStorageList.js"
 import type { OfflineTestRecord } from "../lib/offline/offline-store.js"
-import { ProfileScreen, SavedTestsList } from "./profile.js"
+import {
+  ProfileScreen,
+  SavedTestsList,
+  useProfileReminders,
+  type ProfileReminders,
+} from "./profile.js"
 
 const student: Student = {
   id: "s1",
@@ -25,6 +39,21 @@ const browserTab: PwaSnapshot = {
   updateReady: false,
 }
 
+function reminderProps(
+  overrides: Partial<ProfileReminders> = {},
+): ProfileReminders {
+  return {
+    state: "unsupported",
+    busy: false,
+    problem: null,
+    sheetOpen: false,
+    onToggle: () => undefined,
+    onAllow: () => undefined,
+    onDecline: () => undefined,
+    ...overrides,
+  }
+}
+
 function renderProfile(
   overrides: Partial<Parameters<typeof ProfileScreen>[0]> = {},
 ) {
@@ -32,7 +61,7 @@ function renderProfile(
     student,
     pwa: browserTab,
     version: "4.1.0",
-    reminders: { state: "unsupported", busy: false, onToggle: () => undefined },
+    reminders: reminderProps(),
     offlineStorage: (
       <OfflineStorageList items={[]} onRemove={() => undefined} />
     ),
@@ -103,7 +132,7 @@ describe("ProfileScreen", () => {
     const user = userEvent.setup()
     const onToggle = vi.fn()
 
-    renderProfile({ reminders: { state: "off", busy: false, onToggle } })
+    renderProfile({ reminders: reminderProps({ state: "off", onToggle }) })
 
     await user.click(
       await screen.findByRole("switch", { name: "Practice reminders" }),
@@ -216,5 +245,388 @@ describe("ProfileScreen", () => {
       }),
     )
     expect(onSignOut).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * The route's real wiring (useProfileReminders → useReminders → the real
+ * reminders library) over an in-memory browser and server: only Notification,
+ * PushManager and the HTTP calls are fake.
+ */
+describe("Profile reminders (integration)", () => {
+  const toast = vi.fn<typeof toastStore.show>()
+
+  beforeEach(() => {
+    vi.spyOn(toastStore, "show").mockImplementation(toast)
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+    toast.mockReset()
+  })
+
+  function world(
+    over: {
+      browser?: ReturnType<typeof fakePushBrowser>
+      push?: PushEnvironment | null
+      key?: string | null
+      platform?: "ios" | "android"
+      standalone?: boolean
+      put?: RemindersDeps["put"]
+      remove?: RemindersDeps["remove"]
+    } = {},
+  ) {
+    const browser = over.browser ?? fakePushBrowser()
+    let marker: string | null = null
+    const deps = {
+      snapshot: () => ({
+        platform: over.platform ?? "android",
+        standalone: over.standalone ?? false,
+        userAgent:
+          over.platform === "ios"
+            ? "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) Version/17.2 Mobile/15E148 Safari/604.1"
+            : "Mozilla/5.0 (Linux; Android 14) Chrome/130.0 Mobile Safari/537.36",
+      }),
+      vapidKey: () => (over.key === undefined ? "AQAB" : over.key),
+      push: () => (over.push === undefined ? browser.push : over.push),
+      put:
+        over.put ?? vi.fn<RemindersDeps["put"]>().mockResolvedValue(undefined),
+      remove:
+        over.remove ??
+        vi.fn<RemindersDeps["remove"]>().mockResolvedValue(undefined),
+      timezone: () => "Europe/Paris",
+      locale: () => "en",
+      marker: {
+        get: () => marker,
+        set: (value: string | null) => {
+          marker = value
+        },
+      },
+      student: () => "s1",
+      token: () => "bearer",
+      removeWithToken: vi.fn<RemindersDeps["removeWithToken"]>(),
+    } satisfies RemindersDeps
+    const api = createReminders(deps)
+
+    return { api, deps, browser }
+  }
+
+  function Harness({ api }: { readonly api: RemindersApi }) {
+    const reminders = useProfileReminders(api)
+
+    return (
+      <ProfileScreen
+        student={student}
+        pwa={browserTab}
+        version="4.1.0"
+        reminders={reminders}
+        offlineStorage={null}
+        onInstall={() => undefined}
+        onRefresh={() => undefined}
+        onSignOut={() => undefined}
+      />
+    )
+  }
+
+  function renderWith(api: RemindersApi) {
+    return renderWithRouter(<Harness api={api} />)
+  }
+
+  const reminderSwitch = () =>
+    screen.findByRole("switch", { name: "Practice reminders" })
+
+  async function turnOn(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await reminderSwitch())
+    await user.click(
+      within(
+        screen.getByRole("dialog", { name: "Allow reminders?" }),
+      ).getByRole("button", { name: "Allow" }),
+    )
+  }
+
+  it("switch → soft ask → Allow → browser prompt → subscribe → PUT: on, with a toast", async () => {
+    const user = userEvent.setup()
+    const { api, deps, browser } = world()
+
+    renderWith(api)
+    await user.click(await reminderSwitch())
+
+    expect(
+      screen.getByRole("dialog", { name: "Allow reminders?" }),
+    ).toBeInTheDocument()
+    expect(browser.push.requestPermission).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole("button", { name: "Allow" }))
+
+    await waitFor(async () => {
+      expect(await reminderSwitch()).toBeChecked()
+    })
+    expect(await reminderSwitch()).toHaveAccessibleDescription(
+      "Daily at 4:30 pm",
+    )
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    expect(deps.put).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hour: 16,
+        minute: 30,
+        timezone: "Europe/Paris",
+      }),
+    )
+    expect(browser.live()).not.toBeNull()
+    expect(toast).toHaveBeenCalledWith("Reminders turned on.", "bell")
+  })
+
+  it("Don't allow only closes the soft ask: still off, still usable, no prompt, no toast", async () => {
+    const user = userEvent.setup()
+    const { api, browser } = world()
+
+    renderWith(api)
+    await user.click(await reminderSwitch())
+    await user.click(screen.getByRole("button", { name: "Don't allow" }))
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    expect(await reminderSwitch()).not.toBeChecked()
+    expect(await reminderSwitch()).toBeEnabled()
+    expect(await reminderSwitch()).toHaveAccessibleDescription("Off")
+    expect(browser.push.requestPermission).not.toHaveBeenCalled()
+    expect(toast).not.toHaveBeenCalled()
+  })
+
+  it("a denial at the real browser prompt shows the blocked reason and 'Reminders blocked.'", async () => {
+    const user = userEvent.setup()
+    const { api, deps } = world({
+      browser: fakePushBrowser({ prompt: "denied" }),
+    })
+
+    renderWith(api)
+    await turnOn(user)
+
+    await waitFor(async () => {
+      expect(await reminderSwitch()).toBeDisabled()
+    })
+    expect(await reminderSwitch()).toHaveAccessibleDescription(
+      "Blocked in your browser settings.",
+    )
+    expect(deps.put).not.toHaveBeenCalled()
+    expect(toast).toHaveBeenCalledWith("Reminders blocked.", "bell")
+  })
+
+  it.each([
+    [
+      "the server has no VAPID keys (503)",
+      new ApiError({
+        type: "reminders_not_configured",
+        title: "x",
+        status: 503,
+      }),
+      "Reminders aren't available right now.",
+    ],
+    [
+      "the network is down",
+      new TypeError("Failed to fetch"),
+      "You're offline. Connect to the internet to turn reminders on.",
+    ],
+    [
+      "another sign-in raced it (409)",
+      new ApiError({
+        type: "reminder_endpoint_conflict",
+        title: "x",
+        status: 409,
+      }),
+      "Another sign-in was setting up reminders on this device. Please try again.",
+    ],
+    [
+      "the server failed (500)",
+      new ApiError({ type: "internal", title: "x", status: 500 }),
+      "Reminders couldn't be turned on. Please try again.",
+    ],
+  ])(
+    "when the PUT fails because %s: the browser subscription is rolled back, the switch is off and the reason is shown",
+    async (_name, error, message) => {
+      const user = userEvent.setup()
+      const { api, browser } = world({
+        put: vi.fn<RemindersDeps["put"]>().mockRejectedValue(error),
+      })
+
+      renderWith(api)
+      await turnOn(user)
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(message)
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+      expect(await reminderSwitch()).not.toBeChecked()
+      expect(await reminderSwitch()).toBeEnabled()
+      expect(browser.push.subscribe).toHaveBeenCalledOnce()
+      expect(browser.live()).toBeNull()
+      expect(toast).not.toHaveBeenCalled()
+    },
+  )
+
+  it("a push service the server does not allow (400) reads as 'this browser can't', not a generic error", async () => {
+    const user = userEvent.setup()
+    const { api, browser } = world({
+      put: vi
+        .fn<RemindersDeps["put"]>()
+        .mockRejectedValue(
+          new ApiError({ type: "invalid_body", title: "x", status: 400 }),
+        ),
+    })
+
+    renderWith(api)
+    await turnOn(user)
+
+    await waitFor(async () => {
+      expect(await reminderSwitch()).toBeDisabled()
+    })
+    expect(await reminderSwitch()).toHaveAccessibleDescription(
+      "This browser can't send reminders.",
+    )
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    expect(browser.live()).toBeNull()
+    expect(toast).toHaveBeenCalledWith(
+      "This browser can't send reminders.",
+      "bell",
+    )
+  })
+
+  it.each([
+    ["the permission API throws", "requestPermission"],
+    ["pushManager.subscribe rejects", "subscribe"],
+  ] as const)(
+    "when %s: off, nothing subscribed, a generic retry message",
+    async (_name, method) => {
+      const user = userEvent.setup()
+      const browser = fakePushBrowser()
+
+      browser.push[method].mockRejectedValue(
+        new DOMException("nope", "NotAllowedError"),
+      )
+      const { api, deps } = world({ browser })
+
+      renderWith(api)
+      await turnOn(user)
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Reminders couldn't be turned on. Please try again.",
+      )
+      expect(await reminderSwitch()).not.toBeChecked()
+      expect(deps.put).not.toHaveBeenCalled()
+      expect(browser.live()).toBeNull()
+    },
+  )
+
+  it("turning it off DELETEs, unsubscribes the browser and toasts 'Reminders turned off.'", async () => {
+    const user = userEvent.setup()
+    const { api, deps, browser } = world({
+      browser: fakePushBrowser({ permission: "granted", subscribed: true }),
+    })
+
+    renderWith(api)
+    await waitFor(async () => {
+      expect(await reminderSwitch()).toBeChecked()
+    })
+    await user.click(await reminderSwitch())
+
+    await waitFor(async () => {
+      expect(await reminderSwitch()).not.toBeChecked()
+    })
+    expect(deps.remove).toHaveBeenCalledOnce()
+    expect(browser.live()).toBeNull()
+    expect(toast).toHaveBeenCalledWith("Reminders turned off.", "bell")
+  })
+
+  it("turning it off while offline still stops delivery in the browser", async () => {
+    const user = userEvent.setup()
+    const { api, browser } = world({
+      browser: fakePushBrowser({ permission: "granted", subscribed: true }),
+      remove: vi
+        .fn<RemindersDeps["remove"]>()
+        .mockRejectedValue(new TypeError("offline")),
+    })
+
+    renderWith(api)
+    await waitFor(async () => {
+      expect(await reminderSwitch()).toBeChecked()
+    })
+    await user.click(await reminderSwitch())
+
+    await waitFor(async () => {
+      expect(await reminderSwitch()).not.toBeChecked()
+    })
+    expect(browser.live()).toBeNull()
+  })
+
+  it("a browser that refuses to unsubscribe keeps the switch on and says so", async () => {
+    const user = userEvent.setup()
+    const browser = fakePushBrowser({ permission: "granted", subscribed: true })
+
+    browser.live()?.unsubscribe.mockRejectedValue(new Error("nope"))
+    const { api } = world({ browser })
+
+    renderWith(api)
+    await waitFor(async () => {
+      expect(await reminderSwitch()).toBeChecked()
+    })
+    await user.click(await reminderSwitch())
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Reminders couldn't be turned off. Please try again.",
+    )
+    expect(await reminderSwitch()).toBeChecked()
+    expect(toast).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [
+      "denied in the browser",
+      () => world({ browser: fakePushBrowser({ permission: "denied" }) }),
+      "Blocked in your browser settings.",
+    ],
+    [
+      "an iPhone browser tab",
+      () => world({ platform: "ios", standalone: false, push: null }),
+      "On iPhone, install the app first to turn reminders on.",
+    ],
+    [
+      "a build without a VAPID key",
+      () => world({ key: null }),
+      "This browser can't send reminders.",
+    ],
+    [
+      "a browser without Push",
+      () => world({ push: null }),
+      "This browser can't send reminders.",
+    ],
+  ] as const)(
+    "%s: the switch is disabled and the row says why",
+    async (_name, make, reason) => {
+      renderWith(make().api)
+
+      await waitFor(async () => {
+        expect(await reminderSwitch()).toHaveAccessibleDescription(reason)
+      })
+      expect(await reminderSwitch()).toBeDisabled()
+    },
+  )
+
+  it("re-reads the real permission when the page becomes visible again", async () => {
+    const browser = fakePushBrowser()
+    const { api } = world({ browser })
+
+    renderWith(api)
+    await waitFor(async () => {
+      expect(await reminderSwitch()).toBeEnabled()
+    })
+
+    browser.setPermission("denied")
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"))
+    })
+
+    await waitFor(async () => {
+      expect(await reminderSwitch()).toHaveAccessibleDescription(
+        "Blocked in your browser settings.",
+      )
+    })
   })
 })

@@ -347,5 +347,10 @@
   "offline.timeUp.checkAgain": "Check again",
   "offline.timeUp.failed": "We couldn't send this test. Please tell an adult.",
   "offline.pendingSync": "Saved on this phone — it will be sent when you're back online.",
-  "offline.syncFailed": "Some answers couldn't be sent. Please tell an adult."
+  "offline.syncFailed": "Some answers couldn't be sent. Please tell an adult.",
+  "profile.reminders.error.failed": "Reminders couldn't be turned on. Please try again.",
+  "profile.reminders.error.offline": "You're offline. Connect to the internet to turn reminders on.",
+  "profile.reminders.error.notConfigured": "Reminders aren't available right now.",
+  "profile.reminders.error.conflict": "Another sign-in was setting up reminders on this device. Please try again.",
+  "profile.reminders.error.disable": "Reminders couldn't be turned off. Please try again."
 }

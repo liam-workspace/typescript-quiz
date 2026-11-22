@@ -1,6 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router"
 import {
-  useEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -13,6 +12,7 @@ import { BottomSheet } from "../components/BottomSheet.js"
 import { Icon } from "../components/Icon.js"
 import { InstallSheet } from "../components/InstallSheet.js"
 import { OfflineStorageList } from "../components/OfflineStorageList.js"
+import { ReminderPermissionSheet } from "../components/ReminderPermissionSheet.js"
 import { RemindersRow } from "../components/RemindersRow.js"
 import type { Student } from "../lib/api-types.js"
 import { signOut } from "../lib/auth.js"
@@ -23,26 +23,46 @@ import {
 } from "../lib/offline/use-offline.js"
 import { startInstall } from "../lib/pwa/install-flow.js"
 import { pwaStore, type PwaSnapshot } from "../lib/pwa/pwa-store.js"
-import { reminders, type ReminderState } from "../lib/reminders.js"
+import type { RemindersApi, ReminderState } from "../lib/reminders.js"
 import { getCurrentStudent } from "../lib/session-api.js"
 import { toastStore } from "../lib/toast.js"
-
-const REMINDER_TOAST: Partial<Record<ReminderState, string>> = {
-  on: "toast.remindersOn",
-  denied: "toast.remindersBlocked",
-}
+import { useReminders, type ReminderProblem } from "../lib/useReminders.js"
 
 const LANGUAGES = ["en", "fr", "de", "es", "it", "ja"] as const
+
+export interface ProfileReminders {
+  readonly state: ReminderState
+  readonly busy: boolean
+  readonly problem: ReminderProblem | null
+  /** The "Allow reminders?" soft ask in front of the browser prompt. */
+  readonly sheetOpen: boolean
+  readonly onToggle: (next: boolean) => void
+  readonly onAllow: () => void
+  readonly onDecline: () => void
+}
+
+/** The route's reminders wiring; `api` is a test seam (default: the browser). */
+export function useProfileReminders(api?: RemindersApi): ProfileReminders {
+  const reminder = useReminders(api)
+
+  return {
+    state: reminder.state,
+    busy: reminder.busy,
+    problem: reminder.problem,
+    sheetOpen: reminder.sheetOpen,
+    onToggle: reminder.toggle,
+    onAllow: () => {
+      void reminder.allow()
+    },
+    onDecline: reminder.decline,
+  }
+}
 
 export interface ProfileScreenProps {
   readonly student: Student
   readonly pwa: PwaSnapshot
   readonly version: string
-  readonly reminders: {
-    readonly state: ReminderState
-    readonly busy: boolean
-    readonly onToggle: (next: boolean) => void
-  }
+  readonly reminders: ProfileReminders
   /** The saved-tests list (`OfflineStorageList`), injected by the route. */
   readonly offlineStorage: ReactNode
   readonly onInstall: () => void
@@ -64,6 +84,7 @@ export function ProfileScreen({
   const { t, i18n } = useTranslation("runner")
   const [confirmOpen, setConfirmOpen] = useState(false)
   const signOutTrigger = useRef<HTMLButtonElement>(null)
+  const reminderSwitch = useRef<HTMLInputElement>(null)
   const [language] = (i18n.resolvedLanguage ?? i18n.language).split("-")
 
   return (
@@ -127,7 +148,9 @@ export function ProfileScreen({
           <RemindersRow
             state={reminderProps.state}
             busy={reminderProps.busy}
+            problem={reminderProps.problem}
             onToggle={reminderProps.onToggle}
+            switchRef={reminderSwitch}
           />
 
           <div className="li">
@@ -194,6 +217,14 @@ export function ProfileScreen({
           <Icon name="logout" /> {t("profile.signOut")}
         </button>
       </main>
+
+      <ReminderPermissionSheet
+        open={reminderProps.sheetOpen}
+        busy={reminderProps.busy}
+        onAllow={reminderProps.onAllow}
+        onDecline={reminderProps.onDecline}
+        returnFocusRef={reminderSwitch}
+      />
 
       <BottomSheet
         open={confirmOpen}
@@ -294,25 +325,9 @@ function RouteComponent() {
     (listener) => pwaStore.subscribe(listener),
     () => pwaStore.getSnapshot(),
   )
-  const [reminderState, setReminderState] =
-    useState<ReminderState>("unsupported")
-  const [busy, setBusy] = useState(false)
+  const reminders = useProfileReminders()
   const [installKind, setInstallKind] = useState<"ios" | "manual" | null>(null)
   const offline = useOfflineLibrary()
-
-  useEffect(() => {
-    let active = true
-
-    void reminders.state().then((state) => {
-      if (active) {
-        setReminderState(state)
-      }
-    })
-
-    return () => {
-      active = false
-    }
-  }, [])
 
   async function handleInstall(): Promise<void> {
     const step = await startInstall()
@@ -324,32 +339,13 @@ function RouteComponent() {
     }
   }
 
-  async function handleToggle(next: boolean): Promise<void> {
-    setBusy(true)
-
-    try {
-      const state = await (next ? reminders.enable() : reminders.disable())
-
-      setReminderState(state)
-      toastStore.show(t(REMINDER_TOAST[state] ?? "toast.remindersOff"), "bell")
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
     <>
       <ProfileScreen
         student={student}
         pwa={pwa}
         version={APP_VERSION}
-        reminders={{
-          state: reminderState,
-          busy,
-          onToggle: (next) => {
-            void handleToggle(next)
-          },
-        }}
+        reminders={reminders}
         offlineStorage={<SavedTestsList offline={offline} />}
         onInstall={() => {
           void handleInstall()

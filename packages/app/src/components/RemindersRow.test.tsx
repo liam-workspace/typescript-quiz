@@ -50,6 +50,40 @@ describe("RemindersRow", () => {
     },
   )
 
+  it.each([
+    ["failed", "Reminders couldn't be turned on. Please try again."],
+    [
+      "offline",
+      "You're offline. Connect to the internet to turn reminders on.",
+    ],
+    ["not-configured", "Reminders aren't available right now."],
+    [
+      "conflict",
+      "Another sign-in was setting up reminders on this device. Please try again.",
+    ],
+    ["disable", "Reminders couldn't be turned off. Please try again."],
+  ] as const)(
+    "a %s problem is announced under the row, and the switch stays usable",
+    (problem, message) => {
+      render(
+        <RemindersRow
+          state="off"
+          problem={problem}
+          onToggle={() => undefined}
+        />,
+      )
+
+      expect(screen.getByRole("alert")).toHaveTextContent(message)
+      expect(screen.getByRole("switch")).toBeEnabled()
+    },
+  )
+
+  it("no problem, no alert", () => {
+    render(<RemindersRow state="off" onToggle={() => undefined} />)
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+  })
+
   it("busy: disables the switch while a change is in flight", () => {
     render(<RemindersRow state="off" busy onToggle={() => undefined} />)
 

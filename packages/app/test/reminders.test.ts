@@ -10,6 +10,10 @@ import {
   type RemindersDeps,
 } from "../src/lib/reminders.js"
 import { tokenStore } from "../src/lib/tokenStore.js"
+import {
+  fakePushBrowser as fakeBrowser,
+  fakeSubscription,
+} from "../src/test/fake-push.js"
 
 const IPHONE_17 =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1"
@@ -19,72 +23,6 @@ const IPAD_DESKTOP_16_4 =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.4 Safari/605.1.15"
 const ANDROID =
   "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36"
-
-function fakeSubscription(overrides: Partial<PushSubscriptionJSON> = {}) {
-  const unsubscribe = vi.fn().mockResolvedValue(true)
-
-  return {
-    unsubscribe,
-    toJSON: () => ({
-      endpoint: "https://fcm.googleapis.com/fcm/send/abc",
-      expirationTime: null,
-      keys: { p256dh: "p256dh-key", auth: "auth-secret" },
-      ...overrides,
-    }),
-  } as unknown as PushSubscription & { unsubscribe: typeof unsubscribe }
-}
-
-/**
- * A browser in memory: Notification.permission, PushManager and the
- * worker registration, with a real subscribe → getSubscription → unsubscribe
- * lifecycle, so "the switch is truthful" is checked against what the
- * browser would really report afterwards.
- */
-function fakeBrowser(
-  initial: {
-    permission?: NotificationPermission
-    prompt?: NotificationPermission
-    subscribed?: boolean
-  } = {},
-) {
-  let permission: NotificationPermission = initial.permission ?? "default"
-  let live: ReturnType<typeof fakeSubscription> | null = null
-  const issue = () => {
-    const subscription = fakeSubscription()
-
-    subscription.unsubscribe.mockImplementation(() => {
-      if (live === subscription) {
-        live = null
-      }
-
-      return Promise.resolve(true)
-    })
-    live = subscription
-
-    return subscription
-  }
-
-  if (initial.subscribed) {
-    issue()
-  }
-
-  const push = {
-    permission: vi.fn(() => permission),
-    requestPermission: vi.fn(() => {
-      permission = initial.prompt ?? "granted"
-
-      return Promise.resolve(permission)
-    }),
-    getSubscription: vi.fn(() => Promise.resolve(live)),
-    subscribe: vi.fn((key: Uint8Array<ArrayBuffer>) => {
-      void key
-
-      return Promise.resolve(live ?? issue())
-    }),
-  } satisfies PushEnvironment
-
-  return { push, live: () => live }
-}
 
 function setup(
   over: {

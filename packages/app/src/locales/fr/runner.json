@@ -347,5 +347,10 @@
   "offline.timeUp.checkAgain": "Vérifier à nouveau",
   "offline.timeUp.failed": "Nous n'avons pas pu envoyer ce test. Préviens un adulte.",
   "offline.pendingSync": "Enregistré sur ce téléphone — il sera envoyé quand tu seras de nouveau en ligne.",
-  "offline.syncFailed": "Certaines réponses n'ont pas pu être envoyées. Préviens un adulte."
+  "offline.syncFailed": "Certaines réponses n'ont pas pu être envoyées. Préviens un adulte.",
+  "profile.reminders.error.failed": "Impossible d'activer les rappels. Réessaie.",
+  "profile.reminders.error.offline": "Tu es hors ligne. Connecte-toi à Internet pour activer les rappels.",
+  "profile.reminders.error.notConfigured": "Les rappels ne sont pas disponibles pour le moment.",
+  "profile.reminders.error.conflict": "Une autre connexion configurait les rappels sur cet appareil. Réessaie.",
+  "profile.reminders.error.disable": "Impossible de désactiver les rappels. Réessaie."
 }

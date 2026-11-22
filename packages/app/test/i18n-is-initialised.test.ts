@@ -40,4 +40,12 @@ describe("app startup", () => {
       "Primary Practice",
     )
   })
+
+  it("registers the reminder unsubscribe as a sign-out purge step", () => {
+    // Without it a signed-out browser keeps receiving the previous
+    // student's practice reminders.
+    expect(mainSource).toMatch(
+      /registerPurgeStep\(\s*unsubscribeOnSignOut\s*\)/u,
+    )
+  })
 })

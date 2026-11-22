@@ -335,5 +335,10 @@
   "offline.timeUp.checkAgain": "もう一度確認",
   "offline.timeUp.failed": "このテストを送信できませんでした。大人に伝えてください。",
   "offline.pendingSync": "この端末に保存しました。オンラインに戻ると送信されます。",
-  "offline.syncFailed": "送信できなかった回答があります。大人に伝えてください。"
+  "offline.syncFailed": "送信できなかった回答があります。大人に伝えてください。",
+  "profile.reminders.error.failed": "リマインダーをオンにできませんでした。もう一度お試しください。",
+  "profile.reminders.error.offline": "オフラインです。インターネットにつないでからリマインダーをオンにしてください。",
+  "profile.reminders.error.notConfigured": "いまはリマインダーを使えません。",
+  "profile.reminders.error.conflict": "このデバイスでは別のサインインがリマインダーを設定していました。もう一度お試しください。",
+  "profile.reminders.error.disable": "リマインダーをオフにできませんでした。もう一度お試しください。"
 }

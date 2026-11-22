@@ -46,6 +46,14 @@ import {
   type OfflineMediaRow,
 } from "./repositories/offline-bundle.repository.js"
 import {
+  advanceJournalCursor,
+  createOfflineAttempt,
+  getJournalCursor,
+  loadJournalContext,
+  type CreateOfflineAttemptOutcome,
+  type JournalContextRows,
+} from "./repositories/offline-journal.repository.js"
+import {
   insertFailedWrite,
   type FailedWriteRow,
 } from "./repositories/failed-write.repository.js"
@@ -114,6 +122,8 @@ export type { FailedWriteRow }
 
 export type { OfflineBundleRow, OfflineBundleSectionRow, OfflineMediaRow }
 
+export type { CreateOfflineAttemptOutcome, JournalContextRows }
+
 export type { ResponseWriteInput, WriteOutcome }
 
 export type { QuestionSectionInfo }
@@ -129,6 +139,10 @@ export {
   listPublishedTests,
   loadTestBrief,
   loadOfflineBundle,
+  createOfflineAttempt,
+  getJournalCursor,
+  advanceJournalCursor,
+  loadJournalContext,
   loadSectionBrief,
   InvalidCursorError,
   loadOwnedAttempt,

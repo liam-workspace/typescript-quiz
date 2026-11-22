@@ -299,6 +299,9 @@ CREATE TABLE attempt (
     -- or a recorded score would lose the content it was computed from.
     test_version_id  uuid           NOT NULL REFERENCES test_version (id) ON DELETE RESTRICT,
     status           attempt_status NOT NULL DEFAULT 'in_progress',
+    -- Where the attempt came from. 'offline' = started with no network and
+    -- adopted at sync time; attempt.id is then the client-minted uuid.
+    origin           text           NOT NULL DEFAULT 'server',
 
     -- created_at is when POST /attempts made the row. started_at is when
     -- the FIRST section was entered — reading the brief and the section
@@ -325,6 +328,7 @@ CREATE TABLE attempt (
     question_count   integer,
 
     CONSTRAINT attempt_id_version UNIQUE (id, test_version_id),
+    CONSTRAINT attempt_origin_known CHECK (origin IN ('server', 'offline')),
 
     CONSTRAINT attempt_position_section_fk FOREIGN KEY (current_section_id, test_version_id)
         REFERENCES test_section (id, test_version_id) ON DELETE RESTRICT,
@@ -455,6 +459,17 @@ CREATE TABLE attempt_section (
 CREATE UNIQUE INDEX attempt_section_one_open
     ON attempt_section (attempt_id)
     WHERE completed_at IS NULL;
+
+
+-- The highest offline-journal eventSeq already applied to an attempt.
+-- Events at or below it are never replayed, so a retried or overlapping
+-- POST /attempts/offline-sync cannot double-count a play or an answer.
+CREATE TABLE offline_journal_cursor (
+    attempt_id      uuid PRIMARY KEY REFERENCES attempt (id) ON DELETE CASCADE,
+    last_event_seq  integer     NOT NULL,
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT journal_cursor_non_negative CHECK (last_event_seq >= 0)
+);
 
 
 CREATE TABLE response (

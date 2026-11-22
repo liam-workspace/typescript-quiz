@@ -27,14 +27,40 @@ answers.
 - Tests reach the database by JSON import (`pnpm import:toefl-primary`, or
   `POST /admin/tests/import`) — there is no authoring UI yet.
 
+## 📱 Installable app (PWA)
+
+The student app installs to a phone's home screen and keeps working when the connection drops:
+
+- **Install** — Chrome/Android shows an install card on the Library and the real install prompt; on iPhone, Share → Add to Home Screen (the Library card and Profile show the steps).
+- **Offline** — the app shell, fonts and the library load with no network. "Save offline" stores a whole test (questions and recordings) on the phone, and a saved test can be started and finished offline. Answers and navigation are written to the device first and sent when the connection returns; handing in needs a connection.
+- **Updates** — a "new version is ready" banner; a running test is never reloaded under the student.
+- **Reminders** — an optional daily Web Push reminder (see "Practice reminders (Web Push)" under Docker Compose below).
+- **Shared phones** — signing out clears cached data and saved tests for that student; unsent answers are kept on the device.
+
+Environment (all optional unless noted):
+
+| Variable                     | Where                         | Purpose                                                                                            |
+| ---------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------- |
+| `VITE_VAPID_PUBLIC_KEY`      | SPA build arg / container env | Public Web Push key. Unset ships an empty key: reminders read as unavailable                       |
+| `VAPID_PUBLIC_KEY`           | server (and SPA fallback)     | Same public key; `docker-entrypoint.sh` uses it when `VITE_VAPID_PUBLIC_KEY` is unset              |
+| `VAPID_PRIVATE_KEY`          | server, secret                | Signing key. All three `VAPID_*` or none — a partial set refuses to boot                           |
+| `VAPID_SUBJECT`              | server                        | `mailto:` or `https:` contact for push services                                                    |
+| `PUSH_ENDPOINT_HOSTS`        | server                        | Extra comma-separated push-service host suffixes beyond FCM, Mozilla, Apple and Windows (port 443) |
+| `REMINDER_SCHEDULER_ENABLED` | server                        | `false` stops the in-process sender; default on when VAPID is set, off under `NODE_ENV=test`       |
+
+Docker: `compose.yml` passes `VITE_VAPID_PUBLIC_KEY` as a build arg (default `__VITE_VAPID_PUBLIC_KEY__`, a placeholder that `docker-entrypoint.sh` replaces at container start), so one image serves several environments.
+
+Design: [`docs/superpowers/specs/2026-11-22-quiz-pwa-mobile-design.md`](docs/superpowers/specs/2026-11-22-quiz-pwa-mobile-design.md) · clickable prototype: `docs/prototype/pwa-mobile.html` · verification: [`docs/superpowers/plans/2026-11-22-quiz-pwa-mobile-acceptance.md`](docs/superpowers/plans/2026-11-22-quiz-pwa-mobile-acceptance.md).
+The service worker is disabled under `pnpm dev`; test install, offline and update behaviour against a production build (`pnpm build`, then serve the app from the server with `SPA_ROOT`).
+
 ## 🧱 Packages
 
 Four workspace packages, built in this order:
 
-| Package           | What it is                                                            |
-| ----------------- | ---------------------------------------------------------------------- |
+| Package           | What it is                                                           |
+| ----------------- | -------------------------------------------------------------------- |
 | `packages/common` | Domain types and Zod validators for the test JSON interchange format |
-| `packages/db`     | Migrations and repositories (`@liam-workspace/node-postgres`)           |
+| `packages/db`     | Migrations and repositories (`@liam-workspace/node-postgres`)        |
 | `packages/server` | NestJS REST API — JWKS verification, grading, media signing          |
 | `packages/app`    | The React 19 + Vite single-page app                                  |
 

@@ -81,6 +81,90 @@ describe("production build: installable shell and worker policy", () => {
     expect(bundle).toContain("__VITE_VAPID_PUBLIC_KEY__")
   })
 
+  it("has every manifest field Chrome needs to call the app installable", () => {
+    const manifest = JSON.parse(
+      readFileSync(join(outDir, "manifest.webmanifest"), "utf8"),
+    ) as {
+      name: string
+      short_name: string
+      start_url: string
+      scope: string
+      display: string
+      theme_color: string
+      background_color: string
+      icons: Array<{ src: string; sizes: string; purpose?: string }>
+    }
+
+    expect(manifest).toMatchObject({
+      start_url: "/",
+      scope: "/",
+      display: "standalone",
+    })
+    expect(manifest.name.length).toBeGreaterThan(0)
+    expect(manifest.short_name.length).toBeGreaterThan(0)
+    expect(manifest.theme_color).toMatch(/^#[0-9a-f]{6}$/iu)
+    expect(manifest.background_color).toMatch(/^#[0-9a-f]{6}$/iu)
+    expect(manifest.icons.some((icon) => icon.sizes === "192x192")).toBe(true)
+    expect(manifest.icons.some((icon) => icon.sizes === "512x512")).toBe(true)
+    expect(manifest.icons.some((icon) => icon.purpose === "maskable")).toBe(
+      true,
+    )
+
+    // Every declared icon is a real PNG on disk, not a 404 or an HTML fallback.
+    const pngSignature = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    ])
+
+    for (const icon of manifest.icons) {
+      const file = join(outDir, icon.src.replace(/^\//u, ""))
+
+      expect(existsSync(file), `${icon.src} is missing`).toBe(true)
+      expect(readFileSync(file).subarray(0, 8).equals(pngSignature)).toBe(true)
+    }
+  })
+
+  it("has the apple-touch-icon and theme colour, and no Google Fonts links", () => {
+    const html = readFileSync(join(outDir, "index.html"), "utf8")
+
+    expect(html).toContain('rel="apple-touch-icon"')
+    expect(html).toContain('name="theme-color"')
+    expect(html).not.toContain("fonts.googleapis.com")
+    expect(html).not.toContain("fonts.gstatic.com")
+  })
+
+  it("precaches the shell and self-hosted fonts, and never an API, media or health route", () => {
+    const urls = [...sw.matchAll(/url:\s*"([^"]+)"/gu)].map((match) => match[1])
+
+    expect(urls).toContain("index.html")
+    expect(urls).toContain("push-sw.js")
+    expect(urls.some((url) => url.endsWith(".woff2"))).toBe(true)
+    expect(urls.some((url) => url.endsWith(".css"))).toBe(true)
+
+    for (const url of urls) {
+      expect(url).not.toMatch(/^\/?(api|media|health)(\/|$)/u)
+    }
+  })
+
+  it("falls back to the app shell for navigations except /api, /media and /health", () => {
+    expect(sw).toContain("createHandlerBoundToURL")
+    expect(sw).toMatch(/denylist:\[[^\]]*api[^\]]*media[^\]]*health[^\]]*\]/u)
+  })
+
+  it("only skips waiting when the page asks (registerType: prompt)", () => {
+    // The sole skipWaiting() call sits inside the SKIP_WAITING message handler.
+    expect(sw.match(/skipWaiting\(\)/gu)).toHaveLength(1)
+    expect(sw).toMatch(
+      /"message",\w+=>\{[^}]*"SKIP_WAITING"===[^}]*skipWaiting\(\)\}\)/u,
+    )
+  })
+
+  it("never routes a mutating or per-student attempt call through the runtime cache", () => {
+    expect(sw).not.toContain("/api/session")
+    expect(sw).not.toMatch(
+      /\/api\/attempts\/[^"']*(submit|position|responses|play|sections)/u,
+    )
+  })
+
   it("links the manifest from index.html exactly once", () => {
     const html = readFileSync(join(outDir, "index.html"), "utf8")
 

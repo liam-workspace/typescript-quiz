@@ -344,20 +344,6 @@
     border-style: dashed;
   }
 
-  /* Progress pips along the runner chrome. */
-  .pip {
-    width: 19px;
-    height: 5px;
-    border-radius: 3px;
-    background: var(--color-line);
-  }
-  .pip[data-state="done"] {
-    background: var(--color-teal);
-  }
-  .pip[data-state="now"] {
-    background: var(--color-amber);
-  }
-
   /* The shared screen vocabulary is deliberately responsive: pages fill a
    * phone, tablet, or desktop viewport instead of recreating the prototype's
    * fixed mockup dimensions. */
@@ -491,13 +477,6 @@
     margin: 0;
     color: var(--color-ink-2);
     font-size: 14px;
-  }
-  .question-count {
-    color: var(--color-faint);
-    font-size: 12.5px;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
   }
   .question-prompt {
     margin: 2px 0 4px;
@@ -771,9 +750,6 @@
     border: 1.5px solid var(--color-line);
     border-radius: 16px;
     padding: 14px;
-  }
-  .card.hl {
-    border-color: var(--color-teal);
   }
   .chip {
     display: inline-flex;

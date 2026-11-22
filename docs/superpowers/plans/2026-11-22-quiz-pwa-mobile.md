@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-22-quiz-pwa-mobile-design.md` — **§13 "Amendments after plan drafting" overrides D5/D6 and §6 wherever they differ.** Visual/behavioural authority: `docs/prototype/pwa-mobile.html`.
 
+> **Historical document.** Where task text below disagrees with what shipped (for example a `409 test_not_published` on the offline bundle, a `clientAttemptId` sync body, a `max(monotonic, wall)` clock, or a `pwa-build-output.test.ts` file), the as-built facts are in spec **§13 and §14**, and verification is in `docs/superpowers/plans/2026-11-22-quiz-pwa-mobile-acceptance.md`.
+
 ## Global Constraints
 
 - Prototype tokens (verbatim): ink `#1c2530`, ink-2 `#4b5966`, faint `#8d9aa6`, paper `#ffffff`, surface `#f4f7f9`, line `#dfe6ec`, teal `#0f6e78`, teal-d `#0b5a63`, teal-bg `#e4f1f2`, clay `#a8622f`, clay-bg `#f8ede4`, good `#1f7a43`, good-bg `#e6f4eb`, bad `#b53a34`, bad-bg `#faeae9`, amber `#e8a33d`, amber-bg `#fdf3df`.

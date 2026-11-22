@@ -28,42 +28,42 @@ Turn the existing student web app (`packages/app`, React 19 + TanStack Router + 
 
 Status: **Reuse** (exists, keep) · **Restyle** (exists, change presentation) · **New** (client only) · **New+server** (needs API/DB change).
 
-| # | Prototype feature (function / element) | Real implementation | Status | Task |
-|---|---|---|---|---|
-| 1 | Installable standalone app, manifest, icons, splash | `vite-plugin-pwa` + preset manifest, PNG icons, `<Splash>` | New | 1, 4 |
-| 2 | Offline app shell | Workbox precache + navigate fallback | New | 1, 2 |
-| 3 | Install banner on Library; Android prompt; iOS "Add to Home Screen" steps; dismiss; installed state | `pwaStore`, `<InstallCard>`, install sheets | New | 3, 4, 7 |
-| 4 | "New version ready" banner; deferred during a test (no button, "after you finish this test"); Refresh | `pwaStore.updateReady`, `<UpdateBanner>` | New | 3, 4 |
-| 5 | Offline banner (browsing vs in-test wording) with "Waiting to be sent: N" | `networkStore` + `<OfflineBanner>` | Restyle | 4, 13 |
-| 6 | Tab bar Library / History / Profile with `aria-current` | `<TabBar>` in `AppLayout` | New | 4 |
-| 7 | Toasts (status role, icon, 3.8 s) | `toastStore` + `<ToastHost>` | New | 4 |
-| 8 | Bottom sheets (modal, title, close, scrim inside viewport, Esc, focus return) | `<BottomSheet>` on Radix Dialog | New | 4 |
-| 9 | Sign-in: logo, copy, busy "Signing in…", error alert; no-access screen with Sign out | `sign-in.tsx`; library no-access state | Restyle | 8 |
-| 10 | Library: greeting, plural-aware subtitle, filter (All / To do / Done), cards, skeleton, stats, in-progress card, "Finish X first" disabled reason | `index.tsx` | Restyle | 7 |
-| 11 | Start test → rules directly (no brief screen), busy state | library Start calls `startAttempt` then routes to rules | Restyle | 7, 9 |
-| 12 | Per-test "Save offline · N MB", progress, "Available offline", remove | offline library (D5) | New+server | 14, 15, 16 |
-| 13 | Rules screen per section, "I'm ready" busy → run | `…/rules.tsx` | Restyle | 9 |
-| 14 | Run top bar: menu ⋯, section chip, save chip, timer chip (low ≤ 60 s + icon, `role=timer`), progress bar | `run.tsx` + new chrome components | Restyle | 10 |
-| 15 | Run bottom bar: Previous (free-nav only), navigator `n/N`, Next / Finish X / Hand in | `run.tsx` | Restyle | 10 |
-| 16 | Listening card: scene, Play recording → Playing… → Played, progress, "1 play left", answers locked until played, failure message, no pause | `ListeningRunner`, `QuestionMedia` | Restyle | 11 |
-| 17 | Reading passage `<details>`, A–D lettered choices, multi-select hint | `ReadingRunner`, `ChoiceList` | Restyle | 11 |
-| 18 | Navigator sheet: per-section grids, statuses, legend, forward-only note | `QuestionNavigator` | Restyle | 10 |
-| 19 | Finish-section confirm sheet (blank count) | `run.tsx` | New | 10 |
-| 20 | Run menu sheet: "Leave test", clock-keeps-running note | replaces `AppMenu` drawer in run | Restyle | 10 |
-| 21 | Save chip states: Saved / Saving… / Waiting to send: N / Did not save; toast "Back online — N answers sent." | `SaveState` + flush events | Restyle | 13 |
-| 22 | Hand-in screen: tiles, blank notice, minutes left, offline-disabled with reason, busy | `hand-in.tsx` | Restyle | 12 |
-| 23 | Time-up (section and attempt variants) | `time-up.tsx`, run expiry | Restyle | 12 |
-| 24 | Result: ring, headline by score band, personal-best chip, per-section breakdown, practice notice | `result.tsx` | Restyle | 13 |
-| 25 | Review: outcome chip, passage, tagged choices, explanation, prev/next, jump sheet | `review.tsx` | Restyle | 13 |
-| 26 | History cards: status chip with icon, score, Review / Result | `history.tsx` | Restyle | 13 |
-| 27 | Profile: identity, install row, reminders switch, version/update row, offline storage list with remove, sign out sheet | new `profile.tsx` | New | 6 |
-| 28 | Practice reminders: permission sheet, on / off / denied, iOS-needs-install | Web Push (D7) | New+server | 23, 24, 25 |
-| 29 | Offline mid-test: Next / Finish / play / answer all work, answers queued | journal-first lifecycle (D6) | New+server | 17–21 |
-| 30 | Offline start of a downloaded test; Start disabled with reason if not downloaded | D5 + D6 | New+server | 16, 21 |
-| 31 | Hand-in blocked offline with reason | gateway guard | New | 22 |
-| 32 | Resume after reload mid-test with answers and clock intact | server envelope (online) / journal (offline) | Reuse + New | 21 |
-| 33 | Safe-area padding, 44 px targets, reduced motion, focus rings, no horizontal overflow at 320 px | CSS + tests | New | 4, 26 |
-| 34 | Sign-out clears every offline/auth cache | `purgeClientCaches()` | New | 2 |
+| #   | Prototype feature (function / element)                                                                                                            | Real implementation                                        | Status      | Task       |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ----------- | ---------- |
+| 1   | Installable standalone app, manifest, icons, splash                                                                                               | `vite-plugin-pwa` + preset manifest, PNG icons, `<Splash>` | New         | 1, 4       |
+| 2   | Offline app shell                                                                                                                                 | Workbox precache + navigate fallback                       | New         | 1, 2       |
+| 3   | Install banner on Library; Android prompt; iOS "Add to Home Screen" steps; dismiss; installed state                                               | `pwaStore`, `<InstallCard>`, install sheets                | New         | 3, 4, 7    |
+| 4   | "New version ready" banner; deferred during a test (no button, "after you finish this test"); Refresh                                             | `pwaStore.updateReady`, `<UpdateBanner>`                   | New         | 3, 4       |
+| 5   | Offline banner (browsing vs in-test wording) with "Waiting to be sent: N"                                                                         | `networkStore` + `<OfflineBanner>`                         | Restyle     | 4, 13      |
+| 6   | Tab bar Library / History / Profile with `aria-current`                                                                                           | `<TabBar>` in `AppLayout`                                  | New         | 4          |
+| 7   | Toasts (status role, icon, 3.8 s)                                                                                                                 | `toastStore` + `<ToastHost>`                               | New         | 4          |
+| 8   | Bottom sheets (modal, title, close, scrim inside viewport, Esc, focus return)                                                                     | `<BottomSheet>` on Radix Dialog                            | New         | 4          |
+| 9   | Sign-in: logo, copy, busy "Signing in…", error alert; no-access screen with Sign out                                                              | `sign-in.tsx`; library no-access state                     | Restyle     | 8          |
+| 10  | Library: greeting, plural-aware subtitle, filter (All / To do / Done), cards, skeleton, stats, in-progress card, "Finish X first" disabled reason | `index.tsx`                                                | Restyle     | 7          |
+| 11  | Start test → rules directly (no brief screen), busy state                                                                                         | library Start calls `startAttempt` then routes to rules    | Restyle     | 7, 9       |
+| 12  | Per-test "Save offline · N MB", progress, "Available offline", remove                                                                             | offline library (D5)                                       | New+server  | 14, 15, 16 |
+| 13  | Rules screen per section, "I'm ready" busy → run                                                                                                  | `…/rules.tsx`                                              | Restyle     | 9          |
+| 14  | Run top bar: menu ⋯, section chip, save chip, timer chip (low ≤ 60 s + icon, `role=timer`), progress bar                                          | `run.tsx` + new chrome components                          | Restyle     | 10         |
+| 15  | Run bottom bar: Previous (free-nav only), navigator `n/N`, Next / Finish X / Hand in                                                              | `run.tsx`                                                  | Restyle     | 10         |
+| 16  | Listening card: scene, Play recording → Playing… → Played, progress, "1 play left", answers locked until played, failure message, no pause        | `ListeningRunner`, `QuestionMedia`                         | Restyle     | 11         |
+| 17  | Reading passage `<details>`, A–D lettered choices, multi-select hint                                                                              | `ReadingRunner`, `ChoiceList`                              | Restyle     | 11         |
+| 18  | Navigator sheet: per-section grids, statuses, legend, forward-only note                                                                           | `QuestionNavigator`                                        | Restyle     | 10         |
+| 19  | Finish-section confirm sheet (blank count)                                                                                                        | `run.tsx`                                                  | New         | 10         |
+| 20  | Run menu sheet: "Leave test", clock-keeps-running note                                                                                            | replaces `AppMenu` drawer in run                           | Restyle     | 10         |
+| 21  | Save chip states: Saved / Saving… / Waiting to send: N / Did not save; toast "Back online — N answers sent."                                      | `SaveState` + flush events                                 | Restyle     | 13         |
+| 22  | Hand-in screen: tiles, blank notice, minutes left, offline-disabled with reason, busy                                                             | `hand-in.tsx`                                              | Restyle     | 12         |
+| 23  | Time-up (section and attempt variants)                                                                                                            | `time-up.tsx`, run expiry                                  | Restyle     | 12         |
+| 24  | Result: ring, headline by score band, personal-best chip, per-section breakdown, practice notice                                                  | `result.tsx`                                               | Restyle     | 13         |
+| 25  | Review: outcome chip, passage, tagged choices, explanation, prev/next, jump sheet                                                                 | `review.tsx`                                               | Restyle     | 13         |
+| 26  | History cards: status chip with icon, score, Review / Result                                                                                      | `history.tsx`                                              | Restyle     | 13         |
+| 27  | Profile: identity, install row, reminders switch, version/update row, offline storage list with remove, sign out sheet                            | new `profile.tsx`                                          | New         | 6          |
+| 28  | Practice reminders: permission sheet, on / off / denied, iOS-needs-install                                                                        | Web Push (D7)                                              | New+server  | 23, 24, 25 |
+| 29  | Offline mid-test: Next / Finish / play / answer all work, answers queued                                                                          | journal-first lifecycle (D6)                               | New+server  | 17–21      |
+| 30  | Offline start of a downloaded test; Start disabled with reason if not downloaded                                                                  | D5 + D6                                                    | New+server  | 16, 21     |
+| 31  | Hand-in blocked offline with reason                                                                                                               | gateway guard                                              | New         | 22         |
+| 32  | Resume after reload mid-test with answers and clock intact                                                                                        | server envelope (online) / journal (offline)               | Reuse + New | 21         |
+| 33  | Safe-area padding, 44 px targets, reduced motion, focus rings, no horizontal overflow at 320 px                                                   | CSS + tests                                                | New         | 4, 26      |
+| 34  | Sign-out clears every offline/auth cache                                                                                                          | `purgeClientCaches()`                                      | New         | 2          |
 
 ## 4. Decisions
 
@@ -95,9 +95,9 @@ Use `vite-plugin-pwa` (`generateSW`, `registerType: "prompt"`) seeded with `cmsP
 
 ### D5 — Offline library ("Save offline")
 
-A test can be saved for offline use. "Saved" means everything needed to *run* it is on the device:
+A test can be saved for offline use. "Saved" means everything needed to _run_ it is on the device:
 
-- **Bundle endpoint (new):** `GET /api/tests/:slug/offline-bundle` (student JWT) returns `{ slug, testVersionId, version, title, level, durationSeconds, sections: [...runner-shaped sections with questions, stimuli and choices but NO answer keys...], media: [{ key, url, bytes, capped }], totalBytes }`. For `capped` listening media, `url` is a short-lived download URL signed for *bundle download only* (not play).
+- **Bundle endpoint (new):** `GET /api/tests/:slug/offline-bundle` (student JWT) returns `{ slug, testVersionId, version, title, level, durationSeconds, sections: [...runner-shaped sections with questions, stimuli and choices but NO answer keys...], media: [{ key, url, bytes, capped }], totalBytes }`. For `capped` listening media, `url` is a short-lived download URL signed for _bundle download only_ (not play).
 - **Storage (client):** bundle JSON in IndexedDB `pp-offline` (store `tests`, key = slug); media bytes in Cache Storage `pp-offline-media-v1` keyed by `key`. Progress = bytes done / `totalBytes`. Download aborts cleanly when the network drops ("Save paused — you're offline. Try again when connected.").
 - **Availability:** `offlineStore.has(slug)`; library shows "Available offline" chip; Start is enabled offline only if saved, else disabled with the reason "Needs a connection. Save it for offline use while you're online." Profile lists saved tests with size and a Remove button (toast "{title} removed from this phone.").
 - **Accepted trade-off (record in the PR):** capped audio is retrievable by any signed-in student through the bundle endpoint, so the "plays once" rule becomes enforced by the app and re-checked at sync, not by the byte-gate. This is a single-family practice platform; the server still **audits** play counts at sync (D6) and rejects an offline attempt whose journal claims more plays than allowed.
@@ -109,8 +109,8 @@ Every lifecycle mutation becomes **durable on the device before it is sent**, ex
 
 - **Journal events** (append-only, IndexedDB `pp-attempts`): `start`, `enter_section`, `play`, `position`, `finish_section`, plus the existing answers (still in `AnswerQueue`). Each event carries `{ clientAttemptId, eventSeq, type, clientAt (ISO), payload }`. `clientAttemptId` is a UUID minted at start; the server stores it in `attempt.client_attempt_id` (unique) for idempotency.
 - **Gateway abstraction:** `run`, `rules` and `hand-in` talk to an `AttemptGateway` (D-contract §6). `RemoteAttemptGateway` = today's API calls (behaviour-preserving). `LocalAttemptGateway` applies the event to the local attempt state, appends it to the journal, and tries to flush. A selector picks local-first whenever the network is down **or** the attempt is journal-backed; online attempts that lose connectivity mid-test continue on the local gateway seamlessly (their state is hydrated from the last envelope).
-- **Local clock:** section deadline = `enteredAt + section.durationSeconds` using a monotonic guard (`performance.now()` deltas anchored at enter; wall-clock jumps backwards are ignored; a jump forwards beyond the monotonic delta by > 2 min is treated as tamper and the monotonic value wins).
-- **Server replay** — `POST /api/attempts/offline-sync` `{ clientAttemptId, slug, testVersionId, events[] }`, idempotent by `clientAttemptId`. Validation (reject with a recorded `failed_write`, never silently drop): events strictly ordered by `eventSeq`; `clientAt` monotonic non-decreasing, ≤ server receive time + 60 s, ≥ receive time − 72 h; `testVersionId` still resolvable; one `start`; `enter_section` durations ≤ section limit (a section's later events clamp to `entered + limit`; answers/events after that are recorded as late and **not applied**); ≤ `maxPlays` `play` events per capped stimulus, else the whole offline attempt is rejected with problem `offline_play_cap_exceeded`. The server then applies the events through the **existing** repository functions with `now = clientAt`, so expiry/finalisation rules are reused rather than re-implemented.
+- **Local clock (superseded by §13.1 #3 / §14 — dead band):** section deadline = `enteredAt + section.durationSeconds` using a monotonic guard (`performance.now()` deltas anchored at enter; wall-clock jumps backwards are ignored; a jump forwards beyond the monotonic delta by > 2 min is treated as tamper and the monotonic value wins).
+- **Server replay (request shape and validator superseded by §13.1 #2, #5, #7 and §14)** — `POST /api/attempts/offline-sync` `{ clientAttemptId, slug, testVersionId, events[] }`, idempotent by `clientAttemptId`. Validation (reject with a recorded `failed_write`, never silently drop): events strictly ordered by `eventSeq`; `clientAt` monotonic non-decreasing, ≤ server receive time + 60 s, ≥ receive time − 72 h; `testVersionId` still resolvable; one `start`; `enter_section` durations ≤ section limit (a section's later events clamp to `entered + limit`; answers/events after that are recorded as late and **not applied**); ≤ `maxPlays` `play` events per capped stimulus, else the whole offline attempt is rejected with problem `offline_play_cap_exceeded`. The server then applies the events through the **existing** repository functions with `now = clientAt`, so expiry/finalisation rules are reused rather than re-implemented.
 - **Hand-in requires a connection** (prototype). A student who finishes all sections offline sees "Hand in" disabled with the offline reason; if the final section's clock runs out offline the attempt shows the Time's-up screen's **waiting variant** (§11) and finalises at next sync with `submitted_at` pinned to the deadline (existing rule).
 - Sync trigger: on `online`, on app start, on `visibilitychange → visible`, and after each journal append (debounced); backoff reuses `retryClassifier`. Successful sync toasts "Back online — N answers sent." (N = answers acknowledged).
 
@@ -121,15 +121,15 @@ Every lifecycle mutation becomes **durable on the device before it is sent**, ex
 
 ### D8 — Storage inventory and purge
 
-| Store | Name | Holds | Purged on sign-out |
-|---|---|---|---|
-| localStorage | `pp.install.dismissed`, i18n language | UI prefs | no (not user data) |
-| IndexedDB | existing answer-queue DB | durable answers | **no** — unsent answers must survive; keyed by attempt, flushed after re-auth (existing behaviour) |
-| IndexedDB | `pp-offline` | saved test bundles | yes |
-| IndexedDB | `pp-attempts` | journal + local attempt state | **no if unsynced** (same rule as the answer queue); synced rows deleted |
-| Cache Storage | `pp-offline-media-v1` | downloaded media | yes |
-| Cache Storage | `pp-api-v1` | cached GET responses | yes |
-| Service worker | push subscription | reminder endpoint | yes (and server row deleted) |
+| Store          | Name                                  | Holds                         | Purged on sign-out                                                                                 |
+| -------------- | ------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------- |
+| localStorage   | `pp.install.dismissed`, i18n language | UI prefs                      | no (not user data)                                                                                 |
+| IndexedDB      | existing answer-queue DB              | durable answers               | **no** — unsent answers must survive; keyed by attempt, flushed after re-auth (existing behaviour) |
+| IndexedDB      | `pp-offline`                          | saved test bundles            | yes                                                                                                |
+| IndexedDB      | `pp-attempts`                         | journal + local attempt state | **no if unsynced** (same rule as the answer queue); synced rows deleted                            |
+| Cache Storage  | `pp-offline-media-v1`                 | downloaded media              | yes                                                                                                |
+| Cache Storage  | `pp-api-v1`                           | cached GET responses          | yes                                                                                                |
+| Service worker | push subscription                     | reminder endpoint             | yes (and server row deleted)                                                                       |
 
 `purgeClientCaches()` returns `Promise<void>`, never rejects, and is idempotent.
 
@@ -139,19 +139,19 @@ Port the prototype's tokens verbatim (they already equal the app's `@theme` pale
 
 ## 5. Routes
 
-| Prototype | Real route | Tab bar |
-|---|---|---|
-| `#/signin` | `/sign-in` | no |
-| `#/library` | `/` | yes |
-| `#/history` | `/history` | yes |
-| `#/profile` | **`/profile` (new file `pages/profile.tsx`)** | yes |
-| `#/rules` | `/attempts/$attemptId/sections/$sectionId/rules` | no |
-| `#/run` | `/attempts/$attemptId/run` | no |
-| `#/handin` | `/attempts/$attemptId/hand-in` | no |
-| `#/timeup` | `/attempts/$attemptId/time-up` | no |
-| `#/result/:id` | `/attempts/$attemptId/result` | no |
-| `#/review/:id/:n` | `/attempts/$attemptId/review?q=<ordinal>` (search param, 1-based) | no |
-| (none) | `/tests/$slug` brief — kept for deep links, no longer linked from the library | no |
+| Prototype         | Real route                                                                    | Tab bar |
+| ----------------- | ----------------------------------------------------------------------------- | ------- |
+| `#/signin`        | `/sign-in`                                                                    | no      |
+| `#/library`       | `/`                                                                           | yes     |
+| `#/history`       | `/history`                                                                    | yes     |
+| `#/profile`       | **`/profile` (new file `pages/profile.tsx`)**                                 | yes     |
+| `#/rules`         | `/attempts/$attemptId/sections/$sectionId/rules`                              | no      |
+| `#/run`           | `/attempts/$attemptId/run`                                                    | no      |
+| `#/handin`        | `/attempts/$attemptId/hand-in`                                                | no      |
+| `#/timeup`        | `/attempts/$attemptId/time-up`                                                | no      |
+| `#/result/:id`    | `/attempts/$attemptId/result`                                                 | no      |
+| `#/review/:id/:n` | `/attempts/$attemptId/review?q=<ordinal>` (search param, 1-based)             | no      |
+| (none)            | `/tests/$slug` brief — kept for deep links, no longer linked from the library | no      |
 
 ## 6. Shared interface contract
 
@@ -159,11 +159,13 @@ Plan tasks are written by different authors; these names and shapes are binding.
 
 ```ts
 // lib/network.ts — Task 3
-export interface NetworkSnapshot { readonly online: boolean }
+export interface NetworkSnapshot {
+  readonly online: boolean
+}
 export const networkStore: {
   subscribe(listener: () => void): () => void
-  getSnapshot(): NetworkSnapshot            // online = navigator.onLine && no recent hard fetch failure
-  reportFetchFailure(): void                // called by api-client on TypeError("Failed to fetch")
+  getSnapshot(): NetworkSnapshot // online = navigator.onLine && no recent hard fetch failure
+  reportFetchFailure(): void // called by api-client on TypeError("Failed to fetch")
   reportFetchSuccess(): void
   setOnlineForTests(online: boolean): void
 }
@@ -172,7 +174,7 @@ export const networkStore: {
 export type PwaPlatform = "ios" | "android" | "other"
 export interface PwaSnapshot {
   readonly standalone: boolean
-  readonly canPromptInstall: boolean        // Chromium event captured
+  readonly canPromptInstall: boolean // Chromium event captured
   readonly platform: PwaPlatform
   readonly installDismissed: boolean
   readonly updateReady: boolean
@@ -181,7 +183,7 @@ export const pwaStore: {
   subscribe(listener: () => void): () => void
   getSnapshot(): PwaSnapshot
   promptInstall(): Promise<"accepted" | "dismissed" | "unavailable">
-  markInstalled(): void                     // iOS "I've added it"
+  markInstalled(): void // iOS "I've added it"
   dismissInstall(): void
   setUpdateReady(applyFn: () => Promise<void>): void
   applyUpdate(): Promise<void>
@@ -190,11 +192,22 @@ export const pwaStore: {
 // lib/pwa/purge.ts — Task 2:     export function purgeClientCaches(): Promise<void>
 
 // lib/toast.ts — Task 4
-export type ToastIcon = "check" | "wifioff" | "cloud" | "trash" | "bell" | "refresh" | "clock"
+export type ToastIcon =
+  | "check"
+  | "wifioff"
+  | "cloud"
+  | "trash"
+  | "bell"
+  | "refresh"
+  | "clock"
 export const toastStore: {
   subscribe(listener: () => void): () => void
-  getSnapshot(): { readonly id: number; readonly message: string; readonly icon: ToastIcon } | null
-  show(message: string, icon?: ToastIcon): void   // auto-clears after 3800 ms
+  getSnapshot(): {
+    readonly id: number
+    readonly message: string
+    readonly icon: ToastIcon
+  } | null
+  show(message: string, icon?: ToastIcon): void // auto-clears after 3800 ms
 }
 
 // components/BottomSheet.tsx — Task 4 (stateless; Radix Dialog inside)
@@ -212,15 +225,25 @@ export interface BottomSheetProps {
 
 // lib/offline/offline-store.ts — Task 15
 export interface OfflineTestRecord {
-  readonly slug: string; readonly testVersionId: string; readonly version: number
-  readonly title: string; readonly totalBytes: number; readonly savedAt: string
+  readonly slug: string
+  readonly testVersionId: string
+  readonly version: number
+  readonly title: string
+  readonly totalBytes: number
+  readonly savedAt: string
 }
-export type DownloadProgress = { readonly doneBytes: number; readonly totalBytes: number }
+export type DownloadProgress = {
+  readonly doneBytes: number
+  readonly totalBytes: number
+}
 export const offlineStore: {
   list(): Promise<OfflineTestRecord[]>
   has(slug: string): Promise<boolean>
   getBundle(slug: string): Promise<OfflineBundle | null>
-  download(slug: string, opts: { onProgress(p: DownloadProgress): void; signal: AbortSignal }): Promise<OfflineTestRecord>
+  download(
+    slug: string,
+    opts: { onProgress(p: DownloadProgress): void; signal: AbortSignal },
+  ): Promise<OfflineTestRecord>
   remove(slug: string): Promise<void>
   removeAll(): Promise<void>
   subscribe(listener: () => void): () => void
@@ -232,32 +255,49 @@ export interface AttemptGateway {
   start(slug: string): Promise<AttemptStart>
   loadEnvelope(attemptId: string): Promise<RunnerEnvelope>
   enterSection(attemptId: string, sectionId: string): Promise<SectionEntry>
-  setPosition(attemptId: string, sectionId: string, questionId: string): Promise<void>
+  setPosition(
+    attemptId: string,
+    sectionId: string,
+    questionId: string,
+  ): Promise<void>
   claimPlay(attemptId: string, stimulusId: string): Promise<PlayGrant>
-  finishSection(attemptId: string, sectionId: string, body: FinishSectionBody): Promise<FinishSectionResult>
-  submit(attemptId: string, body: SubmitBody): Promise<FinalizedAttempt>   // remote only; local gateway rejects with OfflineError
+  finishSection(
+    attemptId: string,
+    sectionId: string,
+    body: FinishSectionBody,
+  ): Promise<FinishSectionResult>
+  submit(attemptId: string, body: SubmitBody): Promise<FinalizedAttempt> // remote only; local gateway rejects with OfflineError
+  // As built (§14): + noteAnswer, flushAnswers(ctx), isLocalOnly, hasPendingJournal(attemptId): Promise<boolean>; start(slug, hint?)
 }
-export class OfflineError extends Error { readonly kind = "offline" }
+export class OfflineError extends Error {
+  readonly kind = "offline"
+}
 // lib/attempt/gateway-selector.ts — Task 21: export function gatewayFor(attemptId: string): AttemptGateway
 
 // lib/reminders.ts — Task 25
-export type ReminderState = "off" | "on" | "denied" | "needs-install" | "unsupported"
+export type ReminderState =
+  | "off"
+  | "on"
+  | "denied"
+  | "needs-install"
+  | "unsupported"
 export const reminders: {
   state(): Promise<ReminderState>
-  enable(): Promise<ReminderState>     // permission + subscribe + PUT
+  enable(): Promise<ReminderState> // permission + subscribe + PUT
   disable(): Promise<ReminderState>
 }
 ```
 
 Server (`packages/server/src`, `packages/db/src`, `docs/api/openapi.yaml`):
 
-| Endpoint | Task | Notes |
-|---|---|---|
-| `GET /api/tests/:slug/offline-bundle` | 14 | `CatalogController`; 404 `test_not_found`, 409 `test_not_published` |
-| `POST /api/attempts/offline-sync` | 18 | idempotent on `clientAttemptId`; 200 `{ attemptId, applied, late, answersAcked }`; 409 `offline_play_cap_exceeded`; 422 `offline_journal_invalid` |
-| `PUT /api/me/reminders` · `DELETE /api/me/reminders` | 23 | 204 |
-| Migration `1016_offline_attempts.cjs` | 17 | `attempt.client_attempt_id uuid UNIQUE NULL`, `attempt.origin text NOT NULL DEFAULT 'server' CHECK (origin IN ('server','offline'))` |
-| Migration `1017_reminder_subscription.cjs` | 23 | `reminder_subscription(student_id PK/FK, endpoint, p256dh, auth, timezone, hour, minute, last_sent_on date, created_at)` |
+| Endpoint                                             | Task | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/tests/:slug/offline-bundle`                | 14   | `CatalogController`; **404 `test_not_found` for both an unknown and an unpublished test — there is no 409** (as built, §14)                                                                                                                                                                                                                                                                                                                  |
+| `POST /api/attempts/offline-sync`                    | 18   | body `{ attemptId, clientSentAt, events[] }` (the client-minted UUID is the attempt id; there is no `clientAttemptId`); idempotent by event sequence (the server keeps a cursor); success carries the applied / late / acknowledged counts and `ackedThrough`; 409 `offline_play_cap_exceeded` / `offline_attempt_conflict`; 422 `offline_journal_invalid` (refusal bodies carry `reason` and `eventSeq`); 403 for another student's attempt |
+| `GET /api/attempts/:id` (runner envelope)            | 21   | gains required `offlineJournalCursor: number` (0 when none) so a device that re-hydrates an attempt resumes its journal sequence above what the server already holds                                                                                                                                                                                                                                                                         |
+| `PUT /api/me/reminders` · `DELETE /api/me/reminders` | 23   | 204; `PUT` also takes an optional `locale`; the push `endpoint` must be `https`, port 443 (or none) and on an allow-listed push-service host (FCM, Mozilla, Apple, Windows; extra suffixes via `PUSH_ENDPOINT_HOSTS`), else 400; 503 `reminders_not_configured` when VAPID is unset (`DELETE` still works)                                                                                                                                   |
+| Migration `1016_offline_attempts.cjs`                | 17   | `attempt.origin text NOT NULL DEFAULT 'server' CHECK (origin IN ('server','offline'))`, `attempt.offline_journal_cursor` (no `client_attempt_id` column, §13.1 #5)                                                                                                                                                                                                                                                                           |
+| Migration `1017_reminder_subscription.cjs`           | 23   | `reminder_subscription(student_id PK/FK, endpoint, p256dh, auth, timezone, locale, hour, minute, last_sent_on date, created_at)`                                                                                                                                                                                                                                                                                                             |
 
 ## 7. Accessibility and interaction requirements
 
@@ -286,14 +326,14 @@ These apply to every task (copied from the html-prototype contract; the prototyp
 
 ## 10. Phasing (each phase ships working software)
 
-| Phase | Tasks | Result |
-|---|---|---|
-| A — Installable foundation | 1–6 | Installable, offline shell, tab bar, sheets, toasts, Profile |
-| B — Mobile screens | 7–13 | Every screen matches the prototype; today's online/offline-queue behaviour preserved |
-| C — Offline library | 14–16 | "Save offline" works end to end |
-| D — Offline attempts | 17–22 | Start/continue/finish sections offline; sync on reconnect; hand-in online-only |
-| E — Reminders | 23–25 | Web Push reminders |
-| F — Acceptance | 26 | Parity verification, Lighthouse, docs, deploy config |
+| Phase                      | Tasks | Result                                                                               |
+| -------------------------- | ----- | ------------------------------------------------------------------------------------ |
+| A — Installable foundation | 1–6   | Installable, offline shell, tab bar, sheets, toasts, Profile                         |
+| B — Mobile screens         | 7–13  | Every screen matches the prototype; today's online/offline-queue behaviour preserved |
+| C — Offline library        | 14–16 | "Save offline" works end to end                                                      |
+| D — Offline attempts       | 17–22 | Start/continue/finish sections offline; sync on reconnect; hand-in online-only       |
+| E — Reminders              | 23–25 | Web Push reminders                                                                   |
+| F — Acceptance             | 26    | Parity verification, Lighthouse, docs, deploy config                                 |
 
 Phases C–E can be cut without invalidating A–B; the parity matrix rows 12, 28–32 depend on them.
 
@@ -308,14 +348,14 @@ Phases C–E can be cut without invalidating A–B; the parity matrix rows 12, 2
 
 ## 12. Risks
 
-| Risk | Mitigation |
-|---|---|
-| Journal replay lets a student game timing offline | Server bounds (§D6), monotonic local clock, play-cap audit, `origin='offline'` flagged in admin results; accepted for a private family platform |
-| Capped audio downloadable via bundle | Documented trade-off (D5); audit at sync |
-| Service worker caches stale authenticated data on shared devices | Allow-list + purge on sign-out + subject-change purge |
-| `registerType: "prompt"` leaves users on old shells | Update banner + Profile Refresh; version row |
-| iOS push requires installed PWA and iOS ≥ 16.4 | `needs-install` / `unsupported` states |
-| Refactoring `run.tsx` (1 221 lines, 2 111-line test) onto a gateway regresses behaviour | Task 20 is behaviour-preserving with the existing suite as the guard before any local gateway exists |
+| Risk                                                                                    | Mitigation                                                                                                                                      |
+| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Journal replay lets a student game timing offline                                       | Server bounds (§D6), monotonic local clock, play-cap audit, `origin='offline'` flagged in admin results; accepted for a private family platform |
+| Capped audio downloadable via bundle                                                    | Documented trade-off (D5); audit at sync                                                                                                        |
+| Service worker caches stale authenticated data on shared devices                        | Allow-list + purge on sign-out + subject-change purge                                                                                           |
+| `registerType: "prompt"` leaves users on old shells                                     | Update banner + Profile Refresh; version row                                                                                                    |
+| iOS push requires installed PWA and iOS ≥ 16.4                                          | `needs-install` / `unsupported` states                                                                                                          |
+| Refactoring `run.tsx` (1 221 lines, 2 111-line test) onto a gateway regresses behaviour | Task 20 is behaviour-preserving with the existing suite as the guard before any local gateway exists                                            |
 
 ## 13. Amendments after plan drafting (authoritative over D5, D6 and §6 where they differ)
 
@@ -323,11 +363,11 @@ Drafting the plan against the real code found defects in D6 and several contract
 
 ### 13.1 D6 corrections
 
-1. **Answers are journal events.** The server rejects an answer to an earlier question of a forward-only section as `navigation_locked` once the replayed position has moved on. Offline answers therefore travel in the journal, interleaved with `position` events, not only through the answer queue. (A pre-existing *online* variant — a queued answer flushed after Next — is not fixed here.)
+1. **Answers are journal events.** The server rejects an answer to an earlier question of a forward-only section as `navigation_locked` once the replayed position has moved on. Offline answers therefore travel in the journal, interleaved with `position` events, not only through the answer queue. (A pre-existing _online_ variant — a queued answer flushed after Next — is not fixed here.)
 2. **Time is skew-normalised, not rejected.** `effectiveAt = clientAt + (receivedAt − clientSentAt)`. A phone whose clock is wrong is accepted; it neither gains time nor is rejected for a fast clock. The "≤ receive time + 60 s" rule is dropped.
-3. **Local clock:** `elapsed = max(monotonic, wall)` with a persisted high-water mark. The "wall jump over 2 minutes is tamper" rule is dropped (it granted free time when iOS pauses `performance.now()` in sleep).
+3. **Local clock (as built — a dead band, not `max(monotonic, wall)`):** each observation adds the monotonic delta (`performance.now()`); it adds the wall-clock delta instead only when that exceeds the monotonic delta by more than 2000 ms (a sleep or suspend during which the monotonic timer paused); it never adds a negative amount, so setting the wall clock back cannot rewind time. A persisted high-water mark is written atomically with every journal append, so a stamped `clientAt` is never below the stored mark. Forward wall-clock jumps under about 2 s are deliberately not counted. The "wall jump over 2 minutes is tamper" rule is dropped (it granted free time when iOS pauses `performance.now()` in sleep). A plain `max(mono, wall)` was rejected because the two timers' quantisation bias accumulates (about +32 s per hour at one call per frame).
 4. **Two deadlines.** `attempt.expires_at` (first enter + whole-test duration) is enforced independently of each section's `expires_at`; the validator tracks both.
-5. **Offline start cannot reuse `startOrResumeAttempt`** (it resumes an existing in-progress attempt, so a journal could be applied to a different attempt). Instead: new `createOfflineAttempt`; the **client-minted UUID is the server `attempt.id`**; there is **no `client_attempt_id` column**. Migration `1016_offline_attempts.cjs` adds `attempt.origin ('server'|'offline')` and `offline_journal_cursor`. Request body is `{ attemptId, clientSentAt, events[] }`; errors `offline_journal_invalid` (422), `offline_play_cap_exceeded` (409), `offline_attempt_conflict` (409). A *timed* in-progress attempt can be continued offline only if this device already loaded it (hydration); otherwise Continue is disabled with the connection reason.
+5. **Offline start cannot reuse `startOrResumeAttempt`** (it resumes an existing in-progress attempt, so a journal could be applied to a different attempt). Instead: new `createOfflineAttempt`; the **client-minted UUID is the server `attempt.id`**; there is **no `client_attempt_id` column**. Migration `1016_offline_attempts.cjs` adds `attempt.origin ('server'|'offline')` and `offline_journal_cursor`. Request body is `{ attemptId, clientSentAt, events[] }`; errors `offline_journal_invalid` (422), `offline_play_cap_exceeded` (409), `offline_attempt_conflict` (409). A _timed_ in-progress attempt can be continued offline only if this device already loaded it (hydration); otherwise Continue is disabled with the connection reason.
 6. **Shared device:** local attempts carry `ownerSub` (JWT `sub`); sync, Continue, resume and counts act only for the signed-in student; sign-out purge keeps unsynced work.
 
 7. **Final validator rules (Task 17 review):** time is skew-normalised; **any `clientAt > clientSentAt` fails the whole journal** (`client_at_after_sent_at`, zero tolerance; equality allowed) — the client therefore stamps `clientSentAt` from the SAME high-water clock as the events and freshly on every send; an event whose normalised time lands **>120 s below server-recorded history** fails the journal (`client_at_before_history`) instead of being clamped, because on a hydrated attempt a forged far-future `clientSentAt` would otherwise land every event at the floor and bypass all deadlines; sections must be entered in ordinal order (`section_out_of_order`); `createOfflineAttempt` is race-safe (the loser of a concurrent same-attempt insert re-reads and returns `exists`).
@@ -355,3 +395,27 @@ Drafting the plan against the real code found defects in D6 and several contract
 
 Capped audio is downloadable through the bundle endpoint (play counts are audited at sync, not byte-gated); `apiFetch` has no per-call timeout so a "connected but dead" network keeps choosing the remote gateway; a rare ±1 play over-count can follow a crash mid-apply or a lost `claimPlay` response; `origin = 'offline'` is recorded but not yet surfaced in the admin results table; the "recording didn't load" retry copy can claim a play was used when the local gateway did not consume one.
 Clock trust limits (Task 17 review): "neither gains nor loses time" holds only while the device clock is unchanged between the first event and the send; on a HYDRATED attempt a forged skew can gain up to (first journal event − server-recorded floor) + 120 s; an honest device can be refused by `client_at_before_history` if a previous sync that carried an enter/finish took >120 s in transit (no per-call timeout, §13.4) or the wall clock steps forward >120 s while offline — the local journal is kept and the sync-failed state is shown, never discarded.
+
+Further known limits (Tasks 19–25 reviews, accepted):
+
+- **Hydrated-attempt skew:** on an attempt this device loaded from the server, a forged clock skew can gain up to (first journal event − server-recorded floor) + 120 s against server deadlines.
+- **Free closed time:** close the app, set the wall clock back, reopen: the time the app was closed is free, because it needs a trusted time source to measure.
+- **Refused journal:** a journal the server refuses (`offline_journal_invalid`, `offline_attempt_conflict`, …) is kept on the device and marked sync-failed, but there is no automatic retry and no recovery UI; the work is stranded until a decision is made (open decision, §14).
+- **One reminder subscription per student:** a second device replaces the first. The replaced device cannot detect it (there is no `GET /api/me/reminders`), keeps showing "on", and receives nothing.
+- **No `pushsubscriptionchange` handler:** a browser that rotates its subscription silently stops receiving reminders until the student toggles them off and on.
+- **First post with no response:** if a first journal post is sent and its response is lost, later sends of that range count as retries, which weakens the first-send collision defence (the server cursor removes the root cause).
+- **Push delivery:** a timeout after the push service accepted a message can deliver one duplicate on retry (the notification uses a fixed `tag`, so it replaces rather than stacks); a reminder due at 23:59 can be missed because the send window stops at local midnight; the retry throttle is per server process.
+- **Real-device unknowns:** safe-area insets on notched iPhones, `applicationServerKey` presence on iOS standalone, and the 52 × 32 px `.switch` hit target are verified only by reasoning (see the acceptance checklist).
+
+## 14. As-built notes
+
+Facts about what shipped that the sections above state differently or not at all. §13 and this section win over §3–§12.
+
+- **Offline bundle:** `GET /api/tests/:slug/offline-bundle` answers 404 `test_not_found` for an unknown test and for an unpublished one. Capped stimuli inside `groups` carry no `mediaUrl`; the client matches media through `media[].stimulusId`. Capped audio URLs are the same HMAC as the `/play` URLs, so a bundle holder can play, not only download (accepted trade-off, D5).
+- **Offline sync:** `POST /api/attempts/offline-sync` takes `{ attemptId, clientSentAt, events[] }` and runs one transaction per sync under a per-attempt advisory lock (create-if-needed, every applied event, captures, cursor). The runner envelope carries `offlineJournalCursor`. Events past `clientSentAt` fail the whole journal; so do events that normalise to more than 120 s below server history (§13.1 #7).
+- **Local clock:** a dead band (§13.1 #3), not `max(monotonic, wall)`.
+- **Gateway:** `AttemptGateway` additionally has `hasPendingJournal(attemptId)` (any test fake must implement it); the pagehide keepalive `PATCH /responses` is disabled for an attempt whose local copy still has unsent journal events.
+- **Reminders:** one subscription per student. `PUT /api/me/reminders` takes `locale` (en, de, es, fr, it, ja) and accepts only allow-listed push hosts on port 443; the server rechecks the host at send time and never follows redirects. Delivery responses 404/410 delete the subscription; 400/401/403/413 are kept and logged once (a server-wide key mistake must not wipe subscriptions); 429, 5xx, timeouts and network errors are retried (15-minute throttle). The scheduler runs every 60 s in the API process under a Postgres advisory lock and is controlled by `REMINDER_SCHEDULER_ENABLED` (default on, off under `NODE_ENV=test`, and it also needs VAPID). The app treats a live push subscription as "on" only when a local marker names the current student, and drops a subscription made with a different VAPID key.
+- **Env:** `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (all three or none), `PUSH_ENDPOINT_HOSTS`, `REMINDER_SCHEDULER_ENABLED` (server); `VITE_VAPID_PUBLIC_KEY` (SPA build arg, or substituted at container start by `docker-entrypoint.sh`, falling back to `VAPID_PUBLIC_KEY`).
+- **Removed legacy:** `AppMenu`, `DeviceSheet`, the `.pip` strip CSS and `.question-count` / `.card.hl` rules; 26 unused locale keys (see the Task 26 report).
+- **Open decisions:** (1) a refused offline journal has no recovery path: either an adult-triggered `retrySync(attemptId)` that clears the failed state, or a journal export for support; (2) no `GET /api/me/reminders`, so a replaced device cannot detect that it lost its subscription.

@@ -20,7 +20,10 @@ export interface TimeUpWaiting {
   readonly reason: string
   readonly checkAgainLabel: string
   readonly onCheckAgain: () => void
-  readonly failedMessage: string | null
+  /** The server refused the journal: nothing to retry, no Check again. */
+  readonly failed: boolean
+  /** A re-check failed with nothing left to send: say so, stay retryable. */
+  readonly retryMessage: string | null
 }
 
 export interface TimeUpViewProps {
@@ -131,19 +134,22 @@ function WaitingFooter({ waiting }: { readonly waiting: TimeUpWaiting }) {
       <p id={reasonId} className="m-reason text-center">
         {waiting.reason}
       </p>
-      {waiting.failedMessage ? (
-        <p role="alert" className="m-alert">
-          {waiting.failedMessage}
-        </p>
-      ) : (
-        <button
-          type="button"
-          className="m-btn"
-          data-variant="secondary"
-          onClick={waiting.onCheckAgain}
-        >
-          {waiting.checkAgainLabel}
-        </button>
+      {waiting.failed ? null : (
+        <>
+          {waiting.retryMessage ? (
+            <p role="alert" className="m-alert">
+              {waiting.retryMessage}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            className="m-btn"
+            data-variant="secondary"
+            onClick={waiting.onCheckAgain}
+          >
+            {waiting.checkAgainLabel}
+          </button>
+        </>
       )}
     </footer>
   )

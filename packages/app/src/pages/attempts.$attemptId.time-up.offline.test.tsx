@@ -105,6 +105,29 @@ describe("TimeUpScreen waiting variant", () => {
     expect(screen.queryByRole("button", { name: "Check again" })).toBeNull()
   })
 
+  it("a refused journal no longer promises scoring when back online", () => {
+    render(<TimeUpScreen data={waiting} syncFailed />)
+
+    expect(
+      screen.queryByText("We'll score it as soon as you're back online."),
+    ).toBeNull()
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "We couldn't send this test. Please tell an adult.",
+    )
+  })
+
+  it("a failed re-check with nothing left to send shows a retryable alert", () => {
+    const onCheckAgain = vi.fn()
+
+    render(
+      <TimeUpScreen data={waiting} checkFailed onCheckAgain={onCheckAgain} />,
+    )
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/try again/i)
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }))
+    expect(onCheckAgain).toHaveBeenCalledOnce()
+  })
+
   it("the normal variant still links to the result", () => {
     render(
       <TimeUpScreen

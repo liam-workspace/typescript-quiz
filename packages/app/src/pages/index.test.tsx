@@ -878,7 +878,7 @@ describe("library install card", () => {
       sync: { pendingAttempts: 1, failed: false },
     })
 
-    expect(screen.getByRole("status", { name: "" })).toHaveTextContent(
+    expect(screen.getByText(/saved on this phone/i)).toHaveTextContent(
       "Saved on this phone — it will be sent when you're back online.",
     )
   })

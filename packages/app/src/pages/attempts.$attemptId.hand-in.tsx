@@ -115,6 +115,16 @@ export function HandInScreen({
     () => networkStore.getSnapshot(),
     () => networkStore.getSnapshot(),
   )
+  // Back online: the "needs a connection" outcome of an earlier tap is stale.
+  const [wasOnline, setWasOnline] = useState(online)
+
+  if (online !== wasOnline) {
+    setWasOnline(online)
+
+    if (online && outcome.status === "offline") {
+      setOutcome({ status: "idle" })
+    }
+  }
 
   useEffect(() => {
     let cancelled = false

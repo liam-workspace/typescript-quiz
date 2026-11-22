@@ -55,14 +55,24 @@ export async function loadWaitingSummary(
   try {
     const items = await queue.snapshotForAttempt(attemptId)
 
-    return summarizeWaiting(
-      state,
-      new Set(
-        items
-          .filter((item) => item.selectedChoiceIds.length > 0)
-          .map((item) => item.questionId),
-      ),
+    // Answers the server already accepted were acked out of the queue, but
+    // the local state still remembers them; answers not yet sent are in the
+    // queue and are newer, so they win for the same question (a cleared
+    // selection counts as unanswered).
+    const selections = new Map<string, number>()
+
+    for (const { questionId, selectedChoiceIds } of [
+      ...(state.responses ?? []),
+      ...items,
+    ]) {
+      selections.set(questionId, selectedChoiceIds.length)
+    }
+
+    const answered = new Set(
+      [...selections].filter(([, count]) => count > 0).map(([id]) => id),
     )
+
+    return summarizeWaiting(state, answered)
   } finally {
     void queue.close()
   }

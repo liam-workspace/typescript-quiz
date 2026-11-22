@@ -125,4 +125,83 @@ describe("loadWaitingSummary", () => {
 
     expect(await loadWaitingSummary("att-1")).not.toBeNull()
   })
+
+  const response = (questionId: string, selectedChoiceIds: string[]) => ({
+    questionId,
+    selectedChoiceIds,
+    clientInstanceId: "c",
+    seq: 1,
+  })
+
+  async function queued(ids: Array<[string, string[]]>) {
+    const queue = await AnswerQueue.open()
+
+    await Promise.all(
+      ids.map(([questionId, selectedChoiceIds]) =>
+        queue.recordAnswer(
+          {
+            attemptId: "att-1",
+            sectionId: "sec-l",
+            questionId,
+            selectedChoiceIds,
+            timeSpentMs: null,
+          },
+          new Date("2026-11-22T11:00:00.000Z"),
+        ),
+      ),
+    )
+
+    await queue.close()
+  }
+
+  it("counts answers the server already accepted (acked out of the queue, kept in the local state)", async () => {
+    await unsent({
+      serverKnown: true,
+      responses: [response("q-l1", ["a"]), response("q-l2", ["a"])],
+    })
+
+    expect(await loadWaitingSummary("att-1")).toMatchObject({
+      answeredCount: 2,
+      unansweredCount: 1,
+    })
+  })
+
+  it("an offline-started attempt counts from the queue alone", async () => {
+    await unsent()
+    await queued([["q-l1", ["a"]]])
+
+    expect(await loadWaitingSummary("att-1")).toMatchObject({
+      answeredCount: 1,
+      unansweredCount: 2,
+    })
+  })
+
+  it("a question in both the state and the queue is counted once", async () => {
+    await unsent({
+      serverKnown: true,
+      responses: [response("q-l1", ["a"])],
+    })
+    await queued([
+      ["q-l1", ["b"]],
+      ["q-r1", ["a"]],
+    ])
+
+    expect(await loadWaitingSummary("att-1")).toMatchObject({
+      answeredCount: 2,
+      unansweredCount: 1,
+    })
+  })
+
+  it("a cleared selection (empty array) is unanswered", async () => {
+    await unsent({
+      serverKnown: true,
+      responses: [response("q-l1", ["a"]), response("q-l2", [])],
+    })
+    await queued([["q-l1", []]])
+
+    expect(await loadWaitingSummary("att-1")).toMatchObject({
+      answeredCount: 1,
+      unansweredCount: 2,
+    })
+  })
 })

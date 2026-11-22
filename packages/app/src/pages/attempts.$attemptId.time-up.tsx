@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useSyncExternalStore } from "react"
 import { useTranslation } from "react-i18next"
 import { TimeUpView } from "../components/TimeUpView.js"
 import type { FinalizedAttempt } from "../lib/api-types.js"
 import { getAttemptRuntime } from "../lib/attempt/runtime.js"
 import { useSyncStatus } from "../lib/attempt/use-sync-status.js"
+import { useWaitingRecheck } from "../lib/attempt/use-waiting-recheck.js"
 import { loadWaitingSummary } from "../lib/attempt/waiting-summary.js"
 import { getAttemptResult } from "../lib/attempts-api.js"
 import { networkStore } from "../lib/network.js"
@@ -61,21 +62,38 @@ export interface TimeUpScreenProps {
   readonly onCheckAgain?: () => void
   /** The server refused this attempt's journal (it is kept on the phone). */
   readonly syncFailed?: boolean
+  /** A re-check failed and nothing is left to send: say so, stay retryable. */
+  readonly checkFailed?: boolean
 }
 
 export function TimeUpScreen({
   data,
   onCheckAgain,
   syncFailed = false,
+  checkFailed = false,
 }: TimeUpScreenProps) {
   const { t } = useTranslation("runner")
   const parsedResultUrl = sameOriginPath.safeParse(data.resultUrl)
+
+  let message = t("timeUp.message")
+
+  if (data.waiting) {
+    // Waiting copy only while something is really waiting to be sent.
+    message = t("offline.timeUp.waiting")
+
+    if (syncFailed) {
+      message = t("offline.timeUp.failed")
+    } else if (checkFailed) {
+      message = t("offline.timeUp.waitingReason")
+    }
+  }
 
   return (
     <TimeUpView
       title={data.testTitle}
       heading={t("timeUp.title")}
-      message={data.waiting ? t("offline.timeUp.waiting") : t("timeUp.message")}
+      message={message}
+      messageRole={syncFailed ? "alert" : "status"}
       summary={{ answered: data.answeredCount, blank: data.unansweredCount }}
       waiting={
         data.waiting
@@ -84,7 +102,10 @@ export function TimeUpScreen({
               reason: t("offline.timeUp.waitingReason"),
               checkAgainLabel: t("offline.timeUp.checkAgain"),
               onCheckAgain: onCheckAgain ?? noop,
-              failedMessage: syncFailed ? t("offline.timeUp.failed") : null,
+              failed: syncFailed,
+              retryMessage: checkFailed
+                ? t("sectionRules.error.generic")
+                : null,
             }
           : undefined
       }
@@ -110,68 +131,35 @@ export const Route = createFileRoute("/attempts/$attemptId/time-up")({
   component: RouteComponent,
 })
 
+const requestSync = (): Promise<void> =>
+  getAttemptRuntime().then(({ sync }) => {
+    sync.request()
+  })
+
 function RouteComponent() {
   const { attemptId } = Route.useParams()
   const loaded = Route.useLoaderData()
   const status = useSyncStatus()
-  const [fresh, setFresh] = useState<{
-    readonly attemptId: string
-    readonly data: TimeUpData
-  } | null>(null)
-  const checking = useRef(false)
-  const data = fresh?.attemptId === attemptId ? fresh.data : loaded
-  const syncFailed = status.failedAttemptIds.includes(attemptId)
-
-  // Re-asks the server (no reload). The screen swaps to the normal result
-  // link the moment the result exists; if this phone still holds unsent work
-  // it stays on the waiting variant.
-  const check = useCallback(
-    async (requestSync: boolean): Promise<void> => {
-      if (checking.current) {
-        return
-      }
-
-      checking.current = true
-
-      try {
-        if (requestSync) {
-          await getAttemptRuntime()
-            .then(({ sync }) => {
-              sync.request()
-            })
-            .catch(() => undefined)
-        }
-
-        setFresh({ attemptId, data: await loadTimeUp(attemptId) })
-      } catch {
-        // Still no answer from the server: stay as we are.
-      } finally {
-        checking.current = false
-      }
-    },
-    [attemptId],
+  const online = useSyncExternalStore(
+    (listener) => networkStore.subscribe(listener),
+    () => networkStore.getSnapshot().online,
+    () => true,
   )
-
-  // Every sync-status change (sync finished, journal refused, back online)
-  // is a reason to look again while waiting.
-  useEffect(() => {
-    if (
-      data.waiting &&
-      !status.syncing &&
-      !syncFailed &&
-      networkStore.getSnapshot().online
-    ) {
-      void Promise.resolve().then(() => check(false))
-    }
-  }, [check, data.waiting, status, syncFailed])
+  const { data, syncFailed, checkFailed, checkAgain } = useWaitingRecheck({
+    attemptId,
+    data: loaded,
+    status,
+    online,
+    load: loadTimeUp,
+    requestSync,
+  })
 
   return (
     <TimeUpScreen
       data={data}
       syncFailed={syncFailed}
-      onCheckAgain={() => {
-        void check(true)
-      }}
+      checkFailed={checkFailed}
+      onCheckAgain={checkAgain}
     />
   )
 }

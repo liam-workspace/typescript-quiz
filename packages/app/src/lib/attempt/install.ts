@@ -43,7 +43,20 @@ function lazyHybrid(): AttemptGateway {
  * the tab becoming visible again. Appends request a debounced sync
  * themselves. Unit tests never call this, so they keep the remote default.
  */
+let installed = false
+
+/** Test-only seam: lets a suite install again from a clean slate. */
+export function resetOfflineInstallForTests(): void {
+  installed = false
+}
+
 export function installOfflineAttempts(): void {
+  // A second call would add a second set of triggers and purge steps.
+  if (installed) {
+    return
+  }
+
+  installed = true
   setAttemptGateway(lazyHybrid())
   registerPurgeStep(async () => {
     const { journal } = await getAttemptRuntime()

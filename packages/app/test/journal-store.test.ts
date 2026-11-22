@@ -298,6 +298,40 @@ describe("JournalStore", () => {
     expect(await store.eventsAfter("att-1", 0)).toHaveLength(1)
   })
 
+  it("createWithEvent persists nothing when the EVENT key collides after the attempt row was added", async () => {
+    const name = freshName()
+    const store = await JournalStore.open(name)
+
+    // A stray event (att-1, 1) with no attempt row, as a crash could leave.
+    await store.putAttempt(makeLocalState())
+    await store.append("att-1", { type: "start", clientAt: at, payload: {} })
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open(name)
+
+      request.onsuccess = () => {
+        const tx = request.result.transaction("attempts", "readwrite")
+
+        tx.objectStore("attempts").delete("att-1")
+        tx.oncomplete = () => {
+          request.result.close()
+          resolve()
+        }
+        tx.onerror = () => {
+          reject(tx.error ?? new Error("delete failed"))
+        }
+      }
+    })
+
+    await expect(
+      store.createWithEvent(makeLocalState(), {
+        type: "start",
+        clientAt: at,
+        payload: {},
+      }),
+    ).rejects.toThrow()
+    expect(await store.getAttempt("att-1")).toBeNull()
+  })
+
   it("saveClockHighWater never decreases the stored mark", async () => {
     const store = await JournalStore.open(freshName())
 

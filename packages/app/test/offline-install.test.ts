@@ -5,7 +5,10 @@ import {
   attemptGateway,
   setAttemptGateway,
 } from "../src/lib/attempt/gateway-selector.js"
-import { installOfflineAttempts } from "../src/lib/attempt/install.js"
+import {
+  installOfflineAttempts,
+  resetOfflineInstallForTests,
+} from "../src/lib/attempt/install.js"
 import { JournalStore } from "../src/lib/attempt/journal-store.js"
 import { RemoteAttemptGateway } from "../src/lib/attempt/remote-gateway.js"
 import {
@@ -26,6 +29,7 @@ const syncAll = vi.fn().mockResolvedValue(undefined)
 
 beforeEach(() => {
   resetPurgeStepsForTests()
+  resetOfflineInstallForTests()
   syncAll.mockClear()
 })
 
@@ -53,6 +57,23 @@ describe("installOfflineAttempts", () => {
     window.dispatchEvent(new Event("online"))
 
     expect(syncAll).toHaveBeenCalledTimes(2)
+  })
+
+  it("a second call is a no-op: one set of triggers, one purge step", async () => {
+    const journal = await JournalStore.open("pp-install-3")
+    const step = vi.spyOn(journal, "listAttempts")
+
+    runtime.get.mockResolvedValue({ gateway: {}, journal, sync: { syncAll } })
+    installOfflineAttempts()
+    installOfflineAttempts()
+    await vi.waitFor(() => expect(syncAll).toHaveBeenCalled())
+    await Promise.resolve()
+
+    expect(syncAll).toHaveBeenCalledTimes(1)
+
+    await purgeClientCaches()
+
+    expect(step).toHaveBeenCalledTimes(1)
   })
 
   it("keeps working remote-only when IndexedDB cannot be opened", async () => {

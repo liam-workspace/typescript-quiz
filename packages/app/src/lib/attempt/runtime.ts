@@ -27,7 +27,13 @@ let runtime: Promise<AttemptRuntime> | undefined = undefined
 
 /** Opens IndexedDB once and wires the production gateway graph. Lazy: never runs at import. */
 export function getAttemptRuntime(): Promise<AttemptRuntime> {
-  runtime ??= build()
+  runtime ??= build().catch((error: unknown) => {
+    // A transient open failure must not disable offline attempts for the
+    // rest of the tab: the next caller tries again.
+    runtime = undefined
+
+    throw error
+  })
 
   return runtime
 }

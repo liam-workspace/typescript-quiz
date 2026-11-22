@@ -7,6 +7,7 @@ import "@pp/app/index.css"
 // findings, because every component test builds its OWN i18next instance
 // inline. The suite was supplying the production code the app had forgotten.
 import "@pp/app/i18n"
+import { installOfflineAttempts } from "@pp/app/lib/attempt/install"
 import { registerPwa } from "@pp/app/lib/pwa/register"
 import { routeTree } from "@pp/app/route.gen"
 import { RouterProvider, createRouter } from "@tanstack/react-router"
@@ -28,6 +29,8 @@ if (!root) {
 }
 
 registerPwa()
+// Journal-first attempts (offline start, offline run, sync on reconnect).
+installOfflineAttempts()
 
 createRoot(root).render(
   <StrictMode>

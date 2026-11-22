@@ -210,6 +210,22 @@ describe("createJournalSync", () => {
     ])
   })
 
+  it("a single-try sync (a tap waiting on it) never backs off", async () => {
+    const post = vi
+      .fn<Post>()
+      .mockRejectedValue(
+        new ApiError({ type: "unexpected_error", title: "x", status: 503 }),
+      )
+    const { sync, scheduler, journal } = await setup(post)
+
+    expect(await sync.syncNow("att-1", { singleTry: true })).toEqual({
+      kind: "offline",
+    })
+    expect(post).toHaveBeenCalledTimes(1)
+    expect(scheduler).not.toHaveBeenCalled()
+    expect(await journal.pendingCount("att-1")).toBe(3)
+  })
+
   it.each([
     ["offline_journal_invalid", 422],
     ["offline_play_cap_exceeded", 409],

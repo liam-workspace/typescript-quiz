@@ -201,8 +201,59 @@ describe("HybridAttemptGateway — routing", () => {
 
     await hybrid.setPosition("att-9", "sec-l", "q-l1")
 
-    expect(syncNow).toHaveBeenCalledWith("att-9")
+    expect(syncNow).toHaveBeenCalledWith("att-9", { singleTry: true })
     expect(remote.setPosition).toHaveBeenCalledWith("att-9", "sec-l", "q-l1")
+  })
+
+  it("never makes a tap wait on a slow or failing sync for longer than the budget (one quick try, no backoff)", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
+
+    try {
+      const { hybrid, remote, journal, syncNow } = await setup()
+
+      // A 5xx/429 spell: the sync is stuck.
+      syncNow.mockImplementation(
+        () =>
+          new Promise(() => {
+            // Never settles.
+          }),
+      )
+      await journal.putAttempt(
+        makeLocalState({
+          attemptId: "att-2",
+          serverKnown: true,
+          currentSectionId: "sec-r",
+          currentQuestionId: "q-r1",
+          sections: openReading,
+        }),
+      )
+      await journal.append("att-2", {
+        type: "position",
+        clientAt: iso(T0),
+        payload: { sectionId: "sec-r", questionId: "q-r1" },
+      })
+
+      const tap = hybrid.setPosition("att-2", "sec-r", "q-r1")
+      let done = false
+
+      void tap.then(() => {
+        done = true
+      })
+      // The budget starts when the catch-up sync is asked for.
+      await vi.waitFor(() => {
+        expect(syncNow).toHaveBeenCalled()
+      })
+      await vi.advanceTimersByTimeAsync(1_499)
+      expect(done).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+      await tap
+
+      expect(syncNow).toHaveBeenCalledWith("att-2", { singleTry: true })
+      expect(remote.setPosition).not.toHaveBeenCalled()
+      expect(await types(journal, "att-2")).toEqual(["position", "position"])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("offline, a server-known attempt continues locally and journals the move", async () => {
@@ -370,7 +421,7 @@ describe("HybridAttemptGateway — answers and hand-in", () => {
     )
     await hybrid.submit("att-5", { clientInstanceId: "i", responses: [] })
 
-    expect(syncNow).toHaveBeenCalledWith("att-5")
+    expect(syncNow).toHaveBeenCalledWith("att-5", { singleTry: true })
     expect(remote.submit).toHaveBeenCalled()
     expect(await journal.getAttempt("att-5")).toBeNull()
   })

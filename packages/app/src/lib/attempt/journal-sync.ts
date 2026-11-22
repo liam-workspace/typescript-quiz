@@ -61,8 +61,13 @@ export interface JournalSyncDeps {
   readonly withLock?: LockRunner
 }
 
+export interface SyncOptions {
+  /** One request, no backoff: for a caller (a tap) that must not wait long. */
+  readonly singleTry?: boolean
+}
+
 export interface JournalSync {
-  syncNow(attemptId: string): Promise<SyncOutcome>
+  syncNow(attemptId: string, options?: SyncOptions): Promise<SyncOutcome>
   syncAll(): Promise<void>
   /** Debounced: coalesces a burst of appends into one sync. */
   request(): void
@@ -202,10 +207,11 @@ export function createJournalSync(deps: JournalSyncDeps): JournalSync {
   async function send(
     attemptId: string,
     events: readonly JournalEventRecord[],
+    maxTries: number,
   ): Promise<Sent> {
     const newest = Math.max(...events.map((e) => Date.parse(e.clientAt)))
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    for (let attempt = 1; attempt <= maxTries; attempt += 1) {
       try {
         // eslint-disable-next-line no-await-in-loop
         const response = await deps.post({
@@ -230,7 +236,7 @@ export function createJournalSync(deps: JournalSyncDeps): JournalSync {
               )
             : classifyForRetry({ kind: "network-error" }, attempt)
 
-        if (!outcome.retry || attempt === MAX_ATTEMPTS || !deps.isOnline()) {
+        if (!outcome.retry || attempt === maxTries || !deps.isOnline()) {
           return { kind: "offline" }
         }
 
@@ -247,7 +253,10 @@ export function createJournalSync(deps: JournalSyncDeps): JournalSync {
     return { kind: "offline" }
   }
 
-  async function run(attemptId: string): Promise<SyncOutcome> {
+  async function run(
+    attemptId: string,
+    maxTries: number,
+  ): Promise<SyncOutcome> {
     let last: OfflineSyncResponse | null = null
     let answersAcked = 0
 
@@ -288,7 +297,7 @@ export function createJournalSync(deps: JournalSyncDeps): JournalSync {
       }))
 
       // eslint-disable-next-line no-await-in-loop
-      const sent = await send(attemptId, events)
+      const sent = await send(attemptId, events, maxTries)
 
       if (sent.kind === "terminal") {
         // eslint-disable-next-line no-await-in-loop
@@ -362,26 +371,33 @@ export function createJournalSync(deps: JournalSyncDeps): JournalSync {
     return { kind: "synced", result: last }
   }
 
-  async function guarded(attemptId: string): Promise<SyncOutcome> {
+  async function guarded(
+    attemptId: string,
+    maxTries: number,
+  ): Promise<SyncOutcome> {
     await publish(true)
 
     try {
       return await withLock(`pp-offline-sync:${attemptId}`, () =>
-        run(attemptId),
+        run(attemptId, maxTries),
       )
     } finally {
       await publish(false)
     }
   }
 
-  function syncNow(attemptId: string): Promise<SyncOutcome> {
+  function syncNow(
+    attemptId: string,
+    options: SyncOptions = {},
+  ): Promise<SyncOutcome> {
     const existing = inflight.get(attemptId)
 
     if (existing) {
       return existing
     }
 
-    const started = guarded(attemptId).finally(() => {
+    const maxTries = options.singleTry === true ? 1 : MAX_ATTEMPTS
+    const started = guarded(attemptId, maxTries).finally(() => {
       inflight.delete(attemptId)
     })
 

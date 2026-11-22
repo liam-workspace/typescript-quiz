@@ -26,6 +26,25 @@ export interface HybridDeps {
   readonly journal: JournalStore
   readonly sync: JournalSync
   readonly isOnline: () => boolean
+  /** How long a call may wait for the catch-up sync before going local. */
+  readonly syncBudgetMs?: number
+}
+
+const SYNC_BUDGET_MS = 1500
+
+/** Resolves after `ms`; `cancel` stops the timer once the race is decided. */
+function budget(ms: number): { done: Promise<void>; cancel: () => void } {
+  let timer: ReturnType<typeof setTimeout> | undefined = undefined
+  const done = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, ms)
+  })
+
+  return {
+    done,
+    cancel: () => {
+      clearTimeout(timer)
+    },
+  }
 }
 
 type Route = "local" | "remote"
@@ -230,7 +249,21 @@ export class HybridAttemptGateway implements AttemptGateway {
       return "local"
     }
 
-    await this.d.sync.syncNow(attemptId)
+    // ONE quick try within a short budget: during a 5xx/429 spell a full
+    // sync's backoff would hang every tap. Going local while a sync is still
+    // in flight is safe -- the new event is simply sent after it.
+    const wait = budget(this.d.syncBudgetMs ?? SYNC_BUDGET_MS)
+
+    try {
+      await Promise.race([
+        this.d.sync
+          .syncNow(attemptId, { singleTry: true })
+          .catch(() => undefined),
+        wait.done,
+      ])
+    } finally {
+      wait.cancel()
+    }
 
     return this.route(attemptId)
   }

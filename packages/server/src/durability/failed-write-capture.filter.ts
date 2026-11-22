@@ -46,6 +46,25 @@ interface JsonResponse {
 }
 
 /**
+ * Routes whose bodies are credentials, never stored: a Web Push subscription
+ * carries its `auth` secret, and failed_write is readable by admins and
+ * replayable. The request is still recorded (reason, route, size) so the
+ * response keeps its `capturedAs` handle.
+ */
+const REDACTED_ROUTE = /^\/api\/me\/reminders(?:[/?#]|$)/
+const REDACTED_BODY = "[redacted]"
+
+function capturedBody(req: CapturableRequest): string {
+  if (REDACTED_ROUTE.test(req.originalUrl ?? req.url ?? "")) {
+    return REDACTED_BODY
+  }
+
+  return req.rawBody !== undefined
+    ? req.rawBody.toString("utf8")
+    : JSON.stringify(req.body ?? {})
+}
+
+/**
  * `reason` distinguishes three causes that all land in the same table:
  * the two body-capture signals name their own condition; a schema
  * rejection carries the pipe's own `reason` (`invalid_body` or
@@ -107,10 +126,7 @@ export class FailedWriteCaptureFilter implements ExceptionFilter {
     // schema-rejection (body parsed fine, Zod refused its shape) has a
     // meaningful req.body to fall back on, and even then req.rawBody is the
     // exact bytes the client sent, so prefer it whenever it is present.
-    const rawBody =
-      req.rawBody !== undefined
-        ? req.rawBody.toString("utf8")
-        : JSON.stringify(req.body ?? {})
+    const rawBody = capturedBody(req)
 
     const reason = reasonFor(exception)
 

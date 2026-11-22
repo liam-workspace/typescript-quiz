@@ -52,6 +52,14 @@ services:
       MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET:?set MEDIA_SIGNING_SECRET}
       MEDIA_ROOT: /media
       MEDIA_MAX_BYTES: ${MEDIA_MAX_BYTES:-20971520}
+      # Web Push for the practice reminders. All three or none: an empty value
+      # counts as unset (config.ts), a partial set refuses to boot, none means
+      # PUT /api/me/reminders answers 503 reminders_not_configured and no
+      # reminders are sent. Generate a pair with:
+      #   pnpm --filter @pp/server exec web-push generate-vapid-keys
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
     volumes:
       - pp-media:/media
     depends_on:

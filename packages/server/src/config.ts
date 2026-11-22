@@ -4,6 +4,12 @@ import {
   type Environment,
 } from "@liam-workspace/node-config"
 
+export interface PushConfig {
+  readonly publicKey: string
+  readonly privateKey: string
+  readonly subject: string
+}
+
 export interface ServerConfig {
   port: number
   databaseUrl: string
@@ -15,6 +21,7 @@ export interface ServerConfig {
   mediaSigningSecret: string
   requestBodyMaxBytes: number
   spaRoot: string | null
+  push: PushConfig | null
 }
 
 function required(env: Environment, key: string): string {
@@ -25,6 +32,32 @@ function required(env: Environment, key: string): string {
   }
 
   return value
+}
+
+/**
+ * All three or none. Compose's `${VAR:-}` hands the container EMPTY strings
+ * for unset variables, so blank counts as unset; a partial set refuses to
+ * boot rather than silently running without reminders.
+ */
+function loadPushConfig(env: Environment): PushConfig | null {
+  const publicKey = env.VAPID_PUBLIC_KEY?.trim() ?? ""
+  const privateKey = env.VAPID_PRIVATE_KEY?.trim() ?? ""
+  const subject = env.VAPID_SUBJECT?.trim() ?? ""
+  const present = [publicKey, privateKey, subject].filter(
+    (value) => value.length > 0,
+  ).length
+
+  if (present === 0) {
+    return null
+  }
+
+  if (present < 3) {
+    throw new Error(
+      "VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT must be set together",
+    )
+  }
+
+  return { publicKey, privateKey, subject }
 }
 
 export function loadServerConfig(
@@ -59,5 +92,6 @@ export function loadServerConfig(
     // start`) there is no built SPA sitting alongside the server, so this
     // must not default to a path that doesn't exist.
     spaRoot: env.SPA_ROOT ?? null,
+    push: loadPushConfig(env),
   }
 }

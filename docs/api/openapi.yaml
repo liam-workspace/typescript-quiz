@@ -152,6 +152,52 @@ paths:
                 { schema: { $ref: "#/components/schemas/Problem" } },
             }
 
+  /me/reminders:
+    put:
+      tags: [Session]
+      operationId: putReminderSubscription
+      summary: Turn on the daily practice reminder for this device
+      description: |
+        Stores this student's Web Push subscription (`PushSubscription.toJSON()`) and the local time
+        to remind at. One subscription per student: a second PUT replaces the first, and an endpoint
+        already held by another student moves to the caller (a shared phone follows whoever
+        subscribed last). Returns `503 reminders_not_configured` when the server has no VAPID keys. The endpoint must be a
+        public `https://` host name (no IP literals, `localhost` or credentials), and a rejected body is
+        never retained in `failed_write`: it carries the subscription secret.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReminderSubscriptionRequest" }
+      responses:
+        "204": { description: Subscription stored. }
+        "400": { $ref: "#/components/responses/InvalidBody" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: No profile for this `sub` — call `POST /session` first.
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
+        "503":
+          description: "`reminders_not_configured` — the server has no VAPID key pair."
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
+    delete:
+      tags: [Session]
+      operationId: deleteReminderSubscription
+      summary: Turn off the daily practice reminder
+      description: |
+        Idempotent: 204 whether or not a subscription existed, and available even when the server
+        has no VAPID keys, so sign-out cleanup never fails on server configuration.
+      responses:
+        "204": { description: No subscription remains for this student. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
   # ─────────────────────────────────────────────────────────── Catalog ──
   /tests:
     get:
@@ -1643,6 +1689,49 @@ components:
         retryable: { type: boolean, const: false }
         attempt: { $ref: "#/components/schemas/FinalizedAttempt" }
       additionalProperties: false
+
+    ReminderSubscriptionRequest:
+      type: object
+      required: [subscription, timezone, hour, minute]
+      additionalProperties: false
+      properties:
+        subscription:
+          type: object
+          required: [endpoint, keys]
+          additionalProperties: false
+          properties:
+            endpoint:
+              {
+                type: string,
+                format: uri,
+                maxLength: 2048,
+                pattern: "^https://",
+              }
+            expirationTime: { type: [number, "null"] }
+            keys:
+              type: object
+              required: [p256dh, auth]
+              additionalProperties: false
+              properties:
+                p256dh:
+                  {
+                    type: string,
+                    minLength: 1,
+                    maxLength: 256,
+                    pattern: "^[A-Za-z0-9_-]+={0,2}$",
+                  }
+                auth:
+                  {
+                    type: string,
+                    minLength: 1,
+                    maxLength: 256,
+                    pattern: "^[A-Za-z0-9_-]+={0,2}$",
+                  }
+        timezone:
+          { type: string, description: "IANA zone, e.g. `America/New_York`." }
+        locale: { type: string, enum: [de, en, es, fr, it, ja], default: en }
+        hour: { type: integer, minimum: 0, maximum: 23 }
+        minute: { type: integer, minimum: 0, maximum: 59 }
 
     Problem:
       type: object

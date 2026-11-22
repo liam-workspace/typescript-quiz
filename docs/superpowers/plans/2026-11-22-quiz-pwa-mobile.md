@@ -21190,6 +21190,16 @@ git commit -m "feat(server): PUT/DELETE /api/me/reminders with optional VAPID co
 
 ### Task 24: Reminder scheduler — due-time maths, claim-then-send, `web-push` behind a port
 
+> **CONTROLLER RULINGS (binding; they override the code below wherever they conflict — decided after the Task 23 security reviews):** this task makes the SERVER send HTTP requests to stored, user-supplied URLs, so it is an SSRF boundary.
+> - **Re-validate at send time** with the SAME predicate Task 23 exported: `canonicalPushEndpoint(url, extraSuffixes)` / `isAllowedPushEndpoint` in `packages/server/src/reminders/push-endpoint.ts`, passing `loadServerConfig().pushEndpointHosts` as `extraSuffixes` (the function does NOT validate the suffixes it receives — only config-load validation does; never pass raw strings). A stored endpoint that fails the check at send time is treated like a dead subscription (delete the row, log the id only) and NEVER requested.
+> - **Parser independence:** Task 23 guarantees the stored canonical host is a valid ASCII DNS name whose hostname is identical under WHATWG `URL` and legacy `url.parse`. Still, the request host must be taken from WHATWG `new URL(endpoint).hostname`, or you must CONFIRM that the installed `web-push` version derives its request host in a way that cannot disagree (web-push@3.x used `url.parse`; verify v4 in `node_modules` and say what you found) — put the confirmation in a test or a code comment citing the file/line.
+> - **No redirects, short timeouts:** the push request must never follow redirects (`web-push` uses `https.request` — keep it that way; never wrap it in a redirect-following client) and must set short connect and response timeouts (e.g. 5 s / 10 s); a timeout or network error is a TRANSIENT failure (release the claim, retry throttled), never a deletion.
+> - **Secrets:** never log or return the VAPID private key, the subscription `auth`/`p256dh`, or the endpoint URL (log the student id and a hash prefix at most); the payload carries no PII ("Time for a little practice 🎧" localised by `locale`).
+> - **One subscription per student** (`student_id` is the primary key; a second browser replaces the first) and one endpoint belongs to one student — the scheduler must not assume more than one row per student.
+> - Honour Task 23's final shape: `reminder_subscription(student_id PK, endpoint UNIQUE canonical https URL, p256dh, auth, timezone IANA, hour, minute, locale, last_sent_on date null, created_at)`; repository helpers live in `packages/db/src/repositories/reminder.repository.ts` (`REMINDER_COLUMNS`, `toReminderRow`, `lastSentOn` are NOT re-exported from the `@pp/db` index — add exports as needed).
+> - Gates now include `pnpm build` and root `pnpm typecheck` (see implementer-common.md BUILD GATE).
+
+
 **Files:**
 - Create: `packages/server/src/reminders/reminder-due.ts`
 - Test: `packages/server/test/reminder-due.test.ts`

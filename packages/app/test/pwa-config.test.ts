@@ -158,7 +158,13 @@ describe("workbox policy", () => {
       }
     }>
     navigateFallbackDenylist: RegExp[]
+    importScripts: string[]
   }
+
+  it("pulls the practice-reminder push handlers into the generated worker", () => {
+    expect(workbox.importScripts).toEqual(["push-sw.js"])
+    expect(existsSync(join(appRoot, "public", "push-sw.js"))).toBe(true)
+  })
 
   it("has exactly one runtime route: NetworkFirst, 4 s timeout, 60 entries, 7 days, 200s only", () => {
     expect(workbox.runtimeCaching).toHaveLength(1)

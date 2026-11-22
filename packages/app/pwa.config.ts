@@ -86,6 +86,9 @@ export const pwaOptions: Partial<VitePWAOptions> = {
     globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2,webmanifest}"],
     maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
     navigateFallbackDenylist: [/^\/api\//u, /^\/media\//u, /^\/health/u],
+    // Practice reminders: `push` + `notificationclick` live in the plain,
+    // un-bundled public/push-sw.js (generateSW has no custom worker code).
+    importScripts: ["push-sw.js"],
     runtimeCaching: [
       {
         urlPattern: isCacheableApiRequest,

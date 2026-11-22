@@ -57,6 +57,13 @@ describe("production build: installable shell and worker policy", () => {
     expect(fonts.length).toBeGreaterThan(0)
   })
 
+  it("the built worker imports the push handlers, which ship next to it", () => {
+    expect(sw).toMatch(/importScripts\(\s*"push-sw\.js"\s*\)/u)
+    expect(readFileSync(join(outDir, "push-sw.js"), "utf8")).toContain(
+      '"practice-reminder"',
+    )
+  })
+
   it("links the manifest from index.html exactly once", () => {
     const html = readFileSync(join(outDir, "index.html"), "utf8")
 

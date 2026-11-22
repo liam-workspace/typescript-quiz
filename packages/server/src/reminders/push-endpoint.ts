@@ -28,6 +28,40 @@ export function normaliseHostSuffixes(suffixes: readonly string[]): string[] {
     .filter((suffix) => suffix.length > 0)
 }
 
+/**
+ * Letters, digits and hyphens only, 1-63 characters, no leading or trailing
+ * hyphen (punycode `xn--` labels are ASCII, so they pass). WHATWG `URL`
+ * accepts far more in a hostname (`; ' " { } ` ! $ & ( ) * + , = ~ _`), and
+ * the legacy `url.parse` that web-push 3.x uses reads some of those as the end
+ * of the host, so `evil.test;.push.apple.com` would pass a suffix check yet be
+ * requested as `evil.test`. Refusing every non-DNS character removes the
+ * disagreement between parsers.
+ */
+const DNS_LABEL = /^(?!-)[a-z0-9-]{1,63}(?<!-)$/
+const MAX_HOST_LENGTH = 253
+
+function isDnsName(host: string): boolean {
+  return (
+    host.length <= MAX_HOST_LENGTH &&
+    host.split(".").every((label) => DNS_LABEL.test(label))
+  )
+}
+
+/**
+ * A configured extra suffix opens the allow-list, so it must itself be a real
+ * registrable-looking name: two or more DNS labels and an alphabetic top
+ * label (refuses `com`, `localhost`, `internal`, `0.1`).
+ */
+export function isValidHostSuffix(suffix: string): boolean {
+  const labels = suffix.split(".")
+
+  return (
+    labels.length >= 2 &&
+    isDnsName(suffix) &&
+    /^[a-z]/.test(labels[labels.length - 1])
+  )
+}
+
 function parseUrl(value: string): URL | null {
   try {
     return new URL(value)
@@ -52,7 +86,10 @@ export function canonicalPushEndpoint(
     return null
   }
 
-  // Percent-encoding in the authority is only ever an obfuscation attempt.
+  // Defence in depth only: percent-encoding in the authority is an
+  // obfuscation attempt. It does not catch every spelling (`https:%66cm...`,
+  // `https:\\%66cm...`); those are safe regardless because every check below
+  // runs on the DECODED `url.hostname` and the decoded form is what is stored.
   if (/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*%/i.test(value.trim())) {
     return null
   }
@@ -69,6 +106,11 @@ export function canonicalPushEndpoint(
   }
 
   const host = url.hostname.replace(/\.$/, "")
+
+  if (!isDnsName(host)) {
+    return null
+  }
+
   const suffixes = [
     ...PUSH_ENDPOINT_HOST_SUFFIXES,
     ...normaliseHostSuffixes(extraSuffixes),

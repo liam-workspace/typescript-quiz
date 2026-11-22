@@ -45,4 +45,23 @@ describe("loadServerConfig — Web Push", () => {
       "VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT must be set together",
     )
   })
+
+  it("reads and normalises PUSH_ENDPOINT_HOSTS, default empty", () => {
+    expect(loadServerConfig(BASE).pushEndpointHosts).toEqual([])
+    expect(
+      loadServerConfig({
+        ...BASE,
+        PUSH_ENDPOINT_HOSTS: " *.Push.Example.Test, ,.other.example.org ",
+      }).pushEndpointHosts,
+    ).toEqual(["push.example.test", "other.example.org"])
+  })
+
+  it.each(["com", "localhost", "internal", "0.1", "ok.example.test,com"])(
+    "refuses to boot on PUSH_ENDPOINT_HOSTS=%s",
+    (value) => {
+      expect(() =>
+        loadServerConfig({ ...BASE, PUSH_ENDPOINT_HOSTS: value }),
+      ).toThrow(/PUSH_ENDPOINT_HOSTS entry "(com|localhost|internal|0\.1)"/)
+    },
+  )
 })

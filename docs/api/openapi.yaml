@@ -185,7 +185,7 @@ paths:
                 { schema: { $ref: "#/components/schemas/Problem" } },
             }
         "409":
-          description: "`reminder_endpoint_conflict` — another sign-in was registering the same device at that instant; repeat the request."
+          description: "`reminder_endpoint_conflict` — another sign-in was registering the same device at that instant. Not retryable in the `Problem` sense; the client may re-issue the PUT on its next user action."
           content:
             {
               application/problem+json:

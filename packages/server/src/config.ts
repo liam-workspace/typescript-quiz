@@ -3,6 +3,10 @@ import {
   parseIntegerEnv,
   type Environment,
 } from "@liam-workspace/node-config"
+import {
+  isValidHostSuffix,
+  normaliseHostSuffixes,
+} from "./reminders/push-endpoint.js"
 
 export interface PushConfig {
   readonly publicKey: string
@@ -62,6 +66,26 @@ function loadPushConfig(env: Environment): PushConfig | null {
   return { publicKey, privateKey, subject }
 }
 
+/**
+ * These suffixes ARE the SSRF boundary for push endpoints, so a bad one refuses
+ * the boot (naming the entry) instead of silently admitting `com`,
+ * `localhost` or `0.1`.
+ */
+function loadPushEndpointHosts(env: Environment): string[] {
+  const suffixes = (env.PUSH_ENDPOINT_HOSTS ?? "").split(",")
+  const hosts = normaliseHostSuffixes(suffixes)
+
+  for (const host of hosts) {
+    if (!isValidHostSuffix(host)) {
+      throw new Error(
+        `PUSH_ENDPOINT_HOSTS entry "${host}" is not a valid push-service host suffix (needs two or more DNS labels and an alphabetic last label)`,
+      )
+    }
+  }
+
+  return hosts
+}
+
 export function loadServerConfig(
   env: Environment = nodeEnvironment(),
 ): ServerConfig {
@@ -96,9 +120,6 @@ export function loadServerConfig(
     spaRoot: env.SPA_ROOT ?? null,
     push: loadPushConfig(env),
     // Default empty. Only for a push vendor the built-in list lacks.
-    pushEndpointHosts: (env.PUSH_ENDPOINT_HOSTS ?? "")
-      .split(",")
-      .map((host) => host.trim())
-      .filter((host) => host.length > 0),
+    pushEndpointHosts: loadPushEndpointHosts(env),
   }
 }

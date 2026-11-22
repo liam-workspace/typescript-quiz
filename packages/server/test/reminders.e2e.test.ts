@@ -528,3 +528,57 @@ describe("PUT/DELETE /api/me/reminders", () => {
     })
   })
 })
+
+describe("PUT /api/me/reminders when the endpoint race is lost", () => {
+  let app: TestApp | undefined = undefined
+
+  beforeAll(async () => {
+    app = await createTestApp({
+      poolFault: {
+        matches: isReminderInsert,
+        error: Object.assign(new Error("duplicate"), {
+          code: "23505",
+          constraint: "reminder_subscription_endpoint_key",
+        }),
+      },
+    })
+  })
+
+  afterAll(async () => {
+    await app?.close()
+  })
+
+  it("answers 409 with a non-retryable problem body over the wire", async () => {
+    vi.stubEnv("VAPID_PUBLIC_KEY", "test-public")
+    vi.stubEnv("VAPID_PRIVATE_KEY", "test-private")
+    vi.stubEnv("VAPID_SUBJECT", "mailto:test@example.test")
+
+    if (!app) {
+      throw new Error("Application failed to initialize")
+    }
+
+    const running = app
+    const http = running.http.getHttpServer() as App
+    const token = await running.mint({
+      sub: "rem-409",
+      email: "r@example.test",
+    })
+    await request(http)
+      .post("/api/session")
+      .set("Authorization", `Bearer ${token}`)
+
+    const res = await request(http)
+      .put("/api/me/reminders")
+      .set("Authorization", `Bearer ${token}`)
+      .send(BODY)
+      .expect(409)
+
+    expect(res.type).toBe("application/problem+json")
+    expect(res.body).toMatchObject({
+      type: "reminder_endpoint_conflict",
+      status: 409,
+      retryable: false,
+    })
+    vi.unstubAllEnvs()
+  })
+})

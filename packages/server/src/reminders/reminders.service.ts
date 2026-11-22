@@ -58,13 +58,13 @@ export class RemindersService {
       })
     } catch (error) {
       // The repository already retried once; a third concurrent writer for the
-      // same endpoint is a conflict the client may simply repeat, not a fault.
+      // same endpoint is a conflict, not a fault; the contract keeps `retryable` false for 4xx.
       if (isEndpointConflict(error)) {
         throw new ProblemException({
           type: "reminder_endpoint_conflict",
-          title: "Another sign-in is registering this device. Try again.",
+          title: "Another sign-in is registering this device at the same time.",
           status: HttpStatus.CONFLICT,
-          retryable: true,
+          retryable: false,
         })
       }
 

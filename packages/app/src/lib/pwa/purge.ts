@@ -91,6 +91,19 @@ export function purgeClientCaches(): Promise<void> {
 }
 
 /**
+ * The student this browser last signed in (set by `purgeIfSubjectChanged`
+ * BEFORE it purges), or null. Lets a purge step tell "this student is signing
+ * out" from "a different student just signed in".
+ */
+export function lastSignedInStudent(): string | null {
+  try {
+    return globalThis.localStorage.getItem(LAST_STUDENT_KEY)
+  } catch {
+    return null
+  }
+}
+
+/**
  * Called after a successful sign-in. A different student on the same
  * browser must not inherit the previous student's cached data even if the
  * previous session ended without a clean sign-out (expired refresh token).

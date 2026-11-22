@@ -10,13 +10,24 @@ export interface LocalClockDeps {
  * journal's claimed times, so all this class can defend is "a student cannot
  * gain time by rewinding the phone's clock".
  *
- * `elapsed += max(monotonic delta, wall delta)` per observation:
+ * per observation `elapsed += monotonic delta`, or the wall delta when the wall is ahead by more than `SLEEP_THRESHOLD_MS`:
  *   - wall set BACKWARDS: ignored, the monotonic clock keeps counting;
  *   - wall jumped FORWARDS (or the device slept while `performance.now()`
  *     paused): trusted, it can only cost the student time;
  *   - a persisted high-water mark gives the same guarantee across reloads.
  * `nowMs()` never decreases.
  */
+/**
+ * `Date.now()` ticks in whole milliseconds and `performance.now()` in about
+ * 0.1 ms, so per observation `wall delta - mono delta` is noise in roughly
+ * (-1, +1) ms. Taking a plain `max` per call keeps only the positive half and
+ * the bias accumulates with call frequency (about +32 s per hour at one call
+ * per frame). The wall clock therefore only wins when it is ahead of the
+ * monotonic clock by more than this dead band, which every real sleep/suspend
+ * and every deliberate forward wall jump exceeds by far.
+ */
+export const SLEEP_THRESHOLD_MS = 2000
+
 export class LocalClock {
   private readonly deps: LocalClockDeps
   private readonly base: number
@@ -45,7 +56,10 @@ export class LocalClock {
     const wall = this.deps.wallNow()
     const mono = this.deps.monoNow()
 
-    this.elapsed += Math.max(0, mono - this.lastMono, wall - this.lastWall)
+    const dMono = Math.max(0, mono - this.lastMono)
+    const dWall = wall - this.lastWall
+
+    this.elapsed += dWall - dMono > SLEEP_THRESHOLD_MS ? dWall : dMono
     this.lastWall = wall
     this.lastMono = mono
     this.high = Math.max(this.high, this.base + this.elapsed)

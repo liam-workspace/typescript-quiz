@@ -167,4 +167,45 @@ describe("LocalClock", () => {
 
     await expect(clock.persist()).resolves.toBeUndefined()
   })
+
+  it("does not drift when called every animation frame for an hour", async () => {
+    const start = 1_000_000.37
+    const state = { t: 0 }
+    // Date.now() floors to whole ms; performance.now() has ~0.1 ms steps.
+    const wallNow = (): number => Math.floor(start + state.t)
+    const monoNow = (): number => Math.floor(state.t * 10) / 10
+    const clock = await LocalClock.create({
+      wallNow,
+      monoNow,
+      loadHighWater: () => Promise.resolve(null),
+      saveHighWater: () => Promise.resolve(),
+    })
+    const first = clock.nowMs()
+    // A tiny deterministic jitter so frames are not perfectly regular.
+    let seed = 7
+
+    while (state.t < 3_600_000) {
+      seed = (seed * 16_807) % 2_147_483_647
+      state.t += 16.7 + ((seed % 100) / 100 - 0.5) * 2
+      clock.nowMs()
+    }
+
+    const drift = Math.abs(clock.nowMs() - first - state.t)
+
+    expect(drift).toBeLessThan(50)
+  })
+
+  it("documents the dead band: a 1.5 s wall jump is ignored, 3 s is counted", async () => {
+    const wall = { v: 1_000_000 }
+    const mono = { v: 0 }
+    const clock = await LocalClock.create(deps(wall, mono))
+
+    wall.v += 1_500
+
+    expect(clock.nowMs()).toBe(1_000_000)
+
+    wall.v += 3_000
+
+    expect(clock.nowMs()).toBe(1_003_000)
+  })
 })

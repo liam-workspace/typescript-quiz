@@ -85,20 +85,10 @@ export function createOfflineAttempt(
       return { kind: "version_unavailable" }
     }
 
-    const { rows: existing } = await tx.query<{
-      student_id: string
-      test_version_id: string
-    }>("SELECT student_id, test_version_id FROM attempt WHERE id = $1", [
-      input.attemptId,
-    ])
-    const sameId = existing.find((_row, index) => index === 0)
+    const already = await classifyExistingId(tx, input)
 
-    if (sameId) {
-      const isThisAttempt =
-        sameId.student_id === input.studentId &&
-        sameId.test_version_id === input.testVersionId
-
-      return isThisAttempt ? { kind: "exists" } : { kind: "conflict" }
+    if (already) {
+      return already
     }
 
     const { rows: active } = await tx.query<{
@@ -130,8 +120,46 @@ export function createOfflineAttempt(
       [input.attemptId, input.studentId, input.testVersionId, input.now],
     )
 
-    return created.length === 0 ? { kind: "conflict" } : { kind: "created" }
+    if (created.length > 0) {
+      return { kind: "created" }
+    }
+
+    // Zero rows: a concurrent sync committed first. Two syncs of the SAME
+    // new attempt routinely race (online event, app start, visibility,
+    // debounced append, a second tab), and under READ COMMITTED both pass
+    // the existence check above. This statement sees the winner's commit,
+    // so the loser of a same-attempt race is `exists`, not a conflict that
+    // a client would treat as terminal. No row under this id means the
+    // insert lost to `attempt_one_active` instead: a genuine conflict.
+    return (await classifyExistingId(tx, input)) ?? { kind: "conflict" }
   })
+}
+
+/**
+ * `exists` for this very attempt (same id, student and version), `conflict`
+ * for the same id under anyone or anything else, null when the id is free.
+ */
+async function classifyExistingId(
+  tx: PgQueryable,
+  input: { attemptId: string; studentId: string; testVersionId: string },
+): Promise<{ kind: "exists" } | { kind: "conflict" } | null> {
+  const { rows } = await tx.query<{
+    student_id: string
+    test_version_id: string
+  }>("SELECT student_id, test_version_id FROM attempt WHERE id = $1", [
+    input.attemptId,
+  ])
+  const sameId = rows.find((_row, index) => index === 0)
+
+  if (!sameId) {
+    return null
+  }
+
+  const isThisAttempt =
+    sameId.student_id === input.studentId &&
+    sameId.test_version_id === input.testVersionId
+
+  return isThisAttempt ? { kind: "exists" } : { kind: "conflict" }
 }
 
 export interface JournalContextRows {

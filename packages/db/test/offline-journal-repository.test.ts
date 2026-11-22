@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import type pg from "pg"
 import { describe, expect, it } from "vitest"
 import { claimPlay } from "../src/repositories/media-play.repository.js"
 import {
@@ -16,6 +17,7 @@ import { seedMixedStimulusTest, seedPublishedTest } from "./helpers/fixtures.js"
 
 const NOW = new Date("2026-11-22T12:00:00.000Z")
 const sectionId = (section: { id: string }): string => section.id
+const outcomeKind = (outcome: { kind: string }): string => outcome.kind
 
 describe("migration 1016", () => {
   it("defaults attempt.origin to 'server' and refuses an unknown origin", async () => {
@@ -436,6 +438,160 @@ describe("loadJournalContext", () => {
           testVersionId: randomUUID(),
         }),
       ).rejects.toThrow(/does not exist/)
+    })
+  }, 120_000)
+})
+
+interface RaceInput {
+  attemptId: string
+  studentId: string
+  testVersionId: string
+  slug: string
+  now: Date
+}
+
+async function insertOtherStudent(pool: pg.Pool): Promise<string> {
+  const { rows } = await pool.query<{ id: string }>(
+    `INSERT INTO student (subject_claim, email, display_name)
+     VALUES ('sub-eve', 'eve@example.test', 'Eve') RETURNING id`,
+  )
+
+  return rows[0]?.id ?? ""
+}
+
+async function waitForLockWaiter(pool: pg.Pool): Promise<void> {
+  for (let tries = 0; tries < 200; tries += 1) {
+    // Sequential polling is the point: wait until the call under test is
+    // parked on the row lock the holder's uncommitted INSERT owns.
+    // eslint-disable-next-line no-await-in-loop
+    const { rows } = await pool.query<{ waiting: number }>(
+      `SELECT count(*)::int AS waiting FROM pg_stat_activity
+        WHERE wait_event_type = 'Lock' AND datname = current_database()`,
+    )
+
+    if ((rows[0]?.waiting ?? 0) > 0) {
+      return
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => {
+      setTimeout(resolve, 10)
+    })
+  }
+
+  throw new Error("createOfflineAttempt never blocked on the held insert")
+}
+
+/**
+ * Forces the lost-race path deterministically: a second connection inserts
+ * the same attempt id inside an open transaction, so `createOfflineAttempt`
+ * passes its existence check (the row is uncommitted), blocks on the unique
+ * index at its own INSERT, and gets zero rows once the holder commits.
+ */
+async function createWhileAnotherInsertIsInFlight(
+  pool: pg.Pool,
+  input: RaceInput,
+  holderStudentId: string,
+): Promise<unknown> {
+  const holder = await pool.connect()
+
+  try {
+    await holder.query("BEGIN")
+    await holder.query(
+      `INSERT INTO attempt (id, student_id, test_version_id, status, origin, created_at)
+       VALUES ($1, $2, $3, 'in_progress', 'offline', $4)`,
+      [input.attemptId, holderStudentId, input.testVersionId, input.now],
+    )
+
+    const pending = createOfflineAttempt(pool, input)
+
+    await waitForLockWaiter(pool)
+    await holder.query("COMMIT")
+
+    return await pending
+  } finally {
+    holder.release()
+  }
+}
+
+describe("createOfflineAttempt — concurrent syncs of one new attempt", () => {
+  it("reports the loser of a same-student race as exists, never conflict", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const input = {
+        attemptId: randomUUID(),
+        studentId: f.studentId,
+        testVersionId: f.versionId,
+        slug: f.slug,
+        now: NOW,
+      }
+
+      await expect(
+        createWhileAnotherInsertIsInFlight(pool, input, f.studentId),
+      ).resolves.toEqual({ kind: "exists" })
+    })
+  }, 120_000)
+
+  it("reports the loser as conflict when the winner is a different student", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const eve = await insertOtherStudent(pool)
+      const input = {
+        attemptId: randomUUID(),
+        studentId: f.studentId,
+        testVersionId: f.versionId,
+        slug: f.slug,
+        now: NOW,
+      }
+
+      await expect(
+        createWhileAnotherInsertIsInFlight(pool, input, eve),
+      ).resolves.toEqual({ kind: "conflict" })
+    })
+  }, 120_000)
+
+  it("two concurrent calls for the same attempt yield one created and one exists", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const input = {
+        attemptId: randomUUID(),
+        studentId: f.studentId,
+        testVersionId: f.versionId,
+        slug: f.slug,
+        now: NOW,
+      }
+      const outcomes = await Promise.all([
+        createOfflineAttempt(pool, input),
+        createOfflineAttempt(pool, input),
+      ])
+
+      expect(outcomes.map(outcomeKind).toSorted()).toEqual([
+        "created",
+        "exists",
+      ])
+    })
+  }, 120_000)
+
+  it("two concurrent calls with the same id but different students yield created and conflict", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const eve = await insertOtherStudent(pool)
+      const attemptId = randomUUID()
+      const base = {
+        attemptId,
+        testVersionId: f.versionId,
+        slug: f.slug,
+        now: NOW,
+      }
+      const outcomes = await Promise.all([
+        createOfflineAttempt(pool, { ...base, studentId: f.studentId }),
+        createOfflineAttempt(pool, { ...base, studentId: eve }),
+      ])
+
+      expect(outcomes.map(outcomeKind).toSorted()).toEqual([
+        "conflict",
+        "created",
+      ])
     })
   }, 120_000)
 })

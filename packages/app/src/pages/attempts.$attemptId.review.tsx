@@ -457,7 +457,9 @@ export function ReviewScreen({
           }}
         >
           <Icon name="grid" />
-          <span aria-hidden="true">{t("review.jumpToQuestion")}</span>
+          <span aria-hidden="true" className="m-jump-label">
+            {t("review.jumpToQuestion")}
+          </span>
         </button>
         <button
           type="button"

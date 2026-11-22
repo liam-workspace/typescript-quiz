@@ -1728,4 +1728,11 @@
   .m-save[data-state="failed"] {
     color: #b53a34;
   }
+  /* The icon alone says "jump" on the narrowest phones; the button keeps its
+   * aria-label, so nothing is lost for assistive tech. */
+  @media (max-width: 359px) {
+    .m-jump-label {
+      display: none;
+    }
+  }
 }

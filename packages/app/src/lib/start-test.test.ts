@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { AttemptStart, TestBrief } from "./api-types.js"
+import { attemptGateway } from "./attempt/gateway-selector.js"
 import { startAttempt } from "./attempts-api.js"
 import { getTest } from "./catalog-api.js"
 import { startTestAndRulesPath } from "./start-test.js"
@@ -41,6 +42,24 @@ describe("startTestAndRulesPath", () => {
       "/attempts/a1/sections/s1/rules",
     )
     expect(startAttempt).toHaveBeenCalledWith("practice-3")
+  })
+
+  it("starts through the attempt gateway with the card's hint", async () => {
+    vi.mocked(getTest).mockResolvedValue(brief)
+    const start = vi
+      .spyOn(attemptGateway, "start")
+      .mockResolvedValue({ ...attempt, id: "a9" })
+
+    try {
+      await expect(
+        startTestAndRulesPath("practice-3", { inProgressAttemptId: "a9" }),
+      ).resolves.toBe("/attempts/a9/sections/s1/rules")
+      expect(start).toHaveBeenCalledWith("practice-3", {
+        inProgressAttemptId: "a9",
+      })
+    } finally {
+      start.mockRestore()
+    }
   })
 
   it("carries a finalizedPriorAttempt notice in the search string", async () => {

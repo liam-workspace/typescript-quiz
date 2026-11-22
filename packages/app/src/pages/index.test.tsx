@@ -449,7 +449,9 @@ describe("test library page", () => {
     })
     await user.click(screen.getByRole("button", { name: "Start test" }))
 
-    expect(startTestAndRulesPath).toHaveBeenCalledWith(freshTest.slug)
+    expect(startTestAndRulesPath).toHaveBeenCalledWith(freshTest.slug, {
+      inProgressAttemptId: freshTest.inProgressAttemptId,
+    })
     await waitFor(() => {
       expect(navigate).toHaveBeenCalledWith("/attempts/a1/sections/s1/rules")
     })

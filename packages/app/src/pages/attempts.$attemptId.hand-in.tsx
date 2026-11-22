@@ -12,11 +12,9 @@ import { Icon } from "../components/Icon.js"
 import { TimeUpView } from "../components/TimeUpView.js"
 import { ApiError } from "../lib/api-client.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
-import {
-  getAttemptResult,
-  getRunnerEnvelope,
-  submitAttempt,
-} from "../lib/attempts-api.js"
+import type { AttemptGateway } from "../lib/attempt/attempt-gateway.js"
+import { attemptGateway } from "../lib/attempt/gateway-selector.js"
+import { getAttemptResult } from "../lib/attempts-api.js"
 import { redirectExpiredAttemptToResult } from "../lib/expired-attempt-redirect.js"
 import {
   buildSubmitRemainder,
@@ -62,6 +60,8 @@ export interface HandInScreenProps {
   readonly envelope: RunnerEnvelope
   readonly queue: AnswerQueue
   readonly navigate: (path: string) => void
+  /** Defaults to the app-wide `attemptGateway`; tests inject a fake. */
+  readonly gateway?: AttemptGateway
 }
 
 // A one-time snapshot at load time, not a live countdown -- this screen
@@ -84,6 +84,7 @@ export function HandInScreen({
   envelope,
   queue,
   navigate,
+  gateway = attemptGateway,
 }: HandInScreenProps) {
   const { t } = useTranslation("runner")
   // Defect B4: `pendingCount` used to also gate the Hand-in BUTTON --
@@ -135,7 +136,7 @@ export function HandInScreen({
 
     buildSubmitRemainder(queue, attemptId)
       .then((body) =>
-        submitAttempt(attemptId, body).then(async (result) => {
+        gateway.submit(attemptId, body).then(async (result) => {
           await reconcileFinalFlush(
             queue,
             attemptId,
@@ -387,7 +388,7 @@ export async function loadHandInRouteData(attemptId: string): Promise<{
 }> {
   try {
     const [envelope, queue] = await Promise.all([
-      getRunnerEnvelope(attemptId),
+      attemptGateway.loadEnvelope(attemptId),
       AnswerQueue.open(),
     ])
 

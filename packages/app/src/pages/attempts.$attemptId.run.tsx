@@ -29,13 +29,9 @@ import type { SaveStateProps } from "../components/SaveState.js"
 import { TimeUpView } from "../components/TimeUpView.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
 import { ApiError } from "../lib/api-client.js"
+import type { AttemptGateway } from "../lib/attempt/attempt-gateway.js"
+import { attemptGateway } from "../lib/attempt/gateway-selector.js"
 import { createServerCountdown, type TimeSource } from "../lib/countdown.js"
-import {
-  claimPlay,
-  finishSection,
-  getRunnerEnvelope,
-  setPosition,
-} from "../lib/attempts-api.js"
 import { redirectExpiredAttemptToResult } from "../lib/expired-attempt-redirect.js"
 import {
   FlushController,
@@ -144,6 +140,13 @@ export interface RunScreenProps {
   readonly navigate: (path: string, state?: TimeUpNavigationState) => void
   readonly now?: TimeSource
   readonly flushScheduler?: Scheduler
+  /** Defaults to the app-wide `attemptGateway`; tests inject a fake. */
+  readonly gateway?: AttemptGateway
+  /**
+   * True when the server does not know this attempt yet (an offline start):
+   * the `pagehide` keepalive `PATCH /responses` must not fire for it.
+   */
+  readonly localOnly?: boolean
 }
 
 export interface TimeUpNavigationState {
@@ -159,6 +162,8 @@ export function RunScreen({
   navigate,
   now = Date.now,
   flushScheduler = defaultScheduler,
+  gateway = attemptGateway,
+  localOnly = false,
 }: RunScreenProps) {
   const { t } = useTranslation("runner")
   const section = envelope.currentSectionId
@@ -315,7 +320,8 @@ export function RunScreen({
 
     zeroTouchStartedRef.current = true
 
-    void getRunnerEnvelope(attemptId)
+    void gateway
+      .loadEnvelope(attemptId)
       .then((freshEnvelope) => {
         // Zero was only a prompt. A successful response means the server
         // still considers the attempt active, so recalibrate from this new
@@ -345,16 +351,15 @@ export function RunScreen({
           })
         }
       })
-  }, [attemptId, navigate, now, remainingMs])
+  }, [attemptId, gateway, navigate, now, remainingMs])
 
   // Refs are read outside render (event handlers, effects); writing one
   // must live there too, never inline in the render body, so this update
   // runs as its own no-dependency-array effect -- after every render,
   // exactly the "keep it current" semantics the comment above promises.
   useEffect(() => {
-    openSectionRef.current = section
-      ? { attemptId, sectionId: section.id }
-      : null
+    openSectionRef.current =
+      section && !localOnly ? { attemptId, sectionId: section.id } : null
   })
 
   // Shared by every call site that can learn about a newly (or
@@ -491,8 +496,8 @@ export function RunScreen({
 
     let cancelled = false
 
-    void controller
-      .flushSection(attemptId, section.id, `/attempts/${attemptId}/responses`)
+    void gateway
+      .flushAnswers({ controller, queue, attemptId, sectionId: section.id })
       .then((result) => {
         if (!cancelled) {
           applyFlushResult(result)
@@ -509,7 +514,7 @@ export function RunScreen({
     // envelope/currentSectionId (envelope.sections.find on an unchanged
     // array), so this only re-runs on an actual section change, not on
     // every keystroke-driven re-render.
-  }, [queue, attemptId, controller, section])
+  }, [queue, attemptId, controller, gateway, section])
 
   useEffect(() => {
     if (!section) {
@@ -517,8 +522,8 @@ export function RunScreen({
     }
 
     const flushOnConnectionHint = (): void => {
-      void controller
-        .flushSection(attemptId, section.id, `/attempts/${attemptId}/responses`)
+      void gateway
+        .flushAnswers({ controller, queue, attemptId, sectionId: section.id })
         .then(applyFlushResult)
         .catch(() => {
           // The browser's `online` event is only a hint that the radio came
@@ -532,7 +537,7 @@ export function RunScreen({
     return () => {
       window.removeEventListener("online", flushOnConnectionHint)
     }
-  }, [attemptId, controller, section])
+  }, [attemptId, controller, gateway, queue, section])
 
   // Spec §5 rule 6, "Flush at end of life": a backgrounded/closed tab must
   // not lose whatever the queue is still holding for the open section. The
@@ -665,13 +670,16 @@ export function RunScreen({
     pendingAnswerWritesRef.current.add(durableWrite)
 
     void durableWrite
-      .then(() =>
-        controller.flushSection(
+      .then(async (queued) => {
+        await gateway.noteAnswer(attemptId, queued)
+
+        return gateway.flushAnswers({
+          controller,
+          queue,
           attemptId,
-          section.id,
-          `/attempts/${attemptId}/responses`,
-        ),
-      )
+          sectionId: section.id,
+        })
+      })
       .then((result) => {
         // Defect B5 fix: a terminal per-item rejection (spec §5 rule 5's
         // "stop dead") used to reach here and be thrown away -- the queue
@@ -705,7 +713,7 @@ export function RunScreen({
     }
 
     try {
-      const grant = await claimPlay(attemptId, stimulus.id)
+      const grant = await gateway.claimPlay(attemptId, stimulus.id)
 
       setPlaysUsedByStimulusId((prev) => ({
         ...prev,
@@ -779,7 +787,8 @@ export function RunScreen({
 
   // Next and Previous share the same position update and expiration handling.
   const moveToQuestion = (entry: FlatEntry): void => {
-    setPosition(attemptId, section.id, entry.question.id)
+    gateway
+      .setPosition(attemptId, section.id, entry.question.id)
       .then(() => {
         setCurrentQuestionId(entry.question.id)
         setPlayState({ status: "idle" })
@@ -835,16 +844,18 @@ export function RunScreen({
     void Promise.all([...pendingAnswerWritesRef.current])
       .then(() => buildSectionFinishRemainder(queue, attemptId, section.id))
       .then((body) =>
-        finishSection(attemptId, section.id, body).then(async (result) => {
-          await reconcileFinalFlush(
-            queue,
-            attemptId,
-            body.responses,
-            result.finalFlush,
-          )
+        gateway
+          .finishSection(attemptId, section.id, body)
+          .then(async (result) => {
+            await reconcileFinalFlush(
+              queue,
+              attemptId,
+              body.responses,
+              result.finalFlush,
+            )
 
-          return result
-        }),
+            return result
+          }),
       )
       .then((result) => {
         const { nextSectionId } = result
@@ -937,7 +948,8 @@ export function RunScreen({
       return
     }
 
-    setPosition(attemptId, targetSection.id, targetEntry.question.id)
+    gateway
+      .setPosition(attemptId, targetSection.id, targetEntry.question.id)
       .then(() => {
         setCurrentQuestionId(targetEntry.question.id)
         setPlayState({ status: "idle" })
@@ -1192,7 +1204,7 @@ export async function loadRunScreenData(attemptId: string): Promise<{
   student: RunStudent | undefined
 }> {
   const [envelope, student] = await Promise.all([
-    getRunnerEnvelope(attemptId),
+    attemptGateway.loadEnvelope(attemptId),
     getCurrentStudent().catch(() => undefined),
   ])
 
@@ -1211,14 +1223,16 @@ export async function loadRunRouteData(attemptId: string): Promise<{
   envelope: RunnerEnvelope
   student: RunStudent | undefined
   queue: AnswerQueue
+  localOnly: boolean
 }> {
   try {
-    const [{ envelope, student }, queue] = await Promise.all([
+    const [{ envelope, student }, queue, localOnly] = await Promise.all([
       loadRunScreenData(attemptId),
       AnswerQueue.open(),
+      attemptGateway.isLocalOnly(attemptId),
     ])
 
-    return { envelope, student, queue }
+    return { envelope, student, queue, localOnly }
   } catch (error) {
     // A 410 attempt_expired here means THIS load finalized the attempt --
     // the honest destination is the result screen it names, not an error
@@ -1280,7 +1294,7 @@ export const Route = createFileRoute("/attempts/$attemptId/run")({
 
 function RouteComponent() {
   const { attemptId } = Route.useParams()
-  const { envelope, student, queue } = Route.useLoaderData()
+  const { envelope, student, queue, localOnly } = Route.useLoaderData()
 
   // Same stand-in as sections.$sectionId.rules.tsx: no typed route exists
   // yet for the section-rules destination from here without inventing its
@@ -1300,6 +1314,7 @@ function RouteComponent() {
       queue={queue}
       student={student}
       navigate={navigate}
+      localOnly={localOnly}
     />
   )
 }

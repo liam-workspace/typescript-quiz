@@ -1,6 +1,7 @@
 import { defaultStringifySearch } from "@tanstack/react-router"
 import type { AttemptStart, TestBrief } from "./api-types.js"
-import { startAttempt } from "./attempts-api.js"
+import { attemptGateway } from "./attempt/gateway-selector.js"
+import type { StartHint } from "./attempt/attempt-gateway.js"
 import { getTest } from "./catalog-api.js"
 
 export function sectionRulesPath(
@@ -26,8 +27,15 @@ export function firstSectionOf(
   )
 }
 
-/** Library "Start": brief (for the first section id) → POST /attempts → rules path. */
-export async function startTestAndRulesPath(slug: string): Promise<string> {
+/**
+ * Library "Start": brief (for the first section id) → start the attempt
+ * through the attempt gateway → rules path. `hint` comes from the library
+ * card (`inProgressAttemptId`).
+ */
+export async function startTestAndRulesPath(
+  slug: string,
+  hint: StartHint = { inProgressAttemptId: null },
+): Promise<string> {
   const brief = await getTest(slug)
   const first = firstSectionOf(brief)
 
@@ -35,7 +43,7 @@ export async function startTestAndRulesPath(slug: string): Promise<string> {
     throw new Error(`test ${slug} has no sections`)
   }
 
-  const attempt = await startAttempt(slug)
+  const attempt = await attemptGateway.start(slug, hint)
 
   return sectionRulesPath(attempt, first.id)
 }

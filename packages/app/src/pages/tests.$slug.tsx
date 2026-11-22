@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { ApiError } from "../lib/api-client.js"
-import { startAttempt } from "../lib/attempts-api.js"
+import { attemptGateway } from "../lib/attempt/gateway-selector.js"
 import type { TestBrief } from "../lib/api-types.js"
 import { getTest } from "../lib/catalog-api.js"
 import { firstSectionOf, sectionRulesPath } from "../lib/start-test.js"
@@ -34,7 +34,9 @@ export function TestBriefScreen({ brief, navigate }: TestBriefScreenProps) {
     setStartFailed(false)
 
     try {
-      const attempt = await startAttempt(brief.slug)
+      const attempt = await attemptGateway.start(brief.slug, {
+        inProgressAttemptId: null,
+      })
       navigate(sectionRulesPath(attempt, firstSection.id))
     } catch {
       startingRef.current = false

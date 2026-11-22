@@ -114,7 +114,9 @@ export function LibraryScreen({
     setStartingId(test.id)
     setStartFailed(false)
 
-    startTestAndRulesPath(test.slug)
+    startTestAndRulesPath(test.slug, {
+      inProgressAttemptId: test.inProgressAttemptId,
+    })
       .then(navigate)
       .catch(() => {
         setStartingId(null)

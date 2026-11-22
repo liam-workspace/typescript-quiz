@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next"
 import { z } from "zod"
 import { Icon } from "../components/Icon.js"
 import { ApiError } from "../lib/api-client.js"
-import { enterSection, getRunnerEnvelope } from "../lib/attempts-api.js"
+import type { AttemptGateway } from "../lib/attempt/attempt-gateway.js"
+import { attemptGateway } from "../lib/attempt/gateway-selector.js"
 import { sameOriginPath } from "../lib/same-origin-path.js"
 import type { FinalizedAttempt, SectionType } from "../lib/api-types.js"
 
@@ -62,6 +63,8 @@ export interface SectionRulesScreenProps {
   readonly sectionTotal: number
   readonly finalizedPriorAttempt: FinalizedAttempt | null
   readonly navigate: (path: string) => void
+  /** Defaults to the app-wide `attemptGateway`; tests inject a fake. */
+  readonly gateway?: AttemptGateway
 }
 
 export function SectionRulesScreen({
@@ -77,6 +80,7 @@ export function SectionRulesScreen({
   sectionTotal,
   finalizedPriorAttempt,
   navigate,
+  gateway = attemptGateway,
 }: SectionRulesScreenProps) {
   const { t } = useTranslation("runner")
   const [outcome, setOutcome] = useState<EnterOutcome>({ status: "idle" })
@@ -85,7 +89,8 @@ export function SectionRulesScreen({
   const handleReady = (): void => {
     setOutcome({ status: "entering" })
 
-    enterSection(attemptId, sectionId)
+    gateway
+      .enterSection(attemptId, sectionId)
       .then(() => {
         navigate(`/attempts/${attemptId}/run`)
       })
@@ -247,9 +252,12 @@ export async function loadSectionRulesData(
   attemptId: string,
   sectionId: string,
 ): Promise<
-  Omit<SectionRulesScreenProps, "navigate" | "finalizedPriorAttempt">
+  Omit<
+    SectionRulesScreenProps,
+    "navigate" | "finalizedPriorAttempt" | "gateway"
+  >
 > {
-  const envelope = await getRunnerEnvelope(attemptId)
+  const envelope = await attemptGateway.loadEnvelope(attemptId)
   const section = envelope.sections.find(
     (candidate) => candidate.id === sectionId,
   )

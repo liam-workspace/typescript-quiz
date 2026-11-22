@@ -23,6 +23,8 @@ import {
 import "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
 import { AnswerQueue } from "../lib/answerQueue.js"
+import type { AttemptGateway } from "../lib/attempt/attempt-gateway.js"
+import { RemoteAttemptGateway } from "../lib/attempt/remote-gateway.js"
 import type { Scheduler } from "../lib/flushController.js"
 import {
   claimPlay,
@@ -548,6 +550,78 @@ function getQueue(): AnswerQueue {
   return queue
 }
 
+/** A remote gateway whose answer path is observable (journal hook + flush). */
+function observedGateway(): {
+  gateway: AttemptGateway
+  noteAnswer: MockInstance<AttemptGateway["noteAnswer"]>
+  flushAnswers: MockInstance<AttemptGateway["flushAnswers"]>
+} {
+  const gateway = new RemoteAttemptGateway()
+  const noteAnswer = vi.spyOn(gateway, "noteAnswer")
+  const flushAnswers = vi.spyOn(gateway, "flushAnswers")
+
+  return { gateway, noteAnswer, flushAnswers }
+}
+
+/** Every `fetch` call made with `keepalive: true` (the pagehide flush). */
+function keepaliveFetchCalls(): unknown[][] {
+  return vi
+    .mocked(fetch)
+    .mock.calls.filter(([, init]) => init?.keepalive === true)
+}
+
+/**
+ * Hoisted rather than inlined into `waitFor` (callback-nesting depth, as
+ * above).
+ */
+function calledAtLeastOnce(mock: MockInstance) {
+  return (): void => {
+    expect(mock).toHaveBeenCalled()
+  }
+}
+
+function calledExactlyOnce(mock: MockInstance) {
+  return (): void => {
+    expect(mock).toHaveBeenCalledOnce()
+  }
+}
+
+function oneKeepaliveFetch(): void {
+  expect(keepaliveFetchCalls()).toHaveLength(1)
+}
+
+function waitMs(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+/**
+ * Lets the pagehide handler's snapshot read settle (and, were it going to,
+ * issue its fetch) with the same margin the server-known case gets.
+ */
+async function settlePagehideFlush(): Promise<void> {
+  await act(async () => {
+    await getQueue().snapshotForSection("attempt-1", "section-reading")
+    await waitMs(50)
+  })
+}
+
+async function recordReadingAnswerAndHidePage(): Promise<void> {
+  await getQueue().recordAnswer(
+    {
+      attemptId: "attempt-1",
+      sectionId: "section-reading",
+      questionId: "q-r1",
+      selectedChoiceIds: ["cr-1"],
+      timeSpentMs: null,
+    },
+    new Date(),
+  )
+  vi.mocked(fetch).mockClear()
+  window.dispatchEvent(new Event("pagehide"))
+}
+
 function renderRunScreen(
   envelope: RunnerEnvelope = listeningEnvelope,
   navigate = vi.fn(),
@@ -649,6 +723,74 @@ describe("RunScreen", () => {
   // loader is wrapped as `loadRunRouteData` (exported, above) so both halves
   // of the fix -- the 410 redirect and the fallback to RunRouteError -- are
   // testable directly, matching result.tsx's own `loadResult` convention.
+  describe("attempt gateway seam", () => {
+    it("journals a tapped answer through the gateway, then flushes the open section through it", async () => {
+      const user = userEvent.setup()
+      const { gateway, noteAnswer, flushAnswers } = observedGateway()
+
+      render(
+        <RunScreen
+          attemptId="attempt-1"
+          envelope={readingEnvelope}
+          queue={getQueue()}
+          navigate={vi.fn()}
+          gateway={gateway}
+        />,
+      )
+      await waitFor(calledAtLeastOnce(flushAnswers))
+      flushAnswers.mockClear()
+
+      await user.click(screen.getByRole("radio", { name: "A forest" }))
+
+      await waitFor(calledExactlyOnce(flushAnswers))
+      expect(noteAnswer).toHaveBeenCalledOnce()
+      expect(noteAnswer).toHaveBeenCalledWith(
+        "attempt-1",
+        expect.objectContaining({
+          attemptId: "attempt-1",
+          sectionId: "section-reading",
+          questionId: "q-r2",
+          selectedChoiceIds: ["cr-3"],
+        }),
+      )
+      expect(noteAnswer.mock.invocationCallOrder[0]).toBeLessThan(
+        flushAnswers.mock.invocationCallOrder[0] ?? 0,
+      )
+      expect(flushAnswers).toHaveBeenCalledWith(
+        expect.objectContaining({
+          queue: getQueue(),
+          attemptId: "attempt-1",
+          sectionId: "section-reading",
+        }),
+      )
+    })
+
+    it("sends the pagehide keepalive flush for a server-known attempt", async () => {
+      renderRunScreen(readingEnvelope)
+
+      await recordReadingAnswerAndHidePage()
+
+      await waitFor(oneKeepaliveFetch)
+    })
+
+    it("never sends the pagehide keepalive flush for a local-only attempt", async () => {
+      render(
+        <RunScreen
+          attemptId="attempt-1"
+          envelope={readingEnvelope}
+          queue={getQueue()}
+          navigate={vi.fn()}
+          localOnly
+        />,
+      )
+
+      await recordReadingAnswerAndHidePage()
+      await settlePagehideFlush()
+
+      expect(keepaliveFetchCalls()).toHaveLength(0)
+    })
+  })
+
   describe("loadRunRouteData / RunRouteError", () => {
     const openedQueues: AnswerQueue[] = []
     let openSpy: MockInstance | undefined = undefined

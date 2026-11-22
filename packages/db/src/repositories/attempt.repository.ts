@@ -589,87 +589,97 @@ export function finishSection<T>(
     applyRemainder: (tx: PgQueryable, attempt: AttemptRow) => Promise<T[]>
   },
 ): Promise<FinishSectionOutcome<T>> {
-  return withTransaction(pool, async (tx) => {
-    const { rows } = await tx.query<AttemptDbRow>(
-      `SELECT ${ATTEMPT_COLUMNS}
-         FROM attempt
-        WHERE id = $1
-        FOR UPDATE`,
-      [input.attemptId],
-    )
+  return withTransaction(pool, (tx) => finishSectionInTransaction(tx, input))
+}
 
-    if (rows.length === 0) {
-      return { kind: "not_found" }
-    }
+/** The transaction-scoped form of `finishSection`, for a caller that owns the transaction. */
+export async function finishSectionInTransaction<T>(
+  tx: PgQueryable,
+  input: {
+    attemptId: string
+    sectionId: string
+    now: Date
+    applyRemainder: (tx: PgQueryable, attempt: AttemptRow) => Promise<T[]>
+  },
+): Promise<FinishSectionOutcome<T>> {
+  const { rows } = await tx.query<AttemptDbRow>(
+    `SELECT ${ATTEMPT_COLUMNS}
+       FROM attempt
+      WHERE id = $1
+      FOR UPDATE`,
+    [input.attemptId],
+  )
 
-    const attempt = toAttempt(rows[0])
+  if (rows.length === 0) {
+    return { kind: "not_found" }
+  }
 
-    if (attempt.status === "expired") {
-      const finalized = await finalizeAttemptTx(tx, {
-        attemptId: attempt.id,
-        status: "expired",
-        submittedAt: attempt.expiresAt ?? input.now,
-      })
+  const attempt = toAttempt(rows[0])
 
-      if (!finalized) {
-        throw new Error(`attempt ${attempt.id} vanished while locked`)
-      }
-
-      return { kind: "already_expired", finalized }
-    }
-
-    if (attempt.status !== "in_progress") {
-      return { kind: "section_not_open" }
-    }
-
-    if (isPastDeadline(attempt.expiresAt, input.now)) {
-      const finalized = await finalizeAttemptTx(tx, {
-        attemptId: attempt.id,
-        status: "expired",
-        submittedAt: attempt.expiresAt ?? input.now,
-      })
-
-      if (!finalized) {
-        throw new Error(`attempt ${attempt.id} vanished while locked`)
-      }
-
-      return { kind: "already_expired", finalized }
-    }
-
-    if (attempt.currentSectionId !== input.sectionId) {
-      return { kind: "section_not_open" }
-    }
-
-    const { rows: sectionRows } =
-      await tx.query<AttemptSectionFinishStateDbRow>(
-        `SELECT completed_at
-           FROM attempt_section
-          WHERE attempt_id = $1 AND test_section_id = $2
-          FOR UPDATE`,
-        [attempt.id, input.sectionId],
-      )
-    const sectionState = sectionRows.find((_row, index) => index === 0)
-
-    if (!sectionState) {
-      return { kind: "section_not_open" }
-    }
-
-    const nextSectionId = await loadNextSectionId(tx, input.sectionId)
-
-    if (sectionState.completed_at !== null) {
-      return { kind: "finished", nextSectionId, finalFlush: [] }
-    }
-
-    const finalFlush = await input.applyRemainder(tx, attempt)
-
-    await closeSection(tx, {
+  if (attempt.status === "expired") {
+    const finalized = await finalizeAttemptTx(tx, {
       attemptId: attempt.id,
-      sectionId: input.sectionId,
-      completedAt: input.now,
+      status: "expired",
+      submittedAt: attempt.expiresAt ?? input.now,
     })
 
-    return { kind: "finished", nextSectionId, finalFlush }
+    if (!finalized) {
+      throw new Error(`attempt ${attempt.id} vanished while locked`)
+    }
+
+    return { kind: "already_expired", finalized }
+  }
+
+  if (attempt.status !== "in_progress") {
+    return { kind: "section_not_open" }
+  }
+
+  if (isPastDeadline(attempt.expiresAt, input.now)) {
+    const finalized = await finalizeAttemptTx(tx, {
+      attemptId: attempt.id,
+      status: "expired",
+      submittedAt: attempt.expiresAt ?? input.now,
+    })
+
+    if (!finalized) {
+      throw new Error(`attempt ${attempt.id} vanished while locked`)
+    }
+
+    return { kind: "already_expired", finalized }
+  }
+
+  if (attempt.currentSectionId !== input.sectionId) {
+    return { kind: "section_not_open" }
+  }
+
+  const { rows: sectionRows } = await tx.query<AttemptSectionFinishStateDbRow>(
+    `SELECT completed_at
+         FROM attempt_section
+        WHERE attempt_id = $1 AND test_section_id = $2
+        FOR UPDATE`,
+    [attempt.id, input.sectionId],
+  )
+  const sectionState = sectionRows.find((_row, index) => index === 0)
+
+  if (!sectionState) {
+    return { kind: "section_not_open" }
+  }
+
+  const nextSectionId = await loadNextSectionId(tx, input.sectionId)
+
+  if (sectionState.completed_at !== null) {
+    return { kind: "finished", nextSectionId, finalFlush: [] }
+  }
+
+  const finalFlush = await input.applyRemainder(tx, attempt)
+
+  await closeSection(tx, {
+    attemptId: attempt.id,
+    sectionId: input.sectionId,
+    completedAt: input.now,
   })
+
+  return { kind: "finished", nextSectionId, finalFlush }
 }
 
 /**
@@ -735,7 +745,8 @@ export async function setPosition(
   return result
 }
 
-async function setPositionInTransaction(
+/** The transaction-scoped form of `setPosition`, for a caller that owns the transaction. */
+export async function setPositionInTransaction(
   tx: PgQueryable,
   input: {
     attemptId: string
@@ -868,7 +879,8 @@ export function enterSection(
   )
 }
 
-async function enterSectionInTransaction(
+/** The transaction-scoped form of `enterSection`, for a caller that owns the transaction. */
+export async function enterSectionInTransaction(
   tx: PgQueryable,
   input: { attemptId: string; sectionId: string; now: Date },
 ): Promise<

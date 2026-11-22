@@ -2,12 +2,15 @@ import { type DbConfig, loadDbConfig } from "./config.js"
 import { createJobPool, createRequestPool } from "./pool.js"
 import {
   enterSection,
+  enterSectionInTransaction,
   finishSection,
+  finishSectionInTransaction,
   finalizeAttempt,
   finalizeExpiredAttempt,
   loadOwnedAttempt,
   loadRunningOwnedAttempt,
   setPosition,
+  setPositionInTransaction,
   startOrResumeAttempt,
   submitAttempt,
   TestNotFoundError,
@@ -48,8 +51,10 @@ import {
 import {
   advanceJournalCursor,
   createOfflineAttempt,
+  createOfflineAttemptInTransaction,
   getJournalCursor,
   loadJournalContext,
+  type CreateOfflineAttemptInput,
   type CreateOfflineAttemptOutcome,
   type JournalContextRows,
 } from "./repositories/offline-journal.repository.js"
@@ -122,7 +127,11 @@ export type { FailedWriteRow }
 
 export type { OfflineBundleRow, OfflineBundleSectionRow, OfflineMediaRow }
 
-export type { CreateOfflineAttemptOutcome, JournalContextRows }
+export type {
+  CreateOfflineAttemptInput,
+  CreateOfflineAttemptOutcome,
+  JournalContextRows,
+}
 
 export type { ResponseWriteInput, WriteOutcome }
 
@@ -140,6 +149,7 @@ export {
   loadTestBrief,
   loadOfflineBundle,
   createOfflineAttempt,
+  createOfflineAttemptInTransaction,
   getJournalCursor,
   advanceJournalCursor,
   loadJournalContext,
@@ -154,10 +164,13 @@ export {
   AttemptNotInProgressError,
   SectionExpiredError,
   setPosition,
+  setPositionInTransaction,
   startOrResumeAttempt,
   submitAttempt,
   enterSection,
+  enterSectionInTransaction,
   finishSection,
+  finishSectionInTransaction,
   TestNotFoundError,
   claimPlay,
   isFilenameCapped,

@@ -467,6 +467,68 @@ paths:
             }
         "410": { $ref: "#/components/responses/SectionOrAttemptExpired" }
 
+  /attempts/offline-sync:
+    post:
+      tags: [Attempt]
+      operationId: syncOfflineAttempt
+      summary: Replay a journal of lifecycle events recorded while offline
+      description: |
+        Journal-first lifecycle (spec D6, §13.1): the client records `start`, `enter_section`,
+        `play`, `position`, `answer` and `finish_section` events durably before sending them, then
+        posts them here. `attemptId` is the client-minted uuid and becomes `attempt.id` when the
+        server adopts the attempt, so no remapping is ever needed. The test version comes from the
+        `start` event for a new attempt and from the attempt itself afterwards.
+
+        Events are replayed IN ORDER through the same rules the live routes use, each at its
+        claimed time shifted by clock skew (`clientAt + (receivedAt − clientSentAt)`), so the
+        client stamps `clientSentAt` afresh on every send from the clock that stamps the events.
+        Idempotent: events at or below the stored cursor (`ackedThrough`) are skipped, so the
+        whole journal may be resent, or only the suffix after `ackedThrough`. One sync per attempt
+        runs at a time, and each sync applies atomically: on any error nothing of it is applied.
+
+        Structurally impossible journals (gaps, time running backwards, unknown ids, sections out
+        of order or overlapping, more plays than the cap) are refused as a whole and captured as a
+        `failed_write` (rule 4). Events that arrived after a section or attempt deadline, or after
+        the attempt ended, are `late`; events refused by a navigation or answer rule are
+        `rejected`. Both are captured one by one and never applied, while the rest of the journal
+        still lands. Hand-in is NOT part of the journal: it requires a connection.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OfflineSyncRequest" }
+      responses:
+        "200":
+          description: The journal was applied (possibly partly late or rejected).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OfflineSyncResult" }
+        "400": { $ref: "#/components/responses/InvalidBody" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: The attempt belongs to another student. Nothing was applied; the journal is captured.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/OfflineSyncProblem" }
+        "409":
+          description: |
+            `offline_play_cap_exceeded` (the journal plays a capped recording more often than
+            allowed) or `offline_attempt_conflict` (a live attempt already exists for this test).
+            Nothing was applied; the journal is captured.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/OfflineSyncProblem" }
+        "413": { $ref: "#/components/responses/PayloadCaptured" }
+        "422":
+          description: |
+            `offline_journal_invalid`: the journal is structurally impossible, or its `start` names
+            a version that is not a published version of that slug. `reason` says which rule.
+            Nothing was applied; the journal is captured.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/OfflineSyncProblem" }
+        "500": { $ref: "#/components/responses/UnexpectedWriteError" }
+
   /attempts/{id}/responses/{questionId}:
     put:
       tags: [Attempt]
@@ -2732,6 +2794,101 @@ components:
           description: |
             One ack per item in the request's `responses` array; empty when the queue was already
             drained. Always present, so the client can clear its queue from this response alone.
+
+    OfflineJournalEvent:
+      type: object
+      required: [eventSeq, type, clientAt, payload]
+      additionalProperties: false
+      properties:
+        eventSeq:
+          type: integer
+          minimum: 1
+          description: Contiguous per attempt, starting at 1.
+        type:
+          type: string
+          enum: [start, enter_section, play, position, answer, finish_section]
+        clientAt:
+          type: string
+          format: date-time
+          description: The device clock when the event happened; never later than `clientSentAt`.
+        payload:
+          type: object
+          description: |
+            By type — start: `{slug, testVersionId}`; enter_section / finish_section:
+            `{sectionId}`; play: `{stimulusId}`; position: `{sectionId, questionId}`; answer:
+            `{sectionId, questionId, clientInstanceId, seq, selectedChoiceIds, timeSpentMs?}`.
+
+    OfflineSyncRequest:
+      type: object
+      required: [attemptId, clientSentAt, events]
+      additionalProperties: false
+      properties:
+        attemptId: { type: string, format: uuid }
+        clientSentAt:
+          type: string
+          format: date-time
+          description: The device clock at send time, stamped afresh on every send.
+        events:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: { $ref: "#/components/schemas/OfflineJournalEvent" }
+
+    OfflineSyncResult:
+      type: object
+      required:
+        [
+          attemptId,
+          ackedThrough,
+          applied,
+          late,
+          rejected,
+          answersAcked,
+          finalized,
+        ]
+      additionalProperties: false
+      properties:
+        attemptId: { type: string, format: uuid }
+        ackedThrough:
+          type: integer
+          description: The highest `eventSeq` the server now holds; the client may drop every event up to it.
+        applied:
+          type: integer
+          description: Events applied by this call, answers included.
+        late:
+          type: integer
+          description: Events recorded but not applied because a deadline had passed or the attempt had ended.
+        rejected:
+          type: integer
+          description: Events recorded but not applied because a navigation or answer rule refused them.
+        answersAcked:
+          type: integer
+          description: Answer events applied (or already held) by this call — the "N answers sent" count.
+        finalized:
+          description: The attempt's terminal state when it is over (finalized by this call or earlier), else null.
+          oneOf:
+            - type: object
+              required: [status, resultUrl]
+              additionalProperties: false
+              properties:
+                status: { type: string, enum: [expired, submitted] }
+                resultUrl: { type: string }
+            - { type: "null" }
+
+    OfflineSyncProblem:
+      description: A refused journal. Nothing of it was applied; `capturedAs` names the `failed_write` holding it verbatim.
+      allOf:
+        - { $ref: "#/components/schemas/Problem" }
+        - type: object
+          required: [capturedAs]
+          properties:
+            reason:
+              type: string
+              description: The specific rule, e.g. `event_seq_not_contiguous`, `version_unavailable`, `play_cap_exceeded`.
+            eventSeq:
+              type: [integer, "null"]
+              description: The event that broke the rule, when there is one.
+            capturedAs: { type: string }
 
     SectionScore:
       type: object

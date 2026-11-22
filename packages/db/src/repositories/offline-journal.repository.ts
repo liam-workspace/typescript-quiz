@@ -61,78 +61,93 @@ export type CreateOfflineAttemptOutcome =
  * enclosing transaction.
  *
  * Takes a pool, not a transaction client: it opens its own transaction.
+ * `createOfflineAttemptInTransaction` is the same work inside a caller's.
  */
 export function createOfflineAttempt(
   db: PgPool,
-  input: {
-    attemptId: string
-    studentId: string
-    testVersionId: string
-    slug: string
-    now: Date
-  },
+  input: CreateOfflineAttemptInput,
 ): Promise<CreateOfflineAttemptOutcome> {
-  return withTransaction(db, async (tx) => {
-    const { rows: versions } = await tx.query(
-      `SELECT 1
-         FROM test_version tv
-         JOIN test t ON t.id = tv.test_id
-        WHERE tv.id = $1 AND t.slug = $2 AND tv.published_at IS NOT NULL`,
-      [input.testVersionId, input.slug],
-    )
+  return withTransaction(db, (tx) =>
+    createOfflineAttemptInTransaction(tx, input),
+  )
+}
 
-    if (versions.length === 0) {
-      return { kind: "version_unavailable" }
+export interface CreateOfflineAttemptInput {
+  attemptId: string
+  studentId: string
+  testVersionId: string
+  slug: string
+  now: Date
+}
+
+/**
+ * The transaction-scoped form of `createOfflineAttempt`: the offline sync
+ * creates the attempt, replays its journal and advances the cursor in ONE
+ * transaction, so a crash between them leaves no half-adopted attempt.
+ */
+export async function createOfflineAttemptInTransaction(
+  tx: PgQueryable,
+  input: CreateOfflineAttemptInput,
+): Promise<CreateOfflineAttemptOutcome> {
+  const { rows: versions } = await tx.query(
+    `SELECT 1
+       FROM test_version tv
+       JOIN test t ON t.id = tv.test_id
+      WHERE tv.id = $1 AND t.slug = $2 AND tv.published_at IS NOT NULL`,
+    [input.testVersionId, input.slug],
+  )
+
+  if (versions.length === 0) {
+    return { kind: "version_unavailable" }
+  }
+
+  const already = await classifyExistingId(tx, input)
+
+  if (already) {
+    return already
+  }
+
+  const { rows: active } = await tx.query<{
+    id: string
+    expires_at: Date | null
+  }>(
+    `SELECT id, expires_at FROM attempt
+      WHERE student_id = $1 AND test_version_id = $2 AND status = 'in_progress'
+      FOR UPDATE`,
+    [input.studentId, input.testVersionId],
+  )
+  const live = active.find((_row, index) => index === 0)
+
+  if (live) {
+    // `expires_at IS NULL` (created, never entered) is "not past" too: an
+    // untimed online attempt is still that student's attempt to continue.
+    if (!isPastDeadline(live.expires_at, input.now)) {
+      return { kind: "conflict" }
     }
 
-    const already = await classifyExistingId(tx, input)
+    await finalizeExpiredAttempt(tx, { attemptId: live.id, now: input.now })
+  }
 
-    if (already) {
-      return already
-    }
+  const { rows: created } = await tx.query(
+    `INSERT INTO attempt (id, student_id, test_version_id, status, origin, created_at)
+     VALUES ($1, $2, $3, 'in_progress', 'offline', $4)
+     ON CONFLICT DO NOTHING
+     RETURNING id`,
+    [input.attemptId, input.studentId, input.testVersionId, input.now],
+  )
 
-    const { rows: active } = await tx.query<{
-      id: string
-      expires_at: Date | null
-    }>(
-      `SELECT id, expires_at FROM attempt
-        WHERE student_id = $1 AND test_version_id = $2 AND status = 'in_progress'
-        FOR UPDATE`,
-      [input.studentId, input.testVersionId],
-    )
-    const live = active.find((_row, index) => index === 0)
+  if (created.length > 0) {
+    return { kind: "created" }
+  }
 
-    if (live) {
-      // `expires_at IS NULL` (created, never entered) is "not past" too: an
-      // untimed online attempt is still that student's attempt to continue.
-      if (!isPastDeadline(live.expires_at, input.now)) {
-        return { kind: "conflict" }
-      }
-
-      await finalizeExpiredAttempt(tx, { attemptId: live.id, now: input.now })
-    }
-
-    const { rows: created } = await tx.query(
-      `INSERT INTO attempt (id, student_id, test_version_id, status, origin, created_at)
-       VALUES ($1, $2, $3, 'in_progress', 'offline', $4)
-       ON CONFLICT DO NOTHING
-       RETURNING id`,
-      [input.attemptId, input.studentId, input.testVersionId, input.now],
-    )
-
-    if (created.length > 0) {
-      return { kind: "created" }
-    }
-
-    // Zero rows: a concurrent sync committed first. Two syncs of the SAME
-    // new attempt routinely race (online event, app start, visibility,
-    // debounced append, a second tab), and under READ COMMITTED both pass
-    // the existence check above. This statement sees the winner's commit,
-    // so the loser of a same-attempt race is `exists`, not a conflict that
-    // a client would treat as terminal. No row under this id means the
-    // insert lost to `attempt_one_active` instead: a genuine conflict.
-    return (await classifyExistingId(tx, input)) ?? { kind: "conflict" }
-  })
+  // Zero rows: a concurrent sync committed first. Two syncs of the SAME
+  // new attempt routinely race (online event, app start, visibility,
+  // debounced append, a second tab), and under READ COMMITTED both pass
+  // the existence check above. This statement sees the winner's commit,
+  // so the loser of a same-attempt race is `exists`, not a conflict that
+  // a client would treat as terminal. No row under this id means the
+  // insert lost to `attempt_one_active` instead: a genuine conflict.
+  return (await classifyExistingId(tx, input)) ?? { kind: "conflict" }
 }
 
 /**
@@ -214,24 +229,30 @@ export async function loadJournalContext(
     testVersionId: string
   },
 ): Promise<JournalContextRows> {
-  const [version, sections, stimuli, questions] = await Promise.all([
-    db.query<{ duration_seconds: number }>(
-      "SELECT duration_seconds FROM test_version WHERE id = $1",
-      [input.testVersionId],
-    ),
-    db.query<{
-      id: string
-      ordinal: number
-      duration_seconds: number
-      navigation: "free" | "forward_only"
-      allow_answer_change: boolean
-    }>(
-      `SELECT id, ordinal, duration_seconds, navigation::text AS navigation, allow_answer_change
+  // Sequential, not Promise.all: the offline sync passes its transaction
+  // client, and pg deprecates (pg@9 removes) overlapping queries on one
+  // client. The reads are small and indexed.
+  const version = await db.query<{ duration_seconds: number }>(
+    "SELECT duration_seconds FROM test_version WHERE id = $1",
+    [input.testVersionId],
+  )
+  const sections = await db.query<{
+    id: string
+    ordinal: number
+    duration_seconds: number
+    navigation: "free" | "forward_only"
+    allow_answer_change: boolean
+  }>(
+    `SELECT id, ordinal, duration_seconds, navigation::text AS navigation, allow_answer_change
          FROM test_section WHERE test_version_id = $1 ORDER BY ordinal`,
-      [input.testVersionId],
-    ),
-    db.query<{ id: string; section_id: string; max_plays: number | null }>(
-      `SELECT DISTINCT ON (st.id)
+    [input.testVersionId],
+  )
+  const stimuli = await db.query<{
+    id: string
+    section_id: string
+    max_plays: number | null
+  }>(
+    `SELECT DISTINCT ON (st.id)
               st.id, ts.id AS section_id,
               COALESCE(st.max_plays, ts.default_max_plays) AS max_plays
          FROM stimulus st
@@ -239,18 +260,21 @@ export async function loadJournalContext(
          JOIN test_section ts ON ts.id = qg.test_section_id
         WHERE st.test_version_id = $1 AND st.media_asset_id IS NOT NULL
         ORDER BY st.id, ts.ordinal`,
-      [input.testVersionId],
-    ),
-    db.query<{ id: string; section_id: string; ordinal: number }>(
-      `SELECT q.id, ts.id AS section_id, q.ordinal
+    [input.testVersionId],
+  )
+  const questions = await db.query<{
+    id: string
+    section_id: string
+    ordinal: number
+  }>(
+    `SELECT q.id, ts.id AS section_id, q.ordinal
          FROM question q
          JOIN question_group qg ON qg.id = q.question_group_id
          JOIN test_section ts ON ts.id = qg.test_section_id
         WHERE q.test_version_id = $1
         ORDER BY q.ordinal`,
-      [input.testVersionId],
-    ),
-  ])
+    [input.testVersionId],
+  )
 
   const versionRow = version.rows.find((_row, index) => index === 0)
 
@@ -307,22 +331,20 @@ export async function loadJournalContext(
     )
   }
 
-  const [plays, states] = await Promise.all([
-    db.query<{ stimulus_id: string; play_count: number }>(
-      "SELECT stimulus_id, play_count FROM stimulus_play WHERE attempt_id = $1",
-      [attemptId],
-    ),
-    db.query<{
-      test_section_id: string
-      entered_at: Date
-      expires_at: Date
-      completed_at: Date | null
-    }>(
-      `SELECT test_section_id, entered_at, expires_at, completed_at
+  const plays = await db.query<{ stimulus_id: string; play_count: number }>(
+    "SELECT stimulus_id, play_count FROM stimulus_play WHERE attempt_id = $1",
+    [attemptId],
+  )
+  const states = await db.query<{
+    test_section_id: string
+    entered_at: Date
+    expires_at: Date
+    completed_at: Date | null
+  }>(
+    `SELECT test_section_id, entered_at, expires_at, completed_at
          FROM attempt_section WHERE attempt_id = $1 ORDER BY entered_at`,
-      [attemptId],
-    ),
-  ])
+    [attemptId],
+  )
 
   return {
     ...base,

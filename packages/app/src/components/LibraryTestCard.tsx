@@ -94,7 +94,19 @@ export function LibraryTestCard({
         {testCardActions(test).map((action) => {
           switch (action.kind) {
             case "continue":
-              return (
+              // A reason (offline, no local state) turns the link into a
+              // disabled button: a link cannot be disabled.
+              return disabledReason ? (
+                <button
+                  key="continue"
+                  type="button"
+                  className="m-btn"
+                  disabled
+                  aria-describedby={reasonId}
+                >
+                  {t("library.action.continue")}
+                </button>
+              ) : (
                 <Link
                   key="continue"
                   to="/attempts/$attemptId/run"

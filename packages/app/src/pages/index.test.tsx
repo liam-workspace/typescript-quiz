@@ -719,15 +719,47 @@ describe("library offline saving", () => {
     )
   })
 
-  it("the in-progress card has no save row and no offline reason", async () => {
+  it("offline: Continue is disabled with the connection reason and the card has no save row", async () => {
     await renderLibraryWith({
       initialPage: { ...initialPage, tests: [activeTest] },
       student: tom,
       offline: { ...fakeOffline, online: false },
     })
 
-    expect(screen.queryByText(/for offline use/u)).toBeNull()
+    const resume = screen.getByRole("button", { name: "Continue" })
+
+    expect(resume).toBeDisabled()
+    expect(resume).toHaveAccessibleDescription(/Needs a connection/u)
+    expect(
+      screen.queryByRole("button", { name: /Save .* for offline use/u }),
+    ).toBeNull()
+  })
+
+  it("online: Continue stays an enabled link with no reason", async () => {
+    await renderLibraryWith({
+      initialPage: { ...initialPage, tests: [activeTest] },
+      student: tom,
+      offline: fakeOffline,
+    })
+
+    expect(screen.getByRole("link", { name: "Continue" })).toBeInTheDocument()
     expect(screen.queryByText(/Needs a connection/u)).toBeNull()
+    expect(
+      screen.queryByRole("button", { name: /Save .* for offline use/u }),
+    ).toBeNull()
+  })
+
+  it("falls back to 1 MB when the media size is missing", async () => {
+    await renderLibraryWith({
+      initialPage: {
+        ...initialPage,
+        tests: [{ ...freshTest, mediaBytes: undefined as unknown as number }],
+      },
+      student: tom,
+      offline: fakeOffline,
+    })
+
+    expect(screen.getByText("Save offline · 1 MB")).toBeInTheDocument()
   })
 })
 

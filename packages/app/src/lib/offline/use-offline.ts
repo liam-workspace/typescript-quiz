@@ -91,8 +91,21 @@ function toastSaveFailure(
     paused
       ? i18n.t("runner:toast.savePaused")
       : i18n.t("runner:offline.saveFailed", { title }),
-    "wifioff",
+    paused ? "wifioff" : "alert",
   )
+}
+
+// Test-only: forget every save (aborting those in flight) between tests.
+export function resetOfflineLibraryForTests(): void {
+  for (const controller of controllers.values()) {
+    controller.abort()
+  }
+
+  controllers.clear()
+  listeners.clear()
+  progress = new Map()
+  unwatchNetwork?.()
+  unwatchNetwork = undefined
 }
 
 function startSave(slug: string, title: string): void {
@@ -136,10 +149,7 @@ function removeSaved(slug: string, title: string): void {
       toastStore.show(i18n.t("runner:toast.removedOffline", { title }), "trash")
     })
     .catch(() => {
-      toastStore.show(
-        i18n.t("runner:offline.removeFailed", { title }),
-        "wifioff",
-      )
+      toastStore.show(i18n.t("runner:offline.removeFailed", { title }), "alert")
     })
 }
 

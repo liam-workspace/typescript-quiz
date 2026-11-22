@@ -9,7 +9,10 @@ import {
   type DownloadProgress,
   type OfflineTestRecord,
 } from "../src/lib/offline/offline-store.js"
-import { useOfflineLibrary } from "../src/lib/offline/use-offline.js"
+import {
+  resetOfflineLibraryForTests,
+  useOfflineLibrary,
+} from "../src/lib/offline/use-offline.js"
 
 const record: OfflineTestRecord = {
   slug: "practice-3",
@@ -46,6 +49,7 @@ describe("useOfflineLibrary", () => {
 
   afterEach(() => {
     cleanup()
+    resetOfflineLibraryForTests()
     vi.restoreAllMocks()
     networkStore.setOnlineForTests(true)
     toastStore.resetForTests()
@@ -159,12 +163,16 @@ describe("useOfflineLibrary", () => {
   })
 
   it.each([
-    ["http", "Couldn't save Practice Test 3. Try again."],
-    ["unsupported", "Couldn't save Practice Test 3. Try again."],
-    ["network", "Save paused — you're offline. Try again when connected."],
+    ["http", "Couldn't save Practice Test 3. Try again.", "alert"],
+    ["unsupported", "Couldn't save Practice Test 3. Try again.", "alert"],
+    [
+      "network",
+      "Save paused — you're offline. Try again when connected.",
+      "wifioff",
+    ],
   ] as const)(
     "a %s failure toasts and clears the saving state",
-    async (reason, message) => {
+    async (reason, message, icon) => {
       vi.spyOn(offlineStore, "download").mockRejectedValue(
         new OfflineDownloadError("nope", reason),
       )
@@ -176,7 +184,7 @@ describe("useOfflineLibrary", () => {
       })
 
       await waitFor(() => {
-        expect(show).toHaveBeenCalledWith(message, "wifioff")
+        expect(show).toHaveBeenCalledWith(message, icon)
       })
       await waitFor(() => {
         expect(result.current.progressPercent.has("practice-3")).toBe(false)
@@ -198,7 +206,7 @@ describe("useOfflineLibrary", () => {
     await waitFor(() => {
       expect(show).toHaveBeenCalledWith(
         "Couldn't save Practice Test 3. Try again.",
-        "wifioff",
+        "alert",
       )
     })
   })
@@ -247,7 +255,7 @@ describe("useOfflineLibrary", () => {
     await waitFor(() => {
       expect(show).toHaveBeenCalledWith(
         "Couldn't remove Practice Test 3. Try again.",
-        "wifioff",
+        "alert",
       )
     })
   })

@@ -6,6 +6,7 @@ export type ToastIcon =
   | "bell"
   | "refresh"
   | "clock"
+  | "alert"
 
 export interface ToastSnapshot {
   readonly id: number

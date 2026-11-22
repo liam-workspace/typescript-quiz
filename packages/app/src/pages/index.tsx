@@ -374,6 +374,13 @@ export const Route = createFileRoute("/")({
 
 const BYTES_PER_MB = 1_048_576
 
+/** Whole MB for the label, at least 1; a missing or non-finite size reads as 1. */
+function sizeInMb(bytes: number): number {
+  return Number.isFinite(bytes)
+    ? Math.max(1, Math.round(bytes / BYTES_PER_MB))
+    : 1
+}
+
 /** Download state: none, saving (in progress here), or ready (stale if the test changed since). */
 export function offlineStateFor(
   test: TestCard,
@@ -413,16 +420,12 @@ export function LibraryWithOffline({
     <LibraryScreen
       {...screenProps}
       startDisabledReason={(test) => {
-        if (test.inProgressAttemptId !== null) {
-          return null
-        }
-
         const gate = startGate({
           online: offline.online,
           saved: offline.saved.has(test.slug),
           // Task 21 supplies the real local-state lookup.
           continuableLocally: false,
-          isContinue: false,
+          isContinue: test.inProgressAttemptId !== null,
           activeOtherTitle: null,
         })
 
@@ -432,7 +435,7 @@ export function LibraryWithOffline({
         test.inProgressAttemptId === null ? (
           <SaveOfflineControl
             title={test.title}
-            sizeMb={Math.max(1, Math.round(test.mediaBytes / BYTES_PER_MB))}
+            sizeMb={sizeInMb(test.mediaBytes)}
             online={offline.online}
             state={offlineStateFor(test, offline)}
             onSave={() => {

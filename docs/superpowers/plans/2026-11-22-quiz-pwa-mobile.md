@@ -14692,6 +14692,14 @@ git commit -m "feat(server): pure offline journal validator and sync request sch
 
 ### Task 18: Server — `POST /api/attempts/offline-sync`
 
+> **CONTROLLER RULINGS (binding; they override the code below wherever they conflict — decided after Tasks 14–17 were reviewed):**
+> 1. **Task 17's final interfaces differ from the plan text.** Read `packages/db/src/repositories/offline-journal.repository.ts` and `packages/server/src/attempts/offline-journal.validator.ts` as built: `createOfflineAttempt(pool, …)` takes a POOL, returns `exists` only for the same student + same version (else `conflict`; the zero-row-insert loser re-reads and returns `exists`); `loadJournalContext(db, { attempt: { attemptId, studentId } | null, testVersionId })` throws if the attempt is not that student's on that version; the context carries attempt status + server-recorded position; `buildJournalContext` turns rows into validator input; reasons are typed codes (incl. `section_out_of_order`, `client_at_before_history`, `client_at_after_sent_at`).
+> 2. **Atomicity:** `enterSection`/`setPosition`/etc. each open their own transaction, so apply events ONE AT A TIME and advance the cursor in the SAME transaction as each applied event (or seed the cursor at the `start` event's `eventSeq` inside `createOfflineAttempt`'s transaction). A crash between create and cursor otherwise makes the retry `start_for_existing_attempt` permanently, and a replayed `play` double-counts so an honest journal is refused as `offline_play_cap_exceeded`.
+> 3. **First-sync ordering:** validate with `attempt: null` BEFORE `createOfflineAttempt`; on a retry `exists` must be followed by a context loaded with the attempt and the real cursor; resolve OWNERSHIP before `loadJournalContext` (it throws) and map a foreign id to 403/409, never a 500.
+> 4. **Version:** derive the test version from the `start` event (new attempt) or the attempt row (existing attempt) — NEVER from any other request field (the validator does not compare `start.payload.testVersionId`/`slug` with the context version).
+> 5. Pass the SAME client to `loadJournalContext` that events are applied with. Report "answer change allowed"/choice-validity rejections from `applyResponse` per event (not as a whole-journal failure).
+
+
 **What this builds.** The endpoint that adopts and replays a journal. It reuses the **existing** repository functions with `now = effectiveAt`, so expiry, grading and finalisation rules are not re-implemented. It is idempotent (cursor), serialised per attempt (advisory lock), and keeps everything it refuses in `failed_write` (spec §5 rule 4).
 
 **Files:**
@@ -16781,6 +16789,14 @@ git commit -m "refactor(app): route the attempt lifecycle through an AttemptGate
 ---
 
 ### Task 21: Client — local gateway, hybrid routing and journal sync (offline start, offline run, sync on reconnect)
+
+> **CONTROLLER RULING (binding; overrides the code below wherever they conflict):** the server validator (Task 17, final) refuses ANY journal containing `clientAt > clientSentAt` (zero tolerance; equality allowed) with a terminal 422 `offline_journal_invalid`, and refuses events whose normalised time lands >120 s below server-recorded history (`client_at_before_history`). Therefore:
+> - `clientSentAt` MUST be stamped from the SAME high-water clock that stamps events — `LocalClock.nowMs()` — and MUST be `max(LocalClock.nowMs(), max(event.clientAt))`, freshly computed on EVERY send including retries. Do NOT use `Date.now()`/`deps.wallNow()` for `clientSentAt` (the plan code below does — an NTP step back or monotonic-ahead-of-wall would make honest devices refuse). Add `clockNow: () => number` to `JournalSyncDeps` (wired to the live `LocalClock`) and test: wall clock stepped BACK between append and send → journal still accepted (clientSentAt ≥ every clientAt).
+> - The local gateway/UI must never allow entering sections out of order (`section_out_of_order`).
+> - An UNTIMED in-progress ONLINE attempt for a version blocks an offline start for that version forever (server `conflict`): gate offline start on it client-side (the library already shows the in-progress card).
+> - On a terminal `offline_journal_invalid`/`offline_play_cap_exceeded`/`offline_attempt_conflict` response NEVER delete or purge the local journal or attempt state: keep it, set `syncError`, and surface the sync-failed state (Task 22 shows it) — the student must not silently lose offline work, and the data can be recovered.
+> - On a hydrated attempt a forged skew can gain more than 120 s (up to first-event − floor + 120 s); this is an accepted limit (spec §13.4), not something the client must defend.
+
 
 **What this builds.** Everything that makes the prototype's offline behaviour real:
 

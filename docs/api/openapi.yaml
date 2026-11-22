@@ -2592,6 +2592,7 @@ components:
           currentQuestionId,
           sections,
           responses,
+          offlineJournalCursor,
         ]
       properties:
         id: { type: string }
@@ -2599,6 +2600,14 @@ components:
         attemptNumber:
           type: integer
           description: The authoritative ordinal returned at attempt creation, repeated for section intros.
+        offlineJournalCursor:
+          type: integer
+          minimum: 0
+          description: >-
+            The highest offline-journal eventSeq the server has applied for this
+            attempt (0 when none). A device that mirrors this attempt continues
+            its journal at offlineJournalCursor + 1, because the server skips
+            every event at or below it.
         testTitle: { type: string }
         expiresAt: { type: [string, "null"], format: date-time }
         serverTime: { type: string, format: date-time }

@@ -292,6 +292,15 @@ describe("POST /attempts/offline-sync", () => {
     const suffixOnly = await sync(token, attemptId, events.slice(6)).expect(200)
 
     expect((first.body as SyncBody).ackedThrough).toBe(4)
+
+    // A device that mirrors the attempt now (after every sync above) must
+    // continue its journal at seq 10.
+    const mirrored = await request(a().http.getHttpServer() as App)
+      .get(`/api/attempts/${attemptId}`)
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200)
+
+    expect(mirrored.body).toMatchObject({ offlineJournalCursor: 9 })
     expect(second.body).toMatchObject({
       ackedThrough: 9,
       applied: 5,

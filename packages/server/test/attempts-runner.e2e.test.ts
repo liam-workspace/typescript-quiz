@@ -158,6 +158,7 @@ interface RunnerEnvelopeBody {
   currentQuestionId: string | null
   sections: RunnerEnvelopeSectionBody[]
   responses: unknown[]
+  offlineJournalCursor: number
 }
 
 describe("GET /attempts/:id", () => {
@@ -250,6 +251,7 @@ describe("GET /attempts/:id", () => {
     expect(body.currentSectionId).toBeNull()
     expect(body.currentQuestionId).toBeNull()
     expect(body.responses).toEqual([])
+    expect(body.offlineJournalCursor).toBe(0)
     expect(body.sections).toHaveLength(2)
 
     for (const section of body.sections) {

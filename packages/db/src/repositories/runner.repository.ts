@@ -7,6 +7,7 @@ import {
   type RunnerSectionState,
 } from "@pp/common"
 import type { PgQueryable } from "@liam-workspace/node-postgres"
+import { getJournalCursor } from "./offline-journal.repository.js"
 import { loadForRunner } from "./test-version.repository.js"
 
 interface RunnerSectionIntro {
@@ -38,6 +39,8 @@ export interface RunnerEnvelopeRow {
   currentQuestionId: string | null
   sections: RunnerSectionView[]
   responses: RecordedResponseWire[]
+  /** The attempt's offline-journal cursor (0 when it has none). */
+  offlineJournalCursor: number
 }
 
 interface SectionStateRow {
@@ -138,17 +141,24 @@ export async function loadRunnerEnvelope(
     "id" | "status" | "expiresAt" | "currentSectionId" | "currentQuestionId"
   >
 > {
-  const [content, stateResult, responseResult, attemptIntro, sectionIntro] =
-    await Promise.all([
-      loadForRunner(db, input.testVersionId, input.attemptId),
-      db.query<SectionStateRow>(SECTION_STATE_QUERY, [input.attemptId]),
-      db.query<ResponseRow>(RESPONSES_QUERY, [input.attemptId]),
-      db.query<AttemptIntroRow>(ATTEMPT_INTRO_QUERY, [
-        input.attemptId,
-        input.testVersionId,
-      ]),
-      db.query<SectionIntroRow>(SECTION_INTRO_QUERY, [input.testVersionId]),
-    ])
+  const [
+    content,
+    stateResult,
+    responseResult,
+    attemptIntro,
+    sectionIntro,
+    offlineJournalCursor,
+  ] = await Promise.all([
+    loadForRunner(db, input.testVersionId, input.attemptId),
+    db.query<SectionStateRow>(SECTION_STATE_QUERY, [input.attemptId]),
+    db.query<ResponseRow>(RESPONSES_QUERY, [input.attemptId]),
+    db.query<AttemptIntroRow>(ATTEMPT_INTRO_QUERY, [
+      input.attemptId,
+      input.testVersionId,
+    ]),
+    db.query<SectionIntroRow>(SECTION_INTRO_QUERY, [input.testVersionId]),
+    getJournalCursor(db, input.attemptId),
+  ])
 
   const intro = attemptIntro.rows.find((_row, index) => index === 0)
 
@@ -199,6 +209,7 @@ export async function loadRunnerEnvelope(
     unansweredOrdinals,
     sections,
     responses,
+    offlineJournalCursor,
   }
 }
 

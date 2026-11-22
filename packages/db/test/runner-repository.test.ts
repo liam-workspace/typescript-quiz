@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
 import type pg from "pg"
 import { describe, expect, it } from "vitest"
+import { advanceJournalCursor } from "../src/repositories/offline-journal.repository.js"
 import { loadRunnerEnvelope } from "../src/repositories/runner.repository.js"
 import { withDatabase } from "./helpers/database.js"
 import { seedPublishedTest, type Fixture } from "./helpers/fixtures.js"
@@ -376,6 +377,21 @@ describe("loadRunnerEnvelope", () => {
       })
 
       expect(envelope.responses).toEqual([])
+    })
+  }, 120_000)
+
+  it("reports the offline-journal cursor: 0 for a normal attempt, the applied eventSeq after an offline sync", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const attemptId = await insertAttempt(pool, f)
+      const load = () =>
+        loadRunnerEnvelope(pool, { attemptId, testVersionId: f.versionId })
+
+      expect((await load()).offlineJournalCursor).toBe(0)
+
+      await advanceJournalCursor(pool, attemptId, 7)
+
+      expect((await load()).offlineJournalCursor).toBe(7)
     })
   }, 120_000)
 

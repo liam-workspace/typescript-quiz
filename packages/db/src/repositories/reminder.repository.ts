@@ -154,3 +154,100 @@ export async function deleteReminderSubscription(
 
   return (rowCount ?? 0) > 0
 }
+
+export interface ReminderCandidateRow extends ReminderSubscriptionRow {
+  /** Latest `submitted_at` of the student's finished attempts, or null. */
+  lastFinishedAt: Date | null
+}
+
+/**
+ * Every subscription, with when the student last FINISHED an attempt (a
+ * submitted OR a timed-out one; `submitted_at` is pinned to the deadline for
+ * the latter). This table holds one row per student of a family-sized
+ * deployment, so a full scan per minute is the simple right answer; if it
+ * ever grows, page it by `student_id`.
+ */
+export async function listReminderCandidates(
+  db: PgQueryable,
+): Promise<ReminderCandidateRow[]> {
+  const { rows } = await db.query<
+    ReminderDbRow & { last_finished_at: Date | null }
+  >(
+    `SELECT ${REMINDER_COLUMNS},
+            (SELECT max(a.submitted_at)
+               FROM attempt a
+              WHERE a.student_id = reminder_subscription.student_id
+                AND a.status <> 'in_progress') AS last_finished_at
+       FROM reminder_subscription
+      ORDER BY student_id`,
+  )
+
+  return rows.map((row) => ({
+    ...toReminderRow(row),
+    lastFinishedAt: row.last_finished_at,
+  }))
+}
+
+/** One student's reminder for one LOCAL date, as the scheduler read it. */
+export interface ReminderClaim {
+  readonly studentId: string
+  /** The endpoint the scheduler read and will send to. */
+  readonly endpoint: string
+  /** The student's local calendar date, `YYYY-MM-DD`. */
+  readonly localDate: string
+}
+
+/**
+ * The at-most-once-per-local-day guard. The scheduler CLAIMS the date before
+ * it sends, so two ticks (or two replicas) can never both send for the same
+ * student and day; a failed send hands the claim back with
+ * `releaseReminderClaim`. Conditional on the endpoint the caller read: a row
+ * re-subscribed to another endpoint in between is not claimed (the next tick
+ * sees the new row).
+ */
+export async function claimReminderSend(
+  db: PgQueryable,
+  claim: ReminderClaim,
+): Promise<boolean> {
+  const { rowCount } = await db.query(
+    `UPDATE reminder_subscription
+        SET last_sent_on = $2::date
+      WHERE student_id = $1
+        AND endpoint = $3
+        AND last_sent_on IS DISTINCT FROM $2::date`,
+    [claim.studentId, claim.localDate, claim.endpoint],
+  )
+
+  return (rowCount ?? 0) > 0
+}
+
+/**
+ * Hands back `claim` by restoring `previous`. Conditional on the row still
+ * holding the claimed date, so it never rewinds a date some other writer (a
+ * later claim, a re-subscribe from a new endpoint) has set since.
+ */
+export async function releaseReminderClaim(
+  db: PgQueryable,
+  claim: ReminderClaim,
+  previous: string | null,
+): Promise<void> {
+  await db.query(
+    `UPDATE reminder_subscription
+        SET last_sent_on = $3::date
+      WHERE student_id = $1 AND last_sent_on = $2::date`,
+    [claim.studentId, claim.localDate, previous],
+  )
+}
+
+/**
+ * By endpoint, not student: a dead endpoint is dead whoever holds it now
+ * (a shared phone may have moved it to another student since it was read).
+ */
+export async function deleteReminderSubscriptionByEndpoint(
+  db: PgQueryable,
+  endpoint: string,
+): Promise<void> {
+  await db.query(`DELETE FROM reminder_subscription WHERE endpoint = $1`, [
+    endpoint,
+  ])
+}

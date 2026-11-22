@@ -89,9 +89,15 @@ import {
   type StudentRow,
 } from "./repositories/student.repository.js"
 import {
+  claimReminderSend,
   deleteReminderSubscription,
+  deleteReminderSubscriptionByEndpoint,
   findReminderSubscription,
+  listReminderCandidates,
+  releaseReminderClaim,
   upsertReminderSubscription,
+  type ReminderCandidateRow,
+  type ReminderClaim,
   type ReminderLocale,
   type ReminderSubscriptionInput,
   type ReminderSubscriptionRow,
@@ -104,6 +110,8 @@ export type { DbConfig }
 export type { StudentRow }
 
 export type {
+  ReminderCandidateRow,
+  ReminderClaim,
   ReminderLocale,
   ReminderSubscriptionInput,
   ReminderSubscriptionRow,
@@ -162,6 +170,10 @@ export {
   upsertReminderSubscription,
   findReminderSubscription,
   deleteReminderSubscription,
+  listReminderCandidates,
+  claimReminderSend,
+  releaseReminderClaim,
+  deleteReminderSubscriptionByEndpoint,
   listPublishedTests,
   loadTestBrief,
   loadOfflineBundle,

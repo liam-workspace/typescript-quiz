@@ -224,13 +224,16 @@ export async function completeSignIn(code: string): Promise<SessionResult> {
 }
 
 export function signOut(): void {
+  // The purge must START before the tokens are cleared: its steps (the
+  // reminder unsubscribe) capture the bearer token in their first
+  // synchronous lines. Fire-and-forget: sign-out never waits on the network.
+  void purgeClientCaches()
+
   if (client) {
     client.signOut()
   } else {
     tokenStore.clear()
   }
-
-  void purgeClientCaches()
 }
 
 /**

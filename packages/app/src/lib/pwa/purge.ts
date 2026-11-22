@@ -10,17 +10,40 @@ const CACHE_NAMES = ["pp-api-v1", "pp-offline-media-v1"] as const
 const DATABASE_NAMES = ["pp-offline"] as const
 const LAST_STUDENT_KEY = "pp.last-student"
 
-type PurgeStep = () => Promise<void>
+export type PurgeStep = () => Promise<void> | void
 
-let steps: PurgeStep[] = []
+const steps = new Set<PurgeStep>()
+let inFlight: Promise<void> | null = null
 
-export function registerPurgeStep(step: PurgeStep): void {
-  steps.push(step)
+/**
+ * Registers a step to run on every purge; returns its unregister function.
+ * Steps START SYNCHRONOUSLY, in registration order, inside the
+ * `purgeClientCaches()` call itself: a step that needs the bearer token (the
+ * reminder unsubscribe) reads it in its first synchronous lines, because
+ * `signOut()` clears the token right after calling the purge.
+ */
+export function registerPurgeStep(step: PurgeStep): () => void {
+  steps.add(step)
+
+  return () => {
+    steps.delete(step)
+  }
 }
 
 /** Test-only seam. */
 export function resetPurgeStepsForTests(): void {
-  steps = []
+  steps.clear()
+  inFlight = null
+}
+
+function startStep(step: PurgeStep): Promise<void> {
+  try {
+    return Promise.resolve(step())
+  } catch (error) {
+    return Promise.reject(
+      error instanceof Error ? error : new Error(String(error)),
+    )
+  }
 }
 
 async function deleteCaches(): Promise<void> {
@@ -47,13 +70,24 @@ function deleteDatabase(name: string): Promise<void> {
   })
 }
 
-/** Never rejects; idempotent. */
-export async function purgeClientCaches(): Promise<void> {
-  await Promise.allSettled([
+/**
+ * Never rejects; idempotent. A purge requested while one is running joins it
+ * (a step that triggers a 401 would otherwise re-enter through
+ * clearSessionAndRedirectToSignIn → signOut → purge).
+ */
+export function purgeClientCaches(): Promise<void> {
+  inFlight ??= Promise.allSettled([
+    // Steps first and synchronously (see registerPurgeStep).
+    ...[...steps].map(startStep),
     deleteCaches(),
     ...DATABASE_NAMES.map(deleteDatabase),
-    ...steps.map((step) => Promise.resolve().then(step)),
   ])
+    .then(() => undefined)
+    .finally(() => {
+      inFlight = null
+    })
+
+  return inFlight
 }
 
 /**

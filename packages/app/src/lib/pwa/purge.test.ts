@@ -86,6 +86,68 @@ describe("purgeClientCaches", () => {
   })
 })
 
+describe("purge steps (registry)", () => {
+  beforeEach(() => {
+    resetPurgeStepsForTests()
+    vi.stubGlobal("caches", { delete: vi.fn(() => Promise.resolve(true)) })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it("starts every step SYNCHRONOUSLY, in registration order, before purgeClientCaches returns", () => {
+    const order: string[] = []
+
+    registerPurgeStep(() => {
+      order.push("first")
+    })
+    registerPurgeStep(() => {
+      order.push("second")
+
+      return Promise.resolve()
+    })
+
+    void purgeClientCaches()
+
+    // Nothing awaited: a step that needs the bearer token must be able to
+    // read it in its first lines, because signOut() clears it right after.
+    expect(order).toEqual(["first", "second"])
+  })
+
+  it("stops calling a step once it is unregistered", async () => {
+    const step = vi.fn()
+    const off = registerPurgeStep(step)
+
+    off()
+    await purgeClientCaches()
+
+    expect(step).not.toHaveBeenCalled()
+  })
+
+  it("collapses a re-entrant purge into the one already running", async () => {
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const step = vi.fn(() => gate)
+
+    registerPurgeStep(step)
+
+    const first = purgeClientCaches()
+    const second = purgeClientCaches()
+
+    release()
+    await Promise.all([first, second])
+
+    expect(step).toHaveBeenCalledTimes(1)
+
+    // Once settled, the next purge runs the steps again.
+    await purgeClientCaches()
+    expect(step).toHaveBeenCalledTimes(2)
+  })
+})
+
 describe("purgeIfSubjectChanged", () => {
   const cacheDelete = vi.fn(() => Promise.resolve(true))
 

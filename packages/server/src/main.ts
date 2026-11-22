@@ -72,6 +72,10 @@ async function bootstrap(): Promise<void> {
     new FailedWriteCaptureFilter(app.get(REQUEST_POOL), app.get(CLOCK)),
   )
   app.useGlobalFilters(...filters)
+  // SIGTERM (a deploy, `docker stop`) runs onModuleDestroy: the reminder
+  // scheduler and the math worker stop their timers and let an in-flight
+  // tick or claim finish instead of dying mid-way.
+  app.enableShutdownHooks()
 
   await app.listen(config.port)
 }

@@ -64,6 +64,10 @@ services:
       # Mozilla, Apple, Windows) on port 443. Comma-separated extra host
       # suffixes for any other vendor; leave empty otherwise.
       PUSH_ENDPOINT_HOSTS: ${PUSH_ENDPOINT_HOSTS:-}
+      # The in-process reminder sender (every 60 s, one replica at a time via
+      # a Postgres advisory lock). Empty = on whenever VAPID is set; `false`
+      # stops sending without touching subscriptions.
+      REMINDER_SCHEDULER_ENABLED: ${REMINDER_SCHEDULER_ENABLED:-}
     volumes:
       - pp-media:/media
     depends_on:

@@ -65,3 +65,37 @@ describe("loadServerConfig — Web Push", () => {
     },
   )
 })
+
+describe("loadServerConfig — reminder scheduler", () => {
+  it("runs by default outside tests", () => {
+    expect(
+      loadServerConfig({ ...BASE, NODE_ENV: "production" })
+        .reminderSchedulerEnabled,
+    ).toBe(true)
+    expect(loadServerConfig(BASE).reminderSchedulerEnabled).toBe(true)
+  })
+
+  it("is off under NODE_ENV=test unless explicitly enabled", () => {
+    expect(process.env.NODE_ENV).toBe("test")
+    expect(
+      loadServerConfig({ ...BASE, NODE_ENV: "test" }).reminderSchedulerEnabled,
+    ).toBe(false)
+    expect(
+      loadServerConfig({
+        ...BASE,
+        NODE_ENV: "test",
+        REMINDER_SCHEDULER_ENABLED: "true",
+      }).reminderSchedulerEnabled,
+    ).toBe(true)
+  })
+
+  it("can be switched off in production", () => {
+    expect(
+      loadServerConfig({
+        ...BASE,
+        NODE_ENV: "production",
+        REMINDER_SCHEDULER_ENABLED: "false",
+      }).reminderSchedulerEnabled,
+    ).toBe(false)
+  })
+})

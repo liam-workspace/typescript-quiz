@@ -1,5 +1,6 @@
 import {
   nodeEnvironment,
+  parseBooleanEnv,
   parseIntegerEnv,
   type Environment,
 } from "@liam-workspace/node-config"
@@ -28,6 +29,8 @@ export interface ServerConfig {
   push: PushConfig | null
   /** Extra push-service host suffixes, on top of the built-in vendors. */
   pushEndpointHosts: readonly string[]
+  /** Whether the reminder scheduler's 60 s timer runs (it also needs VAPID). */
+  reminderSchedulerEnabled: boolean
 }
 
 function required(env: Environment, key: string): string {
@@ -121,5 +124,13 @@ export function loadServerConfig(
     push: loadPushConfig(env),
     // Default empty. Only for a push vendor the built-in list lacks.
     pushEndpointHosts: loadPushEndpointHosts(env),
+    // On by default, off under NODE_ENV=test (vitest sets it) so a test app
+    // that happens to have VAPID set never starts a background sender; a
+    // test or an operator can still say `true`/`false` explicitly.
+    reminderSchedulerEnabled: parseBooleanEnv(
+      env,
+      "REMINDER_SCHEDULER_ENABLED",
+      env.NODE_ENV !== "test",
+    ),
   }
 }

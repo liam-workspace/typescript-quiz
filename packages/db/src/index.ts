@@ -88,12 +88,26 @@ import {
   upsertStudentBySubject,
   type StudentRow,
 } from "./repositories/student.repository.js"
+import {
+  deleteReminderSubscription,
+  findReminderSubscription,
+  upsertReminderSubscription,
+  type ReminderLocale,
+  type ReminderSubscriptionInput,
+  type ReminderSubscriptionRow,
+} from "./repositories/reminder.repository.js"
 
 export { migrateToLatest } from "./migrate.js"
 
 export type { DbConfig }
 
 export type { StudentRow }
+
+export type {
+  ReminderLocale,
+  ReminderSubscriptionInput,
+  ReminderSubscriptionRow,
+}
 
 export type {
   ListPublishedTestsResult,
@@ -145,6 +159,9 @@ export {
   loadRunnerEnvelope,
   upsertStudentBySubject,
   findStudentBySubject,
+  upsertReminderSubscription,
+  findReminderSubscription,
+  deleteReminderSubscription,
   listPublishedTests,
   loadTestBrief,
   loadOfflineBundle,

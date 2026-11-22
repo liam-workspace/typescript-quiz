@@ -4,12 +4,20 @@ export interface HeaderSink {
   setHeader(name: string, value: string): unknown
 }
 
-const REVALIDATE = new Set(["sw.js", "manifest.webmanifest", "index.html"])
+// The push handlers (push-sw.js) are pulled into the worker by
+// importScripts: a stale copy would keep an old push handler alive after the
+// worker itself updated.
+const REVALIDATE = new Set([
+  "sw.js",
+  "push-sw.js",
+  "manifest.webmanifest",
+  "index.html",
+])
 const WORKBOX = /^workbox-[\w-]+\.js$/u
 
 /**
  * Cache policy for the built SPA (spec D1). The worker script, its
- * runtime, the manifest and the shell are always revalidated — a worker
+ * runtime and imported push handlers, the manifest and the shell are always revalidated — a worker
  * cached for a day would pin students on an old app for a day. Only
  * hashed files under /assets are immutable.
  */

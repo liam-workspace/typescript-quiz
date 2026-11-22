@@ -23,7 +23,13 @@ describe("production build: installable shell and worker policy", () => {
       ["exec", "vite", "build", "--mode", "production", "--outDir", outDir],
       {
         cwd: appRoot,
-        env: { ...process.env, NODE_ENV: "production", VITEST: undefined },
+        env: {
+          ...process.env,
+          NODE_ENV: "production",
+          VITEST: undefined,
+          // What the Dockerfile bakes; docker-entrypoint.sh replaces it.
+          VITE_VAPID_PUBLIC_KEY: "__VITE_VAPID_PUBLIC_KEY__",
+        },
         stdio: "pipe",
       },
     )
@@ -62,6 +68,17 @@ describe("production build: installable shell and worker policy", () => {
     expect(readFileSync(join(outDir, "push-sw.js"), "utf8")).toContain(
       '"practice-reminder"',
     )
+  })
+
+  it("keeps the VAPID placeholder literal in the bundle for docker-entrypoint.sh to replace", () => {
+    // A minifier that folded the client's placeholder check would drop the
+    // literal, and every container would ship reminders as "unsupported".
+    const bundle = readdirSync(join(outDir, "assets"))
+      .filter((name) => name.endsWith(".js"))
+      .map((name) => readFileSync(join(outDir, "assets", name), "utf8"))
+      .join("\n")
+
+    expect(bundle).toContain("__VITE_VAPID_PUBLIC_KEY__")
   })
 
   it("links the manifest from index.html exactly once", () => {

@@ -56,9 +56,15 @@ COPY packages/app ./packages/app
 ARG VITE_AUTH_ISSUER=__VITE_AUTH_ISSUER__
 ARG VITE_AUTH_CLIENT_ID=__VITE_AUTH_CLIENT_ID__
 ARG VITE_AUTH_REDIRECT_URI=__VITE_AUTH_REDIRECT_URI__
+# The Web Push PUBLIC key (practice reminders) -- public by definition, it is
+# in every page that subscribes. Optional: left as the placeholder,
+# docker-entrypoint.sh fills it at start from VITE_VAPID_PUBLIC_KEY or the
+# server's VAPID_PUBLIC_KEY, or with "" (reminders unavailable).
+ARG VITE_VAPID_PUBLIC_KEY=__VITE_VAPID_PUBLIC_KEY__
 ENV VITE_AUTH_ISSUER=$VITE_AUTH_ISSUER \
     VITE_AUTH_CLIENT_ID=$VITE_AUTH_CLIENT_ID \
-    VITE_AUTH_REDIRECT_URI=$VITE_AUTH_REDIRECT_URI
+    VITE_AUTH_REDIRECT_URI=$VITE_AUTH_REDIRECT_URI \
+    VITE_VAPID_PUBLIC_KEY=$VITE_VAPID_PUBLIC_KEY
 
 RUN pnpm --filter @pp/common build \
     && pnpm --filter @pp/db build \

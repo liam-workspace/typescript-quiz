@@ -19,6 +19,9 @@ services:
         VITE_AUTH_ISSUER: ${VITE_AUTH_ISSUER:?set it, e.g. https://auth-dev.icovn.me}
         VITE_AUTH_CLIENT_ID: ${VITE_AUTH_CLIENT_ID:?set it, e.g. local-dev}
         VITE_AUTH_REDIRECT_URI: ${VITE_AUTH_REDIRECT_URI:?must match a redirect URI registered with the issuer, exactly}
+        # Optional. Unset keeps the placeholder, which docker-entrypoint.sh
+        # fills at start from VAPID_PUBLIC_KEY below.
+        VITE_VAPID_PUBLIC_KEY: ${VITE_VAPID_PUBLIC_KEY:-__VITE_VAPID_PUBLIC_KEY__}
     # Bound to all interfaces ON PURPOSE, unlike postgres below: the child's
     # iPad reaches this over the home wifi, so loopback would make the app
     # unusable for the one device it exists to serve. What protects it is not

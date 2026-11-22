@@ -19,7 +19,13 @@ function headersFor(file: string): Record<string, string> {
 }
 
 describe("spaStaticHeaders", () => {
-  it.each(["sw.js", "manifest.webmanifest", "index.html", "workbox-3d4e5f.js"])(
+  it.each([
+    "sw.js",
+    "manifest.webmanifest",
+    "index.html",
+    "workbox-3d4e5f.js",
+    "push-sw.js",
+  ])(
     "serves %s with no-cache so an update is seen on the next load",
     (file) => {
       expect(headersFor(file)["Cache-Control"]).toBe("no-cache")
@@ -28,6 +34,10 @@ describe("spaStaticHeaders", () => {
 
   it("lets the worker control the whole origin", () => {
     expect(headersFor("sw.js")["Service-Worker-Allowed"]).toBe("/")
+  })
+
+  it("does not widen the worker scope for the imported push handlers", () => {
+    expect(headersFor("push-sw.js")["Service-Worker-Allowed"]).toBeUndefined()
   })
 
   it("serves hashed build assets as immutable", () => {
@@ -52,6 +62,7 @@ describe("shouldServeSpaShell", () => {
     "/sw.js",
     "/manifest.webmanifest",
     "/workbox-abc123.js",
+    "/push-sw.js",
   ])(
     "does not answer %s with index.html (a worker or manifest request must 404, not parse as HTML)",
     (path) => {

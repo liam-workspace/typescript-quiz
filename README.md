@@ -91,6 +91,32 @@ environment. `JWKS_URL` defaults
 to the production issuer; `ALLOWED_EMAILS` defaults to empty, which rejects
 every sign-in until it is set — see the comments in `compose.yml` for both.
 
+#### 🔔 Practice reminders (Web Push)
+
+Reminders are optional. Without keys the server answers
+`503 reminders_not_configured` and the Profile switch explains that
+reminders aren't available.
+
+```bash
+pnpm --filter @pp/server exec web-push generate-vapid-keys --json   # one-time
+export VAPID_PUBLIC_KEY=...        # public; also reaches the SPA (below)
+export VAPID_PRIVATE_KEY=...       # secret — never commit it
+export VAPID_SUBJECT=mailto:you@example.com
+```
+
+All three or none (a partial set refuses to boot). The browser needs the
+public key too: `docker-entrypoint.sh` substitutes `VITE_VAPID_PUBLIC_KEY`
+(falling back to `VAPID_PUBLIC_KEY`) into the built SPA at container start, or
+pass `VITE_VAPID_PUBLIC_KEY` as a build arg to bake it. Unlike the
+`VITE_AUTH_*` values it is not required: unset ships an empty key and
+reminders read as unavailable. The scheduler sends one reminder per student
+per local day at 4:30 pm in the student's own time zone, and not after they
+have already finished a test that day. Push services are allow-listed (FCM,
+Mozilla, Apple, Windows; extend with `PUSH_ENDPOINT_HOSTS`). On iPhone and
+iPad, reminders only work once the app has been added to the home screen
+(iOS/iPadOS 16.4+). The server keeps one subscription per student, so turning
+reminders on on a second device moves them there.
+
 The application will be available at http://localhost:3000.
 
 ### 🛠️ Without Docker

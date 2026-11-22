@@ -24,6 +24,8 @@
     "vite.config.ts",
     "vitest.config.ts",
     "test/dev-auth-prod-build.test.ts",
-    "test/pwa-build.test.ts"
+    "test/pwa-build.test.ts",
+    "test/push-sw.test.ts",
+    "test/docker-entrypoint.test.ts"
   ]
 }

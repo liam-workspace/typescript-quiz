@@ -52,9 +52,24 @@ substitute VITE_AUTH_ISSUER
 substitute VITE_AUTH_CLIENT_ID
 substitute VITE_AUTH_REDIRECT_URI
 
+# The Web Push public key for practice reminders. Optional: unlike the auth
+# trio an unset value is NOT fatal -- it ships "" and the client then reads
+# reminders as unavailable. It falls back to the server's own
+# VAPID_PUBLIC_KEY, so one variable configures both halves. It is replaced
+# with "" rather than left in place so the end-state check below still holds.
+substitute_optional() {
+  var_name="$1"
+  value="$2"
+  esc=$(printf '%s' "$value" | sed 's/[\\&|]/\\&/g')
+  find "$SPA_DIR" -type f \( -name '*.js' -o -name '*.html' \) \
+    -exec sed -i "s|__${var_name}__|${esc}|g" {} +
+}
+
+substitute_optional VITE_VAPID_PUBLIC_KEY "${VITE_VAPID_PUBLIC_KEY:-${VAPID_PUBLIC_KEY:-}}"
+
 # Assert the END STATE, not that substitution work happened: no bare
-# `__VITE_AUTH...` placeholder literal may remain in any file substitution
-# was supposed to touch.
+# `__VITE_AUTH...` / `__VITE_VAPID...` placeholder literal may remain in any
+# file substitution was supposed to touch.
 #
 # This is deliberately NOT "assert at least one file was rewritten". A
 # container restarted in place (a crash, an OOM kill — not a fresh pod)
@@ -77,8 +92,8 @@ substitute VITE_AUTH_REDIRECT_URI
 # `.map` files — a scan of "everything" would then refuse to start on every
 # boot, sourcemaps or not.
 if find "$SPA_DIR" -type f \( -name '*.js' -o -name '*.html' \) \
-     -exec grep -l '__VITE_AUTH' {} + 2>/dev/null | grep -q .; then
-  echo "FATAL: __VITE_AUTH* placeholder still present under $SPA_DIR after substitution" >&2
+     -exec grep -lE '__VITE_(AUTH|VAPID)' {} + 2>/dev/null | grep -q .; then
+  echo "FATAL: __VITE_AUTH*/__VITE_VAPID* placeholder still present under $SPA_DIR after substitution" >&2
   exit 1
 fi
 

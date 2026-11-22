@@ -7,12 +7,15 @@ import {
 import { AllExceptionsFilter } from "@liam-workspace/node-nest-common"
 import type { Request, Response } from "express"
 
-const PWA_FILE = /^\/(?:sw\.js|manifest\.webmanifest|workbox-[\w-]+\.js)$/u
+const PWA_FILE =
+  /^\/(?:sw\.js|push-sw\.js|manifest\.webmanifest|workbox-[\w-]+\.js)$/u
 
 /**
  * A missing worker/manifest must be a real 404: answering `/sw.js` with
  * index.html makes the browser reject registration with a MIME error that
- * is far harder to diagnose than a plain 404.
+ * is far harder to diagnose than a plain 404. The same goes for push-sw.js,
+ * which the worker pulls in with importScripts: HTML there aborts the
+ * worker's install.
  */
 export function shouldServeSpaShell(method: string, path: string): boolean {
   return (

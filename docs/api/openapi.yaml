@@ -161,7 +161,8 @@ paths:
         Stores this student's Web Push subscription (`PushSubscription.toJSON()`) and the local time
         to remind at. One subscription per student: a second PUT replaces the first, and an endpoint
         already held by another student moves to the caller (a shared phone follows whoever
-        subscribed last). Returns `503 reminders_not_configured` when the server has no VAPID keys. The endpoint must be an
+        subscribed last). Returns `503 reminders_not_configured` when the server has no VAPID keys
+        -- checked AFTER the body is validated, so a malformed body is a `400` even then. The endpoint must be an
         `https://` URL on an allow-listed push-service host (FCM `fcm.googleapis.com`,
         `updates.push.services.mozilla.com`, `*.push.apple.com`, `*.notify.windows.com`, plus any
         suffixes the operator adds with `PUSH_ENDPOINT_HOSTS`), matched on a label boundary, with
@@ -273,8 +274,11 @@ paths:
       summary: Everything needed to run a test with no network
       description: |
         Section rules plus the full runner content (groups, stimuli, questions, choices) and a
-        media manifest. Never carries an answer key. Capped listening audio is listed with a
-        short-lived signed URL valid only for downloading; uncapped media carries its plain URL.
+        media manifest. Never carries an answer key. Every media URL is signed and short-lived
+        (`urlsExpireAt`): `/media` judges the cap per filename, which can disagree with a
+        stimulus's own cap, and ignores the signature on a file it does not consider capped.
+        The signature is NOT limited to downloading: until it expires the same URL also streams
+        a capped recording without a play claim (spec §14 accepts this; the window is short).
         The client stores the bytes and enforces the play cap locally; the server audits play
         counts when the journal is synced (`POST /attempts/offline-sync`).
         Same access rules as `GET /tests/{slug}`: a student token is required, and an unknown
@@ -542,7 +546,8 @@ paths:
         client stamps `clientSentAt` afresh on every send from the clock that stamps the events.
         Idempotent: events at or below the stored cursor (`ackedThrough`) are skipped, so the
         whole journal may be resent, or only the suffix after `ackedThrough`. One sync per attempt
-        runs at a time, and each sync applies atomically: on any error nothing of it is applied.
+        runs at a time (a second one gets `503 offline_sync_busy` at once instead of waiting), and
+        each sync applies atomically: on any error nothing of it is applied.
 
         Structurally impossible journals (gaps, time running backwards, unknown ids, sections out
         of order or overlapping) are refused as a whole and captured as a `failed_write` (rule 4).
@@ -566,7 +571,10 @@ paths:
         "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403":
-          description: The attempt belongs to another student. Nothing was applied; the journal is captured.
+          description: |
+            `not_your_attempt`: the attempt belongs to another student, or the caller has no
+            student profile yet (call `POST /session` first). Nothing was applied; the journal is
+            captured under the SENDER (no attempt id), never under the other student's attempt.
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/OfflineSyncProblem" }
@@ -588,6 +596,16 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/OfflineSyncProblem" }
         "500": { $ref: "#/components/responses/UnexpectedWriteError" }
+        "503":
+          description: |
+            `offline_sync_busy` (`retryable: true`): another sync of this attempt is running. The
+            request does not wait for it and nothing is captured; resend the same journal after a
+            backoff.
+          content:
+            {
+              application/problem+json:
+                { schema: { $ref: "#/components/schemas/Problem" } },
+            }
 
   /attempts/{id}/responses/{questionId}:
     put:
@@ -2386,7 +2404,9 @@ components:
         bytes: { type: integer }
         capped:
           { type: boolean, description: True when the stimulus has a play cap. }
-        url: { type: string }
+        url:
+          type: string
+          description: "Always signed, expiring at the bundle's `urlsExpireAt`."
 
     OfflineBundle:
       type: object

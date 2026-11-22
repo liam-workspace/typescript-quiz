@@ -82,3 +82,17 @@ describe.skipIf(!gnuSed)("docker-entrypoint.sh — VAPID public key", () => {
     expect(() => run({ VITE_AUTH_ISSUER: "x" })).toThrow()
   })
 })
+
+describe("compose.yml — the api service shuts down cleanly (B6)", () => {
+  const compose = readFileSync(join(process.cwd(), "../../compose.yml"), "utf8")
+  // The `api:` service block: from its key to the next top-level service.
+  const api = /\n {2}api:\n([\s\S]*?)\n {2}[a-z]+:\n/u.exec(compose)?.[1] ?? ""
+
+  it("runs node under an init, so the SIGTERM it re-raises after Nest's shutdown hooks ends it", () => {
+    expect(api).toMatch(/\n {4}init: true\n/u)
+  })
+
+  it("gives the shutdown hooks time to finish before SIGKILL", () => {
+    expect(api).toMatch(/\n {4}stop_grace_period: 30s\n/u)
+  })
+})

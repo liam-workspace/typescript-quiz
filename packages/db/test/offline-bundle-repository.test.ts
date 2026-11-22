@@ -1,7 +1,13 @@
+import type { PgPool, PgQueryable } from "@liam-workspace/node-postgres"
+import { randomUUID } from "node:crypto"
 import { describe, expect, it } from "vitest"
 import { loadOfflineBundle } from "../src/repositories/offline-bundle.repository.js"
 import { withDatabase } from "./helpers/database.js"
 import { seedPublishedTest } from "./helpers/fixtures.js"
+
+function groupCount(section: { groups: readonly unknown[] }): number {
+  return section.groups.length
+}
 
 function sectionId(section: { id: string }): string {
   return section.id
@@ -71,6 +77,53 @@ describe("loadOfflineBundle", () => {
 
       await expect(
         loadOfflineBundle(pool, { slug: "nope", studentId: f.studentId }),
+      ).resolves.toBeNull()
+    })
+  })
+
+  /**
+   * B2: a republish between the brief read and the version read. Simulated
+   * by answering the version query (the only query naming
+   * `current_version_id` that returns `id, version`) with a version whose
+   * content does not match the brief's sections, `times` times.
+   */
+  function republishedMeanwhile(pool: PgPool, times: number): PgQueryable {
+    let left = times
+    const query = ((sql: string, params?: unknown[]) => {
+      if (left > 0 && /SELECT tv\.id, tv\.version/u.test(sql)) {
+        left -= 1
+
+        return Promise.resolve({ rows: [{ id: randomUUID(), version: 2 }] })
+      }
+
+      return pool.query(sql, params)
+    }) as unknown as PgQueryable["query"]
+
+    return { query }
+  }
+
+  it("re-reads when the version changed between its reads, never saving a copy with empty sections", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+      const bundle = await loadOfflineBundle(republishedMeanwhile(pool, 1), {
+        slug: f.slug,
+        studentId: f.studentId,
+      })
+
+      expect(bundle?.testVersionId).toBe(f.versionId)
+      expect(bundle?.sections.map(groupCount)).toEqual([1, 1])
+    })
+  })
+
+  it("returns null rather than a mismatched copy when the version keeps changing", async () => {
+    await withDatabase(async (pool) => {
+      const f = await seedPublishedTest(pool)
+
+      await expect(
+        loadOfflineBundle(republishedMeanwhile(pool, 99), {
+          slug: f.slug,
+          studentId: f.studentId,
+        }),
       ).resolves.toBeNull()
     })
   })

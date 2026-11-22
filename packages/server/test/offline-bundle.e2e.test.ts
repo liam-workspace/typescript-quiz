@@ -157,6 +157,32 @@ describe("GET /tests/:slug/offline-bundle", () => {
     expect(Date.parse(body.urlsExpireAt)).toBeGreaterThan(NOW.getTime())
   })
 
+  it("signs EVERY media URL, uncapped ones too (B3): the media route checks the cap per filename, which may disagree with the stimulus", async () => {
+    const a = ready()
+    const fx = await seedOfflineFixture(a, "bundle-uncapped", {
+      uncapped: true,
+    })
+    const token = await studentToken(a, "bundle-student-5")
+
+    const res = await request(a.http.getHttpServer() as App)
+      .get("/api/tests/bundle-uncapped/offline-bundle")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200)
+    const [media] = (res.body as BundleBody).media
+    const url = new URL(media.url, "http://x")
+
+    expect(media.capped).toBe(false)
+    expect(
+      verifyMediaSignature(
+        fx.mediaFilename,
+        url.searchParams.get("exp") ?? undefined,
+        url.searchParams.get("sig") ?? undefined,
+        SECRET,
+        NOW,
+      ),
+    ).toBe(true)
+  })
+
   it("serves choices as id and label only (no key material)", async () => {
     const a = ready()
 

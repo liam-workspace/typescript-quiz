@@ -128,11 +128,12 @@ export class CatalogService {
       ...row,
       media: row.media.map((item) => ({
         ...item,
-        // Capped audio is only reachable with a signature; sign it for the
-        // download window. Uncapped media is served unsigned by MediaController.
-        url: item.capped
-          ? signMediaUrl(item.key, expiresAt, mediaSigningSecret)
-          : `/api/media/${item.key}`,
+        // ALWAYS signed for the download window. `capped` is judged per
+        // stimulus here, but MediaController demands a signature per FILENAME
+        // (`isFilenameCapped`: capped if ANY stimulus using the file is), so
+        // an unsigned URL could 403. The route ignores a signature on a file
+        // it does not consider capped.
+        url: signMediaUrl(item.key, expiresAt, mediaSigningSecret),
       })),
       urlsExpireAt: expiresAt.toISOString(),
     }

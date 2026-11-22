@@ -45,7 +45,9 @@ function question(key: string, prompt: string, labels: [string, string]) {
 export async function seedOfflineFixture(
   app: TestApp,
   slug: string,
+  opts: { readonly uncapped?: boolean } = {},
 ): Promise<OfflineFixture> {
+  const maxPlays = opts.uncapped === true ? null : 1
   const pool = app.get<PgPool>(REQUEST_POOL)
   const mediaFilename = `${slug}.mp3`
 
@@ -67,11 +69,15 @@ export async function seedOfflineFixture(
         durationSeconds: 600,
         navigation: "forward_only",
         allowAnswerChange: false,
-        playback: { maxPlays: 1, allowPause: false, allowSeek: false },
+        playback: { maxPlays, allowPause: false, allowSeek: false },
         instructions: ["Put your headphones on now."],
         groups: [
           {
-            stimulus: { type: "audio", mediaFilename, maxPlays: 1 },
+            stimulus: {
+              type: "audio",
+              mediaFilename,
+              ...(maxPlays === null ? {} : { maxPlays }),
+            },
             questions: [
               question("l1", "Where is the bag?", ["Bench", "Desk"]),
               question("l2", "What time is it?", ["8:30", "9:00"]),

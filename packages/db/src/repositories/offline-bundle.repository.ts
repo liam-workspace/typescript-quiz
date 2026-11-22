@@ -83,6 +83,29 @@ export async function loadOfflineBundle(
   db: PgQueryable,
   input: { slug: string; studentId: string },
 ): Promise<OfflineBundleRow | null> {
+  // The brief and the content are two reads of "the current version". A
+  // republish between them would pair the old sections with the new
+  // version's (non-matching) groups -- a copy with empty sections saved under
+  // a version id that never looks stale. Such a pair is detected (the
+  // content's section ids differ from the brief's) and read again.
+  for (let attempt = 0; attempt < MAX_READS; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const read = await readOnce(db, input)
+
+    if (read !== "republished") {
+      return read
+    }
+  }
+
+  return null
+}
+
+const MAX_READS = 3
+
+async function readOnce(
+  db: PgQueryable,
+  input: { slug: string; studentId: string },
+): Promise<OfflineBundleRow | null | "republished"> {
   const brief = await loadTestBrief(db, input)
 
   if (!brief) {
@@ -105,6 +128,20 @@ export async function loadOfflineBundle(
   const groupsBySection = new Map<string, RunnerSection["groups"]>(
     content.map((section) => [section.id, section.groups]),
   )
+
+  // (Content lists only sections with questions: `loadForRunner` inner-joins.)
+  const briefIds = new Set(brief.sections.map((section) => section.id))
+
+  if (
+    content.some((section) => !briefIds.has(section.id)) ||
+    brief.sections.some(
+      (section) =>
+        section.questionCount > 0 && !groupsBySection.has(section.id),
+    )
+  ) {
+    return "republished"
+  }
+
   const media: OfflineMediaRow[] = mediaResult.rows.map((row) => ({
     key: row.filename,
     stimulusId: row.stimulus_id,

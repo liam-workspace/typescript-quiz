@@ -548,6 +548,12 @@ describe("PUT /api/me/reminders when the endpoint race is lost", () => {
     await app?.close()
   })
 
+  // In afterEach, not at the end of the test: a failed assertion would skip
+  // the cleanup and leak the VAPID keys into every later test in the worker.
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
   it("answers 409 with a non-retryable problem body over the wire", async () => {
     vi.stubEnv("VAPID_PUBLIC_KEY", "test-public")
     vi.stubEnv("VAPID_PRIVATE_KEY", "test-private")
@@ -579,6 +585,5 @@ describe("PUT /api/me/reminders when the endpoint race is lost", () => {
       status: 409,
       retryable: false,
     })
-    vi.unstubAllEnvs()
   })
 })

@@ -135,7 +135,11 @@ public key too: `docker-entrypoint.sh` substitutes `VITE_VAPID_PUBLIC_KEY`
 (falling back to `VAPID_PUBLIC_KEY`) into the built SPA at container start, or
 pass `VITE_VAPID_PUBLIC_KEY` as a build arg to bake it. Unlike the
 `VITE_AUTH_*` values it is not required: unset ships an empty key and
-reminders read as unavailable. The scheduler sends one reminder per student
+reminders read as unavailable. **Rotating `VITE_VAPID_PUBLIC_KEY` /
+`VAPID_PUBLIC_KEY` requires building a NEW IMAGE**: the key is substituted
+into a hashed asset at container start, but that asset's precache revision
+does not change, so an installed PWA keeps the old key and never sees the new
+one. The scheduler sends one reminder per student
 per local day at 4:30 pm in the student's own time zone, and not after they
 have already finished a test that day. Push services are allow-listed (FCM,
 Mozilla, Apple, Windows; extend with `PUSH_ENDPOINT_HOSTS`). On iPhone and

@@ -325,43 +325,85 @@ describe("POST /attempts/offline-sync", () => {
     ).toBe(2)
   })
 
-  it("serialises two concurrent syncs of the same new journal: one applies, the other acknowledges", async () => {
+  it("never makes a second sync of the same attempt WAIT for the first (B1): a busy attempt is an immediate retryable 503, nothing captured", async () => {
+    const token = await student("sync-busy")
+    const attemptId = randomUUID()
+    const events = journey(attemptId)
+    const holder = await db().connect()
+
+    try {
+      // Another sync of this attempt is mid-transaction.
+      await holder.query("BEGIN")
+      await holder.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended('offline-sync:' || $1, 0))",
+        [attemptId],
+      )
+
+      const started = Date.now()
+      const busy = await sync(token, attemptId, events).expect(503)
+
+      expect(Date.now() - started).toBeLessThan(2_000)
+      expect(busy.body as ProblemBody).toMatchObject({
+        type: "offline_sync_busy",
+        status: 503,
+        retryable: true,
+      })
+      expect((busy.body as ProblemBody).capturedAs).toBeUndefined()
+    } finally {
+      await holder.query("ROLLBACK")
+      holder.release()
+    }
+
+    expect(await capturedReasons(attemptId)).toEqual([])
+    await sync(token, attemptId, events).expect(200)
+    expect(await playCount(attemptId)).toBe(1)
+  })
+
+  it("two concurrent syncs of the same new journal: one applies; the other acknowledges or is told to retry, and the retry acknowledges", async () => {
     const token = await student("sync-concurrent")
     const attemptId = randomUUID()
     const events = journey(attemptId)
-    const [one, two] = await Promise.all([
+    const results = await Promise.all([
       sync(token, attemptId, events),
       sync(token, attemptId, events),
     ])
 
-    expect([one.status, two.status]).toEqual([200, 200])
+    expect(results.some((r) => r.status === 200)).toBe(true)
+    for (const r of results) {
+      expect([200, 503]).toContain(r.status)
+    }
 
-    const applied = [one.body as SyncBody, two.body as SyncBody]
-      .map((body) => body.applied)
+    const retry = await sync(token, attemptId, events).expect(200)
+    const applied = [...results.filter((r) => r.status === 200), retry]
+      .map((r) => (r.body as SyncBody).applied)
       .sort((x, y) => x - y)
 
-    expect(applied).toEqual([0, 9])
+    expect(applied.at(-1)).toBe(9)
+    expect(applied.slice(0, -1).every((x) => x === 0)).toBe(true)
     expect(await playCount(attemptId)).toBe(1)
+    expect(await capturedReasons(attemptId)).toEqual([])
   })
 
-  it("serialises two concurrent increments of an adopted attempt: the play is claimed once, never refused", async () => {
+  it("two concurrent increments of an adopted attempt: the play is claimed once, never refused", async () => {
     const token = await student("sync-concurrent-increment")
     const attemptId = randomUUID()
     const events = journey(attemptId)
 
     await sync(token, attemptId, events.slice(0, 2)).expect(200)
 
-    const [one, two] = await Promise.all([
+    const results = await Promise.all([
       sync(token, attemptId, events.slice(0, 4)),
       sync(token, attemptId, events.slice(0, 4)),
     ])
-    const bodies = [one.body as SyncBody, two.body as SyncBody]
 
-    expect([one.status, two.status]).toEqual([200, 200])
-    expect(bodies.map((body) => body.applied).sort((x, y) => x - y)).toEqual([
-      0, 2,
-    ])
-    expect(bodies.map((body) => body.rejected)).toEqual([0, 0])
+    for (const r of results) {
+      expect([200, 503]).toContain(r.status)
+    }
+
+    await sync(token, attemptId, events.slice(0, 4)).expect(200)
+    for (const r of results.filter((one) => one.status === 200)) {
+      expect((r.body as SyncBody).rejected).toBe(0)
+    }
     expect(await playCount(attemptId)).toBe(1)
     expect(await capturedReasons(attemptId)).toEqual([])
   })
@@ -577,9 +619,32 @@ describe("POST /attempts/offline-sync", () => {
     )
 
     expect(rows[0]?.last_event_seq).toBe(9)
-    expect(await capturedReasons(attemptId)).toEqual([
-      "not_your_attempt",
-      "not_your_attempt",
+    // B4: never filed under the VICTIM's attempt; attributed to the sender.
+    expect(await capturedReasons(attemptId)).toEqual([])
+
+    const { rows: intruderRow } = await db().query<{ id: string }>(
+      "SELECT id FROM student WHERE subject_claim = $1",
+      ["sync-intruder"],
+    )
+    const { rows: captured } = await db().query<{
+      attempt_id: string | null
+      reason: string
+    }>("SELECT attempt_id, reason FROM failed_write WHERE id = ANY($1)", [
+      [
+        (withStart.body as ProblemBody).capturedAs,
+        (noStart.body as ProblemBody).capturedAs,
+      ],
+    ])
+
+    expect(captured).toEqual([
+      {
+        attempt_id: null,
+        reason: `not_your_attempt:student=${intruderRow[0]?.id ?? "?"}`,
+      },
+      {
+        attempt_id: null,
+        reason: `not_your_attempt:student=${intruderRow[0]?.id ?? "?"}`,
+      },
     ])
   })
 

@@ -79,6 +79,8 @@ class JournalRefusal extends Error {
     readonly type: RefusalType,
     readonly reason: string,
     readonly eventSeq: number | null,
+    /** For `not_your_attempt`: who sent it (null when unprovisioned). */
+    readonly senderStudentId: string | null = null,
   ) {
     super(type)
   }
@@ -91,6 +93,14 @@ class JournalRefusal extends Error {
  * sync again, this time against the existing attempt and its real cursor.
  */
 class AttemptAdoptedMeanwhile extends Error {}
+
+/**
+ * Another sync of this attempt holds its lock. Waiting would pin a pool
+ * connection (max 10, shared with every route) for as long as that sync
+ * runs, so the caller is told to retry instead. Not a refusal: nothing is
+ * captured, and the client's ordinary 5xx backoff resends the same journal.
+ */
+class AttemptSyncBusy extends Error {}
 
 type EventOutcome =
   | { kind: "applied" }
@@ -124,7 +134,8 @@ const canonical = (id: string): string => id.toLowerCase()
  * routes use, each event at its skew-normalised `effectiveAt`, so expiry,
  * grading and finalisation rules are reused rather than re-implemented.
  *
- * One transaction per sync, holding a per-attempt advisory lock: ownership,
+ * One transaction per sync, holding a per-attempt advisory lock (a sync
+ * that cannot take it at once gets a retryable 503): ownership,
  * cursor, context, validation, every applied event, every per-event
  * capture and the cursor advance commit together or not at all. A crash
  * anywhere leaves the attempt exactly as the cursor describes it, so the
@@ -161,6 +172,15 @@ export class OfflineSyncService {
         throw error
       })
     } catch (error) {
+      if (error instanceof AttemptSyncBusy) {
+        throw new ProblemException({
+          type: "offline_sync_busy",
+          title: "Another sync of this attempt is running. Retry shortly.",
+          status: HttpStatus.SERVICE_UNAVAILABLE,
+          retryable: true,
+        })
+      }
+
       if (error instanceof JournalRefusal) {
         throw await this.refuse(req, input, error)
       }
@@ -175,12 +195,18 @@ export class OfflineSyncService {
   ): Promise<OfflineSyncResult> {
     const { body, attemptId, receivedAt } = input
 
-    // Every sync of this attempt id -- any student, any device -- queues
-    // here until the previous one commits, so the reads below see its work.
-    await tx.query(
-      "SELECT pg_advisory_xact_lock(hashtextextended('offline-sync:' || $1, 0))",
+    // One sync of this attempt id -- any student, any device -- at a time,
+    // so the reads below see the previous one's committed work. A second
+    // one does NOT queue here (it would hold a pool connection while it
+    // waits): it is told to retry.
+    const { rows: lock } = await tx.query<{ locked: boolean }>(
+      "SELECT pg_try_advisory_xact_lock(hashtextextended('offline-sync:' || $1, 0)) AS locked",
       [attemptId],
     )
+
+    if (lock.length === 0 || !lock[0].locked) {
+      throw new AttemptSyncBusy()
+    }
 
     // Ownership BEFORE anything attempt-scoped: loadJournalContext throws
     // on a foreign attempt, and a foreign id must be a 403, never a 500.
@@ -190,7 +216,14 @@ export class OfflineSyncService {
     })
 
     if (owned.kind === "forbidden") {
-      throw new JournalRefusal("not_your_attempt", "not_your_attempt", null)
+      const sender = await findStudentBySubject(tx, input.subjectClaim)
+
+      throw new JournalRefusal(
+        "not_your_attempt",
+        "not_your_attempt",
+        null,
+        sender?.id ?? null,
+      )
     }
 
     const student =
@@ -568,11 +601,12 @@ export class OfflineSyncService {
     req: CapturedRequest & { method?: string; originalUrl?: string },
     { body, attemptId, receivedAt }: SyncInput,
     reason: string,
+    options: { readonly attributeToAttempt?: boolean } = {},
   ): Promise<string> {
     const rawBody = req.rawBody?.toString("utf8") ?? JSON.stringify(body)
     const clientVersion = req.headers["x-client-version"]
     const captured = await insertFailedWrite(this.pool, {
-      attemptId,
+      attemptId: options.attributeToAttempt === false ? null : attemptId,
       route: `${req.method ?? "POST"} ${req.originalUrl ?? "/api/attempts/offline-sync"}`,
       reason,
       rawBody,
@@ -590,7 +624,17 @@ export class OfflineSyncService {
     input: SyncInput,
     refusal: JournalRefusal,
   ): Promise<ProblemException> {
-    const capturedAs = await this.captureRequest(req, input, refusal.type)
+    // A journal for someone else's attempt id is the SENDER's failed write:
+    // filed under the victim's attempt it would read as theirs.
+    const foreign = refusal.type === "not_your_attempt"
+    const capturedAs = await this.captureRequest(
+      req,
+      input,
+      foreign
+        ? `not_your_attempt:${refusal.senderStudentId === null ? "unprovisioned" : `student=${refusal.senderStudentId}`}`
+        : refusal.type,
+      { attributeToAttempt: !foreign },
+    )
 
     return new ProblemException({
       type: refusal.type,

@@ -297,6 +297,41 @@ describe("LocalAttemptGateway — sections", () => {
     expect(await types(journal)).toEqual(["start"])
   })
 
+  it("the next enterable section follows the LAST section entered, not the first", async () => {
+    const { local, journal } = await setup()
+    const [listening, reading] = makeLocalState().sections
+    const third = { ...reading, id: "sec-x", title: "Extra" }
+    const closed = { status: "closed" as const }
+    const withSections = (sections: Array<typeof listening>) =>
+      journal.putAttempt(
+        makeLocalState({
+          sections,
+          attemptStartedAt: iso(T0),
+          attemptExpiresAt: iso(T0 + 1_200_000),
+        }),
+      )
+
+    // Entered: 1st and 3rd. The 2nd lies BEHIND the last entered one.
+    await withSections([
+      { ...listening, ...closed },
+      reading,
+      { ...third, ...closed },
+    ])
+
+    await expect(local.enterSection("att-1", "sec-r")).rejects.toMatchObject({
+      problem: { type: "section_out_of_order" },
+    })
+
+    // Entered: 1st and 2nd. The 3rd is next.
+    await withSections([
+      { ...listening, ...closed },
+      { ...reading, ...closed },
+      third,
+    ])
+
+    expect((await local.enterSection("att-1", "sec-x")).sectionId).toBe("sec-x")
+  })
+
   it("a section whose clock ran out is journaled as finished before the next one is entered", async () => {
     const { local, journal, now } = await setup()
 

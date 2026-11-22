@@ -97,11 +97,14 @@ const isTicking = (section: RunnerSection, nowMs: number): boolean =>
 
 /** The only section the server lets the attempt enter next (`section_out_of_order`). */
 function nextEnterableIndex(state: LocalAttemptState): number {
-  const lastTouched = state.sections.findLastIndex(
-    (section) => section.status !== "pending",
-  )
+  // The LAST section already entered (not the first): ES2022, so no findLastIndex.
+  for (let index = state.sections.length - 1; index >= 0; index -= 1) {
+    if (state.sections[index]?.status !== "pending") {
+      return index + 1
+    }
+  }
 
-  return lastTouched + 1
+  return 0
 }
 
 type EnterDecision = { kind: "open" } | { kind: "enter"; index: number }

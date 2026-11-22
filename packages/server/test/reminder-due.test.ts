@@ -367,6 +367,63 @@ const DST_CASES: readonly DstCase[] = [
       "2026-03-30T18:30:00.000Z",
     ],
   },
+  {
+    // Lord Howe's DST is 30 minutes. Falls back 2026-04-05 at 02:00 LHDT
+    // (+11, 15:00Z) -> 01:30 LHST (+10:30): 01:30-01:59 happens twice.
+    name: "Australia/Lord_Howe fall back (30-minute DST), 01:45 happens twice",
+    timezone: "Australia/Lord_Howe",
+    hour: 1,
+    minute: 45,
+    // 2026-04-04 00:00 LHDT -> 2026-04-07 00:00 LHST
+    from: "2026-04-03T13:00:00Z",
+    to: "2026-04-06T13:30:00Z",
+    sends: [
+      // 01:45 LHDT
+      "2026-04-03T14:45:00.000Z",
+      // First 01:45 (LHDT); the LHST one at 15:15Z is skipped
+      "2026-04-04T14:45:00.000Z",
+      // 01:45 LHST
+      "2026-04-05T15:15:00.000Z",
+    ],
+  },
+  {
+    // Springs forward 2026-10-04 at 02:00 LHST (+10:30, 15:30Z) -> 02:30
+    // LHDT (+11): 02:00-02:29 does not exist.
+    name: "Australia/Lord_Howe spring forward (30-minute DST), 02:15 does not exist",
+    timezone: "Australia/Lord_Howe",
+    hour: 2,
+    minute: 15,
+    // 2026-10-03 00:00 LHST -> 2026-10-06 00:00 LHDT
+    from: "2026-10-02T13:30:00Z",
+    to: "2026-10-05T13:00:00Z",
+    sends: [
+      // 02:15 LHST
+      "2026-10-02T15:45:00.000Z",
+      // 02:30 LHDT, the first minute after the gap
+      "2026-10-03T15:30:00.000Z",
+      // 02:15 LHDT
+      "2026-10-04T15:15:00.000Z",
+    ],
+  },
+  {
+    // Samoa skipped 2011-12-30 entirely: 2011-12-29 23:59 (-10) was followed
+    // by 2011-12-31 00:00 (+14) at 10:00Z. No send for the missing date and
+    // nothing throws.
+    name: "Pacific/Apia 2011, the skipped calendar day",
+    timezone: "Pacific/Apia",
+    hour: 16,
+    minute: 30,
+    from: "2011-12-29T10:00:00Z",
+    to: "2012-01-01T10:00:00Z",
+    sends: [
+      // 2011-12-29 16:30 (-10)
+      "2011-12-30T02:30:00.000Z",
+      // 2011-12-31 16:30 (+14)
+      "2011-12-31T02:30:00.000Z",
+      // 2012-01-01 16:30 (+14)
+      "2012-01-01T02:30:00.000Z",
+    ],
+  },
 ]
 
 describe("isReminderDue across DST, simulated minute by minute", () => {
@@ -388,6 +445,7 @@ describe("isReminderDue across DST, simulated minute by minute", () => {
     const days = sends.map((send) => localMoment(send, testCase.timezone)?.date)
 
     expect(new Set(days).size).toBe(days.length)
+    expect(days).not.toContain("2011-12-30")
   })
 
   it("a reminder the scheduler cannot deliver (lastSentOn never advances) is still bounded to the grace window of its own day", () => {

@@ -121,7 +121,14 @@ describe("WebPushSender (real web-push 4, https.request intercepted)", () => {
     expect(options.agent).toBeInstanceOf(https.Agent)
     expect(options.agent).not.toBe(https.globalAgent)
     expect(options.agent?.constructor).toBe(https.Agent)
-    expect(options.headers).toMatchObject({ TTL: 21_600, Urgency: "low" })
+    // "normal", not "low": RFC 8030 "low" means "on power and Wi-Fi" and FCM
+    // holds it behind Doze, so a 16:30 reminder could arrive hours late. The
+    // fixed Topic makes a retry replace a still-queued copy.
+    expect(options.headers).toMatchObject({
+      TTL: 21_600,
+      Urgency: "normal",
+      Topic: "practice-reminder",
+    })
   })
 
   it("never follows a redirect: a 3xx is a transient failure after exactly one request", async () => {
@@ -144,6 +151,20 @@ describe("WebPushSender (real web-push 4, https.request intercepted)", () => {
 
       expect(await new WebPushSender(CONFIG).send(TARGET, MESSAGE)).toEqual({
         kind: "gone",
+      })
+    },
+  )
+
+  it.each([400, 401, 403, 413])(
+    "maps %i to rejected (deterministic: retrying the same request cannot succeed)",
+    async (statusCode) => {
+      responder = (request) => {
+        request.respond(statusCode)
+      }
+
+      expect(await new WebPushSender(CONFIG).send(TARGET, MESSAGE)).toEqual({
+        kind: "rejected",
+        statusCode,
       })
     },
   )

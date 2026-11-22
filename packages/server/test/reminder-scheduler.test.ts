@@ -188,8 +188,10 @@ describe("ReminderScheduler.tick (real Postgres)", () => {
       status: "ran",
       sent: 1,
       failed: 0,
+      rejected: 0,
       removed: 0,
       skipped: 0,
+      invalid: 0,
     })
     expect(sender.calls).toHaveLength(1)
     expect(sender.calls[0].target.endpoint).toBe(student.endpoint)
@@ -407,7 +409,58 @@ describe("ReminderScheduler.tick (real Postgres)", () => {
     expect(await lastSentOn(student.studentId)).toBeNull()
   })
 
-  it("does nothing when another instance holds the advisory lock", async () => {
+  it.each([400, 401, 403, 413])(
+    "keeps the claim and the row on a %i rejection: no retry today, a fresh try tomorrow",
+    async (statusCode) => {
+      const { studentId } = await subscribed()
+      sender.outcome = () => ({ kind: "rejected", statusCode })
+
+      expect(await scheduler().tick()).toMatchObject({
+        sent: 0,
+        rejected: 1,
+        failed: 0,
+        removed: 0,
+      })
+      expect(await lastSentOn(studentId)).toBe("2026-01-15")
+      expect(await findReminderSubscription(pool(), studentId)).not.toBeNull()
+      expect(logged.filter((line) => line.includes(studentId))).toHaveLength(1)
+      expect(logged.join("\n")).toContain(String(statusCode))
+
+      // The rest of today's grace window, every 15 minutes (past any
+      // back-off): never a second request.
+      for (
+        let minute = REMINDER_RETRY_MINUTES;
+        minute < 360;
+        minute += REMINDER_RETRY_MINUTES
+      ) {
+        now = new Date(DUE.getTime() + minute * MINUTE)
+        // oxlint-disable-next-line no-await-in-loop -- ticks are sequential by design
+        expect((await scheduler().tick()).sent).toBe(0)
+      }
+
+      expect(sender.calls).toHaveLength(1)
+
+      sender.outcome = () => ({ kind: "sent" })
+      now = new Date(DUE.getTime() + 24 * 60 * MINUTE)
+
+      expect((await scheduler().tick()).sent).toBe(1)
+      expect(sender.calls).toHaveLength(2)
+      expect(await lastSentOn(studentId)).toBe("2026-01-16")
+    },
+  )
+
+  it("counts a row with an unknown timezone and logs its student once per process", async () => {
+    const { studentId } = await subscribed({ timezone: "Mars/Phobos" })
+
+    expect(await scheduler().tick()).toMatchObject({ sent: 0, invalid: 1 })
+    now = new Date(DUE.getTime() + MINUTE)
+    expect(await scheduler().tick()).toMatchObject({ sent: 0, invalid: 1 })
+
+    expect(logged.filter((line) => line.includes(studentId))).toHaveLength(1)
+    expect(sender.calls).toHaveLength(0)
+  })
+
+  it("the advisory lock keeps a second instance out of a tick while one is running it", async () => {
     await subscribed()
     const holder = await pool().connect()
 
@@ -429,7 +482,7 @@ describe("ReminderScheduler.tick (real Postgres)", () => {
     expect((await scheduler().tick()).sent).toBe(1)
   })
 
-  it("two schedulers on one database (two pools, as two replicas) send each reminder exactly once", async () => {
+  it("at-most-once delivery via the atomic claim: two replicas ticking concurrently send each reminder exactly once", async () => {
     const students = await Promise.all(
       Array.from({ length: 5 }, () => subscribed()),
     )

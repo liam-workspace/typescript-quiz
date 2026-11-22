@@ -18,7 +18,15 @@ export type PushOutcome =
   | { readonly kind: "sent" }
   /** 404/410: the browser unsubscribed or the subscription expired. */
   | { readonly kind: "gone" }
-  /** Anything else (5xx, 429, 3xx, timeout, network): retry later. */
+  /**
+   * 400/401/403/413: deterministic for this request, subscription and VAPID
+   * key (malformed, too large, JWT refused, subscription bound to another
+   * application-server key). Retrying the same request cannot succeed, and
+   * deleting the row would let one server-wide key mistake wipe every
+   * subscription; the scheduler keeps the claim and tries again tomorrow.
+   */
+  | { readonly kind: "rejected"; readonly statusCode: number }
+  /** 429, 5xx, 3xx, any other status, timeout, network error: retry later. */
   | { readonly kind: "failed"; readonly statusCode: number | null }
 
 /** The seam the scheduler tests inject a fake through. */
@@ -44,6 +52,8 @@ const PUSH_TTL_SECONDS = 6 * 60 * 60
  * message) replaces rather than stacks an undelivered first copy.
  */
 const PUSH_TOPIC = "practice-reminder"
+
+const REJECTED_STATUSES: ReadonlySet<number> = new Set([400, 401, 403, 413])
 
 const DEADLINE: PushOutcome = { kind: "failed", statusCode: null }
 
@@ -113,7 +123,10 @@ export class WebPushSender implements PushSender {
         JSON.stringify(message),
         {
           TTL: PUSH_TTL_SECONDS,
-          urgency: "low",
+          // RFC 8030 "low" means "only on power and Wi-Fi", and FCM holds it
+          // behind Doze: a 16:30 reminder could arrive hours late. "normal",
+          // never "high" -- this is a nudge, not an alarm.
+          urgency: "normal",
           topic: PUSH_TOPIC,
           timeout: PUSH_SOCKET_TIMEOUT_MS,
           agent,
@@ -131,6 +144,10 @@ export class WebPushSender implements PushSender {
 
       if (statusCode === 404 || statusCode === 410) {
         return { kind: "gone" }
+      }
+
+      if (statusCode !== null && REJECTED_STATUSES.has(statusCode)) {
+        return { kind: "rejected", statusCode }
       }
 
       return { kind: "failed", statusCode }

@@ -52,12 +52,24 @@ export interface TickSummary {
   readonly status: "ran" | "locked" | "disabled" | "error"
   readonly sent: number
   readonly removed: number
+  /** Transient failures: claim released, retried after the back-off. */
   readonly failed: number
+  /** 400/401/403/413: claim kept (no retry today), row kept. */
+  readonly rejected: number
   /** Due now, but held back: finished an attempt today, or backing off. */
   readonly skipped: number
+  /** Rows whose timezone this runtime does not know: never due. */
+  readonly invalid: number
 }
 
-const EMPTY = { sent: 0, removed: 0, failed: 0, skipped: 0 } as const
+const EMPTY = {
+  sent: 0,
+  removed: 0,
+  failed: 0,
+  rejected: 0,
+  skipped: 0,
+  invalid: 0,
+} as const
 
 interface Claimed {
   readonly candidate: ReminderCandidateRow
@@ -68,6 +80,7 @@ interface ClaimRound {
   readonly claimed: readonly Claimed[]
   readonly removed: number
   readonly skipped: number
+  readonly invalid: number
 }
 
 function errorMessage(error: unknown): string {
@@ -95,6 +108,8 @@ export class ReminderScheduler implements OnModuleInit, OnModuleDestroy {
   private readonly retryAfter = new Map<string, number>()
   private timer: ReturnType<typeof setInterval> | null = null
   private running: Promise<TickSummary> | null = null
+  /** Students already logged for an unknown timezone, so it is logged once. */
+  private readonly reportedInvalidZones = new Set<string>()
 
   constructor(
     @Inject(JOB_POOL) private readonly pool: PgPool,
@@ -186,14 +201,19 @@ export class ReminderScheduler implements OnModuleInit, OnModuleDestroy {
       const claimed: Claimed[] = []
       let removed = 0
       let skipped = 0
+      let invalid = 0
 
       for (const candidate of await listReminderCandidates(tx)) {
         const here = localMoment(now, candidate.timezone)
 
-        if (
-          !here ||
-          !isReminderDue({ ...candidate, lastFinishedAt: null }, now)
-        ) {
+        if (!here) {
+          invalid += 1
+          this.reportInvalidZone(candidate.studentId)
+
+          continue
+        }
+
+        if (!isReminderDue({ ...candidate, lastFinishedAt: null }, now)) {
           continue
         }
 
@@ -237,8 +257,19 @@ export class ReminderScheduler implements OnModuleInit, OnModuleDestroy {
         }
       }
 
-      return { claimed, removed, skipped }
+      return { claimed, removed, skipped, invalid }
     })
+  }
+
+  private reportInvalidZone(studentId: string): void {
+    if (this.reportedInvalidZones.has(studentId)) {
+      return
+    }
+
+    this.reportedInvalidZones.add(studentId)
+    this.logger.warn(
+      `reminder subscription of student ${studentId} has a timezone this runtime does not know; it is never due`,
+    )
   }
 
   private async deliver(
@@ -249,6 +280,7 @@ export class ReminderScheduler implements OnModuleInit, OnModuleDestroy {
     let sent = 0
     let { removed } = round
     let failed = 0
+    let rejected = 0
 
     // Sequential on purpose: the job pool is small and shared, and a
     // family-sized deployment has a handful of reminders per minute.
@@ -260,6 +292,8 @@ export class ReminderScheduler implements OnModuleInit, OnModuleDestroy {
         sent += 1
       } else if (outcome === "removed") {
         removed += 1
+      } else if (outcome === "rejected") {
+        rejected += 1
       } else {
         failed += 1
         this.retryAfter.set(
@@ -269,13 +303,21 @@ export class ReminderScheduler implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    return { status: "ran", sent, removed, failed, skipped: round.skipped }
+    return {
+      status: "ran",
+      sent,
+      removed,
+      failed,
+      rejected,
+      skipped: round.skipped,
+      invalid: round.invalid,
+    }
   }
 
   private async sendOne(
     sender: PushSender,
     { candidate, claim }: Claimed,
-  ): Promise<"sent" | "removed" | "failed"> {
+  ): Promise<"sent" | "removed" | "rejected" | "failed"> {
     let outcome: PushOutcome = { kind: "failed", statusCode: null }
 
     try {
@@ -307,6 +349,17 @@ export class ReminderScheduler implements OnModuleInit, OnModuleDestroy {
         )
 
         return "removed"
+      }
+
+      if (outcome.kind === "rejected") {
+        // The claim stays (no retry today) and so does the row: a 403 from
+        // a server-wide VAPID mistake must not wipe every subscription.
+        this.retryAfter.delete(claim.studentId)
+        this.logger.warn(
+          `reminder push for student ${claim.studentId} rejected (status ${String(outcome.statusCode)}); not retried today`,
+        )
+
+        return "rejected"
       }
 
       await releaseReminderClaim(this.pool, claim, candidate.lastSentOn)

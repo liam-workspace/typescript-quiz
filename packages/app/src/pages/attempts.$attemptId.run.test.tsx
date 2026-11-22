@@ -1,4 +1,5 @@
 import "fake-indexeddb/auto"
+import { StrictMode } from "react"
 import {
   act,
   cleanup,
@@ -252,6 +253,11 @@ const cappedAudio: CappedStimulusWire = {
   allowSeek: false,
 }
 
+// A recording that has already been played once: the listening answers are
+// locked until then (and while a clip is playing), so every test about
+// answering, saving or navigating starts from this one.
+const playedAudio: CappedStimulusWire = { ...cappedAudio, playsUsed: 1 }
+
 const listeningEnvelope: RunnerEnvelope = {
   id: "attempt-1",
   status: "in_progress",
@@ -280,7 +286,7 @@ const listeningEnvelope: RunnerEnvelope = {
       groups: [
         {
           id: "group-1",
-          stimulus: cappedAudio,
+          stimulus: playedAudio,
           questions: [
             {
               id: "q-1",
@@ -356,7 +362,7 @@ const multiChoiceEnvelope: RunnerEnvelope = {
       groups: [
         {
           id: "group-1",
-          stimulus: cappedAudio,
+          stimulus: playedAudio,
           questions: [
             {
               id: "q-1",
@@ -485,6 +491,22 @@ const readingEnvelope: RunnerEnvelope = {
     },
   ],
   responses: [],
+}
+
+// The same section before anything has been played (playback tests).
+const unplayedListeningEnvelope: RunnerEnvelope = {
+  ...listeningEnvelope,
+  sections: [
+    {
+      ...listeningEnvelope.sections[0],
+      groups: [
+        {
+          ...listeningEnvelope.sections[0].groups[0],
+          stimulus: cappedAudio,
+        },
+      ],
+    },
+  ],
 }
 
 const sectionBoundaryEnvelope: RunnerEnvelope = {
@@ -1225,7 +1247,7 @@ describe("RunScreen", () => {
     })
     const user = userEvent.setup()
 
-    renderRunScreen()
+    renderRunScreen(unplayedListeningEnvelope)
 
     const button = screen.getByRole("button", { name: "Play recording" })
     expect(button).toBeEnabled()
@@ -1247,7 +1269,7 @@ describe("RunScreen", () => {
     })
     const user = userEvent.setup()
 
-    renderRunScreen()
+    renderRunScreen(unplayedListeningEnvelope)
 
     expect(screen.queryByTestId("audio-player")).not.toBeInTheDocument()
 
@@ -1992,16 +2014,64 @@ describe("RunScreen", () => {
     })
   })
 
-  it("renders the pip/progress strip from questionCount and the section's own question ordinals, read-only", () => {
+  it("moves focus to the question heading after Next", async () => {
+    const user = userEvent.setup()
+
+    mockSetPosition.mockResolvedValue(undefined)
+    renderRunScreen(readingEnvelope)
+
+    await user.click(screen.getByRole("button", { name: "Next" }))
+
+    await waitFor(() => {
+      expect(document.activeElement).toHaveAttribute("data-qtitle")
+    })
+  })
+
+  it("does not steal focus on arrival, even under StrictMode's double effect run", () => {
+    render(
+      <StrictMode>
+        <RunScreen
+          attemptId="attempt-1"
+          envelope={readingEnvelope}
+          queue={getQueue()}
+          navigate={vi.fn()}
+        />
+      </StrictMode>,
+    )
+
+    expect(document.activeElement).toBe(document.body)
+  })
+
+  it("shows the section-relative position and no pip strip", () => {
     renderRunScreen()
 
-    expect(screen.getByText("Question 3 of 20")).toBeInTheDocument()
+    expect(screen.getByText("Listening · Question 1 of 2")).toBeInTheDocument()
+    expect(screen.queryByTestId("question-pip")).toBeNull()
+  })
 
-    const pips = screen.getAllByTestId("question-pip")
-    expect(pips.map((pip) => pip.textContent)).toEqual(["3", "4"])
-    for (const pip of pips) {
-      expect(pip.tagName).not.toBe("BUTTON")
-    }
+  it("keeps answers locked until the recording has played, then unlocks them", async () => {
+    const user = userEvent.setup()
+
+    mockClaimPlay.mockResolvedValue({
+      stimulusId: "stim-1",
+      playsUsed: 1,
+      playsRemaining: 1,
+      mediaUrl: "/api/media/a.mp3",
+      urlExpiresAt: "2026-08-27T09:05:00.000Z",
+    })
+    renderRunScreen(unplayedListeningEnvelope)
+
+    expect(screen.getByRole("radio", { name: "A dog" })).toBeDisabled()
+
+    await user.click(screen.getByRole("button", { name: "Play recording" }))
+    expect(
+      await screen.findByRole("button", { name: "Playing…" }),
+    ).toBeDisabled()
+    expect(screen.getByRole("radio", { name: "A dog" })).toBeDisabled()
+
+    fireEvent.ended(screen.getByTestId("audio-player"))
+
+    expect(await screen.findByRole("radio", { name: "A dog" })).toBeEnabled()
   })
 
   // Defect B: ListeningRunner's `<audio>` had no `onError`, so a stalled or
@@ -2021,7 +2091,7 @@ describe("RunScreen", () => {
       })
       const user = userEvent.setup()
 
-      renderRunScreen()
+      renderRunScreen(unplayedListeningEnvelope)
 
       await user.click(screen.getByRole("button", { name: "Play recording" }))
       const audio = await screen.findByTestId("audio-player")
@@ -2075,7 +2145,7 @@ describe("RunScreen", () => {
       })
       const user = userEvent.setup()
 
-      renderRunScreen()
+      renderRunScreen(unplayedListeningEnvelope)
 
       await user.click(screen.getByRole("button", { name: "Play recording" }))
       const audio = await screen.findByTestId("audio-player")
@@ -2088,8 +2158,10 @@ describe("RunScreen", () => {
       // Honest about the OTHER direction too: the button reflects the real
       // play cap (exhausted), not the stuck-disabled bug this fix removes.
       expect(
-        screen.getByRole("button", { name: "Play recording" }),
+        screen.getByRole("button", { name: "No plays left" }),
       ).toBeDisabled()
+      // A failed load never leaves the student stuck behind locked answers.
+      expect(screen.getByRole("radio", { name: "A dog" })).toBeEnabled()
     })
   })
 
@@ -2110,7 +2182,7 @@ describe("RunScreen", () => {
       )
       const user = userEvent.setup()
 
-      renderRunScreen()
+      renderRunScreen(unplayedListeningEnvelope)
 
       await user.click(screen.getByRole("button", { name: "Play recording" }))
 
@@ -2133,7 +2205,7 @@ describe("RunScreen", () => {
       )
       const user = userEvent.setup()
 
-      const { navigate } = renderRunScreen()
+      const { navigate } = renderRunScreen(unplayedListeningEnvelope)
 
       await user.click(screen.getByRole("button", { name: "Play recording" }))
 

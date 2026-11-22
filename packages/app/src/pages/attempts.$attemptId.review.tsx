@@ -234,7 +234,7 @@ function ReviewChoiceList({ choices }: ReviewChoiceListProps) {
       aria-label={t("review.answerChoices")}
       className="choice-stack list-none p-0"
     >
-      {choices.map((choice) => (
+      {choices.map((choice, index) => (
         <li
           key={choice.id}
           className="choice"
@@ -245,7 +245,9 @@ function ReviewChoiceList({ choices }: ReviewChoiceListProps) {
             aria-hidden="true"
             className="choice-dot rounded-full"
             data-state={choice.selected ? "checked" : "unchecked"}
-          />
+          >
+            {"ABCDEFGH"[index]}
+          </span>
           {choice.imageSvg ? <ReviewChoiceImage svg={choice.imageSvg} /> : null}
           <span className="min-w-0 flex-1">
             {choice.labelBlocks?.length ? (

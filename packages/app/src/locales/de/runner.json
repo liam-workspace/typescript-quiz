@@ -316,5 +316,14 @@
   "navigator.statusBlank": "nicht beantwortet",
   "navigator.statusLeftBlank": "leer gelassen",
   "navigator.statusCorrect": "richtig",
-  "navigator.statusIncorrect": "falsch"
+  "navigator.statusIncorrect": "falsch",
+  "runner.sectionQuestionCount": "{{section}} · Frage {{current}} von {{total}}",
+  "listening.playing": "Wird abgespielt…",
+  "listening.played": "Abgespielt",
+  "listening.noPlaysLeft": "Keine Wiedergabe übrig",
+  "listening.playsLeftHint_one": "Noch {{count}} Wiedergabe. Sie kann nicht pausiert werden.",
+  "listening.playsLeftHint_other": "Noch {{count}} Wiedergaben. Sie können nicht pausiert werden.",
+  "listening.answerNow": "Antworte jetzt. Du kannst nicht zu dieser Frage zurückkehren.",
+  "listening.unlockHint": "Spiele die Aufnahme ab, um die Antworten freizuschalten.",
+  "listening.recordingLabel": "Aufnahme"
 }

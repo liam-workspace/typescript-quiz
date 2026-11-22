@@ -180,6 +180,7 @@ export function RunScreen({
       ),
   )
   const [playState, setPlayState] = useState<PlayState>({ status: "idle" })
+  const [audioProgress, setAudioProgress] = useState(0)
   const [playsUsedByStimulusId, setPlaysUsedByStimulusId] = useState<
     Record<string, number>
   >({})
@@ -242,15 +243,17 @@ export function RunScreen({
 
   // A new question moves focus to its title (prototype `data-qtitle`), so a
   // screen reader starts reading the new question rather than staying on
-  // Next. Skipped on first render: arriving on the screen is not a move.
-  const firstQuestionRender = useRef(true)
+  // Next. The guard compares against the PREVIOUS question id rather than a
+  // first-render flag: StrictMode re-runs effects on mount and would defeat
+  // a boolean (dev would focus the title on arrival, prod would not).
+  const previousQuestionIdRef = useRef(currentQuestionId)
 
   useEffect(() => {
-    if (firstQuestionRender.current) {
-      firstQuestionRender.current = false
-
+    if (previousQuestionIdRef.current === currentQuestionId) {
       return
     }
+
+    previousQuestionIdRef.current = currentQuestionId
 
     document
       .querySelector<HTMLElement>("[data-qtitle]")
@@ -676,6 +679,7 @@ export function RunScreen({
         [stimulus.id]: grant.playsUsed,
       }))
       setPlayState({ status: "granted", mediaUrl: grant.mediaUrl })
+      setAudioProgress(0)
     } catch (error) {
       if (!(error instanceof ApiError)) {
         throw error
@@ -704,10 +708,12 @@ export function RunScreen({
 
   const handleAudioEnded = (): void => {
     setPlayState({ status: "idle" })
+    setAudioProgress(0)
   }
 
   const handleAudioError = (): void => {
     setPlayState({ status: "failed" })
+    setAudioProgress(0)
   }
 
   const nextEntry = entries.at(currentIndex + 1)
@@ -728,6 +734,7 @@ export function RunScreen({
       .then(() => {
         setCurrentQuestionId(entry.question.id)
         setPlayState({ status: "idle" })
+        setAudioProgress(0)
       })
       .catch((error: unknown) => {
         if (!(error instanceof ApiError)) {
@@ -838,11 +845,8 @@ export function RunScreen({
         }
       : stimulus
 
-  const pips = entries.map((entry) => ({
-    questionId: entry.question.id,
-    ordinal: entry.question.ordinal,
-    current: entry.question.id === question.id,
-  }))
+  const positionInSection = currentIndex + 1
+  const sectionQuestionCount = entries.length
 
   const navigatorSource: NavigatorSource = {
     mode: "runner",
@@ -888,6 +892,7 @@ export function RunScreen({
       .then(() => {
         setCurrentQuestionId(targetEntry.question.id)
         setPlayState({ status: "idle" })
+        setAudioProgress(0)
       })
       .catch((error: unknown) => {
         if (!(error instanceof ApiError)) {
@@ -925,8 +930,10 @@ export function RunScreen({
         onAudioError={handleAudioError}
         audioFailed={playState.status === "failed"}
         saveFailed={saveFailedQuestionIds.has(question.id)}
-        questionCount={envelope.questionCount}
-        pips={pips}
+        positionInSection={positionInSection}
+        sectionQuestionCount={sectionQuestionCount}
+        audioProgress={audioProgress}
+        onAudioProgress={setAudioProgress}
         expired={expired}
       />
     )
@@ -948,8 +955,9 @@ export function RunScreen({
         locked={locked}
         onSelectChoice={handleSelectChoice}
         saveFailed={saveFailedQuestionIds.has(question.id)}
-        questionCount={envelope.questionCount}
-        pips={pips}
+        sectionType={section.type}
+        positionInSection={positionInSection}
+        sectionQuestionCount={sectionQuestionCount}
         expired={expired}
       />
     )

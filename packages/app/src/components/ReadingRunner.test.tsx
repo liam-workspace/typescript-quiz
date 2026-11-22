@@ -41,11 +41,6 @@ const passage: StimulusWire = {
   maxPlays: null,
 }
 
-const pips = [
-  { questionId: "q-r1", ordinal: 5, current: false },
-  { questionId: "q-r2", ordinal: 6, current: true },
-]
-
 const baseProps = {
   question,
   stimulus: passage,
@@ -56,8 +51,9 @@ const baseProps = {
   locked: false,
   onSelectChoice: vi.fn(),
   saveFailed: false,
-  questionCount: 20,
-  pips,
+  sectionType: "reading" as const,
+  positionInSection: 1,
+  sectionQuestionCount: 4,
   expired: null,
 }
 
@@ -85,14 +81,7 @@ describe("ReadingRunner", () => {
     ).toBeInTheDocument()
 
     rerender(
-      <ReadingRunner
-        {...baseProps}
-        question={otherQuestionInSameGroup}
-        pips={[
-          { questionId: "q-r1", ordinal: 5, current: true },
-          { questionId: "q-r2", ordinal: 6, current: false },
-        ]}
-      />,
+      <ReadingRunner {...baseProps} question={otherQuestionInSameGroup} />,
     )
 
     expect(
@@ -152,43 +141,6 @@ describe("ReadingRunner", () => {
     expect(screen.getByText("Passage 2 · questions 7–8")).toBeInTheDocument()
   })
 
-  it("renders the pip/progress strip from questionCount and the passed-in ordinals, read-only", () => {
-    render(<ReadingRunner {...baseProps} />)
-
-    expect(screen.getByText("Question 6 of 20")).toBeInTheDocument()
-
-    const strip = screen.getAllByTestId("question-pip")
-    expect(strip.map((pip) => pip.textContent)).toEqual(["5", "6"])
-    for (const pip of strip) {
-      expect(pip.tagName).not.toBe("BUTTON")
-    }
-  })
-
-  it("uses the prototype body classes and marks prior, current, and future pips", () => {
-    render(
-      <ReadingRunner
-        {...baseProps}
-        pips={[
-          { questionId: "q-r1", ordinal: 5, current: false },
-          { questionId: "q-r2", ordinal: 6, current: true },
-          { questionId: "q-r3", ordinal: 7, current: false },
-        ]}
-      />,
-    )
-
-    expect(screen.getByText("Question 6 of 20")).toHaveClass("question-count")
-    expect(screen.getByText("Where does the fox live?")).toHaveClass(
-      "question-prompt",
-    )
-    expect(screen.getByRole("radiogroup")).toHaveClass("choice-stack")
-    expect(
-      screen.getAllByTestId("question-pip").map((pip) => pip.dataset.state),
-    ).toEqual(["done", "now", "future"])
-    expect(
-      screen.queryByRole("button", { name: /previous|next|hand in/i }),
-    ).not.toBeInTheDocument()
-  })
-
   it("renders an actionable message instead of the question when expired is set to section", () => {
     render(
       <ReadingRunner
@@ -243,5 +195,56 @@ describe("ReadingRunner", () => {
     expect(screen.getByTestId("save-failed-notice")).toHaveTextContent(
       "didn't save",
     )
+  })
+
+  it("wraps the passage in a details panel titled with its question range, open on the first question of the group", () => {
+    render(
+      <ReadingRunner {...baseProps} question={{ ...question, ordinal: 5 }} />,
+    )
+
+    const details = screen
+      .getByText("Passage 1 · questions 5–6")
+      .closest("details")
+
+    expect(details).toHaveClass("m-passage")
+    expect(details).toHaveAttribute("open")
+  })
+
+  it("starts the passage collapsed on later questions of the same passage", () => {
+    render(
+      <ReadingRunner {...baseProps} question={{ ...question, ordinal: 6 }} />,
+    )
+
+    expect(
+      screen.getByText("Passage 1 · questions 5–6").closest("details"),
+    ).not.toHaveAttribute("open")
+  })
+
+  it("shows the section label and position for math, with no passage panel", () => {
+    render(
+      <ReadingRunner
+        {...baseProps}
+        sectionType="math"
+        stimulus={undefined}
+        passageOrdinal={null}
+        positionInSection={2}
+        sectionQuestionCount={3}
+      />,
+    )
+
+    expect(screen.getByText("Math · Question 2 of 3")).toBeInTheDocument()
+    expect(document.querySelector("details")).toBeNull()
+  })
+
+  it("makes the prompt a focus target heading", () => {
+    render(<ReadingRunner {...baseProps} />)
+
+    const title = screen.getByRole("heading", {
+      level: 1,
+      name: "Where does the fox live?",
+    })
+
+    expect(title).toHaveAttribute("tabindex", "-1")
+    expect(title).toHaveAttribute("data-qtitle")
   })
 })

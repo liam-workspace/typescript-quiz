@@ -305,5 +305,13 @@
   "navigator.statusBlank": "未解答",
   "navigator.statusLeftBlank": "空欄",
   "navigator.statusCorrect": "正解",
-  "navigator.statusIncorrect": "不正解"
+  "navigator.statusIncorrect": "不正解",
+  "runner.sectionQuestionCount": "{{section}} · 問題{{current}}／{{total}}",
+  "listening.playing": "再生中…",
+  "listening.played": "再生しました",
+  "listening.noPlaysLeft": "再生できません",
+  "listening.playsLeftHint": "残り{{count}}回再生できます。一時停止はできません。",
+  "listening.answerNow": "いま答えましょう。この問題には戻れません。",
+  "listening.unlockHint": "録音を再生すると答えが選べます。",
+  "listening.recordingLabel": "録音"
 }

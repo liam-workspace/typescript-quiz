@@ -316,5 +316,14 @@
   "navigator.statusBlank": "not answered",
   "navigator.statusLeftBlank": "left blank",
   "navigator.statusCorrect": "correct",
-  "navigator.statusIncorrect": "wrong"
+  "navigator.statusIncorrect": "wrong",
+  "runner.sectionQuestionCount": "{{section}} · Question {{current}} of {{total}}",
+  "listening.playing": "Playing…",
+  "listening.played": "Played",
+  "listening.noPlaysLeft": "No plays left",
+  "listening.playsLeftHint_one": "{{count}} play left. It cannot be paused.",
+  "listening.playsLeftHint_other": "{{count}} plays left. They cannot be paused.",
+  "listening.answerNow": "Answer now. You cannot come back to this question.",
+  "listening.unlockHint": "Play the recording to unlock the answers.",
+  "listening.recordingLabel": "Recording"
 }

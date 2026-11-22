@@ -356,3 +356,65 @@ describe("ChoiceList -- multi_choice", () => {
     ).toBeInTheDocument()
   })
 })
+
+describe("ChoiceList -- letters and lockedMessage", () => {
+  afterEach(() => {
+    cleanup()
+  })
+
+  it("renders an aria-hidden letter badge inside each radio and keeps the accessible name", () => {
+    render(
+      <ChoiceList
+        choices={choices}
+        questionType="single_choice"
+        selectedIds={[]}
+        onSelect={vi.fn()}
+        locked={false}
+      />,
+    )
+
+    const radio = screen.getByRole("radio", { name: "A cat" })
+
+    expect(radio.querySelector('[aria-hidden="true"]')).toHaveTextContent("B")
+  })
+
+  it("renders letters inside checkboxes for multi_choice", () => {
+    render(
+      <ChoiceList
+        choices={choices}
+        questionType="multi_choice"
+        selectedIds={[]}
+        onSelect={vi.fn()}
+        locked={false}
+      />,
+    )
+
+    expect(
+      screen
+        .getByRole("checkbox", { name: "A dog" })
+        .querySelector('[aria-hidden="true"]'),
+    ).toHaveTextContent("A")
+  })
+
+  it("shows the caller's lockedMessage instead of the section-lock line", () => {
+    render(
+      <ChoiceList
+        choices={choices}
+        questionType="single_choice"
+        selectedIds={[]}
+        onSelect={vi.fn()}
+        locked
+        lockedMessage="Play the recording to unlock the answers."
+      />,
+    )
+
+    expect(
+      screen.getByText("Play the recording to unlock the answers."),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText(
+        "Answer locked — this section does not allow changes.",
+      ),
+    ).toBeNull()
+  })
+})

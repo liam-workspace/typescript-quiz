@@ -316,5 +316,14 @@
   "navigator.statusBlank": "senza risposta",
   "navigator.statusLeftBlank": "lasciata vuota",
   "navigator.statusCorrect": "corretta",
-  "navigator.statusIncorrect": "sbagliata"
+  "navigator.statusIncorrect": "sbagliata",
+  "runner.sectionQuestionCount": "{{section}} · Domanda {{current}} di {{total}}",
+  "listening.playing": "In riproduzione…",
+  "listening.played": "Riprodotta",
+  "listening.noPlaysLeft": "Nessun ascolto rimasto",
+  "listening.playsLeftHint_one": "{{count}} ascolto rimasto. Non si può mettere in pausa.",
+  "listening.playsLeftHint_other": "{{count}} ascolti rimasti. Non si possono mettere in pausa.",
+  "listening.answerNow": "Rispondi ora. Non potrai tornare a questa domanda.",
+  "listening.unlockHint": "Ascolta la registrazione per sbloccare le risposte.",
+  "listening.recordingLabel": "Registrazione"
 }

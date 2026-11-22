@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next"
 import type { RunnerQuestion, StimulusWire } from "../lib/api-types.js"
 import { ChoiceList } from "./ChoiceList.js"
-import type { QuestionPip } from "./ListeningRunner.js"
+import { Icon } from "./Icon.js"
 import { MathContent } from "./MathContent.js"
 import { QuestionMedia } from "./QuestionMedia.js"
 
@@ -15,24 +15,6 @@ import { QuestionMedia } from "./QuestionMedia.js"
 export interface ReadingExpiredState {
   readonly kind: "section" | "attempt"
   readonly resultUrl: string | null
-}
-
-type QuestionPipState = "done" | "now" | "future"
-
-function questionPipState(
-  pip: QuestionPip,
-  index: number,
-  currentIndex: number,
-): QuestionPipState {
-  if (index < currentIndex) {
-    return "done"
-  }
-
-  if (pip.current) {
-    return "now"
-  }
-
-  return "future"
 }
 
 export interface ReadingRunnerProps {
@@ -60,12 +42,11 @@ export interface ReadingRunnerProps {
   // file's doc comment. True once the server has terminally refused the
   // CURRENT question's queued answer.
   readonly saveFailed: boolean
-  readonly questionCount: number
-  // Same read-only pip strip as ListeningRunner: one entry per question in
-  // the CURRENT section, in section order, rendered as plain <span>s. A
-  // `free` section allows backward navigation through the route-owned
-  // Previous button, not by tapping an earlier pip.
-  readonly pips: readonly QuestionPip[]
+  // Names the section in the "<section> · Question N of M" line (math
+  // shares this component with reading).
+  readonly sectionType: "reading" | "math"
+  readonly positionInSection: number
+  readonly sectionQuestionCount: number
   readonly expired: ReadingExpiredState | null
 }
 
@@ -86,12 +67,12 @@ export function ReadingRunner({
   locked,
   onSelectChoice,
   saveFailed,
-  questionCount,
-  pips,
+  sectionType,
+  positionInSection,
+  sectionQuestionCount,
   expired,
 }: ReadingRunnerProps) {
   const { t } = useTranslation("runner")
-  const currentPipIndex = pips.findIndex((pip) => pip.current)
 
   if (expired) {
     return (
@@ -108,54 +89,53 @@ export function ReadingRunner({
     )
   }
 
+  const mediaElement = stimulus ? (
+    <QuestionMedia
+      stimulus={stimulus}
+      onClaimPlay={() => Promise.resolve()}
+      playing={false}
+    />
+  ) : null
+  const media =
+    stimulus && passageOrdinal !== null ? (
+      <details
+        key={question.id}
+        className="m-passage"
+        open={question.ordinal === passageFirstOrdinal}
+      >
+        <summary>
+          <Icon name="book" />
+          {t("reading.passageQuestions", {
+            passageNumber: passageOrdinal,
+            first: passageFirstOrdinal,
+            last: passageLastOrdinal,
+          })}
+        </summary>
+        {mediaElement}
+      </details>
+    ) : (
+      mediaElement
+    )
+
   return (
     <div data-testid="reading-runner" className="runner-question">
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <p className="question-count shrink-0">
-          {t("runner.questionCount", {
-            current: question.ordinal,
-            total: questionCount,
-          })}
-        </p>
-        <div className="flex min-w-20 flex-1 flex-wrap gap-1">
-          {pips.map((pip, index) => (
-            <span
-              key={pip.questionId}
-              data-testid="question-pip"
-              data-state={questionPipState(pip, index, currentPipIndex)}
-              aria-current={pip.current ? "step" : undefined}
-              className="pip block overflow-hidden text-[0px]"
-            >
-              {pip.ordinal}
-            </span>
-          ))}
-        </div>
-        {passageOrdinal !== null ? (
-          <p className="text-faint text-xs font-semibold">
-            {t("reading.passageQuestions", {
-              passageNumber: passageOrdinal,
-              first: passageFirstOrdinal,
-              last: passageLastOrdinal,
-            })}
-          </p>
-        ) : null}
-      </div>
+      <p className="m-qmeta">
+        {t("runner.sectionQuestionCount", {
+          section: t(`runner.sectionChip.${sectionType}`),
+          current: positionInSection,
+          total: sectionQuestionCount,
+        })}
+      </p>
 
-      {stimulus ? (
-        <QuestionMedia
-          stimulus={stimulus}
-          onClaimPlay={() => Promise.resolve()}
-          playing={false}
-        />
-      ) : null}
+      {media}
 
-      <p className="question-prompt">
+      <h1 className="question-prompt" tabIndex={-1} data-qtitle>
         {question.promptBlocks?.length ? (
           <MathContent blocks={question.promptBlocks} />
         ) : (
           question.prompt
         )}
-      </p>
+      </h1>
       <ChoiceList
         choices={question.choices}
         questionType={question.type}

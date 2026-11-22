@@ -168,20 +168,22 @@
   /* An answer option. Its selected state is the single most important
    * visual signal in the app: a child taps and must see it took. */
   .choice {
+    position: relative;
     display: flex;
+    width: 100%;
+    min-height: 60px;
     align-items: center;
     gap: 12px;
-    width: 100%;
-    min-height: 44px; /* HIG minimum; the kit's own controls stop at 40px */
+    border: 2px solid var(--color-line);
+    border-radius: 16px;
     background: var(--color-paper);
-    border: 1.5px solid var(--color-line);
-    border-radius: var(--radius-device);
-    padding: 12px 15px;
-    font: inherit;
-    font-size: 15px;
-    text-align: left;
-    cursor: pointer;
+    padding: 10px 14px;
     color: var(--color-ink);
+    cursor: pointer;
+    font: inherit;
+    font-size: 17px;
+    font-weight: 700;
+    text-align: left;
     touch-action: manipulation;
   }
   .choice:hover {
@@ -190,13 +192,23 @@
   .choice:has([data-state="checked"]) {
     border-color: var(--color-teal);
     background: var(--color-teal-bg);
-    font-weight: 700;
   }
+  .choice:has(:focus-visible) {
+    outline: 3px solid var(--color-teal);
+    outline-offset: 2px;
+  }
+  .choice:has(:disabled) {
+    background: #f1f4f6;
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+  /* Review rows are always read-only but must stay fully legible. */
   .choice[data-locked="true"] {
     cursor: not-allowed;
     opacity: 0.92;
   }
-  .choice[data-locked="true"]:hover {
+  .choice[data-locked="true"]:hover,
+  .choice:has(:disabled):hover {
     border-color: var(--color-line);
   }
   /* Review only: the attempt is finished, so correctness may be shown. */
@@ -211,17 +223,22 @@
 
   /* The radio/checkbox mark inside a `.choice`. */
   .choice-dot {
-    width: 19px;
-    height: 19px;
-    flex: none;
-    border: 2px solid var(--color-line);
     display: grid;
+    width: 32px;
+    height: 32px;
+    flex: none;
     place-items: center;
-    background: var(--color-paper);
+    border: 1.5px solid var(--color-line);
+    border-radius: 50%;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-size: 14px;
+    font-weight: 800;
   }
   .choice-dot[data-state="checked"] {
     border-color: var(--color-teal);
     background: var(--color-teal);
+    color: #fff;
   }
 
   /* A picture choice's pictogram. `stroke="currentColor"` inside the SVG
@@ -483,10 +500,13 @@
     text-transform: uppercase;
   }
   .question-prompt {
-    margin: 15px 0 0;
-    font-size: 16.5px;
-    font-weight: 700;
-    text-wrap: balance;
+    margin: 2px 0 4px;
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1.3;
+  }
+  .question-prompt:focus {
+    outline: none;
   }
   .choice-stack {
     display: flex;
@@ -497,31 +517,34 @@
   .audio-box {
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
     gap: 10px;
-    border: 1px solid color-mix(in srgb, var(--color-teal) 22%, transparent);
-    border-radius: 12px;
-    padding: 20px;
-    background: var(--color-teal-bg);
+    border: 1.5px solid var(--color-line);
+    border-radius: 16px;
+    background: var(--color-paper);
+    padding: 16px;
+    text-align: center;
   }
   .play-button {
     display: inline-flex;
-    min-height: 44px;
+    min-height: 48px;
     align-items: center;
+    justify-content: center;
     gap: 10px;
-    border: 0;
-    border-radius: 999px;
-    padding: 10px 24px;
+    border: 2px solid var(--color-teal);
+    border-radius: 14px;
     background: var(--color-teal);
-    color: white;
+    color: #fff;
     cursor: pointer;
-    font-size: 15px;
-    font-weight: 700;
+    font-size: 16px;
+    font-weight: 800;
     touch-action: manipulation;
   }
   .play-button:disabled {
+    border-color: #e8edf1;
+    background: #e8edf1;
+    color: #5d6a76;
     cursor: not-allowed;
-    background: var(--color-faint);
   }
   .passage {
     max-height: min(35dvh, 21rem);
@@ -1749,5 +1772,81 @@
     display: grid;
     gap: 10px;
     margin-top: 14px;
+  }
+
+  .m-qmeta {
+    margin: 0 0 8px;
+    color: var(--color-ink-2);
+    font-size: 13px;
+    font-weight: 800;
+  }
+  .m-hint {
+    margin: 0 0 10px;
+    color: var(--color-ink-2);
+    font-size: 14px;
+  }
+  .m-bar {
+    height: 10px;
+    margin: 12px 0 6px;
+    overflow: hidden;
+    border-radius: 9px;
+    background: var(--color-line);
+  }
+  .m-bar > i {
+    display: block;
+    height: 100%;
+    background: var(--color-clay);
+  }
+  .m-eq {
+    display: inline-flex;
+    height: 16px;
+    align-items: flex-end;
+    gap: 3px;
+  }
+  .m-eq > b {
+    width: 4px;
+    height: 8px;
+    border-radius: 2px;
+    background: currentColor;
+    animation: m-eq 0.8s ease-in-out infinite;
+  }
+  .m-eq > b:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+  .m-eq > b:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+  @keyframes m-eq {
+    50% {
+      height: 16px;
+    }
+  }
+  .m-passage {
+    margin-bottom: 14px;
+    border: 1.5px solid var(--color-line);
+    border-radius: 16px;
+    background: var(--color-paper);
+  }
+  .m-passage > summary {
+    display: flex;
+    min-height: 48px;
+    cursor: pointer;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    font-weight: 800;
+    list-style: none;
+  }
+  .m-passage > summary::-webkit-details-marker {
+    display: none;
+  }
+  .m-passage .passage {
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0 14px 14px;
+    font-size: 17px;
+    line-height: 1.6;
   }
 }

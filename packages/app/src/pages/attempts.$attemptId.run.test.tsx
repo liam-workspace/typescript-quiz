@@ -676,6 +676,10 @@ function renderRunScreen(
   return { ...utils, navigate }
 }
 
+const finishHasFocus = (): void => {
+  expect(screen.getByRole("button", { name: "Finish Listening" })).toHaveFocus()
+}
+
 /** A `fetch` stub that answers every call with its OWN Response (a body reads once). */
 const freshJsonResponse =
   (body: string): (() => Promise<Response>) =>
@@ -998,7 +1002,7 @@ describe("RunScreen", () => {
   })
 
   it.each([1, 2])(
-    "hides Previous at the first question in a free math section (question count: %i)",
+    "shows Previous DISABLED at the first question in a free math section, so the bar does not jump (D2; question count: %i)",
     (questionCount) => {
       const envelope = structuredClone(readingEnvelope)
       const [section] = envelope.sections
@@ -1016,9 +1020,7 @@ describe("RunScreen", () => {
 
       renderRunScreen(envelope)
 
-      expect(
-        screen.queryByRole("button", { name: "Previous" }),
-      ).not.toBeInTheDocument()
+      expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled()
     },
   )
 
@@ -1033,6 +1035,16 @@ describe("RunScreen", () => {
     expect(
       screen.queryByRole("button", { name: "Previous" }),
     ).not.toBeInTheDocument()
+  })
+
+  it("names the navigator button with the count it shows (D3, WCAG 2.5.3)", () => {
+    renderRunScreen()
+
+    expect(
+      screen.getByRole("button", {
+        name: "Question navigator, 0 of 2 answered",
+      }),
+    ).toHaveTextContent("0/2")
   })
 
   it("keeps Previous in the route-owned footer for reading", () => {
@@ -1112,7 +1124,7 @@ describe("RunScreen", () => {
         clock.read.bind(clock),
       )
       const navigatorTrigger = screen.getByRole("button", {
-        name: "Open the question navigator",
+        name: /^Question navigator/u,
       })
       const announcement = (): HTMLElement | null =>
         document.querySelector<HTMLElement>("p[aria-live='polite']")
@@ -1273,7 +1285,7 @@ describe("RunScreen", () => {
 
       await userEvent.keyboard("{Escape}")
       await userEvent.click(
-        screen.getByRole("button", { name: "Open the question navigator" }),
+        screen.getByRole("button", { name: /^Question navigator/u }),
       )
 
       expect(runner).toHaveAttribute("data-panel", "navigator")
@@ -1316,7 +1328,7 @@ describe("RunScreen", () => {
       expect(menuTrigger).toHaveFocus()
 
       const navigatorTrigger = screen.getByRole("button", {
-        name: "Open the question navigator",
+        name: /^Question navigator/u,
       })
       await userEvent.click(navigatorTrigger)
       await userEvent.keyboard("{Escape}")
@@ -1335,7 +1347,7 @@ describe("RunScreen", () => {
       )
       expect(
         screen.getByRole("button", {
-          name: "Open the question navigator",
+          name: /^Question navigator/u,
         }),
       ).toHaveClass("m-btn")
     })
@@ -1362,6 +1374,23 @@ describe("RunScreen", () => {
 
       await waitFor(finishWasCalled)
       await waitFor(navigatedToReadingRules(navigate))
+    })
+
+    it("returns focus to Finish when the confirm sheet is dismissed, even where a click does not focus buttons (D13)", async () => {
+      const user = userEvent.setup()
+
+      renderRunScreen(sectionBoundaryEnvelope)
+
+      const finish = screen.getByRole("button", { name: "Finish Listening" })
+
+      // Safari: tapping a button does not focus it, so Radix's default
+      // (whatever was focused when the sheet opened) would be <body>.
+      fireEvent.click(finish)
+      expect(finish).not.toHaveFocus()
+      await screen.findByRole("dialog", { name: "Finish Listening?" })
+      await user.keyboard("{Escape}")
+
+      await waitFor(finishHasFocus)
     })
 
     it("offers Hand in on the last question of the last section and goes to the hand-in route", async () => {
@@ -1402,7 +1431,7 @@ describe("RunScreen", () => {
       renderRunScreen()
 
       expect(
-        screen.getByRole("button", { name: "Open the question navigator" }),
+        screen.getByRole("button", { name: /^Question navigator/u }),
       ).toHaveTextContent("0/2")
       expect(
         screen.getByRole("progressbar", { name: "Section progress" }),
@@ -1414,7 +1443,7 @@ describe("RunScreen", () => {
 
       await userEvent.click(
         screen.getByRole("button", {
-          name: "Open the question navigator",
+          name: /^Question navigator/u,
         }),
       )
       await userEvent.click(
@@ -1430,7 +1459,7 @@ describe("RunScreen", () => {
 
       await userEvent.click(
         screen.getByRole("button", {
-          name: "Open the question navigator",
+          name: /^Question navigator/u,
         }),
       )
       await userEvent.click(
@@ -1525,8 +1554,9 @@ describe("RunScreen", () => {
   // hardcoded `true`, so the menu told a child "the clock keeps running
   // while you are away" before they had started anything -- false, and
   // exactly what would stop a child leaving a test they had not begun. I
-  // fixed the wiring and did not test it. AppMenu covers both branches of
-  // the COMPONENT; nothing asserted the run shell passes the right value.
+  // fixed the wiring and did not test it. RunMenuSheet's own test covers both
+  // branches of the COMPONENT; nothing asserted the run shell passes the
+  // right value.
   //
   // openapi.yaml is explicit that an attempt's expiresAt "stays null until
   // the first section entry", so that null IS the not-started signal.

@@ -279,6 +279,29 @@ describe("reminders.enable", () => {
     expect(await api.state()).toBe("on")
   })
 
+  it("a state() refresh landing while enable() waits on the PUT never drops the fresh subscription (D9)", async () => {
+    let finishPut: () => void = () => undefined
+    const put = vi.fn<RemindersDeps["put"]>(
+      () =>
+        new Promise<void>((resolve) => {
+          finishPut = resolve
+        }),
+    )
+    const { api, browser } = setup({ put })
+    const enabling = api.enable()
+
+    await vi.waitFor(() => {
+      expect(put).toHaveBeenCalled()
+    })
+    // A visibilitychange refresh, mid-enable: the marker is not written yet.
+    expect(await api.state()).toBe("off")
+    finishPut()
+
+    expect(await enabling).toBe("on")
+    expect(await browser.push.getSubscription()).not.toBeNull()
+    expect(await api.state()).toBe("on")
+  })
+
   it("asks for permission synchronously, inside the tap (Safari drops the prompt otherwise)", () => {
     const { api, browser } = setup()
 

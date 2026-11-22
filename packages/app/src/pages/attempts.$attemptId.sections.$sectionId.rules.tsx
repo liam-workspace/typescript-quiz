@@ -164,7 +164,11 @@ export function SectionRulesScreen({
   return (
     <div className="m-page">
       <header className="m-appbar">
-        <a href="/" className="m-iconbtn" aria-label={t("sectionRules.leave")}>
+        <a
+          href="/"
+          className="m-iconbtn"
+          aria-label={t("result.backToLibrary")}
+        >
           <Icon name="back" />
         </a>
         <span className="m-brand">{t("library.brand")}</span>

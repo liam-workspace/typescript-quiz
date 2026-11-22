@@ -106,6 +106,11 @@ describe("HandInScreen", () => {
         />,
       )
 
+      // D7: the app bar says what the screen is (prototype vHandin).
+      expect(screen.getByRole("banner")).toHaveTextContent("Hand in")
+      expect(screen.getByRole("banner")).not.toHaveTextContent(
+        "Practice Test 04",
+      )
       expect(
         screen.getByRole("heading", { level: 1, name: "Hand in your test?" }),
       ).toHaveAttribute("tabindex", "-1")

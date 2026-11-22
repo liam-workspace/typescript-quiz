@@ -11,6 +11,8 @@ export interface FinishSectionSheetProps {
   readonly failed: boolean
   readonly onConfirm: () => void
   readonly returnFocusRef?: RefObject<HTMLElement | null>
+  /** Takes focus on close when the trigger is disabled (busy finishing). */
+  readonly fallbackFocusRef?: RefObject<HTMLElement | null>
 }
 
 export function FinishSectionSheet({
@@ -22,6 +24,7 @@ export function FinishSectionSheet({
   failed,
   onConfirm,
   returnFocusRef,
+  fallbackFocusRef,
 }: FinishSectionSheetProps) {
   const { t } = useTranslation("runner")
 
@@ -32,6 +35,7 @@ export function FinishSectionSheet({
       title={t("runner.finishSectionTitle", { section: sectionLabel })}
       closeLabel={t("menu.closeLabel")}
       returnFocusRef={returnFocusRef}
+      fallbackFocusRef={fallbackFocusRef}
     >
       <p>
         {blankCount > 0

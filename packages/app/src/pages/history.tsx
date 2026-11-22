@@ -1,7 +1,7 @@
-import { Card, CardContent } from "@liam-workspace/browser-react-ui"
 import { createFileRoute } from "@tanstack/react-router"
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
+import { RouteErrorView } from "../components/RouteErrorView.js"
 import { Icon } from "../components/Icon.js"
 import { ApiError } from "../lib/api-client.js"
 import type { AttemptHistoryPage, Student } from "../lib/api-types.js"
@@ -149,21 +149,19 @@ export function HistoryScreen({ initialPage }: HistoryScreenProps) {
           </ul>
         )}
 
-        <button
-          type="button"
-          className="m-btn mt-3"
-          data-variant="secondary"
-          data-block="true"
-          disabled={nextCursor === null || loading}
-          aria-busy={loading}
-          onClick={loadMore}
-        >
-          {t(
-            nextCursor === null
-              ? "history.noOlderAttempts"
-              : "history.loadMore",
-          )}
-        </button>
+        {nextCursor === null ? null : (
+          <button
+            type="button"
+            className="m-btn mt-3"
+            data-variant="secondary"
+            data-block="true"
+            disabled={loading}
+            aria-busy={loading}
+            onClick={loadMore}
+          >
+            {t("history.loadMore")}
+          </button>
+        )}
         {loadMoreFailed ? (
           <p role="alert" className="text-bad mt-3 text-sm font-semibold">
             {t("history.loadMoreError")}
@@ -183,15 +181,9 @@ export function HistoryRouteError({ error }: HistoryRouteErrorProps) {
   const unauthorized = error instanceof ApiError && error.problem.status === 401
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-12">
-      <Card>
-        <CardContent>
-          <p role="alert">
-            {t(unauthorized ? "history.unauthorized" : "history.error")}
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <RouteErrorView
+      message={t(unauthorized ? "history.unauthorized" : "history.error")}
+    />
   )
 }
 

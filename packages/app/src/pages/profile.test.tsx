@@ -1,4 +1,13 @@
-import { act, cleanup, screen, waitFor, within } from "@testing-library/react"
+import {
+  act,
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react"
+import { createRef, useState } from "react"
+import { InstallSheet } from "../components/InstallSheet.js"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import i18n from "../i18n.js"
@@ -700,6 +709,57 @@ describe("Profile reminders (integration)", () => {
       expect(await reminderSwitch()).toHaveAccessibleDescription(
         "Blocked in your browser settings.",
       )
+    })
+  })
+})
+
+describe("Profile install sheet focus (D13)", () => {
+  afterEach(cleanup)
+
+  it("returns focus to Install when the manual-install sheet closes", async () => {
+    const user = userEvent.setup()
+    const trigger = createRef<HTMLButtonElement>()
+
+    function Harness() {
+      const [open, setOpen] = useState(false)
+
+      return (
+        <>
+          <ProfileScreen
+            student={student}
+            pwa={browserTab}
+            version="1.0.0"
+            reminders={reminderProps()}
+            offlineStorage={null}
+            installTriggerRef={trigger}
+            onInstall={() => {
+              setOpen(true)
+            }}
+            onRefresh={() => undefined}
+            onSignOut={() => undefined}
+          />
+          <InstallSheet
+            open={open}
+            onOpenChange={setOpen}
+            kind="manual"
+            onConfirm={() => undefined}
+            returnFocusRef={trigger}
+          />
+        </>
+      )
+    }
+
+    renderWithRouter(<Harness />)
+
+    const install = screen.getByRole("button", { name: "Install" })
+
+    fireEvent.click(install)
+    expect(install).not.toHaveFocus()
+    await screen.findByRole("dialog")
+    await user.keyboard("{Escape}")
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Install" })).toHaveFocus()
     })
   })
 })

@@ -194,15 +194,16 @@ describe("SectionRulesScreen", () => {
     ).toHaveLength(baseProps.instructions.length)
   })
 
-  it("offers a Leave link back to the library", () => {
+  it("offers two ways back to the library, each with its own name (D11)", () => {
     render(<SectionRulesScreen {...baseProps} navigate={vi.fn()} />)
 
-    const links = screen.getAllByRole("link", { name: "Leave" })
-
-    expect(links).toHaveLength(2)
-    for (const link of links) {
-      expect(link).toHaveAttribute("href", "/")
-    }
+    expect(
+      screen.getByRole("link", { name: "Back to library" }),
+    ).toHaveAttribute("href", "/")
+    expect(screen.getByRole("link", { name: "Leave" })).toHaveAttribute(
+      "href",
+      "/",
+    )
   })
 
   it("pins the action bar so I'm ready is visible without scrolling (C4)", () => {

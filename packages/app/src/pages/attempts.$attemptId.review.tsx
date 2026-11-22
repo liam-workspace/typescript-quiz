@@ -1,7 +1,7 @@
-import { Card, CardContent } from "@liam-workspace/browser-react-ui"
 import { createFileRoute, redirect } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { RouteErrorView } from "../components/RouteErrorView.js"
 import { z } from "zod"
 import { choiceLabel } from "../components/ChoiceList.js"
 import { Icon } from "../components/Icon.js"
@@ -507,15 +507,9 @@ export function ReviewRouteError({ error }: ReviewRouteErrorProps) {
   const forbidden = error instanceof ApiError && error.problem.status === 403
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-12">
-      <Card>
-        <CardContent>
-          <p role="alert">
-            {t(forbidden ? "review.forbidden" : "review.error")}
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <RouteErrorView
+      message={t(forbidden ? "review.forbidden" : "review.error")}
+    />
   )
 }
 

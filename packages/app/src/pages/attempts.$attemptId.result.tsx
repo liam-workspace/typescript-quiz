@@ -1,7 +1,7 @@
-import { Card, CardContent } from "@liam-workspace/browser-react-ui"
 import { Link, createFileRoute, redirect } from "@tanstack/react-router"
 import type { CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
+import { RouteErrorView } from "../components/RouteErrorView.js"
 import { ApiError } from "../lib/api-client.js"
 import type { AttemptResult, AttemptSectionScore } from "../lib/api-types.js"
 import { Icon, type IconName } from "../components/Icon.js"
@@ -85,6 +85,8 @@ export function ResultScreen({ result }: ResultScreenProps) {
           data-testid="score-ring"
           className="score-ring mx-auto my-3"
           style={ringStyle}
+          // A role, or the label is ignored (ARIA forbids naming a plain div).
+          role="img"
           aria-label={t("result.scoreLabel")}
         >
           <div>
@@ -164,15 +166,9 @@ export function ResultRouteError({ error }: ResultRouteErrorProps) {
   const forbidden = error instanceof ApiError && error.problem.status === 403
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-12">
-      <Card>
-        <CardContent>
-          <p role="alert">
-            {t(forbidden ? "result.forbidden" : "result.error")}
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <RouteErrorView
+      message={t(forbidden ? "result.forbidden" : "result.error")}
+    />
   )
 }
 

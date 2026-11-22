@@ -66,6 +66,8 @@
   --color-amber: #e8a33d;
   --color-teal-d: #0b5a63;
   --color-amber-bg: #fdf3df;
+  /* Text on amber (pending / waiting): the amber itself is too light to read. */
+  --color-amber-ink: #7a4d00;
 
   --radius-device: 10px;
 }
@@ -210,6 +212,13 @@
   .choice[data-locked="true"]:hover,
   .choice:has(:disabled):hover {
     border-color: var(--color-line);
+  }
+  /* A disabled choice the student SELECTED (a locked answer) keeps the
+   * selected fill and border: the rules above would grey it out (D14). */
+  .choice:has(:disabled):has([data-state="checked"]),
+  .choice:has(:disabled):has([data-state="checked"]):hover {
+    border-color: var(--color-teal);
+    background: var(--color-teal-bg);
   }
   /* Review only: the attempt is finished, so correctness may be shown. */
   .choice[data-verdict="correct"] {
@@ -780,7 +789,7 @@
   }
   .chip.warn {
     background: var(--color-amber-bg);
-    color: #7a4d00;
+    color: var(--color-amber-ink);
     border-color: transparent;
   }
   .chip.clay {
@@ -837,9 +846,9 @@
   }
   .switch input {
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+    /* The track is 52×32; the input reaches 4 px past each side and 6 px
+     * above and below, so the TARGET is 60×44 with the same look (D10). */
+    inset: -6px -4px;
     opacity: 0;
     margin: 0;
     cursor: pointer;
@@ -1328,7 +1337,7 @@
   .m-chip[data-tone="warn"] {
     border-color: transparent;
     background: #fdf3df;
-    color: #7a4d00;
+    color: var(--color-amber-ink);
   }
   .m-chip[data-tone="clay"] {
     border-color: transparent;
@@ -1481,7 +1490,7 @@
     border-radius: 12px;
     background: var(--color-bad-bg);
     padding: 10px 12px;
-    color: #b53a34;
+    color: var(--color-bad);
     font-size: 14px;
     font-weight: 700;
     text-align: left;
@@ -1709,10 +1718,10 @@
     text-overflow: ellipsis;
   }
   .m-save[data-state="pending"] {
-    color: #7a4d00;
+    color: var(--color-amber-ink);
   }
   .m-save[data-state="failed"] {
-    color: #b53a34;
+    color: var(--color-bad);
   }
   /* The icon alone says "jump" on the narrowest phones; the button keeps its
    * aria-label, so nothing is lost for assistive tech. */

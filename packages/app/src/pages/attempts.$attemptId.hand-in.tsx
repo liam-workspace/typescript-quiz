@@ -1,13 +1,7 @@
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@liam-workspace/browser-react-ui"
 import { createFileRoute } from "@tanstack/react-router"
 import { useEffect, useId, useState, useSyncExternalStore } from "react"
 import { useTranslation } from "react-i18next"
+import { RouteErrorView } from "../components/RouteErrorView.js"
 import { Icon } from "../components/Icon.js"
 import { TimeUpView } from "../components/TimeUpView.js"
 import { ApiError } from "../lib/api-client.js"
@@ -276,7 +270,7 @@ export function HandInScreen({
   return (
     <div className="m-page">
       <header className="m-appbar">
-        <span className="m-brand truncate">{envelope.testTitle}</span>
+        <span className="m-brand truncate">{t("runner.handIn")}</span>
       </header>
       <main className="m-body">
         <h1 className="m-title" tabIndex={-1} data-page-title>
@@ -390,24 +384,16 @@ export function HandInRouteError(_props: HandInRouteErrorProps) {
   const { t } = useTranslation("runner")
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-12">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("runError.title")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p role="alert">{t("runError.message")}</p>
-          <Button
-            className="h-11 min-w-11 touch-manipulation select-none"
-            onClick={() => {
-              window.location.reload()
-            }}
-          >
-            {t("runError.retry")}
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+    <RouteErrorView
+      title={t("runError.title")}
+      message={t("runError.message")}
+      retry={{
+        label: t("runError.retry"),
+        onRetry: () => {
+          window.location.reload()
+        },
+      }}
+    />
   )
 }
 

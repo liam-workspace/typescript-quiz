@@ -5,6 +5,7 @@ import {
   useSyncExternalStore,
   type JSX,
   type ReactNode,
+  type RefObject,
 } from "react"
 import { useTranslation } from "react-i18next"
 import { APP_VERSION } from "../app-version.js"
@@ -66,6 +67,8 @@ export interface ProfileScreenProps {
   /** The saved-tests list (`OfflineStorageList`), injected by the route. */
   readonly offlineStorage: ReactNode
   readonly onInstall: () => void
+  /** The Install button, so the install sheet can return focus to it. */
+  readonly installTriggerRef?: RefObject<HTMLButtonElement | null>
   readonly onRefresh: () => void
   readonly onSignOut: () => void
 }
@@ -78,6 +81,7 @@ export function ProfileScreen({
   reminders: reminderProps,
   offlineStorage,
   onInstall,
+  installTriggerRef,
   onRefresh,
   onSignOut,
 }: ProfileScreenProps): JSX.Element {
@@ -137,6 +141,7 @@ export function ProfileScreen({
               </span>
             ) : (
               <button
+                ref={installTriggerRef}
                 type="button"
                 className="btn sm secondary"
                 onClick={onInstall}
@@ -330,6 +335,7 @@ function RouteComponent() {
   )
   const reminders = useProfileReminders()
   const [installKind, setInstallKind] = useState<"ios" | "manual" | null>(null)
+  const installTrigger = useRef<HTMLButtonElement>(null)
   const offline = useOfflineLibrary()
 
   async function handleInstall(): Promise<void> {
@@ -350,6 +356,7 @@ function RouteComponent() {
         version={APP_VERSION}
         reminders={reminders}
         offlineStorage={<SavedTestsList offline={offline} />}
+        installTriggerRef={installTrigger}
         onInstall={() => {
           void handleInstall()
         }}
@@ -369,6 +376,7 @@ function RouteComponent() {
           }
         }}
         kind={installKind ?? "manual"}
+        returnFocusRef={installTrigger}
         onConfirm={() => {
           pwaStore.markInstalled()
           setInstallKind(null)

@@ -31,7 +31,7 @@ describe("RunActionBar", () => {
 
     expect(screen.getByRole("button", { name: "Previous" })).toBeInTheDocument()
     expect(
-      screen.getByRole("button", { name: "Open the question navigator" }),
+      screen.getByRole("button", { name: /^Question navigator/u }),
     ).toHaveTextContent("2/4")
 
     rerender(<RunActionBar {...props} showPrevious={false} />)
@@ -72,7 +72,7 @@ describe("RunActionBar", () => {
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull()
     expect(screen.queryByRole("button", { name: "Previous" })).toBeNull()
     expect(
-      screen.getByRole("button", { name: "Open the question navigator" }),
+      screen.getByRole("button", { name: /^Question navigator/u }),
     ).toBeInTheDocument()
   })
 })

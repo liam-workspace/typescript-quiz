@@ -98,6 +98,11 @@ async function renderAt(path: string) {
       }),
       createRoute({
         getParentRoute: () => rootRoute,
+        path: "/attempts/$attemptId/hand-in",
+        component: page("hand-in page"),
+      }),
+      createRoute({
+        getParentRoute: () => rootRoute,
         path: "/admin",
         component: page("admin page"),
       }),
@@ -175,18 +180,34 @@ describe("AppLayout chrome", () => {
     ).not.toBeInTheDocument()
   })
 
-  it.each(["/attempts/a1/result", "/attempts/a1/sections/s1/rules"])(
-    "shows the browsing offline banner on %s",
-    async (path) => {
-      networkStore.setOnlineForTests(false)
-      await renderAt(path)
+  it.each([
+    ["/attempts/a1/result", "browsing"],
+    ["/attempts/a1/sections/s1/rules", "in-test"],
+    ["/attempts/a1/hand-in", "in-test"],
+  ])("on %s shows the %s offline banner (D1)", async (path, variant) => {
+    networkStore.setOnlineForTests(false)
+    await renderAt(path)
 
-      expect(screen.getByTestId("offline-banner")).toHaveAttribute(
-        "data-variant",
-        "browsing",
-      )
-    },
-  )
+    expect(screen.getByTestId("offline-banner")).toHaveAttribute(
+      "data-variant",
+      variant,
+    )
+  })
+
+  it.each([
+    ["/attempts/a1/hand-in", true],
+    ["/attempts/a1/sections/s1/rules", true],
+    ["/attempts/a1/result", false],
+  ])("on %s defers a ready update: %s (D1)", async (path, deferred) => {
+    const ready = { ...pwaStore.getSnapshot(), updateReady: true }
+
+    vi.spyOn(pwaStore, "getSnapshot").mockReturnValue(ready)
+    await renderAt(path)
+
+    expect(screen.queryByRole("button", { name: "Refresh" }) === null).toBe(
+      deferred,
+    )
+  })
 
   it("announces going offline and coming back through one polite live region", async () => {
     await renderAt("/")
@@ -233,6 +254,16 @@ describe("AppLayout chrome", () => {
         selector: "[aria-live] *, [aria-live]",
       }),
     ).toBeInTheDocument()
+  })
+
+  it("says 'Updated to version X.' once on the boot after an update (D4)", async () => {
+    window.sessionStorage.setItem("pp.updated", "1")
+    await renderAt("/")
+
+    expect(
+      await screen.findByText("Updated to version dev."),
+    ).toBeInTheDocument()
+    expect(window.sessionStorage.getItem("pp.updated")).toBeNull()
   })
 
   it("renders toasts from the toast store", async () => {

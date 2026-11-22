@@ -31,6 +31,15 @@ describe("startInstall", () => {
     expect(s.promptInstall).toHaveBeenCalledTimes(1)
   })
 
+  it("falls back to the manual sheet when the browser's prompt is unavailable after all (D12)", async () => {
+    const s = store(
+      { canPromptInstall: true, platform: "android" },
+      "unavailable",
+    )
+
+    await expect(startInstall(s)).resolves.toBe("show-manual")
+  })
+
   it("shows the Share-menu steps on iOS Safari (no prompt exists)", async () => {
     const s = store({ platform: "ios" })
 

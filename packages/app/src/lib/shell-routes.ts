@@ -26,6 +26,13 @@ export function isRunPath(pathname: string): boolean {
   return /^\/attempts\/[^/]+\/run\/?$/u.test(pathname)
 }
 
-export function isAttemptPath(pathname: string): boolean {
-  return pathname.startsWith("/attempts/")
+/**
+ * A test is being taken: the run, section-rules and hand-in screens
+ * (prototype). The offline banner uses its in-test wording here and an
+ * update waits; result, review and time-up come after the test is over.
+ */
+export function isInTestPath(pathname: string): boolean {
+  return /^\/attempts\/[^/]+\/(?:run|hand-in|sections\/[^/]+\/rules)\/?$/u.test(
+    pathname,
+  )
 }

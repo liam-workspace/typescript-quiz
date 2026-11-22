@@ -106,6 +106,8 @@ describe("attempt result page", () => {
 
     const scoreRing = screen.getByTestId("score-ring")
     expect(scoreRing).toHaveClass("score-ring")
+    // D7: a named image, not an ignored label on a role-less div.
+    expect(scoreRing).toHaveAttribute("role", "img")
     expect(scoreRing).toHaveStyle("--score-pct: 88%")
 
     const rows = screen.getAllByTestId("breakdown-row")

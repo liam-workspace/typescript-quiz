@@ -250,23 +250,18 @@ describe("attempt history page", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
       "/api/attempts?status=finished&limit=20&cursor=cursor-page-2",
     )
+    // D7: no permanently disabled "No older attempts" button.
     expect(
-      screen.getByRole("button", { name: "No older attempts" }),
-    ).toBeDisabled()
+      screen.queryByRole("button", { name: /older|load more/iu }),
+    ).toBeNull()
   })
 
-  it("disables Load more when nextCursor is null", () => {
+  it("shows no pagination button at all when there is no next page (D7)", () => {
     renderHistory(lastPage)
 
-    const terminalPagination = screen.getByRole("button", {
-      name: "No older attempts",
-    })
-    expect(terminalPagination).toBeDisabled()
-    expect(terminalPagination).toHaveClass("m-btn")
-    expect(terminalPagination).toHaveAttribute("data-variant", "secondary")
     expect(
-      screen.queryByRole("button", { name: "Load more" }),
-    ).not.toBeInTheDocument()
+      screen.queryByRole("button", { name: /older|load more/iu }),
+    ).toBeNull()
   })
 
   it("disables Load more while a page is in flight and re-enables it when another cursor arrives", async () => {

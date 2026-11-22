@@ -1,3 +1,5 @@
+import { SPLASH_SHOWN_KEY, UPDATED_KEY } from "./session-flags.js"
+
 export type PwaPlatform = "ios" | "android" | "other"
 
 export interface PwaSnapshot {
@@ -29,6 +31,8 @@ export interface PwaStoreDeps {
     addEventListener(type: string, listener: (event: Event) => void): void
   }
   readonly storage: Pick<Storage, "getItem" | "setItem"> | null
+  /** Session storage: carries "just updated" across the update's reload. */
+  readonly session?: Pick<Storage, "setItem" | "removeItem"> | null
 }
 
 const DISMISS_KEY = "pp.install.dismissed"
@@ -49,7 +53,7 @@ export function detectPlatform(
   return /Android/u.test(userAgent) ? "android" : "other"
 }
 
-export function createPwaStore({ win, storage }: PwaStoreDeps) {
+export function createPwaStore({ win, storage, session = null }: PwaStoreDeps) {
   const listeners = new Set<Listener>()
   let deferred: InstallPromptEvent | null = null
   let applyFn: (() => Promise<void>) | null = null
@@ -150,9 +154,16 @@ export function createPwaStore({ win, storage }: PwaStoreDeps) {
 
       deferred = null
       publish()
-      await event.prompt()
 
-      return (await event.userChoice).outcome
+      // A prompt the browser refuses (already shown, no user gesture) must
+      // not break Install: the caller falls back to the manual steps.
+      try {
+        await event.prompt()
+
+        return (await event.userChoice).outcome
+      } catch {
+        return "unavailable"
+      }
     },
     /** On iOS, "I've added it": the app cannot detect the install, so it only hides the card. */
     markInstalled(): void {
@@ -166,7 +177,30 @@ export function createPwaStore({ win, storage }: PwaStoreDeps) {
       publish()
     },
     async applyUpdate(): Promise<void> {
-      await applyFn?.()
+      if (!applyFn) {
+        return
+      }
+
+      // The reload that follows boots the new version: it says "Updated to
+      // version X." once, and shows the splash again.
+      try {
+        session?.setItem(UPDATED_KEY, "1")
+        session?.removeItem(SPLASH_SHOWN_KEY)
+      } catch {
+        // No session storage: the update still applies, just unannounced.
+      }
+
+      try {
+        await applyFn()
+      } catch (error) {
+        try {
+          session?.removeItem(UPDATED_KEY)
+        } catch {
+          // Nothing to undo.
+        }
+
+        throw error
+      }
     },
   }
 }
@@ -177,6 +211,7 @@ function browserStore(): ReturnType<typeof createPwaStore> {
   }
 
   let storage: Storage | null = null
+  let session: Storage | null = null
 
   try {
     storage = window.localStorage
@@ -184,7 +219,13 @@ function browserStore(): ReturnType<typeof createPwaStore> {
     storage = null
   }
 
-  return createPwaStore({ win: window, storage })
+  try {
+    session = window.sessionStorage
+  } catch {
+    session = null
+  }
+
+  return createPwaStore({ win: window, storage, session })
 }
 
 export const pwaStore: ReturnType<typeof createPwaStore> = browserStore()

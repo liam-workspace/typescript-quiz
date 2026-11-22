@@ -301,8 +301,10 @@ export interface OfflineMedia {
 // A brief section plus its runner content. Everything that is per-attempt
 // state on `RunnerSection` (status, completedAt, expiresAt) is absent: a bundle
 // is content, an attempt is state.
-export interface OfflineBundleSection
-  extends Omit<RunnerSection, "status" | "completedAt" | "expiresAt"> {
+export interface OfflineBundleSection extends Omit<
+  RunnerSection,
+  "status" | "completedAt" | "expiresAt"
+> {
   ordinal: number
   playback: PlaybackRules | null
 }

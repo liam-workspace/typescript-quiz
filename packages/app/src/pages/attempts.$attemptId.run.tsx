@@ -1,10 +1,3 @@
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@liam-workspace/browser-react-ui"
 import { createFileRoute } from "@tanstack/react-router"
 import {
   useEffect,
@@ -14,6 +7,7 @@ import {
   type JSX,
 } from "react"
 import { useTranslation } from "react-i18next"
+import { RouteErrorView } from "../components/RouteErrorView.js"
 import { FinishSectionSheet } from "../components/FinishSectionSheet.js"
 import { ListeningRunner } from "../components/ListeningRunner.js"
 import { OfflineBanner } from "../components/Banners.js"
@@ -122,9 +116,9 @@ type PlayState =
   | { readonly status: "failed" }
 
 /**
- * Who is signed in, as the loader fetches it (`GET /me`). The run screen no
- * longer shows it -- its menu is a "Leave test" sheet -- but the loader still
- * returns it, so the type stays here rather than in the retired AppMenu.
+ * Who is signed in, as the loader fetches it (`GET /me`). The run screen does
+ * not show it -- its menu is a "Leave test" sheet -- but the loader still
+ * returns it.
  */
 export interface RunStudent {
   readonly displayName: string
@@ -207,6 +201,7 @@ export function RunScreen({
   const [panel, setPanel] = useState<RunnerPanel>(null)
   const menuTriggerRef = useRef<HTMLButtonElement>(null)
   const navigatorTriggerRef = useRef<HTMLButtonElement>(null)
+  const primaryTriggerRef = useRef<HTMLButtonElement>(null)
   const [finishingSection, setFinishingSection] = useState(false)
   const [sectionTransitionFailed, setSectionTransitionFailed] = useState(false)
   const [readRemainingMs, setReadRemainingMs] = useState<(() => number) | null>(
@@ -866,12 +861,13 @@ export function RunScreen({
   }
 
   const nextEntry = entries.at(currentIndex + 1)
-  const previousEntry =
+  // Free sections always show Previous (disabled on their first question,
+  // acceptance row 15), so the action bar never shifts under the thumb.
+  const hasPrevious =
     (section.type === "reading" || section.type === "math") &&
-    section.navigation === "free" &&
-    currentIndex > 0
-      ? entries.at(currentIndex - 1)
-      : undefined
+    section.navigation === "free"
+  const previousEntry =
+    hasPrevious && currentIndex > 0 ? entries.at(currentIndex - 1) : undefined
   const sectionIndex = envelope.sections.findIndex(
     (candidate) => candidate.id === section.id,
   )
@@ -1273,7 +1269,8 @@ export function RunScreen({
       </main>
 
       <RunActionBar
-        showPrevious={!expired && previousEntry !== undefined}
+        showPrevious={!expired && hasPrevious}
+        previousDisabled={previousEntry === undefined}
         onPrevious={handlePrevious}
         answered={answeredInSection}
         total={entries.length}
@@ -1284,6 +1281,7 @@ export function RunScreen({
         }}
         primary={primary}
         onPrimary={handlePrimary}
+        primaryRef={primaryTriggerRef}
       />
 
       <RunMenuSheet
@@ -1303,9 +1301,12 @@ export function RunScreen({
         }}
         returnFocusRef={menuTriggerRef}
       />
-      {/* No returnFocusRef: BottomSheet falls back to Radix's default, the
-          element focused when it opened -- the action bar's Finish button. */}
+      {/* Focus returns to Finish explicitly: Safari does not focus a tapped
+          button, so Radix's default would land on <body>. While finishing,
+          Finish is disabled and the navigator button takes it instead. */}
       <FinishSectionSheet
+        returnFocusRef={primaryTriggerRef}
+        fallbackFocusRef={navigatorTriggerRef}
         open={panel === "finish"}
         onOpenChange={closePanel("finish")}
         sectionLabel={sectionLabel}
@@ -1403,24 +1404,16 @@ export function RunRouteError(_props: RunRouteErrorProps) {
   const { t } = useTranslation("runner")
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-12">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("runError.title")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p role="alert">{t("runError.message")}</p>
-          <Button
-            className="h-11 min-w-11 touch-manipulation select-none"
-            onClick={() => {
-              window.location.reload()
-            }}
-          >
-            {t("runError.retry")}
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+    <RouteErrorView
+      title={t("runError.title")}
+      message={t("runError.message")}
+      retry={{
+        label: t("runError.retry"),
+        onRetry: () => {
+          window.location.reload()
+        },
+      }}
+    />
   )
 }
 

@@ -249,6 +249,10 @@ export function createReminders(deps: RemindersDeps): BrowserReminders {
   // this page's lifetime so the row stays "unsupported" instead of offering
   // a switch that can only fail the same way again.
   let refusedByServer = false
+  // How many enable() calls are between subscribe() and writing the marker.
+  // Meanwhile the fresh subscription has no marker yet and would look stale
+  // to state(), which must not drop it (spec: one flag).
+  let enabling = 0
 
   interface Ready {
     readonly push: PushEnvironment
@@ -310,6 +314,11 @@ export function createReminders(deps: RemindersDeps): BrowserReminders {
       return "off"
     }
 
+    if (enabling > 0) {
+      // Being turned on right now: not on yet, and not ours to drop.
+      return "off"
+    }
+
     if (
       deps.marker.get() !== tokenSubject(deps.token()) ||
       !sameServerKey(subscription, key)
@@ -325,6 +334,16 @@ export function createReminders(deps: RemindersDeps): BrowserReminders {
   }
 
   async function enable(): Promise<ReminderState> {
+    enabling += 1
+
+    try {
+      return await enableNow()
+    } finally {
+      enabling -= 1
+    }
+  }
+
+  async function enableNow(): Promise<ReminderState> {
     const ready = gate()
 
     if (typeof ready === "string") {

@@ -14,15 +14,16 @@ import { ToastHost } from "../components/ToastHost.js"
 import { networkStore } from "../lib/network.js"
 import { pendingCountStore } from "../lib/pending-count.js"
 import { pwaStore } from "../lib/pwa/pwa-store.js"
-import { SPLASH_SHOWN_KEY } from "../lib/pwa/session-flags.js"
+import { SPLASH_SHOWN_KEY, takeUpdatedFlag } from "../lib/pwa/session-flags.js"
 import {
   TAB_HREF,
-  isAttemptPath,
+  isInTestPath,
   isRunPath,
   tabForPath,
   type ShellTab,
 } from "../lib/shell-routes.js"
 import { toastStore } from "../lib/toast.js"
+import { APP_VERSION } from "../app-version.js"
 import { usePageTitleFocus } from "../lib/usePageTitleFocus.js"
 
 export interface AppShellProps {
@@ -139,15 +140,26 @@ export function AppLayout() {
 
   const admin = pathname.startsWith("/admin")
   const tab = admin ? null : tabForPath(pathname)
-  const inAttempt = isAttemptPath(pathname)
+  const inTest = isInTestPath(pathname)
 
   // The update banner is not a live region of its own (spec §7: one
   // region): say it here, once, when an update becomes ready.
   const updateWording = pwa.updateReady
-    ? t(inAttempt ? "pwa.update.deferred" : "pwa.update.ready")
+    ? t(inTest ? "pwa.update.deferred" : "pwa.update.ready")
     : null
 
   const updateAnnounced = useRef(false)
+
+  // The boot right after `applyUpdate`'s reload (prototype: "Updated to
+  // version X."). Taking the flag removes it, so it is said once.
+  useEffect(() => {
+    if (takeUpdatedFlag()) {
+      toastStore.show(
+        t("pwa.update.applied", { version: APP_VERSION }),
+        "refresh",
+      )
+    }
+  }, [t])
 
   useEffect(() => {
     // Once, when it becomes ready: not again on every route change.
@@ -179,11 +191,14 @@ export function AppLayout() {
       <Splash visible={splashVisible} />
       <AppShell column={!admin} withTabBar={tab !== null}>
         {!admin && !network.online && !isRunPath(pathname) ? (
-          <OfflineBanner variant="browsing" pendingCount={pending} />
+          <OfflineBanner
+            variant={inTest ? "in-test" : "browsing"}
+            pendingCount={pending}
+          />
         ) : null}
         {!admin && pwa.updateReady ? (
           <UpdateBanner
-            deferred={inAttempt}
+            deferred={inTest}
             onRefresh={() => {
               void pwaStore.applyUpdate()
             }}

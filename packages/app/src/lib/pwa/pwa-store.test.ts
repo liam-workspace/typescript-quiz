@@ -36,7 +36,10 @@ function fakeWindow(
   }
 }
 
-function memoryStorage(): Pick<Storage, "getItem" | "setItem"> & {
+function memoryStorage(): Pick<
+  Storage,
+  "getItem" | "setItem" | "removeItem"
+> & {
   data: Map<string, string>
 } {
   const data = new Map<string, string>()
@@ -46,6 +49,9 @@ function memoryStorage(): Pick<Storage, "getItem" | "setItem"> & {
     getItem: (key) => data.get(key) ?? null,
     setItem: (key, value) => {
       data.set(key, value)
+    },
+    removeItem: (key) => {
+      data.delete(key)
     },
   }
 }
@@ -185,6 +191,40 @@ describe("pwaStore", () => {
 
     await store.applyUpdate()
     expect(apply).toHaveBeenCalledTimes(1)
+  })
+
+  it("applyUpdate leaves a once-per-launch note for the next boot and lets the splash show again (D4)", async () => {
+    const session = memoryStorage()
+    const store = createPwaStore({ win: fakeWindow(), storage, session })
+
+    session.setItem("pp.splashShown", "1")
+    store.setUpdateReady(() => Promise.resolve())
+    await store.applyUpdate()
+
+    expect(session.getItem("pp.updated")).toBe("1")
+    expect(session.getItem("pp.splashShown")).toBeNull()
+  })
+
+  it("a failed applyUpdate leaves no note behind (D4)", async () => {
+    const session = memoryStorage()
+    const store = createPwaStore({ win: fakeWindow(), storage, session })
+
+    store.setUpdateReady(() => Promise.reject(new Error("no worker")))
+    await expect(store.applyUpdate()).rejects.toThrow("no worker")
+    expect(session.getItem("pp.updated")).toBeNull()
+  })
+
+  it("a rejecting prompt() reports 'unavailable' instead of throwing (D12)", async () => {
+    const win = fakeWindow()
+    const store = createPwaStore({ win, storage })
+    const event = installEvent("accepted")
+
+    event.prompt = vi.fn(() =>
+      Promise.reject(new DOMException("x", "NotAllowedError")),
+    )
+    win.dispatch("beforeinstallprompt", event)
+
+    await expect(store.promptInstall()).resolves.toBe("unavailable")
   })
 
   it("applyUpdate with nothing waiting is a no-op", async () => {

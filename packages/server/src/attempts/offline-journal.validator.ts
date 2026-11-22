@@ -2,8 +2,13 @@ import { isPastDeadline } from "@pp/common"
 import type { JournalContextRows } from "@pp/db"
 import type { OfflineJournalEvent } from "./offline-sync-request.schema.js"
 
-/** A device clock may read this far past its own `clientSentAt`: ordinary jitter. */
-export const FUTURE_TOLERANCE_MS = 60_000
+/**
+ * How far BELOW the server-recorded history a normalised event may land and
+ * still be absorbed (clamped up to it): honest jitter -- network latency in
+ * the skew estimate, a small NTP step between syncs -- is seconds. Anything
+ * further means the skew itself is forged (see `effectiveTimes`).
+ */
+export const HISTORY_TOLERANCE_MS = 120_000
 
 /** Beyond this the attempt's content and the student's intent are both stale. */
 export const MAX_JOURNAL_AGE_MS = 72 * 60 * 60 * 1000
@@ -77,6 +82,7 @@ export type InvalidReason =
   | "client_at_after_sent_at"
   | "client_at_backwards"
   | "event_too_old"
+  | "client_at_before_history"
   | "start_missing"
   | "start_for_existing_attempt"
   | "start_repeated"
@@ -185,9 +191,9 @@ export function buildJournalContext(
 
 /**
  * The latest instant the server has already recorded for this attempt. A
- * replayed event can never precede its own history, so effective times are
- * clamped up to it -- later is always the conservative direction (closer to
- * every deadline), so a clamp can cost a cheater time but never grant any.
+ * replayed event can never precede its own history: within
+ * `HISTORY_TOLERANCE_MS` it is clamped up to it (later is the conservative
+ * direction, closer to every deadline); beyond that the journal is refused.
  */
 function historyFloorMs(ctx: JournalContext): number {
   const instants = [ctx.attemptStartedAt]
@@ -212,6 +218,21 @@ function historyFloorMs(ctx: JournalContext): number {
  * timing it reports matters. What is checked is the device's consistency
  * with itself (no event after its own send time, no time running backwards)
  * and the journal's absolute age once normalised.
+ *
+ * `clientAt` and `clientSentAt` come from the SAME device clock and an
+ * honest client stamps every event before it sends, so `clientAt >
+ * clientSentAt` is refused outright (equality is fine). Any tolerance there
+ * would be granted time: the excess is clamped away on the event but not on
+ * the `enter` it is measured from, shrinking the event's offset into a
+ * deadline it missed. The client must therefore stamp `clientSentAt` afresh
+ * at every send, from the clock that stamps the events.
+ *
+ * The skew is ONE client-controlled field. For a new attempt that is
+ * harmless -- every deadline is relative to the journal's own `enter`, so a
+ * uniform shift cancels. For a hydrated attempt the deadlines are absolute
+ * server instants, and a forged far-future `clientSentAt` would drag every
+ * event below the recorded history, where a silent clamp would park them
+ * all inside the deadline. Hence `client_at_before_history`.
  */
 function effectiveTimes(
   events: readonly OfflineJournalEvent[],
@@ -234,7 +255,7 @@ function effectiveTimes(
 
     const clientMs = Date.parse(event.clientAt)
 
-    if (clientMs > sentMs + FUTURE_TOLERANCE_MS) {
+    if (clientMs > sentMs) {
       return invalid("client_at_after_sent_at", event.eventSeq)
     }
 
@@ -248,8 +269,13 @@ function effectiveTimes(
       return invalid("event_too_old", event.eventSeq)
     }
 
+    if (effectiveMs < floorMs - HISTORY_TOLERANCE_MS) {
+      return invalid("client_at_before_history", event.eventSeq)
+    }
+
     previousClientMs = clientMs
-    times.push(new Date(Math.min(Math.max(effectiveMs, floorMs), receivedMs)))
+    // `clientMs <= sentMs` already keeps this at or before `receivedAt`.
+    times.push(new Date(Math.max(effectiveMs, floorMs)))
   }
 
   return times

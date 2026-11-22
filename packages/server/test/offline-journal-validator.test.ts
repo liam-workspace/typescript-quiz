@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import type { OfflineJournalEvent } from "../src/attempts/offline-sync-request.schema.js"
 import {
   buildJournalContext,
-  FUTURE_TOLERANCE_MS,
+  HISTORY_TOLERANCE_MS,
   MAX_JOURNAL_AGE_MS,
   validateJournal,
   type JournalContext,
@@ -181,6 +181,26 @@ function openState(
   }
 }
 
+/** An existing attempt whose L section was entered 120 s ago and is open. */
+function hydratedAt120(): JournalContext {
+  return ctx({
+    attemptExists: true,
+    attemptStartedAt: at(120),
+    attemptExpiresAt: new Date(RECEIVED - 120_000 + 1_200_000),
+    sectionStates: new Map([[SEC_L, openState(120, 600)]]),
+  })
+}
+
+/** An existing attempt whose L section was entered 700 s ago (closed 100 s ago). */
+function hydratedSectionClosedAgo100(): Partial<JournalContext> {
+  return {
+    attemptExists: true,
+    attemptStartedAt: at(700),
+    attemptExpiresAt: new Date(RECEIVED - 700_000 + 1_200_000),
+    sectionStates: new Map([[SEC_L, openState(700, 600)]]),
+  }
+}
+
 function describeDisposition(
   planned: Extract<JournalValidation, { ok: true }>["planned"][number],
 ): string {
@@ -320,7 +340,7 @@ describe("validateJournal — sequence and time (structural)", () => {
     ).toEqual(["apply", "apply"])
   })
 
-  it("client_at_after_sent_at: rejects an event stamped after the device's own send time plus tolerance", () => {
+  it("client_at_after_sent_at: rejects an event stamped well after the device's own send time", () => {
     const sentEarlier = ctx({ clientSentAt: new Date(RECEIVED - 600_000) })
 
     expect(kinds(validateJournal([start(1, 100)], sentEarlier))).toEqual(
@@ -328,17 +348,30 @@ describe("validateJournal — sequence and time (structural)", () => {
     )
   })
 
-  it("client_at_after_sent_at: jitter inside the tolerance is accepted but never lands after receipt", () => {
-    const events: OfflineJournalEvent[] = [
-      {
-        ...start(1, 0),
-        clientAt: new Date(RECEIVED + FUTURE_TOLERANCE_MS - 1).toISOString(),
-      },
+  it("client_at_after_sent_at: clientAt equal to clientSentAt is accepted, one millisecond later is refused", () => {
+    const stampedAt = (ms: number): OfflineJournalEvent[] => [
+      { ...start(1, 0), clientAt: new Date(ms).toISOString() },
     ]
-    const result = validateJournal(events, ctx())
+    const equal = validateJournal(stampedAt(RECEIVED), ctx())
 
-    expect(kinds(result)).toEqual(["apply"])
-    expect(result.ok && result.planned[0]?.effectiveAt.getTime()).toBe(RECEIVED)
+    expect(kinds(equal)).toEqual(["apply"])
+    expect(equal.ok && equal.planned[0]?.effectiveAt.getTime()).toBe(RECEIVED)
+    expect(kinds(validateJournal(stampedAt(RECEIVED + 1), ctx()))).toEqual(
+      INVALID("client_at_after_sent_at"),
+    )
+  })
+
+  it("client_at_after_sent_at: no tolerance can shrink an event's offset from its enter into a missed deadline", () => {
+    // Answer 600 s after the enter (exactly at the section deadline), stamped
+    // 30 s past clientSentAt: a tolerance-then-clamp would pull it to 570 s.
+    const events = shifted(
+      [start(1, 700), enter(2, 690, SEC_L), answer(3, 90, SEC_L, QL1)],
+      30_000 + 90_000,
+    )
+
+    expect(kinds(validateJournal(events, ctx()))).toEqual(
+      INVALID("client_at_after_sent_at"),
+    )
   })
 
   it("client_at_after_sent_at: an absurdly future clientAt is refused", () => {
@@ -440,20 +473,79 @@ describe("validateJournal — sequence and time (structural)", () => {
     }
   })
 
-  it("floor clamp: an event claiming to precede the server's recorded history is moved up to it", () => {
-    const state = new Map([[SEC_L, openState(120, 600)]])
+  it("floor clamp: an event a little below the server's recorded history is moved up to it", () => {
     const result = validateJournal(
-      [answer(1, 300, SEC_L, QL1)],
-      ctx({
-        attemptExists: true,
-        attemptStartedAt: at(120),
-        attemptExpiresAt: new Date(RECEIVED - 120_000 + 1_200_000),
-        sectionStates: state,
-      }),
+      [answer(1, 180, SEC_L, QL1)],
+      hydratedAt120(),
     )
 
     expect(kinds(result)).toEqual(["apply"])
     expect(result.ok && result.planned[0]?.effectiveAt).toEqual(at(120))
+  })
+
+  it("client_at_before_history: exactly the tolerance below the history is absorbed; one millisecond more is refused", () => {
+    const toleranceSeconds = HISTORY_TOLERANCE_MS / 1000
+    const edge = answer(1, 120 + toleranceSeconds, SEC_L, QL1)
+    const beyond: OfflineJournalEvent = {
+      ...edge,
+      clientAt: new Date(Date.parse(edge.clientAt) - 1).toISOString(),
+    }
+
+    expect(kinds(validateJournal([edge], hydratedAt120()))).toEqual(["apply"])
+    expect(kinds(validateJournal([beyond], hydratedAt120()))).toEqual(
+      INVALID("client_at_before_history"),
+    )
+  })
+
+  it("client_at_before_history: a forged far-future clientSentAt cannot park a hydrated attempt's events inside its deadline", () => {
+    // L was entered 700 s ago with a 600 s clock: it closed 100 s ago. The
+    // answer really happened 50 s ago. A clientSentAt one day ahead would
+    // put it a day before the history, and a silent clamp would land it on
+    // the entry instant -- inside the deadline.
+    const result = validateJournal(
+      [answer(1, 50, SEC_L, QL1)],
+      ctx({
+        ...hydratedSectionClosedAgo100(),
+        clientSentAt: new Date(RECEIVED + 86_400_000),
+      }),
+    )
+
+    expect(kinds(result)).toEqual(INVALID("client_at_before_history"))
+  })
+
+  it("skew: a hydrated attempt accepts an honest slow phone and an honest fast phone, deadlines intact", () => {
+    // Real timeline: answer 650 s ago (inside L's clock), answer 50 s ago
+    // (after L closed 100 s ago). The phone's clock is off by `offset`, and
+    // it stamps clientSentAt from that same clock.
+    const events = [answer(1, 650, SEC_L, QL1), answer(2, 50, SEC_L, QL2)]
+
+    for (const offset of [-600_000, 600_000]) {
+      const result = validateJournal(
+        shifted(events, offset),
+        ctx({
+          ...hydratedSectionClosedAgo100(),
+          clientSentAt: new Date(RECEIVED + offset),
+        }),
+      )
+
+      expect(kinds(result), `offset ${offset}`).toEqual(["apply", "late"])
+    }
+  })
+
+  it("skew: a new attempt is unaffected by a forged clientSentAt — the skew cancels against the journal's own enter", () => {
+    const events = [
+      start(1, 1000),
+      enter(2, 990, SEC_L),
+      answer(3, 500, SEC_L, QL1),
+      answer(4, 300, SEC_L, QL2),
+    ]
+    const forged = validateJournal(
+      events,
+      ctx({ clientSentAt: new Date(RECEIVED + 86_400_000) }),
+    )
+
+    expect(kinds(forged)).toEqual(kinds(validateJournal(events, ctx())))
+    expect(kinds(forged)).toEqual(["apply", "apply", "apply", "late"])
   })
 })
 
@@ -549,6 +641,71 @@ describe("validateJournal — sections", () => {
       "apply",
       "apply",
       "rejected:section_already_entered",
+    ])
+  })
+
+  it("clock: a rejected re-enter of a finished section does not reopen it", () => {
+    const events = [
+      start(1, 100),
+      enter(2, 90, SEC_L),
+      finish(3, 80, SEC_L),
+      enter(4, 70, SEC_L),
+      answer(5, 60, SEC_L, QL1),
+    ]
+
+    expect(kinds(validateJournal(events, ctx()))).toEqual([
+      "apply",
+      "apply",
+      "apply",
+      "rejected:section_already_entered",
+      "late",
+    ])
+  })
+
+  it("clock: a repeated (idempotent) enter does not restart the section clock", () => {
+    // 650 s after the FIRST enter is past L's 600 s clock, even though it is
+    // only 150 s after the repeat.
+    const events = [
+      start(1, 1000),
+      enter(2, 990, SEC_L),
+      enter(3, 490, SEC_L),
+      answer(4, 340, SEC_L, QL1),
+    ]
+
+    expect(kinds(validateJournal(events, ctx()))).toEqual([
+      "apply",
+      "apply",
+      "apply",
+      "late",
+    ])
+  })
+
+  it("clock: only the first APPLIED enter starts the attempt clock, never a rejected or late one", () => {
+    // First enter 2000 s ago: the 1200 s attempt ends 800 s ago. The rejected
+    // re-enter at 1500 s ago must not move that to 300 s ago (which would
+    // make the 700 s answer apply), and the late enter of M changes nothing.
+    const events = [
+      start(1, 2010),
+      enter(2, 2000, SEC_L),
+      finish(3, 1990, SEC_L),
+      enter(4, 1500, SEC_L),
+      enter(5, 900, SEC_R),
+      finish(6, 850, SEC_R),
+      enter(7, 750, SEC_M),
+      answer(8, 700, SEC_R, QR1),
+      answer(9, 650, SEC_M, QM1),
+    ]
+
+    expect(kinds(validateJournal(events, ctx()))).toEqual([
+      "apply",
+      "apply",
+      "apply",
+      "rejected:section_already_entered",
+      "apply",
+      "apply",
+      "late",
+      "late",
+      "late",
     ])
   })
 

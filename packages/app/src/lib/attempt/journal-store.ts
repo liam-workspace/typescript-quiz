@@ -171,14 +171,19 @@ export class JournalStore {
         throw new Error(`no local attempt ${attemptId}`)
       }
 
+      const meta = tx.objectStore(META)
       const record: JournalEventRecord = {
         attemptId,
         eventSeq: state.nextEventSeq,
         type: draft.type,
-        clientAt: draft.clientAt,
+        clientAt: await JournalStore.notBelowMark(meta, draft.clientAt),
         payload: draft.payload,
       }
       // Run the callback BEFORE any write so a throw leaves nothing behind.
+      // It runs on the state as read INSIDE this transaction, so a callback
+      // that validates (and throws) decides against the latest state even
+      // when another tab wrote in between: IndexedDB serialises readwrite
+      // transactions on overlapping stores.
       const next: LocalAttemptState = {
         ...mutate(state),
         attemptId,
@@ -190,24 +195,101 @@ export class JournalStore {
 
       attempts.put(next)
       await added
-      // Keep the clock mark >= every journaled clientAt, atomically, so a crash
-      // before `persist()` can never let the next event be stamped lower.
-      const stamped = Date.parse(draft.clientAt)
-
-      if (Number.isFinite(stamped)) {
-        await JournalStore.raiseMark(tx.objectStore(META), stamped)
-      }
-
+      await JournalStore.stampMark(meta, record.clientAt)
       await done
-      for (const listener of this.listeners) {
-        listener()
-      }
+      this.notify()
 
       return record
     } catch (error) {
       JournalStore.abortQuietly(tx, done)
 
       throw error
+    }
+  }
+
+  /**
+   * A new attempt and its first event (the offline `start`) in ONE
+   * transaction: a crash can never leave an attempt the server would refuse
+   * as `start_missing`. Refuses (writes nothing) if the attempt exists.
+   */
+  async createWithEvent(
+    state: LocalAttemptState,
+    draft: JournalEventDraft,
+  ): Promise<JournalEventRecord> {
+    const tx = this.db.transaction([ATTEMPTS, EVENTS, META], "readwrite")
+    const done = txDone(tx)
+
+    try {
+      const meta = tx.objectStore(META)
+      const record: JournalEventRecord = {
+        attemptId: state.attemptId,
+        eventSeq: 1,
+        type: draft.type,
+        clientAt: await JournalStore.notBelowMark(meta, draft.clientAt),
+        payload: draft.payload,
+      }
+      const created = promisify(
+        tx
+          .objectStore(ATTEMPTS)
+          .add({ ...state, nextEventSeq: 2, syncedThrough: 0 }),
+      )
+      const added = promisify(tx.objectStore(EVENTS).add(record))
+
+      // Both settle (the second as an abort once the first fails): never
+      // leave one rejecting unobserved.
+      await Promise.all([created, added])
+      await JournalStore.stampMark(meta, record.clientAt)
+      await done
+      this.notify()
+
+      return record
+    } catch (error) {
+      JournalStore.abortQuietly(tx, done)
+
+      throw error
+    }
+  }
+
+  private notify(): void {
+    for (const listener of this.listeners) {
+      listener()
+    }
+  }
+
+  /**
+   * The mark is >= every journaled clientAt, so stamping at least the mark
+   * keeps each attempt's journal non-decreasing even when two tabs (two
+   * `LocalClock` instances) write: the server refuses a journal whose time
+   * runs backwards (`client_at_backwards`).
+   */
+  private static async notBelowMark(
+    meta: IDBObjectStore,
+    clientAt: string,
+  ): Promise<string> {
+    const row = await promisify(
+      meta.get(CLOCK_KEY) as IDBRequest<
+        { key: string; value: number } | undefined
+      >,
+    )
+    const stamped = Date.parse(clientAt)
+
+    return row !== undefined && Number.isFinite(stamped) && stamped < row.value
+      ? new Date(row.value).toISOString()
+      : clientAt
+  }
+
+  /**
+   * Keep the clock mark >= every journaled clientAt, atomically, so a crash
+   * before `persist()` can never let the next event be stamped lower.
+   */
+  private static async stampMark(
+    meta: IDBObjectStore,
+    clientAt: string,
+  ): Promise<void> {
+    const stamped = Date.parse(clientAt)
+
+    if (Number.isFinite(stamped)) {
+      await JournalStore.raiseMark(meta, stamped)
     }
   }
 

@@ -1,4 +1,8 @@
-import type { PlaybackRules, RunnerSection } from "../api-types.js"
+import type {
+  PlaybackRules,
+  RecordedResponse,
+  RunnerSection,
+} from "../api-types.js"
 
 export type JournalEventType =
   | "start"
@@ -42,4 +46,10 @@ export interface LocalAttemptState {
   syncedThrough: number
   finalized: { status: "expired"; submittedAt: string } | null
   syncError: string | null
+  /**
+   * Answers this device knows the attempt holds (from the hydrated envelope
+   * and every answer noted since). Only for rebuilding the runner view: the
+   * AnswerQueue and the journal remain what is sent.
+   */
+  responses?: RecordedResponse[]
 }

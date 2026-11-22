@@ -252,6 +252,52 @@ describe("JournalStore", () => {
     )
   })
 
+  it("append never stamps an event below the stored mark (a second tab with a slower clock)", async () => {
+    const store = await JournalStore.open(freshName())
+    const tabA = "2026-11-22T11:00:05.000Z"
+    // Tab B's LocalClock lags tab A's.
+    const tabB = "2026-11-22T11:00:04.000Z"
+
+    await store.putAttempt(makeLocalState())
+    await store.append("att-1", { type: "start", clientAt: tabA, payload: {} })
+
+    const second = await store.append("att-1", {
+      type: "position",
+      clientAt: tabB,
+      payload: {},
+    })
+    const stamps = (await store.eventsAfter("att-1", 0)).map((e) => e.clientAt)
+
+    expect(second.clientAt).toBe(tabA)
+    expect(stamps).toEqual([tabA, tabA])
+  })
+
+  it("createWithEvent writes the attempt and its first event atomically", async () => {
+    const store = await JournalStore.open(freshName())
+
+    await store.createWithEvent(makeLocalState(), {
+      type: "start",
+      clientAt: at,
+      payload: { slug: "practice-3" },
+    })
+
+    expect(
+      (await store.eventsAfter("att-1", 0)).map((e) => e.eventSeq),
+    ).toEqual([1])
+    expect((await store.getAttempt("att-1"))?.nextEventSeq).toBe(2)
+
+    // An existing attempt is never overwritten, and nothing half-lands.
+    await expect(
+      store.createWithEvent(makeLocalState({ title: "other" }), {
+        type: "start",
+        clientAt: at,
+        payload: {},
+      }),
+    ).rejects.toThrow()
+    expect((await store.getAttempt("att-1"))?.title).toBe("Practice Test 3")
+    expect(await store.eventsAfter("att-1", 0)).toHaveLength(1)
+  })
+
   it("saveClockHighWater never decreases the stored mark", async () => {
     const store = await JournalStore.open(freshName())
 

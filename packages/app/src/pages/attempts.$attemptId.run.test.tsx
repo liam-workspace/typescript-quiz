@@ -610,6 +610,27 @@ async function settlePagehideFlush(): Promise<void> {
   })
 }
 
+/** The remote gateway, with the local journal's "behind" answer stubbed. */
+function gatewayWithJournal(
+  hasPendingJournal: AttemptGateway["hasPendingJournal"],
+): AttemptGateway {
+  const remote = new RemoteAttemptGateway()
+
+  return {
+    start: (slug, hint) => remote.start(slug, hint),
+    loadEnvelope: (id) => remote.loadEnvelope(id),
+    enterSection: (id, s) => remote.enterSection(id, s),
+    setPosition: (id, s, q) => remote.setPosition(id, s, q),
+    claimPlay: (id, s) => remote.claimPlay(id, s),
+    finishSection: (id, s, body) => remote.finishSection(id, s, body),
+    submit: (id, body) => remote.submit(id, body),
+    noteAnswer: (id, answer) => remote.noteAnswer(id, answer),
+    flushAnswers: (ctx) => remote.flushAnswers(ctx),
+    isLocalOnly: (id) => remote.isLocalOnly(id),
+    hasPendingJournal,
+  }
+}
+
 async function recordReadingAnswerAndHidePage(): Promise<void> {
   await getQueue().recordAnswer(
     {
@@ -770,6 +791,45 @@ describe("RunScreen", () => {
 
     it("sends the pagehide keepalive flush for a server-known attempt", async () => {
       renderRunScreen(readingEnvelope)
+
+      await recordReadingAnswerAndHidePage()
+
+      await waitFor(oneKeepaliveFetch)
+    })
+
+    it("never sends the pagehide keepalive for a server-known attempt whose journal is behind (it would overtake journaled moves)", async () => {
+      const hasPendingJournal = vi.fn().mockResolvedValue(true)
+
+      render(
+        <RunScreen
+          attemptId="attempt-1"
+          envelope={readingEnvelope}
+          queue={getQueue()}
+          navigate={vi.fn()}
+          gateway={gatewayWithJournal(hasPendingJournal)}
+        />,
+      )
+      await waitFor(calledAtLeastOnce(hasPendingJournal))
+
+      await recordReadingAnswerAndHidePage()
+      await settlePagehideFlush()
+
+      expect(keepaliveFetchCalls()).toHaveLength(0)
+    })
+
+    it("still sends the pagehide keepalive for a server-known attempt with nothing pending in the journal", async () => {
+      const hasPendingJournal = vi.fn().mockResolvedValue(false)
+
+      render(
+        <RunScreen
+          attemptId="attempt-1"
+          envelope={readingEnvelope}
+          queue={getQueue()}
+          navigate={vi.fn()}
+          gateway={gatewayWithJournal(hasPendingJournal)}
+        />,
+      )
+      await waitFor(calledAtLeastOnce(hasPendingJournal))
 
       await recordReadingAnswerAndHidePage()
 

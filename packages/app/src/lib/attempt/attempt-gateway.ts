@@ -79,4 +79,10 @@ export interface AttemptGateway {
   flushAnswers(ctx: FlushContext): Promise<FlushResult>
   /** True when the server does not know this attempt id yet (offline start). */
   isLocalOnly(attemptId: string): Promise<boolean>
+  /**
+   * True when this phone's journal holds events the server has not applied.
+   * Anything sent around the journal (the pagehide keepalive) would then
+   * overtake journaled moves and be refused.
+   */
+  hasPendingJournal(attemptId: string): Promise<boolean>
 }

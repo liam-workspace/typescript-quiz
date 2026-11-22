@@ -749,6 +749,8 @@ describe("LocalAttemptGateway — answers, envelope, hydration", () => {
 
     expect(await local.isLocalOnly("att-1")).toBe(true)
     expect(await local.isLocalOnly("nope")).toBe(false)
+    expect(await local.hasPendingJournal("att-1")).toBe(true)
+    expect(await local.hasPendingJournal("nope")).toBe(false)
 
     owner.sub = "sub-2"
 

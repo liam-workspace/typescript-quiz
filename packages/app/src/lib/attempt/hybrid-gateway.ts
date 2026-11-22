@@ -217,6 +217,10 @@ export class HybridAttemptGateway implements AttemptGateway {
     return this.d.local.isLocalOnly(attemptId)
   }
 
+  hasPendingJournal(attemptId: string): Promise<boolean> {
+    return this.d.local.hasPendingJournal(attemptId)
+  }
+
   private async route(attemptId: string): Promise<Route> {
     const state = await this.d.local.getMine(attemptId)
 

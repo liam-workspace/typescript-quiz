@@ -60,6 +60,7 @@ function gatewayThatCannotPlay(): AttemptGateway {
       outcome: "success",
     }),
     isLocalOnly: vi.fn().mockResolvedValue(true),
+    hasPendingJournal: vi.fn().mockResolvedValue(true),
   }
 }
 
@@ -143,6 +144,7 @@ describe("RunScreen offline", () => {
       },
       flushAnswers: (ctx) => local.flushAnswers(ctx),
       isLocalOnly: (id) => local.isLocalOnly(id),
+      hasPendingJournal: (id) => local.hasPendingJournal(id),
     }
     const navigate = vi.fn()
 

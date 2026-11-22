@@ -300,6 +300,10 @@ export function RunScreen({
     sectionId: string
   } | null>(null)
   const pendingAnswerWritesRef = useRef<Set<Promise<unknown>>>(new Set())
+  // Whether this phone's journal is ahead of the server for this attempt.
+  // Read synchronously at `pagehide`, so it is kept current after every
+  // gateway call that can journal something.
+  const journalBehindRef = useRef(false)
   const zeroTouchStartedRef = useRef(false)
 
   useEffect(() => {
@@ -376,6 +380,17 @@ export function RunScreen({
     }
 
     setSaveFailedQuestionIds((prev) => new Set([...prev, ...questionIds]))
+  }
+
+  const refreshJournalBehind = (): void => {
+    void gateway
+      .hasPendingJournal(attemptId)
+      .then((behind) => {
+        journalBehindRef.current = behind
+      })
+      .catch(() => {
+        // Keep the last known answer; the next call refreshes it.
+      })
   }
 
   const applyFlushResult = (result: FlushResult): void => {
@@ -547,9 +562,22 @@ export function RunScreen({
   // queue itself is closed here too -- on unmount, not per render -- since
   // this component owns the one open() call the loader made for it.
   useEffect(() => {
+    void gateway
+      .hasPendingJournal(attemptId)
+      .then((behind) => {
+        journalBehindRef.current = behind
+      })
+      .catch(() => {
+        // Assume nothing pending: exactly the pre-journal behaviour.
+      })
+  }, [attemptId, gateway])
+
+  useEffect(() => {
     const unregisterPagehideFlush = registerPagehideFlush(
       queue,
-      () => openSectionRef.current,
+      // The journal is durable and will sync: a keepalive sent around it
+      // would land ahead of journaled moves (per-event navigation_locked).
+      () => (journalBehindRef.current ? null : openSectionRef.current),
       (id) => `/attempts/${id}/responses`,
     )
 
@@ -707,6 +735,7 @@ export function RunScreen({
         // `.catch()` below), because only a settled, terminal rejection is
         // ever actionable enough to interrupt the child with.
         applyFlushResult(result)
+        refreshJournalBehind()
       })
       .catch((error: unknown) => {
         // A rule refusal is surfaced; anything else is deliberately not
@@ -767,6 +796,7 @@ export function RunScreen({
         [stimulus.id]: grant.playsUsed,
       }))
       setPlayState({ status: "granted", mediaUrl: grant.mediaUrl })
+      refreshJournalBehind()
       setAudioProgress(0)
     } catch (error) {
       if (error instanceof OfflineError) {
@@ -847,6 +877,7 @@ export function RunScreen({
       .setPosition(attemptId, section.id, entry.question.id)
       .then(() => {
         setCurrentQuestionId(entry.question.id)
+        refreshJournalBehind()
         setPlayState({ status: "idle" })
         setAudioProgress(0)
       })
@@ -1008,6 +1039,7 @@ export function RunScreen({
       .setPosition(attemptId, targetSection.id, targetEntry.question.id)
       .then(() => {
         setCurrentQuestionId(targetEntry.question.id)
+        refreshJournalBehind()
         setPlayState({ status: "idle" })
         setAudioProgress(0)
       })

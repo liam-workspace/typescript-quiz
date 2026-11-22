@@ -33,6 +33,7 @@ export const attemptGateway: AttemptGateway = {
   noteAnswer: (attemptId, answer) => current.noteAnswer(attemptId, answer),
   flushAnswers: (ctx) => current.flushAnswers(ctx),
   isLocalOnly: (attemptId) => current.isLocalOnly(attemptId),
+  hasPendingJournal: (attemptId) => current.hasPendingJournal(attemptId),
 }
 
 export function gatewayFor(_attemptId: string): AttemptGateway {

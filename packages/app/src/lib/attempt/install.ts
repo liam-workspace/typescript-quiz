@@ -32,6 +32,7 @@ function lazyHybrid(): AttemptGateway {
     noteAnswer: async (id, answer) => (await rt()).noteAnswer(id, answer),
     flushAnswers: async (ctx) => (await rt()).flushAnswers(ctx),
     isLocalOnly: async (id) => (await rt()).isLocalOnly(id),
+    hasPendingJournal: async (id) => (await rt()).hasPendingJournal(id),
   }
 }
 

@@ -123,6 +123,7 @@ describe("RemoteAttemptGateway", () => {
   it("noteAnswer is a no-op and a remote attempt is never local-only", async () => {
     await expect(gateway.noteAnswer("a1", {} as never)).resolves.toBeUndefined()
     await expect(gateway.isLocalOnly("a1")).resolves.toBe(false)
+    await expect(gateway.hasPendingJournal("a1")).resolves.toBe(false)
   })
 
   it("OfflineError carries a discriminating kind and reason", () => {
@@ -163,6 +164,7 @@ describe("attemptGateway (selector)", () => {
       noteAnswer: vi.fn().mockResolvedValue(undefined),
       flushAnswers: vi.fn().mockResolvedValue("flushed"),
       isLocalOnly: vi.fn().mockResolvedValue(true),
+      hasPendingJournal: vi.fn().mockResolvedValue(true),
     } satisfies Record<keyof AttemptGateway, unknown>
     const hint = { inProgressAttemptId: "a0" }
     const body = { clientInstanceId: "i", responses: [] }
@@ -183,6 +185,7 @@ describe("attemptGateway (selector)", () => {
     await attemptGateway.noteAnswer("a1", answer)
     await expect(attemptGateway.flushAnswers(ctx)).resolves.toBe("flushed")
     await expect(attemptGateway.isLocalOnly("a1")).resolves.toBe(true)
+    await expect(attemptGateway.hasPendingJournal("a1")).resolves.toBe(true)
 
     expect(installed.start).toHaveBeenCalledWith("p3", hint)
     expect(installed.loadEnvelope).toHaveBeenCalledWith("a1")

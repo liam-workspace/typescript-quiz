@@ -120,4 +120,9 @@ export class RemoteAttemptGateway implements AttemptGateway {
   isLocalOnly(_attemptId: string): Promise<boolean> {
     return Promise.resolve(false)
   }
+
+  // oxlint-disable-next-line class-methods-use-this
+  hasPendingJournal(_attemptId: string): Promise<boolean> {
+    return Promise.resolve(false)
+  }
 }

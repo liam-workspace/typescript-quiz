@@ -884,6 +884,14 @@ export class LocalAttemptGateway implements AttemptGateway {
     return state !== null && !state.serverKnown
   }
 
+  async hasPendingJournal(attemptId: string): Promise<boolean> {
+    const state = await this.getMine(attemptId)
+
+    return (
+      state !== null && (await this.deps.journal.pendingCount(attemptId)) > 0
+    )
+  }
+
   /** This student's local state for the attempt, or null (absent or another student's). */
   async getMine(attemptId: string): Promise<LocalAttemptState | null> {
     const state = await this.deps.journal.getAttempt(attemptId)

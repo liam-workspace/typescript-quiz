@@ -66,6 +66,7 @@ function remoteFake(log: string[]): RemoteFake {
     noteAnswer: vi.fn().mockResolvedValue(undefined),
     flushAnswers: vi.fn().mockResolvedValue({ flushed: true }),
     isLocalOnly: vi.fn().mockResolvedValue(false),
+    hasPendingJournal: vi.fn().mockResolvedValue(false),
   }
 }
 

@@ -46,6 +46,8 @@ type EnterOutcome =
   | { readonly status: "idle" }
   | { readonly status: "entering" }
   | { readonly status: "refused"; readonly problem: ApiError["problem"] }
+  /** No refusal: the call never completed (no network, a full disk). */
+  | { readonly status: "failed" }
   | { readonly status: "sectionExpired" }
   | { readonly status: "attemptExpired"; readonly resultUrl: string | null }
 
@@ -96,7 +98,13 @@ export function SectionRulesScreen({
       })
       .catch((error: unknown) => {
         if (!(error instanceof ApiError)) {
-          throw error
+          // An OfflineError (nothing saved to enter offline), a storage
+          // failure, a dead network: rethrowing left the button stuck on
+          // "Starting…" with nothing said. Show the generic error; the
+          // button is the retry.
+          setOutcome({ status: "failed" })
+
+          return
         }
 
         if (error.problem.type === "attempt_expired" && error.problem.attempt) {
@@ -211,9 +219,12 @@ export function SectionRulesScreen({
             </li>
           ))}
         </ul>
-        {outcome.status === "refused" ? (
+        {outcome.status === "refused" || outcome.status === "failed" ? (
           <p role="alert" className="m-alert mt-3">
-            {refusalMessage(outcome.problem.type, t)}
+            {refusalMessage(
+              outcome.status === "refused" ? outcome.problem.type : null,
+              t,
+            )}
           </p>
         ) : null}
         <p className="m-reason mt-3.5">
@@ -286,7 +297,7 @@ export async function loadSectionRulesData(
 }
 
 function refusalMessage(
-  problemType: string,
+  problemType: string | null,
   t: ReturnType<typeof useTranslation>["t"],
 ): string {
   if (problemType === "section_still_open") {

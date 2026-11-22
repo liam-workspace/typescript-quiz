@@ -162,7 +162,7 @@ describe("an offline attempt from start to finished section, as the server will 
     const sync = createJournalSync({
       journal,
       post,
-      openQueue: () => Promise.resolve(queue),
+      openQueue: () => AnswerQueue.open("pp-offline-journey-q"),
       scheduler: () => Promise.resolve(),
       clockNow: () => clock.nowMs(),
       isOnline: () => online.v,

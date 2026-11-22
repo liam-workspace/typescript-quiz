@@ -1,4 +1,4 @@
-import type { QueuedAnswer } from "../answerQueue.js"
+import type { AnswerQueue, QueuedAnswer } from "../answerQueue.js"
 import { canAcceptAnswerChange } from "@pp/common"
 import { ApiError } from "../api-client.js"
 import type {
@@ -44,6 +44,16 @@ export interface LocalGatewayDeps {
   readonly requestSync: () => void
   /** The signed-in student's JWT `sub`; stamped on every attempt this gateway creates or mirrors. */
   readonly ownerSub: () => string | null
+  /**
+   * The AnswerQueue. An answer tapped while the attempt was online and synced
+   * is only MIRRORED (the FlushController owns its send); if the network
+   * dies before that send lands, the queue is the only place it exists, and
+   * it must reach the journal before the next move that would lock it out.
+   * Absent: only `finishSection`'s body remainder is journaled.
+   */
+  readonly openQueue?: () => Promise<
+    Pick<AnswerQueue, "snapshotForSection" | "close">
+  >
 }
 
 const iso = (ms: number): string => new Date(ms).toISOString()
@@ -654,6 +664,9 @@ export class LocalAttemptGateway implements AttemptGateway {
 
     await this.assertLive(state, nowMs)
     checkPosition(state, { sectionId, questionId }, nowMs)
+    // BEFORE the move: once the position is journaled, a forward-only rule
+    // refuses every answer to the question being left.
+    await this.journalRemainder(state, sectionId, [])
 
     await this.record(
       attemptId,
@@ -745,7 +758,21 @@ export class LocalAttemptGateway implements AttemptGateway {
       throw problem("section_not_open", 409)
     }
 
-    await this.journalRemainder(state, sectionId, body)
+    await this.journalRemainder(
+      state,
+      sectionId,
+      (body.responses ?? []).map((item) => ({
+        attemptId,
+        sectionId,
+        questionId: item.questionId,
+        clientInstanceId: body.clientInstanceId,
+        seq: item.seq,
+        selectedChoiceIds: item.selectedChoiceIds,
+        answeredAt: item.answeredAt,
+        timeSpentMs: item.timeSpentMs ?? null,
+        terminalRejection: false,
+      })),
+    )
 
     await this.record(
       attemptId,
@@ -764,20 +791,35 @@ export class LocalAttemptGateway implements AttemptGateway {
   }
 
   /**
-   * The queue's remainder for this section (`body.responses`) may hold
-   * answers that never reached the journal: tapped while the attempt was
-   * online and synced (only mirrored, the FlushController owned the send)
-   * and the network went before that send landed. Journal them BEFORE the
-   * `finish_section`, or the sync would close the section first and every
-   * later send of them would be refused. Already-journaled ones (same
-   * device seq) are skipped, and an answer the rules refuse is left out.
+   * The queue's answers for this section (plus `extra`, the finish body's
+   * remainder) may hold answers that never reached the journal: tapped while
+   * the attempt was online and synced (only mirrored, the FlushController
+   * owned the send) and the network went before that send landed. Journal
+   * them BEFORE the event that follows (a `position`, a `finish_section`),
+   * or the sync would apply that event first and every later send of them
+   * would be refused (`navigation_locked`, a closed section). They still pass
+   * the rules here because the position has not moved yet. Already-journaled
+   * ones (same device `clientInstanceId:seq`) are skipped, and an answer the
+   * rules refuse is left out.
    */
   private async journalRemainder(
     state: LocalAttemptState,
     sectionId: string,
-    body: FinishSectionRequest,
+    extra: readonly QueuedAnswer[],
   ): Promise<void> {
-    const remainder = body.responses ?? []
+    const queued = await this.queuedFor(state.attemptId, sectionId)
+    const seen = new Set<string>()
+    const remainder = [...queued, ...extra].filter((item) => {
+      const key = `${item.clientInstanceId}:${item.seq}`
+
+      if (seen.has(key)) {
+        return false
+      }
+
+      seen.add(key)
+
+      return true
+    })
 
     if (remainder.length === 0) {
       return
@@ -797,28 +839,36 @@ export class LocalAttemptGateway implements AttemptGateway {
         ),
     )
 
-    for (const item of remainder) {
-      if (journaled.has(`${body.clientInstanceId}:${item.seq}`)) {
+    for (const item of remainder.sort((a, b) => a.seq - b.seq)) {
+      if (journaled.has(`${item.clientInstanceId}:${item.seq}`)) {
         continue
       }
 
       // eslint-disable-next-line no-await-in-loop
-      await this.noteAnswer(state.attemptId, {
-        attemptId: state.attemptId,
-        sectionId,
-        questionId: item.questionId,
-        clientInstanceId: body.clientInstanceId,
-        seq: item.seq,
-        selectedChoiceIds: item.selectedChoiceIds,
-        answeredAt: item.answeredAt,
-        timeSpentMs: item.timeSpentMs ?? null,
-        terminalRejection: false,
-      }).catch((error: unknown) => {
-        // A refused answer would be applied nowhere; never let it block the finish.
+      await this.noteAnswer(state.attemptId, item).catch((error: unknown) => {
+        // A refused answer would be applied nowhere; never let it block the move.
         if (!(error instanceof ApiError)) {
           throw error
         }
       })
+    }
+  }
+
+  /** This section's queued answers, or none when no queue is wired. */
+  private async queuedFor(
+    attemptId: string,
+    sectionId: string,
+  ): Promise<QueuedAnswer[]> {
+    if (!this.deps.openQueue) {
+      return []
+    }
+
+    const queue = await this.deps.openQueue()
+
+    try {
+      return await queue.snapshotForSection(attemptId, sectionId)
+    } finally {
+      void queue.close()
     }
   }
 
@@ -893,6 +943,71 @@ export class LocalAttemptGateway implements AttemptGateway {
     return (
       state !== null && (await this.deps.journal.pendingCount(attemptId)) > 0
     )
+  }
+
+  /**
+   * This student's unfinished attempt at `slug` that the server is BEHIND on
+   * (unknown to it, or with unsynced events), or null. A refused journal is
+   * not one: it is never re-sent, so waiting on it would block the test.
+   */
+  async unsyncedAttemptFor(slug: string): Promise<LocalAttemptState | null> {
+    for (const attempt of await this.myAttempts()) {
+      if (
+        attempt.slug !== slug ||
+        attempt.finalized !== null ||
+        attempt.syncError !== null
+      ) {
+        continue
+      }
+
+      const behind =
+        !attempt.serverKnown ||
+        // eslint-disable-next-line no-await-in-loop
+        (await this.deps.journal.pendingCount(attempt.attemptId)) > 0
+
+      if (behind) {
+        return attempt
+      }
+    }
+
+    return null
+  }
+
+  /**
+   * Called with a fresh ONLINE library list. A local copy the server fully
+   * holds (known to it, nothing pending, never refused) whose attempt the
+   * list no longer shows in progress was finished elsewhere (another device,
+   * a hand-in, time running out): resuming it offline would only produce
+   * late work, so it is dropped. Safe by construction -- the server has all
+   * of it. A copy without a slug (hydrated) is judged only against a
+   * complete list, since its test could be on a page not yet loaded.
+   */
+  async pruneSettledNotInProgress(list: {
+    readonly tests: ReadonlyArray<{
+      readonly slug: string
+      readonly inProgressAttemptId: string | null
+    }>
+    readonly complete: boolean
+  }): Promise<void> {
+    const inProgress = new Set(list.tests.map((t) => t.inProgressAttemptId))
+    const listed = new Set(list.tests.map((t) => t.slug))
+
+    for (const attempt of await this.myAttempts()) {
+      const judged =
+        attempt.slug === null ? list.complete : listed.has(attempt.slug)
+
+      if (
+        judged &&
+        attempt.serverKnown &&
+        attempt.syncError === null &&
+        !inProgress.has(attempt.attemptId) &&
+        // eslint-disable-next-line no-await-in-loop
+        (await this.deps.journal.pendingCount(attempt.attemptId)) === 0
+      ) {
+        // eslint-disable-next-line no-await-in-loop
+        await this.deps.journal.deleteAttempt(attempt.attemptId)
+      }
+    }
   }
 
   /** This student's local state for the attempt, or null (absent or another student's). */

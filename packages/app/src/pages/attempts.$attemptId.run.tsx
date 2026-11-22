@@ -718,41 +718,46 @@ export function RunScreen({
     pendingAnswerWritesRef.current.add(settled)
 
     void recorded
-      .then(() =>
-        gateway.flushAnswers({
-          controller,
-          queue,
-          attemptId,
-          sectionId: section.id,
-        }),
+      .then(
+        () =>
+          gateway
+            .flushAnswers({
+              controller,
+              queue,
+              attemptId,
+              sectionId: section.id,
+            })
+            .then((result) => {
+              // Defect B5 fix: a terminal per-item rejection (spec §5 rule 5's
+              // "stop dead") is surfaced here; retry/backoff successes and
+              // in-flight failures still resolve silently, because only a
+              // settled, terminal rejection is actionable enough to
+              // interrupt the child with.
+              applyFlushResult(result)
+              refreshJournalBehind()
+            })
+            .catch((error: unknown) => {
+              // FlushController owns retry/backoff and the answer is already
+              // durable, so a failed flush is not the child's problem -- the
+              // next tap, pagehide or hand-in carries it. Caught so a queue
+              // closed out from under an in-flight flush (unmount) is never an
+              // unhandled rejection.
+              if (error instanceof ApiError) {
+                refuseAnswer(error, question.id)
+              }
+            }),
+        (error: unknown) => {
+          // The answer never became durable (or the gateway refused it). A
+          // rule refusal gets its verdict; a storage failure (a full disk:
+          // QuotaExceededError) must not be silent while the choice still
+          // shows selected -- the "didn't save" notice asks for another tap.
+          if (error instanceof ApiError) {
+            refuseAnswer(error, question.id)
+          } else {
+            addSaveFailedQuestionIds([question.id])
+          }
+        },
       )
-      .then((result) => {
-        // Defect B5 fix: a terminal per-item rejection (spec §5 rule 5's
-        // "stop dead") used to reach here and be thrown away -- the queue
-        // stopped resending it, correctly, but nothing ever told the
-        // child. This is the one place that DOES surface it: retry/backoff
-        // successes and in-flight failures still resolve silently (see the
-        // `.catch()` below), because only a settled, terminal rejection is
-        // ever actionable enough to interrupt the child with.
-        applyFlushResult(result)
-        refreshJournalBehind()
-      })
-      .catch((error: unknown) => {
-        // A rule refusal is surfaced; anything else is deliberately not
-        // re-thrown, and deliberately not surfaced as UI
-        // state (unlike moveToQuestion/handleNavigatorNavigate's own
-        // `.catch`, which react to `attempt_expired`/`section_expired`):
-        // FlushController already owns retry/backoff internally (see the
-        // "fire-and-forget on purpose" comment above), and the answer is
-        // already durable in IndexedDB regardless of whether THIS flush
-        // attempt succeeds -- the next one (the next tap, pagehide, or
-        // hand-in) carries it. Only exists so a rejection here (including a
-        // queue closed out from under an in-flight flush, e.g. on unmount)
-        // is never left as an unhandled promise rejection.
-        if (error instanceof ApiError) {
-          refuseAnswer(error, question.id)
-        }
-      })
       .finally(() => {
         pendingAnswerWritesRef.current.delete(settled)
       })
@@ -871,10 +876,32 @@ export function RunScreen({
   )
   const nextSection = envelope.sections.at(sectionIndex + 1)
 
+  // Every answer tapped so far has reached the gateway (journaled, when the
+  // attempt is local). A move must wait for it: offline, an answer takes more
+  // IndexedDB hops to reach the journal than a position does, so "tap, then
+  // Next at once" journaled the move FIRST -- and in a forward-only section
+  // the rules then refused the answer (`navigation_locked`) for good. A full
+  // page navigation (Leave, Hand in) can likewise abandon an unfinished
+  // note-to-journal chain. A failed write is surfaced by its own tap; it
+  // must not also block the move, so the wait never rejects.
+  const afterPendingAnswerWrites = (): Promise<void> =>
+    Promise.all([...pendingAnswerWritesRef.current]).then(
+      () => undefined,
+      () => undefined,
+    )
+
+  // A move that could not be written (the journal's disk is full, or the
+  // network died under an online move with no local copy) leaves the student
+  // where they are. Silence would read as a dead Next button: say that this
+  // question's work did not save, so the child taps again.
+  const moveFailed = (): void => {
+    addSaveFailedQuestionIds([question.id])
+  }
+
   // Next and Previous share the same position update and expiration handling.
   const moveToQuestion = (entry: FlatEntry): void => {
-    gateway
-      .setPosition(attemptId, section.id, entry.question.id)
+    void afterPendingAnswerWrites()
+      .then(() => gateway.setPosition(attemptId, section.id, entry.question.id))
       .then(() => {
         setCurrentQuestionId(entry.question.id)
         refreshJournalBehind()
@@ -883,7 +910,9 @@ export function RunScreen({
       })
       .catch((error: unknown) => {
         if (!(error instanceof ApiError)) {
-          throw error
+          moveFailed()
+
+          return
         }
 
         if (error.problem.type === "section_expired") {
@@ -1035,8 +1064,14 @@ export function RunScreen({
       return
     }
 
-    gateway
-      .setPosition(attemptId, targetSection.id, targetEntry.question.id)
+    void afterPendingAnswerWrites()
+      .then(() =>
+        gateway.setPosition(
+          attemptId,
+          targetSection.id,
+          targetEntry.question.id,
+        ),
+      )
       .then(() => {
         setCurrentQuestionId(targetEntry.question.id)
         refreshJournalBehind()
@@ -1045,7 +1080,9 @@ export function RunScreen({
       })
       .catch((error: unknown) => {
         if (!(error instanceof ApiError)) {
-          throw error
+          moveFailed()
+
+          return
         }
 
         if (error.problem.type === "section_expired") {
@@ -1173,7 +1210,9 @@ export function RunScreen({
     } else if (nextSection) {
       setPanel("finish")
     } else {
-      navigate(`/attempts/${attemptId}/hand-in`)
+      void afterPendingAnswerWrites().then(() => {
+        navigate(`/attempts/${attemptId}/hand-in`)
+      })
     }
   }
 
@@ -1249,7 +1288,9 @@ export function RunScreen({
         // a child leaving a test they had not begun.
         clockStarted={envelope.expiresAt !== null}
         onLeave={() => {
-          navigate("/")
+          void afterPendingAnswerWrites().then(() => {
+            navigate("/")
+          })
         }}
         returnFocusRef={menuTriggerRef}
       />

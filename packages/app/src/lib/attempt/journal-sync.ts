@@ -79,6 +79,34 @@ const DEBOUNCE_MS = 1500
 /** The request schema's `events.max(500)`. */
 export const MAX_EVENTS_PER_REQUEST = 500
 
+/**
+ * Events per request are also capped by size: 500 answers with several
+ * choices each measured ~252 KiB against the server's 256 KiB body limit.
+ * Measured as the events' JSON length, well clear of the limit.
+ */
+export const MAX_REQUEST_BYTES = 200_000
+
+/** The longest prefix of `pending` within both caps (never empty). */
+function batchOf(
+  pending: readonly JournalEventRecord[],
+  maxEvents: number,
+): JournalEventRecord[] {
+  const batch: JournalEventRecord[] = []
+  let bytes = 0
+
+  for (const event of pending.slice(0, maxEvents)) {
+    bytes += JSON.stringify(toWire(event)).length + 1
+
+    if (batch.length > 0 && bytes > MAX_REQUEST_BYTES) {
+      break
+    }
+
+    batch.push(event)
+  }
+
+  return batch
+}
+
 export const postOfflineSync = (
   body: OfflineSyncBody,
 ): Promise<OfflineSyncResponse> =>
@@ -129,24 +157,30 @@ export const ACK_MISMATCH = "offline_sync_ack_mismatch"
  * acting on such an ack would delete unsent events and their answers.
  *   - an ack BEYOND the last event sent: the server holds history this
  *     journal does not know about;
- *   - a first send of new events that the server processed none of.
+ *   - a first send that the server processed FEWER of than the events it
+ *     had never been sent before (none, or only part: its cursor overlaps
+ *     them).
  * Either way nothing is deleted or acknowledged, and the sync is failed.
  */
 function ackContradictsJournal(
   response: OfflineSyncResponse,
-  sent: { readonly lastSent: number; readonly firstSend: boolean },
+  sent: {
+    readonly lastSent: number
+    /** Events in this request never sent before; 0 when it may be a retry. */
+    readonly neverSent: number
+  },
 ): boolean {
   const processed = response.applied + response.late + response.rejected
 
-  return (
-    response.ackedThrough > sent.lastSent || (sent.firstSend && processed === 0)
-  )
+  return response.ackedThrough > sent.lastSent || processed < sent.neverSent
 }
 
 type Sent =
   | { kind: "ok"; response: OfflineSyncResponse; tries: number }
   | { kind: "offline" }
   | { kind: "terminal"; type: string }
+  /** 413 for a request of several events: send fewer at a time. */
+  | { kind: "too_large" }
 
 /**
  * Replays this phone's attempt journals to the server (spec D6, §13.1).
@@ -191,15 +225,20 @@ export function createJournalSync(deps: JournalSyncDeps): JournalSync {
   ): Promise<void> {
     const queue = await deps.openQueue()
 
-    for (const event of events) {
-      if (event.type === "answer" && event.eventSeq <= ackedThrough) {
-        const { questionId, seq } = event.payload
+    try {
+      for (const event of events) {
+        if (event.type === "answer" && event.eventSeq <= ackedThrough) {
+          const { questionId, seq } = event.payload
 
-        if (typeof questionId === "string" && typeof seq === "number") {
-          // eslint-disable-next-line no-await-in-loop
-          await queue.ackItem(attemptId, questionId, seq)
+          if (typeof questionId === "string" && typeof seq === "number") {
+            // eslint-disable-next-line no-await-in-loop
+            await queue.ackItem(attemptId, questionId, seq)
+          }
         }
       }
+    } finally {
+      // One connection per acknowledged batch: never leave it open.
+      void queue.close()
     }
   }
 
@@ -224,6 +263,16 @@ export function createJournalSync(deps: JournalSyncDeps): JournalSync {
 
         return { kind: "ok", response, tries: attempt }
       } catch (error) {
+        // The body was too big, not the journal wrong: only a single event
+        // that cannot fit on its own is a verdict.
+        if (
+          error instanceof ApiError &&
+          error.problem.status === 413 &&
+          events.length > 1
+        ) {
+          return { kind: "too_large" }
+        }
+
         if (error instanceof ApiError && isVerdict(error)) {
           return { kind: "terminal", type: error.problem.type }
         }
@@ -259,6 +308,7 @@ export function createJournalSync(deps: JournalSyncDeps): JournalSync {
   ): Promise<SyncOutcome> {
     let last: OfflineSyncResponse | null = null
     let answersAcked = 0
+    let maxEvents = MAX_EVENTS_PER_REQUEST
 
     for (;;) {
       // eslint-disable-next-line no-await-in-loop
@@ -277,7 +327,7 @@ export function createJournalSync(deps: JournalSyncDeps): JournalSync {
         attemptId,
         state.syncedThrough,
       )
-      const events = pending.slice(0, MAX_EVENTS_PER_REQUEST)
+      const events = batchOf(pending, maxEvents)
 
       if (events.length === 0) {
         break
@@ -313,14 +363,27 @@ export function createJournalSync(deps: JournalSyncDeps): JournalSync {
         return sent
       }
 
+      if (sent.kind === "too_large") {
+        maxEvents = Math.ceil(events.length / 2)
+
+        continue
+      }
+
       const { response } = sent
 
       if (
         ackContradictsJournal(response, {
           lastSent,
-          // Only a FIRST send can prove the server should have applied
-          // something: a retry may follow a request that landed.
-          firstSend: sent.tries === 1 && sentBefore < lastSent,
+          // Only a FIRST send can prove the server should have processed
+          // something: a retry may follow a request that landed. Events at
+          // or below an earlier send (or the synced mark) may have landed.
+          neverSent:
+            sent.tries === 1
+              ? Math.max(
+                  0,
+                  lastSent - Math.max(sentBefore, state.syncedThrough),
+                )
+              : 0,
         })
       ) {
         // eslint-disable-next-line no-await-in-loop

@@ -479,7 +479,17 @@ export function LibraryWithOffline({
 function RouteComponent() {
   const data = Route.useLoaderData()
   const offline = useOfflineLibrary()
-  const localAttemptIds = useLocalAttemptIds()
+  // Only a list loaded while online is the server's word on what is in
+  // progress (offline, the service worker may answer from its cache).
+  const [freshList] = useState(() =>
+    offline.online
+      ? {
+          tests: data.initialPage.tests,
+          complete: data.initialPage.nextCursor === null,
+        }
+      : null,
+  )
+  const localAttemptIds = useLocalAttemptIds(freshList)
   const status = useSyncStatus()
   const sync = {
     pendingAttempts: status.pendingAttempts,

@@ -3,6 +3,10 @@ import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
 import { ApiError } from "../lib/api-client.js"
+import {
+  OfflineError,
+  type AttemptGateway,
+} from "../lib/attempt/attempt-gateway.js"
 import { enterSection, getRunnerEnvelope } from "../lib/attempts-api.js"
 import type { RunnerEnvelope } from "../lib/api-types.js"
 import {
@@ -342,6 +346,40 @@ describe("SectionRulesScreen", () => {
     expect(navigate).not.toHaveBeenCalled()
     expect(screen.getByTestId("ready-button")).toBeEnabled()
   })
+
+  it.each([
+    [
+      "a storage failure",
+      new DOMException("The quota has been exceeded.", "QuotaExceededError"),
+    ],
+    ["an offline refusal", new OfflineError("not_hydrated")],
+  ])(
+    "surfaces %s as the generic error and re-enables I'm ready (A9)",
+    async (_label, failure) => {
+      const gateway = {
+        enterSection: vi.fn().mockRejectedValue(failure),
+      } as unknown as AttemptGateway
+      const navigate = vi.fn()
+      const user = userEvent.setup()
+
+      render(
+        <SectionRulesScreen
+          {...baseProps}
+          navigate={navigate}
+          gateway={gateway}
+        />,
+      )
+
+      await user.click(screen.getByTestId("ready-button"))
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Something went wrong. Please try again.",
+      )
+      expect(navigate).not.toHaveBeenCalled()
+      expect(screen.getByTestId("ready-button")).toBeEnabled()
+      expect(screen.getByTestId("ready-button")).toHaveTextContent("I'm ready")
+    },
+  )
 
   it("shows the section-expired state on a 410 section_expired without navigating", async () => {
     mockEnterSection.mockRejectedValue(

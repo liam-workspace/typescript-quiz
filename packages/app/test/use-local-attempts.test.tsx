@@ -56,3 +56,49 @@ describe("useLocalAttemptIds", () => {
     expect(result.current.size).toBe(0)
   })
 })
+
+describe("useLocalAttemptIds — a fresh online list prunes settled copies first (A10)", () => {
+  it("asks the local gateway to prune against the list before listing", async () => {
+    const journal = await JournalStore.open("pp-use-local-prune")
+    const order: string[] = []
+    const pruneSettledNotInProgress = vi.fn(async () => {
+      order.push("prune")
+      await journal.deleteAttempt("stale")
+    })
+
+    await journal.putAttempt(makeLocalState({ attemptId: "stale" }))
+    await journal.putAttempt(makeLocalState({ attemptId: "mine" }))
+    runtime.get.mockResolvedValue({
+      journal,
+      local: { pruneSettledNotInProgress },
+    })
+    tokenStore.set("access_token", tokenFor("sub-1"))
+
+    const list = {
+      tests: [{ slug: "practice-3", inProgressAttemptId: "mine" }],
+      complete: true,
+    }
+    const { result } = renderHook(() => useLocalAttemptIds(list))
+
+    await waitFor(() => expect([...result.current]).toEqual(["mine"]))
+    expect(pruneSettledNotInProgress).toHaveBeenCalledWith(list)
+    expect(order).toEqual(["prune"])
+  })
+
+  it("does not prune without a fresh online list", async () => {
+    const journal = await JournalStore.open("pp-use-local-noprune")
+    const pruneSettledNotInProgress = vi.fn()
+
+    await journal.putAttempt(makeLocalState({ attemptId: "mine" }))
+    runtime.get.mockResolvedValue({
+      journal,
+      local: { pruneSettledNotInProgress },
+    })
+    tokenStore.set("access_token", tokenFor("sub-1"))
+
+    const { result } = renderHook(() => useLocalAttemptIds(null))
+
+    await waitFor(() => expect([...result.current]).toEqual(["mine"]))
+    expect(pruneSettledNotInProgress).not.toHaveBeenCalled()
+  })
+})

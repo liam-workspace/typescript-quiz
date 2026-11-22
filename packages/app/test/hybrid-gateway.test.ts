@@ -1,5 +1,6 @@
 import "fake-indexeddb/auto"
 import { describe, expect, it, vi, type Mock } from "vitest"
+import { AnswerQueue } from "../src/lib/answerQueue.js"
 import { ApiError } from "../src/lib/api-client.js"
 import type { RunnerEnvelope } from "../src/lib/api-types.js"
 import {
@@ -8,7 +9,11 @@ import {
 } from "../src/lib/attempt/attempt-gateway.js"
 import { HybridAttemptGateway } from "../src/lib/attempt/hybrid-gateway.js"
 import { JournalStore } from "../src/lib/attempt/journal-store.js"
-import type { JournalSync } from "../src/lib/attempt/journal-sync.js"
+import {
+  createJournalSync,
+  type JournalSync,
+} from "../src/lib/attempt/journal-sync.js"
+import { createSyncStatusStore } from "../src/lib/attempt/sync-status.js"
 import { LocalAttemptGateway } from "../src/lib/attempt/local-gateway.js"
 import { makeBundle } from "./helpers/bundle-fixture.js"
 import { makeLocalState } from "./helpers/local-state-fixture.js"
@@ -71,7 +76,13 @@ function remoteFake(log: string[]): RemoteFake {
 }
 
 async function setup(
-  opts: { online?: { v: boolean }; saved?: boolean; sub?: string } = {},
+  opts: {
+    online?: { v: boolean }
+    saved?: boolean
+    sub?: string
+    /** Wire the local gateway to a real AnswerQueue with this name. */
+    queueName?: string
+  } = {},
 ) {
   n += 1
   const online = opts.online ?? { v: true }
@@ -92,10 +103,13 @@ async function setup(
     objectUrl: () => "blob:x",
     requestSync: () => undefined,
     ownerSub: () => opts.sub ?? "sub-1",
+    ...(opts.queueName === undefined
+      ? {}
+      : { openQueue: () => AnswerQueue.open(opts.queueName) }),
   })
   const remote = remoteFake(log)
   // A sync that "succeeds": the server now holds everything that was pending.
-  const syncNow = vi.fn(async (id: string) => {
+  const syncNow = vi.fn<JournalSync["syncNow"]>(async (id: string) => {
     const sent = await journal.eventsAfter(id, 0)
 
     log.push(...sent.map((e) => `sync:${e.type}`))
@@ -422,9 +436,34 @@ describe("HybridAttemptGateway — answers and hand-in", () => {
     )
     await hybrid.submit("att-5", { clientInstanceId: "i", responses: [] })
 
-    expect(syncNow).toHaveBeenCalledWith("att-5", { singleTry: true })
+    expect(syncNow).toHaveBeenCalledWith("att-5")
     expect(remote.submit).toHaveBeenCalled()
     expect(await journal.getAttempt("att-5")).toBeNull()
+  })
+
+  it("submit runs a FULL sync (retries, no budget) before handing in, so a reconnect blip does not say 'needs a connection' (A8)", async () => {
+    const { hybrid, remote, journal, syncNow } = await setup()
+    const fullSync = syncNow.getMockImplementation()
+
+    // One quick try fails (a 503 right after reconnecting); the full sync's
+    // retry lands.
+    syncNow.mockImplementation((id, options) =>
+      options?.singleTry === true
+        ? Promise.resolve({ kind: "offline" as const })
+        : (fullSync?.(id, options) ?? Promise.resolve({ kind: "nothing" })),
+    )
+    await journal.putAttempt(
+      makeLocalState({ attemptId: "att-5", serverKnown: false }),
+    )
+    await journal.append("att-5", {
+      type: "start",
+      clientAt: iso(T0),
+      payload: { slug: "practice-3" },
+    })
+
+    await hybrid.submit("att-5", { clientInstanceId: "i", responses: [] })
+
+    expect(remote.submit).toHaveBeenCalledTimes(1)
   })
 
   it("a journal the server refused is never handed in behind its back", async () => {
@@ -465,5 +504,211 @@ describe("HybridAttemptGateway — answers and hand-in", () => {
 
     expect(await hybrid.isLocalOnly("att-7")).toBe(true)
     expect(await hybrid.isLocalOnly("unknown")).toBe(false)
+  })
+})
+
+describe("HybridAttemptGateway — an online answer whose send never landed (A2)", () => {
+  /**
+   * Online and synced: the tap is only MIRRORED (the FlushController owns
+   * the send). The radio dies before that PATCH lands, so the answer exists
+   * only in the AnswerQueue.
+   */
+  async function answeredOnlineThenOffline() {
+    const queueName = `pp-hybrid-a2-${n + 1}`
+    const online = { v: true }
+    const rig = await setup({ online, queueName })
+    const queue = await AnswerQueue.open(queueName)
+
+    await rig.hybrid.loadEnvelope("srv-1")
+
+    const queued = await queue.recordAnswer(
+      {
+        attemptId: "srv-1",
+        sectionId: "sec-l",
+        questionId: "q-l1",
+        selectedChoiceIds: ["c-l1a"],
+        timeSpentMs: null,
+      },
+      new Date(T0),
+    )
+
+    await rig.hybrid.noteAnswer("srv-1", queued)
+    expect(await types(rig.journal, "srv-1")).toEqual([])
+
+    online.v = false
+
+    return { ...rig, queue, queued, queueName }
+  }
+
+  it("Next offline journals the queued answer BEFORE the position", async () => {
+    const { hybrid, journal, queue, queued } = await answeredOnlineThenOffline()
+
+    await hybrid.setPosition("srv-1", "sec-l", "q-l2")
+
+    const events = await journal.eventsAfter("srv-1", 0)
+
+    expect(events.map((e) => [e.type, e.payload.questionId])).toEqual([
+      ["answer", "q-l1"],
+      ["position", "q-l2"],
+    ])
+    expect(events[0]?.payload).toMatchObject({
+      clientInstanceId: queued.clientInstanceId,
+      seq: queued.seq,
+      selectedChoiceIds: ["c-l1a"],
+    })
+    await queue.close()
+  })
+
+  it("an answer already journaled is not journaled twice", async () => {
+    const { hybrid, journal, queue, online, queued } =
+      await answeredOnlineThenOffline()
+
+    // Offline now, so this tap IS journaled.
+    await hybrid.noteAnswer("srv-1", queued)
+    online.v = false
+    await hybrid.setPosition("srv-1", "sec-l", "q-l2")
+
+    expect(await types(journal, "srv-1")).toEqual(["answer", "position"])
+    await queue.close()
+  })
+
+  it("finishing the section offline journals the queued answer BEFORE the finish_section, even with no remainder in the body", async () => {
+    const { hybrid, journal, queue } = await answeredOnlineThenOffline()
+
+    await hybrid.finishSection("srv-1", "sec-l", {
+      clientInstanceId: "other",
+      responses: [],
+    })
+
+    expect(await types(journal, "srv-1")).toEqual(["answer", "finish_section"])
+    await queue.close()
+  })
+
+  it("the sync then sends the answer first and acknowledges it out of the queue", async () => {
+    const { hybrid, journal, queue, local, queueName } =
+      await answeredOnlineThenOffline()
+
+    await hybrid.setPosition("srv-1", "sec-l", "q-l2")
+
+    const posted: string[] = []
+    const sync = createJournalSync({
+      journal,
+      post: (body) => {
+        posted.push(...body.events.map((e) => e.type))
+
+        return Promise.resolve({
+          attemptId: body.attemptId,
+          ackedThrough: body.events.at(-1)?.eventSeq ?? 0,
+          applied: body.events.length,
+          late: 0,
+          rejected: 0,
+          answersAcked: 1,
+          finalized: null,
+        })
+      },
+      openQueue: () => AnswerQueue.open(queueName),
+      scheduler: () => Promise.resolve(),
+      clockNow: () => T0,
+      isOnline: () => true,
+      currentSub: () => "sub-1",
+      onSynced: () => undefined,
+      status: createSyncStatusStore(),
+    })
+
+    await sync.syncNow("srv-1")
+
+    expect(posted).toEqual(["answer", "position"])
+    expect(await queue.snapshotForSection("srv-1", "sec-l")).toEqual([])
+    expect(await local.getMine("srv-1")).toMatchObject({
+      currentQuestionId: "q-l2",
+    })
+  })
+})
+
+describe("HybridAttemptGateway — an online Start never strands an unsynced offline attempt (A3)", () => {
+  const offlineStarted = (over: Parameters<typeof makeLocalState>[0] = {}) =>
+    makeLocalState({ attemptId: "att-off", serverKnown: false, ...over })
+
+  it("syncs the offline attempt first, then starts (resumes) it on the server", async () => {
+    const { hybrid, remote, syncNow, journal } = await setup()
+
+    await journal.putAttempt(offlineStarted())
+
+    await hybrid.start("practice-3", { inProgressAttemptId: null })
+
+    expect(syncNow).toHaveBeenCalledWith("att-off")
+    expect(remote.start).toHaveBeenCalledTimes(1)
+  })
+
+  it("when the sync cannot land, resumes the offline attempt locally instead of creating a second one on the server", async () => {
+    const { hybrid, remote, syncNow, journal } = await setup()
+
+    await journal.putAttempt(offlineStarted())
+    syncNow.mockResolvedValue({ kind: "offline" })
+
+    const started = await hybrid.start("practice-3", {
+      inProgressAttemptId: null,
+    })
+
+    expect(remote.start).not.toHaveBeenCalled()
+    expect(started).toMatchObject({ id: "att-off", resumed: true })
+  })
+
+  it("a server-known attempt with unsynced events is synced before the server start", async () => {
+    const { hybrid, remote, syncNow, journal } = await setup()
+
+    await journal.putAttempt(offlineStarted({ serverKnown: true }))
+    await journal.append("att-off", {
+      type: "position",
+      clientAt: iso(T0),
+      payload: { sectionId: "sec-l", questionId: "q-l1" },
+    })
+
+    await hybrid.start("practice-3")
+
+    expect(syncNow).toHaveBeenCalledWith("att-off")
+    expect(remote.start).toHaveBeenCalledTimes(1)
+  })
+
+  it("leaves other tests, finished attempts and refused journals alone", async () => {
+    const { hybrid, remote, syncNow, journal } = await setup()
+
+    await journal.putAttempt(offlineStarted({ slug: "other-test" }))
+    await journal.putAttempt(
+      offlineStarted({
+        attemptId: "att-done",
+        finalized: { status: "expired", submittedAt: iso(T0) },
+      }),
+    )
+    await journal.putAttempt(
+      offlineStarted({
+        attemptId: "att-refused",
+        syncError: "offline_journal_invalid",
+      }),
+    )
+
+    await hybrid.start("practice-3")
+
+    expect(syncNow).not.toHaveBeenCalled()
+    expect(remote.start).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("HybridAttemptGateway — a lost claimPlay response never spends a second play (A4)", () => {
+  it("counts the play as spent locally (conservative) and reports offline instead of spending another local play", async () => {
+    const { hybrid, remote, journal } = await setup()
+
+    await hybrid.loadEnvelope("srv-1")
+    // The POST reached the server (the play is spent there) but the
+    // response never came back.
+    remote.claimPlay.mockRejectedValue(offlineFetch())
+
+    await expect(hybrid.claimPlay("srv-1", "st-l")).rejects.toEqual(
+      new OfflineError("offline"),
+    )
+    expect(await types(journal, "srv-1")).toEqual([])
+    expect((await journal.getAttempt("srv-1"))?.playsUsed).toEqual({
+      "st-l": 1,
+    })
   })
 })

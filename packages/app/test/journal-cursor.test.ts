@@ -70,7 +70,8 @@ function serverEnvelope(cursor: number): RunnerEnvelope {
 async function setup() {
   n += 1
   const journal = await JournalStore.open(`pp-cursor-${n}`)
-  const queue = await AnswerQueue.open(`pp-cursor-q-${n}`)
+  const queueName = `pp-cursor-q-${n}`
+  const queue = await AnswerQueue.open(queueName)
   const bundle = makeBundle()
   const local = new LocalAttemptGateway({
     journal,
@@ -89,7 +90,7 @@ async function setup() {
     createJournalSync({
       journal,
       post,
-      openQueue: () => Promise.resolve(queue),
+      openQueue: () => AnswerQueue.open(queueName),
       scheduler: () => Promise.resolve(),
       clockNow: () => T0,
       isOnline: () => true,
@@ -134,7 +135,9 @@ describe("journal cursor of a re-hydrated attempt (no local row, server cursor N
     const sent = post.mock.calls.flatMap(([body]) => body.events)
 
     expect(sent.map((e) => e.eventSeq)).toEqual([6, 7])
-    expect(post.mock.results[0]?.value).resolves.toMatchObject({ applied: 2 })
+    await expect(post.mock.results[0]?.value).resolves.toMatchObject({
+      applied: 2,
+    })
     expect(await journal.pendingCount("srv-1")).toBe(0)
     expect(await queue.snapshotForAttempt("srv-1")).toEqual([])
   })
@@ -189,6 +192,37 @@ describe("journal cursor of a re-hydrated attempt (no local row, server cursor N
 
     expect((await sync(post).syncNow("srv-1")).kind).toBe("terminal")
     expect(await journal.pendingCount("srv-1")).toBe(2)
+    expect(await queue.snapshotForAttempt("srv-1")).toHaveLength(1)
+  })
+
+  it("defence in depth (A5): a first send the server processed only PART of (its cursor overlaps the new events) keeps everything", async () => {
+    const { journal, queue, local, sync } = await setup()
+    // The server's cursor is 2; this mirror's journal (as an older build
+    // would have) starts at 1, so events 1-2 would be skipped yet acked.
+    const post = cursorServer({ v: 2 })
+
+    await journal.putAttempt(
+      makeLocalState({
+        attemptId: "srv-1",
+        serverKnown: true,
+        origin: "hydrated",
+        sections: serverEnvelope(0).sections,
+        currentSectionId: "sec-l",
+        currentQuestionId: "q-l1",
+        attemptStartedAt: iso(T0),
+        attemptExpiresAt: iso(T0 + 1_200_000),
+      }),
+    )
+    await answerOffline(local, queue)
+    await answerOffline(local, queue)
+
+    const outcome = await sync(post).syncNow("srv-1")
+
+    expect(outcome).toEqual({
+      kind: "terminal",
+      type: "offline_sync_ack_mismatch",
+    })
+    expect(await journal.pendingCount("srv-1")).toBe(4)
     expect(await queue.snapshotForAttempt("srv-1")).toHaveLength(1)
   })
 

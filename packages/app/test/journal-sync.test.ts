@@ -5,6 +5,7 @@ import { ApiError } from "../src/lib/api-client.js"
 import { JournalStore } from "../src/lib/attempt/journal-store.js"
 import {
   createJournalSync,
+  MAX_REQUEST_BYTES,
   purgeSyncedAttempts,
   type OfflineSyncBody,
   type OfflineSyncResponse,
@@ -47,7 +48,11 @@ async function setup(
 ) {
   n += 1
   const journal = await JournalStore.open(`pp-sync-${n}`)
-  const queue = await AnswerQueue.open(`pp-sync-q-${n}`)
+  const queueName = `pp-sync-q-${n}`
+  const queue = await AnswerQueue.open(queueName)
+  // Every connection the sync opens (its `close` spy), so a test can see it
+  // closed again.
+  const opened: Array<ReturnType<typeof vi.fn>> = []
   const onSynced = vi.fn()
   const scheduler = vi.fn().mockResolvedValue(undefined)
   const status = createSyncStatusStore()
@@ -56,7 +61,13 @@ async function setup(
   const sync = createJournalSync({
     journal,
     post,
-    openQueue: () => Promise.resolve(queue),
+    openQueue: async () => {
+      const connection = await AnswerQueue.open(queueName)
+
+      opened.push(vi.spyOn(connection, "close"))
+
+      return connection
+    },
     scheduler,
     clockNow: opts.clockNow ?? (() => AT),
     isOnline: () => online.v,
@@ -100,8 +111,21 @@ async function setup(
     },
   })
 
-  return { journal, queue, onSynced, scheduler, status, sync, online, sub }
+  return {
+    journal,
+    queue,
+    opened,
+    onSynced,
+    scheduler,
+    status,
+    sync,
+    online,
+    sub,
+  }
 }
+
+const eventSeqsOf = (body: OfflineSyncBody): number[] =>
+  body.events.map((e) => e.eventSeq)
 
 const sentBodies = (post: ReturnType<typeof vi.fn>): OfflineSyncBody[] =>
   post.mock.calls.map(([body]) => body as OfflineSyncBody)
@@ -132,6 +156,27 @@ describe("createJournalSync", () => {
       attemptId: "att-1",
       answersAcked: 1,
     })
+  })
+
+  it("closes every AnswerQueue connection it opens to acknowledge answers (A7)", async () => {
+    const post = vi.fn(echo)
+    const { opened, sync, journal } = await setup(post)
+
+    for (let i = 0; i < 600; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await journal.append("att-1", {
+        type: "position",
+        clientAt: at,
+        payload: { sectionId: "sec-l", questionId: "q-l1" },
+      })
+    }
+
+    await sync.syncNow("att-1")
+
+    expect(opened.length).toBeGreaterThan(1)
+    for (const close of opened) {
+      expect(close).toHaveBeenCalledTimes(1)
+    }
   })
 
   it("does nothing when there is nothing to send, and does not call the network when offline", async () => {
@@ -228,7 +273,6 @@ describe("createJournalSync", () => {
 
   it.each([
     ["offline_journal_invalid", 422],
-    ["offline_play_cap_exceeded", 409],
     ["offline_attempt_conflict", 409],
   ])(
     "a terminal %s keeps the whole journal, records syncError and never re-sends it",
@@ -310,6 +354,70 @@ describe("createJournalSync", () => {
     expect(bodies.map((b) => b.events.length)).toEqual([500, 103])
     expect(bodies[1]?.events[0]?.eventSeq).toBe(501)
     expect(await journal.pendingCount("att-1")).toBe(0)
+  })
+
+  it("also caps each request by size (A6): a journal of large events goes in requests well under the server's body limit", async () => {
+    const post = vi.fn(echo)
+    const { sync, journal } = await setup(post)
+
+    for (let i = 0; i < 12; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await journal.append("att-1", {
+        type: "position",
+        clientAt: at,
+        payload: { sectionId: "sec-l", questionId: "x".repeat(30_000) },
+      })
+    }
+
+    await sync.syncNow("att-1")
+
+    const bodies = sentBodies(post)
+
+    expect(bodies.length).toBeGreaterThan(1)
+    for (const body of bodies) {
+      expect(JSON.stringify(body).length).toBeLessThanOrEqual(
+        MAX_REQUEST_BYTES + 200,
+      )
+    }
+    expect(bodies.flatMap(eventSeqsOf)).toEqual(
+      Array.from({ length: 15 }, (_, i) => i + 1),
+    )
+    expect(await journal.pendingCount("att-1")).toBe(0)
+  })
+
+  it("a 413 is not a verdict (A6): the batch is halved and retried until it fits", async () => {
+    const tooLarge = new ApiError({
+      type: "payload_too_large",
+      title: "x",
+      status: 413,
+    })
+    const post = vi.fn<Post>((body) =>
+      body.events.length > 1 ? Promise.reject(tooLarge) : echo(body),
+    )
+    const { sync, journal } = await setup(post)
+
+    expect((await sync.syncNow("att-1")).kind).toBe("synced")
+    expect(sentBodies(post).map((b) => b.events.length)).toEqual([
+      3, 2, 1, 1, 1,
+    ])
+    expect(await journal.pendingCount("att-1")).toBe(0)
+    expect((await journal.getAttempt("att-1"))?.syncError).toBeNull()
+  })
+
+  it("a 413 for a SINGLE event is a verdict: nothing is deleted and the sync is failed", async () => {
+    const post = vi
+      .fn<Post>()
+      .mockRejectedValue(
+        new ApiError({ type: "payload_too_large", title: "x", status: 413 }),
+      )
+    const { sync, journal } = await setup(post)
+
+    expect(await sync.syncNow("att-1")).toEqual({
+      kind: "terminal",
+      type: "payload_too_large",
+    })
+    expect(sentBodies(post).map((b) => b.events.length)).toEqual([3, 2, 1])
+    expect(await journal.pendingCount("att-1")).toBe(3)
   })
 
   it("a server-side finalization (time ran out while offline) drops the fully sent local copy", async () => {

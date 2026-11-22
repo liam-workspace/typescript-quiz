@@ -792,3 +792,70 @@ describe("LocalAttemptGateway — answers, envelope, hydration", () => {
     expect(await local.isLocalOnly("att-1")).toBe(false)
   })
 })
+
+describe("LocalAttemptGateway — pruning settled copies the server says are over (A10)", () => {
+  it("drops only this student's settled, server-known copies that a fresh online list no longer shows in progress", async () => {
+    const { journal, local } = await setup()
+    const settled = (attemptId: string, over = {}) =>
+      makeLocalState({ attemptId, serverKnown: true, ...over })
+
+    await journal.putAttempt(settled("over-elsewhere"))
+    await journal.putAttempt(settled("still-running"))
+    await journal.putAttempt(settled("hydrated-over", { slug: null }))
+    await journal.putAttempt(settled("other-test", { slug: "not-listed" }))
+    await journal.putAttempt(settled("refused", { syncError: "x" }))
+    await journal.putAttempt(settled("siblings", { ownerSub: "sub-2" }))
+    await journal.putAttempt(makeLocalState({ attemptId: "offline-only" }))
+    await journal.putAttempt(settled("behind"))
+    await journal.append("behind", {
+      type: "position",
+      clientAt: iso(T0),
+      payload: { sectionId: "sec-l", questionId: "q-l1" },
+    })
+
+    await local.pruneSettledNotInProgress({
+      tests: [{ slug: "practice-3", inProgressAttemptId: "still-running" }],
+      complete: true,
+    })
+
+    expect(
+      (await journal.listAttempts()).map((a) => a.attemptId).sort(),
+    ).toEqual([
+      "behind",
+      "offline-only",
+      "other-test",
+      "refused",
+      "siblings",
+      "still-running",
+    ])
+  })
+
+  it("keeps slug-less (hydrated) copies while the list has more pages it has not seen", async () => {
+    const { journal, local } = await setup()
+
+    await journal.putAttempt(
+      makeLocalState({ attemptId: "hydrated", serverKnown: true, slug: null }),
+    )
+
+    await local.pruneSettledNotInProgress({ tests: [], complete: false })
+
+    expect(await journal.getAttempt("hydrated")).not.toBeNull()
+  })
+
+  it("an offline Start without a hint then starts afresh instead of resuming the stale copy", async () => {
+    const { journal, local } = await setup()
+
+    await journal.putAttempt(
+      makeLocalState({ attemptId: "stale", serverKnown: true }),
+    )
+    await local.pruneSettledNotInProgress({
+      tests: [{ slug: "practice-3", inProgressAttemptId: null }],
+      complete: true,
+    })
+
+    expect(await local.start("practice-3")).toMatchObject({
+      id: "att-1",
+      resumed: false,
+    })
+  })
+})

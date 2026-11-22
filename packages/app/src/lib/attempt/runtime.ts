@@ -86,6 +86,7 @@ async function build(): Promise<AttemptRuntime> {
       sync.request()
     },
     ownerSub: currentSubject,
+    openQueue: () => AnswerQueue.open(),
   })
   const gateway = new HybridAttemptGateway({
     remote: new RemoteAttemptGateway(),

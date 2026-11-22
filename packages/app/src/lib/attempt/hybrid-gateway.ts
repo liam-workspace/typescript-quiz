@@ -75,9 +75,11 @@ function isNetworkFailure(error: unknown): boolean {
  * mutation updates it, so a network that dies mid-test continues locally
  * from where the student really is, with the plays already spent online.
  *
- * Known limit (spec §13.4): if a remote `claimPlay` reaches the server and
- * only its RESPONSE is lost, the local fallback spends the play again; the
- * server audits that at sync (`offline_play_cap_exceeded`).
+ * A remote `claimPlay` whose response is lost never falls back to a local
+ * play (see `claimPlay`): it counts the play as spent. Should an over-cap
+ * play still reach the server (another tab's stale count), the server
+ * refuses that one event (`play_cap_exceeded`) and applies the rest of the
+ * journal (spec §13.4).
  */
 export class HybridAttemptGateway implements AttemptGateway {
   private readonly d: HybridDeps
@@ -88,6 +90,26 @@ export class HybridAttemptGateway implements AttemptGateway {
 
   async start(slug: string, hint?: StartHint): Promise<AttemptStart> {
     if (this.d.isOnline()) {
+      // An attempt started offline whose journal has not reached the server
+      // yet is invisible to it: the library still offers Start, and a server
+      // start would create a SECOND in-progress attempt -- after which the
+      // offline journal is refused (`offline_attempt_conflict`) for good.
+      // Catch the server up first; if it still does not know the attempt,
+      // keep going with it locally.
+      const unsynced = await this.d.local.unsyncedAttemptFor(slug)
+
+      if (unsynced) {
+        await this.d.sync.syncNow(unsynced.attemptId).catch(() => undefined)
+
+        const after = await this.d.local.getMine(unsynced.attemptId)
+
+        if (after && !after.serverKnown) {
+          return this.d.local.start(slug, {
+            inProgressAttemptId: unsynced.attemptId,
+          })
+        }
+      }
+
       try {
         return await this.d.remote.start(slug, hint)
       } catch (error) {
@@ -145,13 +167,47 @@ export class HybridAttemptGateway implements AttemptGateway {
     })
   }
 
-  claimPlay(attemptId: string, stimulusId: string): Promise<PlayGrant> {
-    return this.dispatch(attemptId, {
-      remote: () => this.d.remote.claimPlay(attemptId, stimulusId),
-      local: () => this.d.local.claimPlay(attemptId, stimulusId),
-      mirror: (grant) =>
-        this.d.local.mirrorPlay(attemptId, stimulusId, grant.playsUsed),
-    })
+  /**
+   * Unlike the other moves, a play whose remote call fails outright does NOT
+   * fall back to a local play: the POST may have reached the server and only
+   * its response been lost, and a second (journaled) play would then exceed
+   * the cap. The play is counted as spent on this phone (conservative: the
+   * student may lose a play they never heard, never gain one) and the page
+   * gets the ordinary "recording didn't load" state, which unlocks the
+   * answers.
+   */
+  async claimPlay(attemptId: string, stimulusId: string): Promise<PlayGrant> {
+    if ((await this.pick(attemptId)) === "local") {
+      return this.d.local.claimPlay(attemptId, stimulusId)
+    }
+
+    try {
+      const grant = await this.d.remote.claimPlay(attemptId, stimulusId)
+
+      await this.d.local
+        .mirrorPlay(attemptId, stimulusId, grant.playsUsed)
+        .catch(() => undefined)
+
+      return grant
+    } catch (error) {
+      const state = isNetworkFailure(error)
+        ? await this.d.local.getMine(attemptId)
+        : null
+
+      if (state) {
+        await this.d.local
+          .mirrorPlay(
+            attemptId,
+            stimulusId,
+            (state.playsUsed[stimulusId] ?? 0) + 1,
+          )
+          .catch(() => undefined)
+
+        throw new OfflineError("offline")
+      }
+
+      throw error
+    }
   }
 
   finishSection(
@@ -167,7 +223,19 @@ export class HybridAttemptGateway implements AttemptGateway {
   }
 
   async submit(attemptId: string, body: SubmitRequest): Promise<SubmitResult> {
-    if ((await this.pick(attemptId)) === "local") {
+    // Handing in is a deliberate wait (the screen says so), not a tap that
+    // must stay quick: a FULL sync with its retries, not `pick`'s one try,
+    // so a 503 right after reconnecting does not read as "needs a
+    // connection". A refused journal is never re-sent.
+    if (
+      (await this.route(attemptId)) === "local" &&
+      this.d.isOnline() &&
+      (await this.d.local.getMine(attemptId))?.syncError === null
+    ) {
+      await this.d.sync.syncNow(attemptId).catch(() => undefined)
+    }
+
+    if ((await this.route(attemptId)) === "local") {
       // Still local after trying to sync: nothing the server can submit yet.
       throw new OfflineError("offline")
     }

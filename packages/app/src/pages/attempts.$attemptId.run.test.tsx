@@ -676,6 +676,21 @@ function renderRunScreen(
   return { ...utils, navigate }
 }
 
+/** A `fetch` stub that answers every call with its OWN Response (a body reads once). */
+const freshJsonResponse =
+  (body: string): (() => Promise<Response>) =>
+  () =>
+    Promise.resolve(
+      new Response(body, {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    )
+
+const toastSays = (message: string) => (): void => {
+  expect(toastStore.getSnapshot()?.message).toBe(message)
+}
+
 describe("RunScreen", () => {
   // A default fetch stub for every test in this describe, not just the ones
   // that assert on it: selecting a choice now durably records the answer
@@ -2028,32 +2043,33 @@ describe("RunScreen", () => {
       expect(allVisibleRadiosAreEnabled()).toBe(true)
 
       vi.mocked(fetch).mockClear()
-      vi.mocked(fetch).mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            results: pending.map(toAppliedFlushItem),
-          }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        ),
-      )
+      // A FRESH Response per call: the retry loop still in flight from the
+      // outage and the `online` flush can overlap, and one shared Response
+      // has a body only the first caller can read ("body used" counted as a
+      // network error made this test flaky).
+      const appliedBody = JSON.stringify({
+        results: pending.map(toAppliedFlushItem),
+      })
+
+      vi.mocked(fetch).mockImplementation(freshJsonResponse(appliedBody))
 
       window.dispatchEvent(new Event("online"))
 
+      await waitFor(readingQueueIsEmpty)
       await waitFor(offlineBannerIsGone)
-      expect(toastStore.getSnapshot()?.message).toBe(
-        "Back online — 3 answers sent.",
-      )
+      await waitFor(toastSays("Back online — 3 answers sent."))
       expect(pendingCountStore.getSnapshot()).toBe(0)
 
-      expect(fetch).toHaveBeenCalledOnce()
-      const [firstFetchCall] = vi.mocked(fetch).mock.calls
-      const [url, init] = firstFetchCall
+      // Overlapping flushes may each send: what matters is that the
+      // snapshot sent carried all three answers.
+      expect(fetch).toHaveBeenCalled()
+      const lastFetchCall = vi.mocked(fetch).mock.calls.at(-1)
+      const [url, init] = lastFetchCall ?? []
       const body = JSON.parse((init?.body as string | undefined) ?? "null") as {
         responses: Array<{ questionId: string }>
       }
       expect(url).toBe("/api/attempts/attempt-1/responses")
       expect(questionIdsOf(body.responses)).toEqual(["q-r2", "q-r3", "q-r4"])
-      await waitFor(readingQueueIsEmpty)
     })
 
     it("restores three visible answers and a pending count of three after a reload mid-outage", async () => {

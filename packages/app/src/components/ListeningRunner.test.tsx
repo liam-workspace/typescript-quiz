@@ -363,7 +363,7 @@ describe("ListeningRunner", () => {
     render(
       <ListeningRunner
         {...baseProps}
-        stimulus={{ ...cappedAudio, playsUsed: 1 }}
+        stimulus={{ ...cappedAudio, playsUsed: 0 }}
         audioFailed
       />,
     )
@@ -402,6 +402,18 @@ describe("ListeningRunner", () => {
     fireEvent.timeUpdate(audio)
 
     expect(onAudioProgress).toHaveBeenCalledWith(0.4)
+  })
+
+  it("keeps the prompt and choice-stack hooks and renders no navigation buttons", () => {
+    render(<ListeningRunner {...baseProps} />)
+
+    expect(screen.getByText("What did the boy see?")).toHaveClass(
+      "question-prompt",
+    )
+    expect(screen.getByRole("radiogroup")).toHaveClass("choice-stack")
+    expect(
+      screen.queryByRole("button", { name: /previous|next|hand in/i }),
+    ).not.toBeInTheDocument()
   })
 
   it("makes the prompt a focus target heading", () => {

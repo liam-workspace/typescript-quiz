@@ -33,6 +33,11 @@ export interface ChoiceListProps {
 
 const LETTERS = "ABCDEFGH"
 
+// Past the eighth choice a letter would be `undefined`; fall back to a number.
+export function choiceLabel(index: number): string {
+  return LETTERS[index] ?? String(index + 1)
+}
+
 // Shared by both widgets below -- the prototype's `.choice` row (docs/
 // prototype/index.html), including the selected state. Radix primitives
 // ship unstyled: an Item/Root with no className renders a control with no
@@ -90,7 +95,7 @@ function MultiChoiceList({
               disabled={locked}
               className="choice-dot rounded-full"
             >
-              <span aria-hidden="true">{LETTERS[index]}</span>
+              <span aria-hidden="true">{choiceLabel(index)}</span>
             </Checkbox.Root>
             {choice.imageSvg ? <ChoiceImage svg={choice.imageSvg} /> : null}
             {choice.labelBlocks?.length ? (
@@ -131,7 +136,7 @@ function SingleChoiceList({
               value={choice.id}
               className="choice-dot rounded-full"
             >
-              <span aria-hidden="true">{LETTERS[index]}</span>
+              <span aria-hidden="true">{choiceLabel(index)}</span>
             </RadioGroup.Item>
             {choice.imageSvg ? <ChoiceImage svg={choice.imageSvg} /> : null}
             {choice.labelBlocks?.length ? (

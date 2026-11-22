@@ -2042,6 +2042,35 @@ describe("RunScreen", () => {
     expect(document.activeElement).toBe(document.body)
   })
 
+  it("unlocks the answers and says no plays are left when the server refuses a claim with 409", async () => {
+    const user = userEvent.setup()
+
+    mockClaimPlay.mockRejectedValueOnce(
+      new ApiError({
+        type: "no_plays_remaining",
+        title: "No plays",
+        status: 409,
+      }),
+    )
+    renderRunScreen(unplayedListeningEnvelope)
+
+    expect(screen.getByRole("radio", { name: "A dog" })).toBeDisabled()
+
+    await user.click(screen.getByRole("button", { name: "Play recording" }))
+
+    expect(
+      await screen.findByRole("button", { name: "No plays left" }),
+    ).toBeDisabled()
+    expect(screen.getByRole("radio", { name: "A dog" })).toBeEnabled()
+    expect(screen.queryByTestId("audio-player")).not.toBeInTheDocument()
+  })
+
+  it("renders exactly one h1 on the run screen", () => {
+    renderRunScreen()
+
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1)
+  })
+
   it("shows the section-relative position and no pip strip", () => {
     renderRunScreen()
 
@@ -2114,6 +2143,9 @@ describe("RunScreen", () => {
       // spend a play they never asked for.
       expect(mockClaimPlay).toHaveBeenCalledTimes(1)
       expect(screen.queryByTestId("audio-player")).not.toBeInTheDocument()
+      // A failed load with plays still left must not trap the student behind
+      // locked answers either.
+      expect(screen.getByRole("radio", { name: "A dog" })).toBeEnabled()
 
       // A deliberate retap is a perfectly ordinary new claim, and clears
       // the failure message once it succeeds.

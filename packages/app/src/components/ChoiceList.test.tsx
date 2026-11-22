@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import "../i18n.js"
-import { ChoiceList } from "./ChoiceList.js"
+import { ChoiceList, choiceLabel } from "./ChoiceList.js"
 
 const choices = [
   { id: "c-1", label: "A dog" },
@@ -416,5 +416,13 @@ describe("ChoiceList -- letters and lockedMessage", () => {
         "Answer locked — this section does not allow changes.",
       ),
     ).toBeNull()
+  })
+})
+
+describe("choiceLabel", () => {
+  it("uses letters for the first eight choices and numbers after", () => {
+    expect(choiceLabel(0)).toBe("A")
+    expect(choiceLabel(7)).toBe("H")
+    expect(choiceLabel(8)).toBe("9")
   })
 })

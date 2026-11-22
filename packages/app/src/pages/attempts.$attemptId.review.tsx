@@ -2,6 +2,7 @@ import { Card, CardContent } from "@liam-workspace/browser-react-ui"
 import { createFileRoute, redirect } from "@tanstack/react-router"
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { choiceLabel } from "../components/ChoiceList.js"
 import { MathContent } from "../components/MathContent.js"
 import { QuestionNavigator } from "../components/QuestionNavigator.js"
 import { ApiError } from "../lib/api-client.js"
@@ -246,7 +247,7 @@ function ReviewChoiceList({ choices }: ReviewChoiceListProps) {
             className="choice-dot rounded-full"
             data-state={choice.selected ? "checked" : "unchecked"}
           >
-            {"ABCDEFGH"[index]}
+            {choiceLabel(index)}
           </span>
           {choice.imageSvg ? <ReviewChoiceImage svg={choice.imageSvg} /> : null}
           <span className="min-w-0 flex-1">

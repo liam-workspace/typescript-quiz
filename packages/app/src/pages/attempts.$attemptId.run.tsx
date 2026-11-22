@@ -702,6 +702,22 @@ export function RunScreen({
       // 409 (no plays remaining) or anything else unexpected: the play
       // simply did not happen. Reset so the button reflects that rather
       // than staying stuck mid-claim.
+      if (error.problem.status === 409 && stimulus.maxPlays !== null) {
+        // The server says nothing is left (plays spent on another device or
+        // tab) while this client's count is stale. Record the stimulus as
+        // used up so the card shows "No plays left" and the answers unlock
+        // -- a recording that cannot play must never trap the student.
+        const { maxPlays } = stimulus
+
+        setPlaysUsedByStimulusId((prev) => ({
+          ...prev,
+          [stimulus.id]: Math.max(prev[stimulus.id] ?? 0, maxPlays),
+        }))
+        setPlayState({ status: "failed" })
+
+        return
+      }
+
       setPlayState({ status: "idle" })
     }
   }

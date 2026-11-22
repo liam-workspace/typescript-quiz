@@ -236,6 +236,18 @@ describe("ReadingRunner", () => {
     expect(document.querySelector("details")).toBeNull()
   })
 
+  it("keeps the prompt and choice-stack hooks and renders no navigation buttons", () => {
+    render(<ReadingRunner {...baseProps} />)
+
+    expect(screen.getByText("Where does the fox live?")).toHaveClass(
+      "question-prompt",
+    )
+    expect(screen.getByRole("radiogroup")).toHaveClass("choice-stack")
+    expect(
+      screen.queryByRole("button", { name: /previous|next|hand in/i }),
+    ).not.toBeInTheDocument()
+  })
+
   it("makes the prompt a focus target heading", () => {
     render(<ReadingRunner {...baseProps} />)
 

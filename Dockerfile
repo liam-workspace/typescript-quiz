@@ -11,6 +11,7 @@ COPY packages/common/package.json ./packages/common/
 COPY packages/db/package.json ./packages/db/
 COPY packages/server/package.json ./packages/server/
 COPY packages/app/package.json ./packages/app/
+COPY packages/mcp/package.json ./packages/mcp/
 
 # ---- BUILDER (full deps, compiles dist/) ----
 FROM base AS builder

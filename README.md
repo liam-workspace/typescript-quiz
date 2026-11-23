@@ -149,6 +149,27 @@ reminders on on a second device moves them there.
 
 The application will be available at http://localhost:3000.
 
+### MCP gateway
+
+The MCP gateway is a separate process. Configure `MCP_PUBLIC_ORIGIN` (the
+gateway's public origin), `MCP_AUTHORIZATION_SERVER` (the existing OIDC
+issuer), and `API_BASE_URL` (this API's public origin), then run:
+
+```bash
+pnpm dev:mcp
+```
+
+It binds to `127.0.0.1:3100` by default. Set `MCP_BIND_HOST=0.0.0.0` when
+the gateway runs behind a container or reverse proxy, and set `MCP_PORT` when
+the default port is unavailable.
+
+It serves Streamable HTTP at `POST /mcp` and OAuth protected-resource metadata
+at `/.well-known/oauth-protected-resource`. The selected MCP client completes
+the authorization-code/PKCE flow with the configured issuer and presents its
+JWT to the gateway; the issuer must accept that client's registration and
+redirect URI. The gateway offers only read-only tools for published tests and
+completed-attempt history, results, and review.
+
 ### 🛠️ Without Docker
 
 1. Clone the repository:

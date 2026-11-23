@@ -1,0 +1,23 @@
+{
+  "name": "@pp/mcp",
+  "type": "module",
+  "private": true,
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run --exclude dist/**"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.0",
+    "express": "5.2.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@types/node": "^26.0.1",
+    "@types/supertest": "^6.0.2",
+    "supertest": "^7.0.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.0"
+  }
+}

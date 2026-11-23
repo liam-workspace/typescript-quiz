@@ -5,11 +5,11 @@
   "scripts": {
     "icons:pwa": "node scripts/generate-pwa-icons.ts",
     "dev": "dotenv -e .env -- pnpm -r --parallel dev",
-    "build": "pnpm --filter @pp/common build && pnpm --filter @pp/db build && pnpm --filter @pp/server build && pnpm --filter @pp/app build",
+    "build": "pnpm --filter @pp/common build && pnpm --filter @pp/db build && pnpm --filter @pp/server build && pnpm --filter @pp/app build && pnpm --filter @pp/mcp build",
     "start": "pnpm -r --parallel run start",
     "clean": "pnpm -r exec rm -rf dist node_modules",
     "typecheck": "pnpm build && pnpm --filter @pp/common exec tsc --noEmit && pnpm --filter @pp/db exec tsc --noEmit && pnpm --filter @pp/server exec tsc --noEmit && pnpm --filter @pp/app typecheck && tsc -p scripts/tsconfig.json",
-    "test": "pnpm build && pnpm --filter @pp/common test && pnpm --filter @pp/db test && pnpm --filter @pp/server test && pnpm --filter @pp/app test",
+    "test": "pnpm build && pnpm --filter @pp/common test && pnpm --filter @pp/db test && pnpm --filter @pp/server test && pnpm --filter @pp/app test && pnpm --filter @pp/mcp test",
     "test:db": "pnpm --filter @pp/db test",
     "lint": "pnpm build && oxlint && pnpm lint:frontend && pnpm lint:i18n && redocly lint docs/api/openapi.yaml",
     "lint:fix": "pnpm build && oxlint --fix",
@@ -21,7 +21,8 @@
     "import:toefl-primary": "pnpm build && node scripts/import-toefl-primary.ts",
     "export:toefl-primary": "pnpm build && node scripts/export-toefl-primary.ts",
     "import:fixtures": "pnpm build && node scripts/import-fixtures.ts",
-    "lint:api": "redocly lint docs/api/openapi.yaml"
+    "lint:api": "redocly lint docs/api/openapi.yaml",
+    "dev:mcp": "dotenv -e .env -- pnpm --filter @pp/mcp build && pnpm --filter @pp/mcp exec node dist/main.js"
   },
   "dependencies": {
     "@liam-workspace/node-postgres": "^0.4.0",

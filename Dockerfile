@@ -28,6 +28,7 @@ COPY packages/common ./packages/common
 COPY packages/db ./packages/db
 COPY packages/server ./packages/server
 COPY packages/app ./packages/app
+COPY packages/mcp ./packages/mcp
 
 # common -> db -> server -> app, each via its own build script (`tsc -p
 # tsconfig.build.json` for the three backend packages, that plus `vite build`
@@ -70,7 +71,8 @@ ENV VITE_AUTH_ISSUER=$VITE_AUTH_ISSUER \
 RUN pnpm --filter @pp/common build \
     && pnpm --filter @pp/db build \
     && pnpm --filter @pp/server build \
-    && pnpm --filter @pp/app build
+    && pnpm --filter @pp/app build \
+    && pnpm --filter @pp/mcp build
 
 # ---- PROD-DEPS (production-only node_modules, no dev tooling) ----
 # A fresh --prod install rather than `pnpm prune --prod` on the builder's
@@ -95,14 +97,20 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=prod-deps /app/packages/common/package.json ./packages/common/
 COPY --from=prod-deps /app/packages/db/package.json ./packages/db/
 COPY --from=prod-deps /app/packages/server/package.json ./packages/server/
+COPY --from=prod-deps /app/packages/mcp/package.json ./packages/mcp/
 COPY --from=prod-deps /app/packages/common/node_modules ./packages/common/node_modules
 COPY --from=prod-deps /app/packages/db/node_modules ./packages/db/node_modules
 COPY --from=prod-deps /app/packages/server/node_modules ./packages/server/node_modules
+COPY --from=prod-deps /app/packages/mcp/node_modules ./packages/mcp/node_modules
 
 COPY --from=builder /app/packages/common/dist ./packages/common/dist
 COPY --from=builder /app/packages/db/dist ./packages/db/dist
 COPY --from=builder /app/packages/db/migrations ./packages/db/migrations
 COPY --from=builder /app/packages/server/dist ./packages/server/dist
+# The OAuth MCP gateway ships in this image but runs as its own process (a
+# second container in the same pod: `node packages/mcp/dist/main.js`). The
+# default CMD still starts only the API.
+COPY --from=builder /app/packages/mcp/dist ./packages/mcp/dist
 
 # The built SPA is static output only -- no node_modules, no package.json,
 # just the files express.static serves (see main.ts). SPA_ROOT tells the
